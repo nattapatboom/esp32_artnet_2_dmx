@@ -13,6 +13,20 @@ if not exist "%PIO%" (
   exit /b 1
 )
 
+set "PYTHON=%USERPROFILE%\.platformio\penv\Scripts\python.exe"
+if exist "%PYTHON%" (
+  echo Compiling Web UI assets (web/index.html to include/web_pages.h)...
+  "%PYTHON%" tools/build_web.py
+  if errorlevel 1 (
+    echo.
+    echo Web UI compilation failed.
+    pause
+    exit /b 1
+  )
+) else (
+  echo Warning: Python interpreter not found in PlatformIO penv. Skipping Web UI asset compilation.
+)
+
 echo Cleaning previous build...
 "%PIO%" run -t clean
 if errorlevel 1 (

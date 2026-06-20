@@ -80,6 +80,19 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - **Bootstrapping Pin warning:** Actively checks and warns the user in the Web UI if the critical bootstrapping pin GPIO 12 (MTDI) is configured, preventing bootloops.
 - **Configuration Layout Versioning:** Enforces layout version 2 on config file loading and saving, ensuring type layout translations are safely applied only once.
 
+## Developer Tools
+
+ระบบประกอบด้วยสคริปต์ Python ในโฟลเดอร์ `tools/` เพื่อช่วยพัฒนาและทดสอบ Web UI ได้อย่างรวดเร็ว:
+
+- **[build_web.py](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/tools/build_web.py)**
+  - ทำการย่อขนาด (Minify) ไฟล์ HTML, CSS และ JavaScript จาก `web/index.html` แล้วแปลงเป็นตัวแปรข้อความดิบ (Raw String) ในไฟล์ `include/web_pages.h`
+  - สคริปต์นี้จะถูกเรียกโดยอัตโนมัติในกระบวนการทำงานของ `build_firmware_bin.bat`
+- **[extract_web.py](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/tools/extract_web.py)**
+  - เป็นสคริปต์เสริมสำหรับย้อนสกัดไฟล์ HTML/JS ออกมาจากไฟล์ `include/web_pages.h`
+- **[web_mock_server.py](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/tools/web_mock_server.py)**
+  - จำลองระบบ API REST ของบอร์ด ESP32 บนพอร์ต local (`http://localhost:5000`)
+  - ช่วยให้ผู้พัฒนาสามารถแก้ไข UI ใน `web/index.html` และทดสอบฟังก์ชันการทำงานบนหน้าเว็บได้ทันทีโดยไม่ต้องคอยคอมไพล์และอัปโหลดไปที่บอร์ดจริง
+
 ## Coding Conventions
 - **No comments** in code unless necessary
 - Follow existing patterns (look at neighboring code first)
@@ -99,7 +112,7 @@ curl.exe -F "update=@.pio\build\wt32-eth01\firmware.bin" http://192.168.1.93/upd
 
 ## Handover System
 - Docs in `handover/` folder, format `x.xx.xx.md`
-- Current: `handover/1.19.00.md`
+- Current: [1.20.00.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/handover/1.20.00.md)
 - Rules: no editing old files, max 1000 lines per file
 - SEE `handover/README.md` for full system rules
 
