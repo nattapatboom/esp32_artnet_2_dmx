@@ -978,7 +978,7 @@ void setupWebServer() {
     // API Route: Get Dynamic Output Channels
     server.on("/api/outputs", HTTP_GET, [](AsyncWebServerRequest *request) {
         if (!LittleFS.exists("/outputs.json")) {
-            request->send(200, "application/json", "{\"outputs\":[{\"type\":0,\"pin\":4,\"start_universe\":0,\"start_address\":1,\"led_count\":170,\"color_order\":0}]}");
+            request->send(200, "application/json", "{\"outputs\":[{\"type\":3,\"pin\":4,\"start_universe\":0,\"start_address\":1,\"led_count\":170,\"color_order\":0}]}");
             return;
         }
         request->send(LittleFS, "/outputs.json", "application/json");
@@ -1006,7 +1006,7 @@ void setupWebServer() {
         }
         if (outputs.size() == 0) {
             JsonObject item = outputs.add<JsonObject>();
-            item["type"] = 0;
+            item["type"] = 3;
             item["pin"] = 4;
             item["start_universe"] = 0;
             item["start_address"] = 1;
@@ -1124,11 +1124,12 @@ void setupWebServer() {
                 return;
             }
 
-            // Check resource scoring
-            float score = totalOutputScoreFromJson(outputs);
+            // Check combined resource + compute scoring
+            uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
+            float score = totalCombinedScoreFromJson(outputs, fps);
             if (score > SCORE_LIMIT) {
-                char msg[64];
-                snprintf(msg, sizeof(msg), "Resource score %.1f exceeds limit of %.0f. Reduce output channels.", score, SCORE_LIMIT);
+                char msg[96];
+                snprintf(msg, sizeof(msg), "Combined score %.1f (resource+compute) exceeds limit of %.0f at %d FPS. Reduce channels or FPS.", score, SCORE_LIMIT, fps);
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + String(msg) + "\"}");
                 return;
             }
@@ -1247,7 +1248,7 @@ void setupWebServer() {
         JsonDocument doc;
         JsonArray arr = doc["outputs"].to<JsonArray>();
         JsonObject item = arr.add<JsonObject>();
-        item["type"] = 0;
+        item["type"] = 3;
         item["pin"] = 4;
         item["start_universe"] = 0;
         item["start_address"] = 1;
@@ -1276,7 +1277,7 @@ void setupWebServer() {
         JsonDocument doc;
         JsonArray arr = doc["outputs"].to<JsonArray>();
         JsonObject item = arr.add<JsonObject>();
-        item["type"] = 0;
+        item["type"] = 3;
         item["pin"] = 4;
         item["start_universe"] = 0;
         item["start_address"] = 1;
@@ -1432,21 +1433,29 @@ void setupWebServer() {
         request->send(200, "application/json", resp);
     });
 
-    // API Route: Output Resource Scoring
+    // API Route: Output Resource + Compute Scoring
     server.on("/api/scoring", HTTP_GET, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
         std::vector<OutputChannel>& chs = outputCtrl.getChannels();
-        float total = totalOutputScore(chs);
-        doc["total"] = total;
+        uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
+        float resourceTotal = totalOutputScore(chs);
+        float computeTotal = totalComputeScore(chs, fps);
+        float combinedTotal = resourceTotal + computeTotal;
+        doc["resource_total"] = resourceTotal;
+        doc["compute_total"] = computeTotal;
+        doc["compute_detail"] = totalComputeScore(chs, 0);
+        doc["fps_factor"] = fpsComputeFactor(fps);
+        doc["total"] = combinedTotal;
         doc["limit"] = SCORE_LIMIT;
-        doc["remaining"] = SCORE_LIMIT - total;
+        doc["remaining"] = SCORE_LIMIT - combinedTotal;
         JsonArray arr = doc["channels"].to<JsonArray>();
         for (size_t i = 0; i < chs.size(); i++) {
             JsonObject item = arr.add<JsonObject>();
             item["index"] = (uint8_t)i;
             item["type"] = chs[i].type;
             item["name"] = outputTypeName(chs[i].type);
-            item["score"] = outputChannelScore(chs[i]);
+            item["resource_score"] = outputChannelScore(chs[i]);
+            item["compute_score"] = channelComputeScore(chs[i]);
         }
         String response;
         serializeJson(doc, response);

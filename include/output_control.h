@@ -98,18 +98,18 @@ public:
 };
 
 struct OutputChannel {
-    uint8_t type; // 0 = CHAN_TYPE_LED, 1 = CHAN_TYPE_DMX
-    uint8_t source = 0; // 0 = ESP32 GPIO, 1 = PCA9685, 2 = MCP23017, 3 = TCA9555, 4 = PCF857x
-    uint8_t pin;
+    uint8_t type = 0;
+    uint8_t source = 0;
+    uint8_t pin = 255;
     uint8_t pca_addr = 0x40;
     uint8_t pca_channel = 0;
     uint8_t pca_channel2 = 255;
     uint8_t pca_channel3 = 255;
     uint8_t pca_channel4 = 255;
-    uint16_t start_universe;
-    uint16_t start_address = 1; // 1-based DMX channel for small output types
-    uint16_t led_count;
-    uint8_t color_order;
+    uint16_t start_universe = 0;
+    uint16_t start_address = 1;
+    uint16_t led_count = 0;
+    uint8_t color_order = 0;
     uint8_t led_protocol = 0; // 0 = WS2812x (800kHz), 1 = WS2811 (400kHz)
     
     // Unicast feedback & Smoke parameters
@@ -490,9 +490,8 @@ public:
         File file = LittleFS.open("/outputs.json", "r");
         if (!file) {
             Serial.println("/outputs.json not found. Creating default output channel...");
-            // Create a clean default channel when no output file exists.
             OutputChannel defCh;
-            defCh.type = 0; // CHAN_TYPE_LED
+            defCh.type = 3; // RGB LED strip (v3)
             defCh.pin = DEFAULT_LED_DATA_PIN;
             defCh.start_universe = 0;
             defCh.start_address = 1;
@@ -520,7 +519,7 @@ public:
         if (error) {
             Serial.println("Failed to read outputs.json. Using fallback default.");
             OutputChannel defCh;
-            defCh.type = 0; // CHAN_TYPE_LED
+            defCh.type = 3; // RGB LED strip (v3)
             defCh.pin = DEFAULT_LED_DATA_PIN;
             defCh.start_universe = 0;
             defCh.start_address = 1;
@@ -710,7 +709,7 @@ public:
              item["shoot_duration_ms"] = ch.shoot_duration_ms;
              item["smoke_lockout_ms"] = ch.smoke_lockout_ms;
 
-            if ((ch.type >= 4 && ch.type <= 8) || ch.type == 17) { // v3 motion range: Single Color(4), Analog RGB(5), Motor(6), Stepper(7), Servo(8), Solenoid(17)
+            if (ch.type >= 4 && ch.type <= 8) { // v3 motion range: Single Color(4), Analog RGB(5), Motor(6), Stepper(7), Servo(8)
                 item["pin2"] = ch.pin2;
                 item["pin3"] = ch.pin3;
                 item["pin4"] = ch.pin4;
@@ -743,21 +742,23 @@ public:
                 item["mc_homing_timeout"] = ch.mc_homing_timeout;
                 item["mc_scale_factor"] = ch.mc_scale_factor;
                 item["mc_unit_type"] = ch.mc_unit_type;
+            } else if (ch.type == 17) {  // Solenoid (v3)
+                item["solenoid_mode"] = ch.solenoid_mode;
+                item["solenoid_threshold"] = ch.solenoid_threshold;
+                item["solenoid_pulse_ms"] = ch.solenoid_pulse_ms;
+                item["solenoid_pre_delay"] = ch.solenoid_pre_delay;
+                item["solenoid_post_delay"] = ch.solenoid_post_delay;
+            } else if (ch.type == 9) {  // Buzzer (v3) — save mc_freq for tone restore
+                item["mc_freq"] = ch.mc_freq;
             } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) {  // 7-Segment (all variants)
                 item["pin2"] = ch.pin2;
                 item["pin2_source"] = ch.pin2_source;
                 item["pin2_addr"] = ch.pin2_addr;
                 item["pin2_channel"] = ch.pin2_channel;
                 item["mc_mode"] = ch.mc_mode;
-             } else if (ch.type == 17) {  // Solenoid (v3)
-                item["solenoid_mode"] = ch.solenoid_mode;
-                item["solenoid_threshold"] = ch.solenoid_threshold;
-                item["solenoid_pulse_ms"] = ch.solenoid_pulse_ms;
-                item["solenoid_pre_delay"] = ch.solenoid_pre_delay;
-                item["solenoid_post_delay"] = ch.solenoid_post_delay;
-             } else if (ch.type == 10) {  // DFPlayer (v3)
+            } else if (ch.type == 10) {  // DFPlayer (v3)
                 item["pin2"] = ch.pin2;
-             } else if (ch.type == 15 || ch.type == 16) {  // PWM DAC / FuncGen — stays same
+            } else if (ch.type == 15 || ch.type == 16) {  // PWM DAC / FuncGen
                 item["mc_freq"] = ch.mc_freq;
                 item["mc_resolution"] = ch.mc_resolution;
             }

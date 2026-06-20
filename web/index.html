@@ -748,7 +748,6 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
 // ==========================================
 // State
 let outputs = [];
-let wizBulbs = [];
 let editOutIdx = -1;
 let outputsDirty = false;
 let savedOutputsJson = '';
@@ -1167,8 +1166,8 @@ function outputChannelCount(o){
     const posBytes=valueByteCount(parseInt(o.mc_resolution||8));
     return `${posBytes+2} Ch (${posBytes} Pos + Speed + Cmd)`;
   }
-  if(t>=4&&t<=8||t===17||t===15) return `${valueByteCount(parseInt(o.mc_resolution||8))} Ch`;
   if(t===5) return (o.color_order||0)>=4 ? '4 Ch (RGBW)' : '3 Ch (RGB)';
+  if(t>=4&&t<=8||t===17||t===15) return `${valueByteCount(parseInt(o.mc_resolution||8))} Ch`;
   if(t===9) return '2 Ch';
   if(t===18) return '1 Ch';
   if(t>=11&&t<=13){const m=parseInt(o.mc_mode||0);return m===1?'4 Ch (ASCII)':t>=12?'1 Ch (Direct)':'2 Ch (Numeric)';}
@@ -1181,8 +1180,8 @@ function outputChannelCount(o){
 function outputByteCount(o){
   const t=typeId(o);
   if(t===6) return valueByteCount(parseInt(o.mc_resolution||8))+2;
-  if(t>=4&&t<=8||t===17||t===15) return valueByteCount(parseInt(o.mc_resolution||8));
   if(t===5) return (o.color_order||0)>=4 ? 4 : 3;
+  if(t>=4&&t<=8||t===17||t===15) return valueByteCount(parseInt(o.mc_resolution||8));
   if(t===9) return 2;
   if(t===18) return 1;
   if(t>=11&&t<=13){const m=parseInt(o.mc_mode||0);return m===1?4:t>=12?1:2;}
@@ -1284,7 +1283,8 @@ function renderPinRows(){
     if(showAddr){
       pinOpts=mkSel('no_pin2_channel',`<option value="255">None</option>${chOpts}`);
     } else if(is7SegDD){
-      pinOpts=`<span style="display:inline-block;width:100%;background:#fef9c3;color:#854d0e;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #fef08a">base+0..6</span>`;
+      const pinCount = mcMode===3 ? 7 : 6;
+      pinOpts=`<span style="display:inline-block;width:100%;background:#fef9c3;color:#854d0e;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #fef08a">base+0..${pinCount}</span>`;
     } else {
       pinOpts=mkSel('no_pin2',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`);
     }
@@ -1539,42 +1539,98 @@ async function loadOutputs(){
 
 function channelScore(o){
   const t=typeId(o);
+  const src=o.source||0;
+  const mode=o.mc_mode||0;
+  const pin4=o.pin4!==undefined?o.pin4:255;
+  const W={gpio:0.5,ledc:2.5,rmt:3.0,uart:8.0,dac:2.0,pca:0.25,exp:0.125};
+  let gpio=0,ledc=0,rmt=0,uart=0,dac=0,pca=0,exp=0;
+  // Count used UARTs by DFPlayer channels to determine DMX UART availability
+  const dfCount=outputs.filter(x=>typeId(x)===10).length;
   switch(t){
-    case 0: return 2; // AC Dimmer
-    case 1: return 4; // DMX
-    case 2: return 0.5; // Relay
-    case 3: return 2+(o.led_count||170)/100; // RGB LED
-    case 4: return 3; // Single Color LED
-    case 5: return 3; // Analog RGB
-    case 6: return 3; // Motor
-    case 7: return 8; // Stepper
-    case 8: return 2; // Servo
-    case 9: return 1.5; // Buzzer
-    case 10: return 2; // DFPlayer
-    case 11: return 2; // 7-Seg 2-Pin
-    case 12: return 3; // 7-Seg DD 7-Pin PWM (uses 7 LEDC)
-    case 13: return 3; // 7-Seg DD 8-Pin PWM (uses 8 LEDC)
-    case 14: return 0.5; // DAC
-    case 15: return 2; // PWM DAC
-    case 16: return 3; // Function Gen
-    case 17: return 0.5; // Solenoid
-    case 18: return 1.5; // Smoke
-    default: return 0;
+    case 0: if(src===0) gpio=1; break;
+    case 1:
+      if(src===0){
+        gpio=1;
+        // DFPlayer has priority on UART; DMX falls back to RMT when both UARTs are taken
+        const dmxBefore=outputs.slice(0,outputs.indexOf(o)).filter(x=>typeId(x)===1&&(x.source||0)===0).length;
+        const freeUarts=Math.max(0,2-dfCount);
+        if(dmxBefore<freeUarts) uart=1; else rmt=1;
+      }
+      break;
+    case 2: if(src===0) gpio=1; else if(src===1) pca=1; else exp=1; break;
+    case 3: if(src===0) gpio=1; break;
+    case 4: if(src===0){gpio=1;ledc=1;}else if(src===1) pca=1; else exp=1; break;
+    case 5: if(src===0){gpio=3;ledc=3;}else if(src===1) pca=3; break;
+    case 6:
+      if(src===0){gpio=mode===2?3:2; ledc=mode===0?2:1;}
+      else if(src===1) pca=mode===2?3:2;
+      break;
+    case 7:
+      if(src===0){gpio=2+(pin4!==255&&(o.mc_homing_mode||0)===0?1:0); rmt=2;}
+      else if(src===1) pca=2;
+      break;
+    case 8: if(src===0){gpio=1;ledc=1;}else if(src===1) pca=1; break;
+    case 9: if(src===0){gpio=1;ledc=1;} break;
+    case 10: if(src===0) gpio=2; uart=1; break;
+    case 11: if(src===0) gpio=2; else exp=2; break;
+    case 12: gpio=7; ledc=7; break;
+    case 13: gpio=8; ledc=8; break;
+    case 14: gpio=1; dac=1; break;
+    case 15: if(src===0){gpio=1;ledc=1;}else if(src===1) pca=1; break;
+    case 16: gpio=1; ledc=1; break;
+    case 17: if(src===0) gpio=1; else if(src===1) pca=1; else exp=1; break;
+    case 18: if(src===0) gpio=2; else if(src===1) pca=2; else exp=2; break;
   }
+  return gpio*W.gpio+ledc*W.ledc+rmt*W.rmt+uart*W.uart+dac*W.dac+pca*W.pca+exp*W.exp;
 }
 function totalScore(arr){
   return arr.reduce((s,o)=>s+channelScore(o),0);
+}
+function channelComputeScore(o){
+  const t=typeId(o);
+  switch(t){
+    case 3: return (o.led_count||0)*0.005;
+    case 6: return 0.5;
+    case 7: return 2.0;
+    case 10: return 0.5;
+    case 11: return 0.5;
+    case 12: return 1.0;
+    case 13: return 1.2;
+    case 16: return 2.0;
+    case 18: return 0.3;
+    default: return 0;
+  }
+}
+function fpsComputeFactor(fps){
+  fps=parseInt(fps)||40;
+  return (fps/60)*5;
+}
+function totalComputeScore(arr,fps){
+  let t=fpsComputeFactor(fps);
+  arr.forEach(o=>t+=channelComputeScore(o));
+  return t;
+}
+function resourceScoreLimit(){
+  const MAX_GPIO=8, MAX_LEDC=16, MAX_RMT=8, MAX_UART=2, MAX_DAC=0;
+  const W={gpio:0.5,ledc:2.5,rmt:3.0,uart:8.0,dac:2.0,pca:0.25,exp:0.125};
+  return MAX_GPIO*W.gpio+MAX_LEDC*W.ledc+MAX_RMT*W.rmt+MAX_UART*W.uart+MAX_DAC*W.dac;
+}
+function totalScoreLimit(){
+  return resourceScoreLimit()+25;
 }
 function updateScoreBar(){
   const bar=document.getElementById('score-fill');
   const txt=document.getElementById('score-text');
   if(!bar||!txt) return;
-  const s=totalScore(outputs);
-  const limit=100;
+  const fps=parseInt(document.getElementById('output_fps')?.value)||40;
+  const rs=totalScore(outputs);
+  const cs=totalComputeScore(outputs,fps);
+  const s=rs+cs;
+  const limit=totalScoreLimit();
   const pct=Math.min(s/limit*100,100);
   bar.style.width=pct+'%';
-  bar.style.background=s>limit?'#ef4444':s>80?'#eab308':'#22c55e';
-  txt.textContent=s.toFixed(1)+' / '+limit;
+  bar.style.background=s>limit?'#ef4444':s>limit*0.8?'#eab308':'#22c55e';
+  txt.textContent='R'+rs.toFixed(0)+'+C'+cs.toFixed(0)+'='+s.toFixed(0)+' / '+limit;
 
   // Calculate hardware resource metrics
   let ledCount = 0;
@@ -1608,9 +1664,10 @@ function updateScoreBar(){
         ledcUsed++;
       } else if (t === 15) { // PWM DAC
         ledcUsed++;
-      } else if (t === 12 || t === 13) { // 7-Seg DD PWM
-        const m = parseInt(o.mc_mode || 2);
-        ledcUsed += (m === 3 ? 8 : 7);
+      } else if (t === 12) { // 7-Seg DD 7-Pin PWM
+        ledcUsed += 7;
+      } else if (t === 13) { // 7-Seg DD 8-Pin PWM
+        ledcUsed += 8;
       }
     }
   });
@@ -1663,7 +1720,7 @@ function updateScoreBar(){
 
   if (hasError) {
     let errMsg = 'Limit Exceeded';
-    if (scoreOver) errMsg = 'Resource Score Exceeded';
+    if (scoreOver) errMsg = 'Combined Score (Resource+Compute) Exceeded';
     else if (rmtOver) errMsg = 'RMT Limit Exceeded';
     else if (uartOver) errMsg = 'UART Limit Exceeded';
     else if (ledcOver) errMsg = 'LEDC Limit Exceeded';
@@ -1705,7 +1762,7 @@ function renderOutputs(){
     const sc=channelScore(o);
     const scClass=sc>10?'pill-warn':'pill-ok';
     tr.innerHTML=`<td>${i+1}</td><td>${deviceLabel(o)}</td><td>${gpioLabel(o)}</td><td>${outputAddressLabel(o)}</td>
-      <td>${outputChannelCount(o)}</td><td><span class="pill ${scClass}" style="font-size:0.65rem">${sc.toFixed(1)}</span></td>
+      <td>${outputChannelCount(o)}</td><td><span class="pill ${scClass}" style="font-size:0.65rem">${sc.toFixed(0)}</span></td>
       <td>${i===currentTestIdx?'<span class="pill pill-warn" style="margin-right:4px">TEST</span>':''}${removed?'<span class="pill pill-warn" style="margin-right:4px">DELETE</span>':`<button class="btn bg" style="padding:3px 8px;font-size:0.72rem;margin-right:4px" onclick="showOutputTest(${i})">Test</button>
           <button class="btn bs" style="padding:3px 8px;font-size:0.72rem;margin-right:4px" onclick="editOutput(${i})">Edit</button>`}
           <button class="btn bd" style="padding:3px 8px;font-size:0.72rem" onclick="delOutput(${i})">Delete</button></td>`;
@@ -1967,12 +2024,15 @@ function setResolutionOptions(isStepper){
   sel.value=allowed?current:8;
 }
 
-function setModeOptions(kind){
+function setModeOptions(kind, type){
   const sel=document.getElementById('mc_mode');
   const lbl=document.getElementById('mc_mode_lbl');
   const current=parseInt(sel.value||0);
   const opts=kind==='7seg'
-    ? [[0,'TM1637 Numeric (2 Ch)'],[1,'TM1637 ASCII Text (4 Ch)'],
+    ? type===11?[[0,'TM1637 Numeric (2 Ch)'],[1,'TM1637 ASCII Text (4 Ch)']]
+      :type===12?[[2,'Direct 7-pin (A-G)']]
+      :type===13?[[3,'Direct 8-pin (A-G+DP)']]
+      :[[0,'TM1637 Numeric (2 Ch)'],[1,'TM1637 ASCII Text (4 Ch)'],
        [2,'Direct 7-pin (A-G)'],[3,'Direct 8-pin (A-G+DP)']]
     : [[0,'PWM + PWM (2 pins)'],[1,'PWM + DIR (2 pins)'],[2,'IN1 + IN2 + EN (3 pins)']];
   if(lbl) lbl.textContent=kind==='7seg'?'Display Mode':'Motor Sub-Mode';
@@ -2030,12 +2090,12 @@ function toggleOutFields(){
     if(src>=2 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=32;
   }
   
-  document.getElementById('no_addr_grp').style.display=(isDmx||t===3||isDfPlayer)?'none':'';
+  document.getElementById('no_addr_grp').style.display=(isDmx||t===3)?'none':'';
   document.getElementById('no_cnt_grp').style.display=(isDmx||isRelay||isDimmer||isMc||isSolenoid||isAnalogRgb||isBuzzer||isSmoke||is7Seg||isDfPlayer||isPwmDac)?'none':'';
   document.getElementById('no_ord_grp').style.display=(isDmx||isRelay||isDimmer||isMc||isSolenoid||isBuzzer||isSmoke||is7Seg||isDfPlayer||isPwmDac)?'none':'';
   document.getElementById('no_led_proto_grp').style.display=(t===3)?'':'none';
   
-  setModeOptions(is7Seg?'7seg':'motor');
+  setModeOptions(is7Seg?'7seg':'motor', t);
   document.getElementById('no_mc_grp').style.display=(isMc||is7Seg||isFuncGen||isPwmDac)?'':'none';
   document.getElementById('no_sol_grp').style.display=isSolenoid?'':'none';
   document.getElementById('no_smoke_grp').style.display=isSmoke?'':'none';
@@ -2166,12 +2226,9 @@ function editOutput(idx){
   setVal('mc_scale_factor',o.mc_scale_factor??0.0);
   setChk('mc_invert',o.mc_invert||false);
   setChk('mc_brake',o.mc_brake||false);
-  setChk('mc_enable_active_high',o.mc_enable_active_high||false);
-  setChk('mc_dir_invert',o.mc_dir_invert||false);
-  setChk('mc_step_invert',o.mc_step_invert||false);
-  setChk('no_pin_invert',o.pin_invert||false);
-  setChk('no_pin2_invert',o.pin2_invert||false);
-  setChk('no_pin3_invert',o.pin3_invert||false);
+  setChk('no_pin_invert',o.mc_step_invert||o.pin_invert||false);
+  setChk('no_pin2_invert',o.mc_dir_invert||o.pin2_invert||false);
+  setChk('no_pin3_invert',o.mc_enable_active_high||o.pin3_invert||false);
   setChk('no_pin4_invert',o.pin4_invert||false);
   setVal('mc_homing_mode',o.mc_homing_mode??0);
   setVal('mc_homing_dir',o.mc_homing_dir??0);
@@ -2436,10 +2493,14 @@ function addOrUpdateOutput(){
   if(totalLedPixels>4000) warnings.push('Total LED pixels ('+totalLedPixels+') may cause RAM exhaustion.');
   newOutputs.forEach(o => { if(o.type===3&&o.led_count>1111) warnings.push('Single GPIO LED count >1111 drops refresh rate below 30 FPS.'); });
   
-  // Resource scoring check
-  const sc=totalScore(newOutputs);
-  if(sc>100){
-    alert('Resource score '+sc.toFixed(1)+' exceeds limit of 100. Remove some channels or reduce LED pixel count.');
+  // Resource + Compute scoring check
+  const fps=parseInt(document.getElementById('output_fps')?.value)||40;
+  const rs=totalScore(newOutputs);
+  const cs=totalComputeScore(newOutputs,fps);
+  const sc=rs+cs;
+  const lim=totalScoreLimit();
+  if(sc>lim){
+    alert('Combined score R'+rs.toFixed(0)+'+C'+cs.toFixed(0)+'='+sc.toFixed(0)+' exceeds limit of '+lim+' at '+fps+' FPS. Reduce channels or FPS.');
     return;
   }
 

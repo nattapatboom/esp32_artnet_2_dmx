@@ -214,7 +214,7 @@ public:
                         Serial.printf("Motor (PWM+PWM) on GPIO %d, %d\n", ch.pin, ch.pin2);
                     }
                 } 
-                else if (ch.type == 6 && ch.mc_mode == 1) { // PWM + DIR (v3)
+                else if (ch.mc_mode == 1) { // PWM + DIR (v3)
                     uint8_t pwmChan = allocateLedc();
                     if (pwmChan != 255) {
                         ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
@@ -230,7 +230,7 @@ public:
                         Serial.printf("Motor (PWM+DIR) src=%d GPIO=%d DIR src=%d\n", ch.source, ch.pin, ch.pin2_source);
                     }
                 }
-                else if (ch.type == 6 && ch.mc_mode == 2) { // IN1 + IN2 + EN (v3)
+                else if (ch.mc_mode == 2) { // IN1 + IN2 + EN (v3)
                     uint8_t pwmChan = allocateLedc();
                     if (pwmChan != 255) {
                         ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
@@ -332,35 +332,35 @@ public:
                 }
                 ch.prev_7seg_val = 0;
                 ch.prev_7seg_valid = false;
-                    Serial.printf("7-Segment Direct Drive: expander src=%d addr=0x%02X baseCh=%d pins=%d\n",
-                                  ch.pin2_source, ch.pin2_addr, ch.pin2_channel, ch.mc_mode == 3 ? 8 : 7);
-                } else if (ch.mc_mode >= 2 && ch.pin2_source == 0) { // Direct Drive via GPIO
-                    if (ch.type == 12 || ch.type == 13) {
-                        uint8_t numSeg = (ch.mc_mode == 3) ? 8 : 7;
-                        uint8_t baseChan = allocateLedc();
-                        if (baseChan != 255) {
-                            for (uint8_t s = 0; s < numSeg; s++) {
-                                if (baseChan + s <= 15) {
-                                    ledcSetup(baseChan + s, ch.mc_freq ? ch.mc_freq : 1000, 8);
-                                    ledcAttachPin(ch.pin + s, baseChan + s);
-                                    ledcWrite(baseChan + s, 0);
-                                }
+                Serial.printf("7-Segment Direct Drive: expander src=%d addr=0x%02X baseCh=%d pins=%d\n",
+                              ch.pin2_source, ch.pin2_addr, ch.pin2_channel, ch.mc_mode == 3 ? 8 : 7);
+            } else if (ch.mc_mode >= 2 && ch.pin2_source == 0) { // Direct Drive via GPIO
+                if (ch.type == 12 || ch.type == 13) {
+                    uint8_t numSeg = (ch.mc_mode == 3) ? 8 : 7;
+                    uint8_t baseChan = allocateLedc();
+                    if (baseChan != 255) {
+                        for (uint8_t s = 0; s < numSeg; s++) {
+                            if (baseChan + s <= 15) {
+                                ledcSetup(baseChan + s, ch.mc_freq ? ch.mc_freq : 1000, 8);
+                                ledcAttachPin(ch.pin + s, baseChan + s);
+                                ledcWrite(baseChan + s, 0);
                             }
-                            ch.dmxPort = baseChan;
-                            Serial.printf("7-Segment DD PWM: GPIO base=%d pins=%d baseLEDC=%d freq=%dHz\n",
-                                          ch.pin, numSeg, baseChan, ch.mc_freq ? ch.mc_freq : 1000);
                         }
-                    } else {
-                        for (uint8_t s = 0; s < (ch.mc_mode == 3 ? 8 : 7); s++) {
-                            pinMode(ch.pin + s, OUTPUT);
-                            digitalWrite(ch.pin + s, LOW);
-                        }
-                        Serial.printf("7-Segment Direct Drive: GPIO base=%d pins=%d\n",
-                                      ch.pin, ch.mc_mode == 3 ? 8 : 7);
+                        ch.dmxPort = baseChan;
+                        Serial.printf("7-Segment DD PWM: GPIO base=%d pins=%d baseLEDC=%d freq=%dHz\n",
+                                      ch.pin, numSeg, baseChan, ch.mc_freq ? ch.mc_freq : 1000);
                     }
-                    ch.prev_7seg_val = 0;
-                    ch.prev_7seg_valid = false;
-                } else { // TM1637
+                } else {
+                    for (uint8_t s = 0; s < (ch.mc_mode == 3 ? 8 : 7); s++) {
+                        pinMode(ch.pin + s, OUTPUT);
+                        digitalWrite(ch.pin + s, LOW);
+                    }
+                    Serial.printf("7-Segment Direct Drive: GPIO base=%d pins=%d\n",
+                                  ch.pin, ch.mc_mode == 3 ? 8 : 7);
+                }
+                ch.prev_7seg_val = 0;
+                ch.prev_7seg_valid = false;
+            } else { // TM1637
                     TM1637Driver tm(ch.pin, ch.pin2);
                     tm.begin();
                     ch.prev_7seg_val = 0;
