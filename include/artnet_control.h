@@ -2,6 +2,7 @@
 #define ARTNET_CONTROL_H
 
 #include <Arduino.h>
+#include <atomic>
 #include <WiFiUdp.h>
 #include <vector>
 #include <algorithm>
@@ -53,7 +54,7 @@ private:
 
 public:
     static unsigned long packetCount;
-    static bool newRxData;
+    static std::atomic<bool> newRxData;
 
     void begin() {
         if (initialized) return;

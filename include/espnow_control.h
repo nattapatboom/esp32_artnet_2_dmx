@@ -2,6 +2,7 @@
 #define ESPNOW_CONTROL_H
 
 #include <Arduino.h>
+#include <atomic>
 #include <WiFi.h>
 #include <esp_now.h>
 #include <vector>
@@ -76,7 +77,7 @@ public:
     static uint8_t rxDmxBuffer[512];
     static uint16_t rxDmxLength;
     static unsigned long lastRxTime;
-    static bool newRxData;
+    static std::atomic<bool> newRxData;
 
     void loadPeers() {
         if (sysCfg.device_mode != MODE_ESPNOW_MASTER) return;

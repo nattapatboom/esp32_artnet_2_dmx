@@ -83,9 +83,18 @@ progress{width:100%;height:18px;border-radius:4px;margin:8px 0}
 progress::-webkit-progress-bar{background:#e2e8f0;border-radius:4px}
 progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
 @media(max-width:600px){.hdr{flex-wrap:wrap}.stats{grid-template-columns:1fr 1fr}.proto-grid{grid-template-columns:1fr}}
+@keyframes spin{to{transform:rotate(360deg)}}
+#reboot-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.92);z-index:9999;flex-direction:column;align-items:center;justify-content:center;color:#f8fafc;font-family:sans-serif;gap:16px}
 </style>
 </head>
 <body>
+
+<div id="reboot-overlay">
+  <div style="font-size:1.5rem;font-weight:600">Rebooting Controller...</div>
+  <div style="font-size:1.1rem;color:#94a3b8" id="reboot-msg">Saving changes and restarting. Please wait.</div>
+  <div style="font-size:3.5rem;font-weight:700;margin:8px 0;color:#3b82f6" id="reboot-countdown">9</div>
+  <div style="width:40px;height:40px;border:4px solid #334155;border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+</div>
 
 <div class="hdr">
   <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABAAQMAAADoGO08AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAGUExURQAAAP///6XZn90AAAAJcEhZcwAAEnMAABJzAYwiuQcAAACNSURBVDjL5dIxDsMgDAXQHzF0zJF6tBJxMXITjsDIUPELyEYkZemGVMYnYcy3wdvBf0EGdkc6emzxAlbgrQCBdIcokBWCQFKAQFAwrAXoPHk0eAic5PkDHKS51LCA8frKSvDVaf/La8ijwbOAlcQqpJpfGCBXiAO0hNMI5X6f3BxKd33YcwgzWGVxF4EPJ6cwIWyZLd0AAAAASUVORK5CYII=" alt="Logo">
@@ -716,12 +725,35 @@ function setSaveState(label,kind='ok'){
 }
 
 // Tabs
+let diagTimer = null;
 function showTab(e,id){
   document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
   document.getElementById('pane-'+id).classList.add('on');
   e.currentTarget.classList.add('on');
-  if(id==='diag') diagRefreshSysInfo();
+  if(diagTimer) { clearInterval(diagTimer); diagTimer = null; }
+  if(id==='diag') {
+    diagRefreshSysInfo();
+    diagTimer = setInterval(diagRefreshSysInfo, 5000);
+  }
+}
+
+function startRebootCountdown(msg, seconds){
+  const overlay = document.getElementById('reboot-overlay');
+  const textVal = document.getElementById('reboot-msg');
+  const countVal = document.getElementById('reboot-countdown');
+  if(!overlay || !textVal || !countVal) return;
+  textVal.textContent = msg;
+  countVal.textContent = seconds;
+  overlay.style.display = 'flex';
+  const interval = setInterval(()=>{
+    seconds--;
+    countVal.textContent = seconds;
+    if(seconds <= 0){
+      clearInterval(interval);
+      location.reload();
+    }
+  }, 1000);
 }
 
 // ==========================================
@@ -949,7 +981,7 @@ async function saveSettings(e){
   try{
     const res=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});
     showAlert(res.ok);
-    if(res.ok) setTimeout(()=>location.reload(),1500);
+    if(res.ok) startRebootCountdown('Saving settings and restarting...', 4);
   }catch(err){showAlert(false);}
 }
 
@@ -969,7 +1001,7 @@ async function resetOutputs(){
     const res=await fetch('/api/outputs/clear',{method:'POST'});
     const ok=res.ok;
     showAlert(ok);
-    if(ok) setTimeout(()=>location.reload(),1000);
+    if(ok) startRebootCountdown('Resetting outputs and restarting...', 4);
   }catch(e){showAlert(false);}
 }
 async function factoryReset(){
@@ -979,7 +1011,7 @@ async function factoryReset(){
     const res=await fetch('/api/config/factory-reset',{method:'POST'});
     const ok=res.ok;
     showAlert(ok);
-    if(ok) setTimeout(()=>location.reload(),1500);
+    if(ok) startRebootCountdown('Performing factory reset and restarting...', 6);
   }catch(e){showAlert(false);}
 }
 async function importConfigFile(input){
@@ -1006,7 +1038,7 @@ async function importConfigFile(input){
     }
     setBackupStatus('Import complete. Device is rebooting. This page will reload automatically.','green');
     showAlert(true);
-    setTimeout(()=>location.reload(),9000);
+    startRebootCountdown('Importing config and restarting...', 9);
   }catch(err){
     setBackupStatus('Import failed: invalid JSON file','red');
     alert(err.message||'Invalid JSON file.');
@@ -2201,12 +2233,12 @@ async function saveOutputs(){
         state.className='ib ib-yellow';
         state.textContent='Outputs saved. Device is rebooting. This page will reload automatically.';
       }
-      setTimeout(()=>location.reload(),9000);
+      startRebootCountdown('Saving output channels and restarting...', 9);
     }
     showAlert(res.ok);
   }catch(e){
     setSaveState('Reconnecting...','warn');
-    setTimeout(()=>location.reload(),9000);
+    startRebootCountdown('Reconnecting and reloading...', 9);
   }
 }
 
@@ -2341,7 +2373,7 @@ function flashOta(){
       prog.value=100;
       status.textContent='Flash successful. Board is restarting... (reconnect in ~10s)';
       status.style.color='#166534';
-      setTimeout(()=>location.reload(),12000);
+      startRebootCountdown('OTA firmware flash complete. Restarting...', 12);
     } else {
       status.textContent='Flash failed: '+(xhr.responseText||'Try again.');
       status.style.color='#dc2626';

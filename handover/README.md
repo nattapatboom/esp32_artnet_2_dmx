@@ -49,3 +49,4 @@ handover/
 | 1.16.00 | 2026-06-20 | P0 & P1 Bug Fixes, Dimmer Globals/ISR safety, ESP-NOW Queuing, HTTP OOM fix, Dynamic UART Allocation |
 | 1.17.00 | 2026-06-20 | UART allocation priority to DFPlayer, RMT validation & fallback, SKILL.md update |
 | 1.18.00 | 2026-06-20 | JS Code Restructuring into 6 sections, case 14 dead code cleanup in scoring.h |
+| 1.19.00 | 2026-06-20 | Atomic flags for thread-safety, Web UI reboot overlay & countdown, auto-refresh Diagnostics |

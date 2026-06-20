@@ -2,6 +2,7 @@
 #define OUTPUT_CONTROL_H
 
 #include <Arduino.h>
+#include <atomic>
 #include <esp_dmx.h>
 #include <NeoPixelBus.h>
 #include "rmt_dmx.h"
@@ -25,7 +26,7 @@ extern DigitalExpanderManager digitalExpanderManager;
 extern uint8_t activeDmxBuffer[DMX_BUFFER_SIZE];
 extern unsigned long lastDmxUpdateTime;
 extern bool systemActive;
-extern volatile bool networkFramePending;
+extern std::atomic<bool> networkFramePending;
 
 // Interface for virtualized NeoPixelBus
 class PixelStripWrapper {

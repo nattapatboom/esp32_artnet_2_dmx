@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <atomic>
 #include <ETH.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -47,7 +48,7 @@ SystemConfig sysCfg;
 uint8_t activeDmxBuffer[DMX_BUFFER_SIZE] = {0};
 unsigned long lastDmxUpdateTime = 0;
 bool systemActive = false;
-volatile bool networkFramePending = false;
+std::atomic<bool> networkFramePending(false);
 
 OutputControl outputCtrl;
 ArtNetControl artNetCtrl;
@@ -70,11 +71,11 @@ void updateMotionControl() {
 
 // Static member definitions (out-of-class, C++14 compatible)
 unsigned long ArtNetControl::packetCount = 0;
-bool ArtNetControl::newRxData = false;
+std::atomic<bool> ArtNetControl::newRxData(false);
 uint8_t EspNowControl::rxDmxBuffer[512] = {0};
 uint16_t EspNowControl::rxDmxLength = 0;
 unsigned long EspNowControl::lastRxTime = 0;
-bool EspNowControl::newRxData = false;
+std::atomic<bool> EspNowControl::newRxData(false);
 
 AsyncWebServer server(80);
 

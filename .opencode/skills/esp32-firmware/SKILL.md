@@ -75,6 +75,7 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - **Memory Allocation Safety:** Performs NULL checks on all `calloc()` calls allocating DMX buffers.
 - **Interrupt Storm Rate Limiting:** Enforces a 5ms rate limit on zero-cross interrupts to avoid lockups when the Zero-Cross pin floats.
 - **Core-Safe Deferral:** ESP-NOW callback pushes packets into a FreeRTOS queue, deferring the thread-unsafe `mapDmxDataToChannels()` processing to the Core 1 `outputTask` thread.
+- **Atomic Flags:** Uses `std::atomic<bool>` for cross-core signaling flags (`networkFramePending`, `newRxData`) to prevent thread-safety buffer race conditions.
 
 ## Coding Conventions
 - **No comments** in code unless necessary
@@ -95,7 +96,7 @@ curl.exe -F "update=@.pio\build\wt32-eth01\firmware.bin" http://192.168.1.93/upd
 
 ## Handover System
 - Docs in `handover/` folder, format `x.xx.xx.md`
-- Current: `handover/1.15.00.md`
+- Current: `handover/1.19.00.md`
 - Rules: no editing old files, max 1000 lines per file
 - SEE `handover/README.md` for full system rules
 
