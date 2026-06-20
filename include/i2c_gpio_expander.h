@@ -18,7 +18,7 @@ private:
     bool _started;
 
     void writeReg8(uint8_t reg, uint8_t value) {
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
         Wire.beginTransmission(_address);
         Wire.write(reg);
         Wire.write(value);
@@ -27,7 +27,7 @@ private:
     }
 
     void writeReg16(uint8_t reg, uint16_t value) {
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
         Wire.beginTransmission(_address);
         Wire.write(reg);
         Wire.write(value & 0xFF);
@@ -37,7 +37,7 @@ private:
     }
 
     void writePcf(uint16_t value) {
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
         Wire.beginTransmission(_address);
         Wire.write(value & 0xFF);
         Wire.write((value >> 8) & 0xFF);
@@ -95,7 +95,7 @@ public:
         } else if (_kind == DIG_EXP_TCA9555) {
             return regRead16(0x00); // INPUT port
         } else if (_kind == DIG_EXP_PCF857X) {
-            if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+            if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return 0xFFFF;
             Wire.beginTransmission(_address);
             Wire.write(_state & 0xFF);
             Wire.write((_state >> 8) & 0xFF);
@@ -132,7 +132,7 @@ public:
 
 private:
     uint8_t regRead8(uint8_t reg) {
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return 0xFF;
         Wire.beginTransmission(_address);
         Wire.write(reg);
         Wire.endTransmission();
@@ -143,7 +143,7 @@ private:
     }
 
     uint16_t regRead16(uint8_t reg) {
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return 0xFFFF;
         Wire.beginTransmission(_address);
         Wire.write(reg);
         Wire.endTransmission();

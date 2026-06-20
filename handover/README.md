@@ -50,3 +50,5 @@ handover/
 | 1.17.00 | 2026-06-20 | UART allocation priority to DFPlayer, RMT validation & fallback, SKILL.md update |
 | 1.18.00 | 2026-06-20 | JS Code Restructuring into 6 sections, case 14 dead code cleanup in scoring.h |
 | 1.19.00 | 2026-06-20 | Atomic flags for thread-safety, Web UI reboot overlay & countdown, auto-refresh Diagnostics |
+| 1.20.00 | 2026-06-20 | I2C lock protection, GPIO 12 bootstrapping pin warning, contiguous output type mapping and versioning |
+

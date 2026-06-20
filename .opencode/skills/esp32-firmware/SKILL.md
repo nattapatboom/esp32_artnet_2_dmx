@@ -23,7 +23,7 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - **Usable GPIO:** 4, 12, 14, 15, 2, 17, 32, 33 (+ input-only 36, 39, 34, 35)
 - **Built-in:** Ethernet (LAN8720), no WiFi needed in Ethernet mode
 
-## Output Types (0-15)
+## Output Types (0-13)
 
 | Type | Name | DMX Bytes | Source Support | Resource |
 |------|------|-----------|----------------|----------|
@@ -31,16 +31,16 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 | 1 | DMX Serial Output | 512 | GPIO (UART1/2 or RMT) | UART 1-2 |
 | 2 | Relay (On/Off) | 1 | GPIO, PCA, Expander | GPIO 1 |
 | 3 | AC Dimmer (TRIAC) | 1-2 | GPIO only | Timer + ZC |
-| 5 | DC PWM Dimmer | 1-2 | GPIO, PCA | LEDC 1-2ch |
-| 6 | DC Motor (H-Bridge) | 1-2 | GPIO, PCA, Expander | LEDC 1-3ch |
-| 7 | Stepper Motor | 3-5 | GPIO+Expander hybrid | FastAccelStepper |
-| 8 | RC Servo | 1 | GPIO, PCA | LEDC 1ch |
-| 9 | Solenoid Trigger | 1 | GPIO, Expander | GPIO 1 |
-| 10 | Analog RGB/RGBW | 3-4 | GPIO, PCA | LEDC 3-4ch |
-| 11 | Passive Buzzer | 2 | GPIO only | LEDC 1ch |
-| 12 | Sequential Smoke Shooter | 1 | GPIO, Expander | GPIO 2 |
-| 13 | 7-Segment Display | 2-4 | GPIO, Expander | GPIO 2-8 |
-| 15 | DFPlayer MP3 Module | 3 | GPIO only (UART2) | UART2 |
+| 4 | DC PWM Dimmer | 1-2 | GPIO, PCA | LEDC 1-2ch |
+| 5 | DC Motor (H-Bridge) | 1-2 | GPIO, PCA, Expander | LEDC 1-3ch |
+| 6 | Stepper Motor | 3-5 | GPIO+Expander hybrid | FastAccelStepper |
+| 7 | RC Servo | 1 | GPIO, PCA | LEDC 1ch |
+| 8 | Solenoid Trigger | 1 | GPIO, Expander | GPIO 1 |
+| 9 | Analog RGB/RGBW | 3-4 | GPIO, PCA | LEDC 3-4ch |
+| 10 | Passive Buzzer | 2 | GPIO only | LEDC 1ch |
+| 11 | Sequential Smoke Shooter | 1 | GPIO, Expander | GPIO 2 |
+| 12 | 7-Segment Display | 2-4 | GPIO, Expander | GPIO 2-8 |
+| 13 | DFPlayer MP3 Module | 3 | GPIO only (UART) | UART |
 
 ## Architecture
 
@@ -55,11 +55,11 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - `src/main.cpp` — Entry point, HTTP API routes, validation, network tasks
 
 ### OutputChannel Struct (output_control.h:98-189)
-- `type` (0-15), `source` (0=GPIO, 1=PCA9685, 2=MCP23017, 3=TCA9555, 4=PCF857x)
+- `type` (0-13), `source` (0=GPIO, 1=PCA9685, 2=MCP23017, 3=TCA9555, 4=PCF857x)
 - `pin`-`pin4` with `_source`/`_addr`/`_channel` for expander hybrid
 - `dmxBuffer`, `bufferSize` (512 bytes for all non-LED types)
 - `pixelStrip` (LED), `dmxPort`/`rmtDmx` (DMX), `dfPlayer` (MP3)
-- Source compatibility: PCA (2,5,6,7,8,10,12), Digital (2,6,9,12)
+- Source compatibility: PCA (2,4,5,6,7,9,11), Digital (2,5,8,11)
 
 ### Hardware Resource Limits
 - **UART:** 3 total. UART0=console. UART1 and UART2 are dynamically allocated. **DFPlayer has priority on UART** (assigns to UART2, then UART1) because DMX can dynamically fall back to RMT.
@@ -76,6 +76,9 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - **Interrupt Storm Rate Limiting:** Enforces a 5ms rate limit on zero-cross interrupts to avoid lockups when the Zero-Cross pin floats.
 - **Core-Safe Deferral:** ESP-NOW callback pushes packets into a FreeRTOS queue, deferring the thread-unsafe `mapDmxDataToChannels()` processing to the Core 1 `outputTask` thread.
 - **Atomic Flags:** Uses `std::atomic<bool>` for cross-core signaling flags (`networkFramePending`, `newRxData`) to prevent thread-safety buffer race conditions.
+- **I2C Hang Protection:** Replaces blocking `portMAX_DELAY` lockups with a 100ms timeout check (`xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE`) on `i2cMutex` takes, safeguarding task operations if hardware faults freeze the I2C bus SCL/SDA lines.
+- **Bootstrapping Pin warning:** Actively checks and warns the user in the Web UI if the critical bootstrapping pin GPIO 12 (MTDI) is configured, preventing bootloops.
+- **Configuration Layout Versioning:** Enforces layout version 2 on config file loading and saving, ensuring type layout translations are safely applied only once.
 
 ## Coding Conventions
 - **No comments** in code unless necessary

@@ -10,7 +10,7 @@ private:
     uint16_t _lastDuty[16]; // Keep track of the last duty cycle written to each channel (dirty-state check)
 
     void writeRegister(uint8_t reg, uint8_t value) {
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
         Wire.beginTransmission(_address);
         Wire.write(reg);
         Wire.write(value);
@@ -19,7 +19,7 @@ private:
     }
 
     uint8_t readRegister(uint8_t reg) {
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return 0;
         Wire.beginTransmission(_address);
         Wire.write(reg);
         Wire.endTransmission(false);
@@ -74,7 +74,7 @@ public:
         }
         _lastDuty[channel] = duty;
 
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
         Wire.beginTransmission(_address);
         Wire.write(0x06 + 4 * channel); // LEDn_ON_L register
 

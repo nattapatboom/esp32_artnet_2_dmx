@@ -20,7 +20,7 @@ extern DigitalExpanderManager digitalExpanderManager;
 
 // Max universes supported per channel
 #define DMX_BUFFER_SIZE 512
-#define CHAN_TYPE_ANALOG_RGB 10
+#define CHAN_TYPE_ANALOG_RGB 9
 
 // Global active DMX channel buffer for current universe-0 frame state
 extern uint8_t activeDmxBuffer[DMX_BUFFER_SIZE];
@@ -391,11 +391,11 @@ private:
         uint16_t firstConfiguredFreq = 0;
         for (const auto& candidate : channels) {
             if (candidate.source != 1 || candidate.pca_addr != address) continue;
-            if (candidate.type == 8) {
+            if (candidate.type == 7) {
                 return 50; // PCA9685 frequency is shared per chip; RC servo requires 50 Hz.
             }
-            if ((candidate.type == 5 || candidate.type == 6 ||
-                 candidate.type == CHAN_TYPE_ANALOG_RGB || candidate.type == 12) &&
+            if ((candidate.type == 4 || candidate.type == 5 ||
+                 candidate.type == CHAN_TYPE_ANALOG_RGB || candidate.type == 11) &&
                 firstConfiguredFreq == 0) {
                 firstConfiguredFreq = candidate.mc_freq;
             }
@@ -533,13 +533,29 @@ public:
             return;
         }
         JsonArray arr = doc["outputs"].as<JsonArray>();
+        int layoutVersion = doc["version"] | 1;
+        bool needsMigration = (layoutVersion < 2);
         for (JsonObject item : arr) {
             if (channels.size() >= 16) break; // Max 16 channels total
             OutputChannel ch;
-            ch.type = item["type"] | 0; // default 0 (LED)
-            if (ch.type == 4) {
-                Serial.println("Skipping removed WiZ output channel from /outputs.json");
-                continue;
+            uint8_t rawType = item["type"] | 0;
+            if (needsMigration) {
+                if (rawType == 4) {
+                    Serial.println("Skipping deprecated WiZ output channel from /outputs.json during migration");
+                    continue;
+                } else if (rawType == 5) ch.type = 4;
+                else if (rawType == 6) ch.type = 5;
+                else if (rawType == 7) ch.type = 6;
+                else if (rawType == 8) ch.type = 7;
+                else if (rawType == 9) ch.type = 8;
+                else if (rawType == 10) ch.type = 9;
+                else if (rawType == 11) ch.type = 10;
+                else if (rawType == 12) ch.type = 11;
+                else if (rawType == 13) ch.type = 12;
+                else if (rawType == 15) ch.type = 13;
+                else ch.type = rawType;
+            } else {
+                ch.type = rawType;
             }
             ch.source = item["source"] | 0;
             ch.pin = item["pin"] | 4;
@@ -571,7 +587,7 @@ public:
             ch.pin3_addr = item["pin3_addr"] | 0x20;
             ch.pin3_channel = item["pin3_channel"] | 255;
             ch.mc_resolution = item["mc_resolution"] | 8;
-            if (ch.type != 7 && ch.mc_resolution > 16) ch.mc_resolution = 16;
+            if (ch.type != 6 && ch.mc_resolution > 16) ch.mc_resolution = 16;
             if (ch.mc_resolution == 0) ch.mc_resolution = 8;
             ch.mc_freq = item["mc_freq"] | 1000;
             ch.mc_mode = item["mc_mode"] | 0;
@@ -624,6 +640,10 @@ public:
             
             channels.push_back(ch);
         }
+        if (needsMigration) {
+            saveChannels();
+            Serial.println("Saved migrated output channels to /outputs.json with version 2");
+        }
         Serial.printf("Loaded %d output channels from /outputs.json\n", channels.size());
     }
  
@@ -635,6 +655,7 @@ public:
          }
  
          JsonDocument doc;
+         doc["version"] = 2;
          JsonArray arr = doc["outputs"].to<JsonArray>();
          for (const auto& ch : channels) {
              JsonObject item = arr.add<JsonObject>();
@@ -664,11 +685,11 @@ public:
              item["shoot_duration_ms"] = ch.shoot_duration_ms;
              item["smoke_lockout_ms"] = ch.smoke_lockout_ms;
 
-            if (ch.type >= 5 && ch.type <= 8) {
+            if (ch.type >= 4 && ch.type <= 7) {
                 item["pin2"] = ch.pin2;
                 item["pin3"] = ch.pin3;
                 item["pin4"] = ch.pin4;
-                if (ch.type == 7) {
+                if (ch.type == 6) {
                     item["pin4_source"] = ch.pin4_source;
                     item["pin4_addr"] = ch.pin4_addr;
                     item["pin4_channel"] = ch.pin4_channel;
@@ -697,19 +718,19 @@ public:
                 item["mc_homing_timeout"] = ch.mc_homing_timeout;
                 item["mc_scale_factor"] = ch.mc_scale_factor;
                 item["mc_unit_type"] = ch.mc_unit_type;
-            } else if (ch.type == 13) {
+            } else if (ch.type == 12) {
                 item["pin2"] = ch.pin2;
                 item["pin2_source"] = ch.pin2_source;
                 item["pin2_addr"] = ch.pin2_addr;
                 item["pin2_channel"] = ch.pin2_channel;
                 item["mc_mode"] = ch.mc_mode;
-             } else if (ch.type == 9) {
+             } else if (ch.type == 8) {
                 item["solenoid_mode"] = ch.solenoid_mode;
                 item["solenoid_threshold"] = ch.solenoid_threshold;
                 item["solenoid_pulse_ms"] = ch.solenoid_pulse_ms;
                 item["solenoid_pre_delay"] = ch.solenoid_pre_delay;
                 item["solenoid_post_delay"] = ch.solenoid_post_delay;
-            } else if (ch.type == 15) {
+            } else if (ch.type == 13) {
                 item["pin2"] = ch.pin2;
             }
         }
@@ -756,7 +777,7 @@ public:
 
         // DFPlayer gets priority because DMX can fall back to RMT
         for (const auto& ch : channels) {
-            if (ch.type == 15) {
+            if (ch.type == 13) {
                 if (!uart2Used) {
                     uart2Used = true;
                 } else if (!uart1Used) {
@@ -777,10 +798,10 @@ public:
                 continue;
             } else if (ch.source >= 2 && ch.source <= 4) {
                 writeOutputPin(ch, 1, false);
-                if ((ch.type == 12 || ch.type == 6 || ch.type == 7) && ch.pca_channel2 != 255) {
+                if ((ch.type == 11 || ch.type == 5 || ch.type == 6) && ch.pca_channel2 != 255) {
                     writeOutputPin(ch, 2, false);
                 }
-                if ((ch.type == 6 || ch.type == 7) && ch.pca_channel3 != 255) {
+                if ((ch.type == 5 || ch.type == 6) && ch.pca_channel3 != 255) {
                     writeOutputPin(ch, 3, false);
                 }
                 Serial.printf("Digital expander initialized: source %d, addr 0x%02X, type %d\n",
@@ -814,7 +835,7 @@ public:
                 pinMode(ch.pin, OUTPUT);
                 digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
                 Serial.printf("Relay Channel initialized: GPIO %d, Start Universe %d\n", ch.pin, ch.start_universe);
-            } else if (ch.type == 9) { // CHAN_TYPE_SOLENOID
+            } else if (ch.type == 8) { // CHAN_TYPE_SOLENOID
                 pinMode(ch.pin, OUTPUT);
                 digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
                 // Set defaults if not configured
@@ -859,7 +880,7 @@ public:
                 } else {
                     Serial.println("Max 8 RMTs reached. Cannot initialize more DMX channels.");
                 }
-            } else if (ch.type == 12) { // Sequential Smoke Shooter
+            } else if (ch.type == 11) { // Sequential Smoke Shooter
                 if (ch.source == 0) { // ESP32 GPIO
                     pinMode(ch.pin, OUTPUT);
                     pinMode(ch.pin2, OUTPUT);
@@ -869,7 +890,7 @@ public:
                 ch.smoke_state = 0;
                 ch.smoke_prev_trigger = false;
                 Serial.printf("Smoke Shooter initialized: Smoke Pin %d, Shooter Pin %d\n", ch.pin, ch.pin2);
-            } else if (ch.type == 15) { // DFPlayer MP3
+            } else if (ch.type == 13) { // DFPlayer MP3
                 ch.dfPlayer = new DFPlayerController();
                 if (dfPlayerCount == 0) {
                     ch.dfPlayer->begin(Serial2, ch.pin, ch.pin2);

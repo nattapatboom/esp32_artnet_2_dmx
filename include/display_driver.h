@@ -26,7 +26,7 @@ public:
         _addr = addr;
         if (type == DISPLAY_OFF) return false;
 
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return false;
 
         Wire.beginTransmission(addr);
         if (Wire.endTransmission() != 0) {
@@ -61,7 +61,7 @@ public:
     void update(const String& line1, const String& line2, const String& line3, const String& line4) {
         if (!_active) return;
 
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
 
         Wire.beginTransmission(_addr);
         if (Wire.endTransmission() != 0) {
@@ -102,7 +102,7 @@ public:
         if (!_active) return;
         _brightness = level;
 
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
 
         Wire.beginTransmission(_addr);
         if (Wire.endTransmission() == 0) {
@@ -120,7 +120,7 @@ public:
     void end() {
         if (!_active) return;
 
-        if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
 
         Wire.beginTransmission(_addr);
         if (Wire.endTransmission() == 0) {

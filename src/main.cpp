@@ -282,14 +282,14 @@ bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
     if (source == 0) {
         uint8_t pin2Source = output["pin2_source"] | 0;
         uint8_t pin3Source = output["pin3_source"] | 0;
-        if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 12 || type == 13 ||
-             (type == 7 && pin2Source == 0)) &&
+        if ((type == 5 || type == CHAN_TYPE_ANALOG_RGB || type == 11 || type == 12 || type == 13 ||
+             (type == 6 && pin2Source == 0)) &&
             jsonPinMatches(output["pin2"], reservedPin)) return true;
-        if ((type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2) ||
-             (type == 7 && pin3Source == 0)) &&
+        if ((type == CHAN_TYPE_ANALOG_RGB || (type == 5 && mcMode == 2) ||
+             (type == 6 && pin3Source == 0)) &&
             jsonPinMatches(output["pin3"], reservedPin)) return true;
         uint8_t colorOrder = output["color_order"] | 0;
-        if (((type == 7 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && jsonPinMatches(output["pin4"], reservedPin)) return true;
+        if (((type == 6 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && jsonPinMatches(output["pin4"], reservedPin)) return true;
     }
     return false;
 }
@@ -357,13 +357,13 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
         uint8_t pin2Source = output["pin2_source"] | 0;
         uint8_t pin3Source = output["pin3_source"] | 0;
         if (addPin(output["pin"] | 255, channel)) return true;
-        if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 12 || type == 13 ||
-             (type == 7 && pin2Source == 0)) &&
+        if ((type == 5 || type == CHAN_TYPE_ANALOG_RGB || type == 11 || type == 12 || type == 13 ||
+             (type == 6 && pin2Source == 0)) &&
             addPin(output["pin2"] | 255, channel)) return true;
-        if ((type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2) ||
-             (type == 7 && pin3Source == 0)) &&
+        if ((type == CHAN_TYPE_ANALOG_RGB || (type == 5 && mcMode == 2) ||
+             (type == 6 && pin3Source == 0)) &&
             addPin(output["pin3"] | 255, channel)) return true;
-        if (((type == 7 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && addPin(output["pin4"] | 255, channel)) return true;
+        if (((type == 6 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && addPin(output["pin4"] | 255, channel)) return true;
         channel++;
     }
     return false;
@@ -405,14 +405,14 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
         uint8_t colorOrder = output["color_order"] | 0;
         if (source != 0) {
             if (addChannel(source, address, output["pca_channel"] | 0, outputIndex)) return true;
-            if ((type == 6 || type == 7 || type == CHAN_TYPE_ANALOG_RGB || type == 12) &&
+            if ((type == 5 || type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 11) &&
                 addChannel(source, address, output["pca_channel2"] | 255, outputIndex)) return true;
-            if ((type == 7 || type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2)) &&
+            if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || (type == 5 && mcMode == 2)) &&
                 addChannel(source, address, output["pca_channel3"] | 255, outputIndex)) return true;
             if ((type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4) &&
                 addChannel(source, address, output["pca_channel4"] | 255, outputIndex)) return true;
         }
-        if (type == 7 && source == 0) {
+        if (type == 6 && source == 0) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             uint8_t pin3Source = output["pin3_source"] | 0;
             if (addChannel(pin2Source, output["pin2_addr"] | 0x20, output["pin2_channel"] | 255, outputIndex)) return true;
@@ -549,7 +549,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         uint8_t source = output["source"] | 0;
         if (type == 1 && source == 0) { // DMX on local GPIO
             dmxCount++;
-        } else if (type == 15) { // DFPlayer
+        } else if (type == 13) { // DFPlayer
             dfPlayerCount++;
         } else if (type == 0) { // LED Strip
             ledCount++;
@@ -570,16 +570,12 @@ bool validateOutputJson(JsonArray outputs, String& message) {
     for (JsonObject output : outputs) {
         uint8_t type = output["type"] | 0;
         uint8_t source = output["source"] | 0;
-        if (type == 4) {
-            message = "WiZ output type has been removed. Delete or reconfigure channel " + String(channelNumber) + ".";
-            return false;
-        }
-        if (type > 15) {
+        if (type > 13) {
             message = "Invalid output type on channel " + String(channelNumber) + ".";
             return false;
         }
-        bool pcaOk = (type == 2 || type == 5 || type == 6 || type == 7 || type == 8 || type == CHAN_TYPE_ANALOG_RGB || type == 12);
-        bool digitalOk = (type == 2 || type == 9 || type == 12);
+        bool pcaOk = (type == 2 || type == 4 || type == 5 || type == 6 || type == 7 || type == CHAN_TYPE_ANALOG_RGB || type == 11);
+        bool digitalOk = (type == 2 || type == 5 || type == 8 || type == 11);
         if (source == 1 && !pcaOk) {
             message = "PCA9685 source is not supported by output channel " + String(channelNumber);
             return false;
@@ -592,7 +588,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             message = "Unsupported output source on channel " + String(channelNumber);
             return false;
         }
-        if (type == 7) {
+        if (type == 6) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             uint8_t pin3Source = output["pin3_source"] | 0;
             if (source != 0) {
@@ -1140,6 +1136,7 @@ void setupWebServer() {
                 return;
             }
 
+            doc["version"] = 2;
             File file = LittleFS.open("/outputs.json", "w");
             if (!file) {
                 request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to open file for writing\"}");
@@ -1592,41 +1589,42 @@ void networkTask(void* pvParameters) {
 
             JsonDocument doc;
             JsonArray arr = doc.to<JsonArray>();
-            if (i2cMutex) xSemaphoreTake(i2cMutex, portMAX_DELAY);
-            for (uint8_t addr = 1; addr < 128; addr++) {
-                Wire.beginTransmission(addr);
-                uint8_t error = Wire.endTransmission();
-                if (error == 0) {
-                    JsonObject obj = arr.add<JsonObject>();
-                    obj["address"] = addr;
-                    char hex[6];
-                    snprintf(hex, sizeof(hex), "0x%02X", addr);
-                    obj["hex"] = hex;
-                    String usedBy = "";
-                    int idx = 0;
-                    for (const auto& ch : outputCtrl.getChannels()) {
-                        idx++;
-                        if ((ch.source == 1 || (ch.source >= 2 && ch.source <= 4)) && ch.pca_addr == addr) {
-                            if (usedBy.length() > 0) usedBy += ", ";
-                            usedBy += "CH" + String(idx);
+            if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                for (uint8_t addr = 1; addr < 128; addr++) {
+                    Wire.beginTransmission(addr);
+                    uint8_t error = Wire.endTransmission();
+                    if (error == 0) {
+                        JsonObject obj = arr.add<JsonObject>();
+                        obj["address"] = addr;
+                        char hex[6];
+                        snprintf(hex, sizeof(hex), "0x%02X", addr);
+                        obj["hex"] = hex;
+                        String usedBy = "";
+                        int idx = 0;
+                        for (const auto& ch : outputCtrl.getChannels()) {
+                            idx++;
+                            if ((ch.source == 1 || (ch.source >= 2 && ch.source <= 4)) && ch.pca_addr == addr) {
+                                if (usedBy.length() > 0) usedBy += ", ";
+                                usedBy += "CH" + String(idx);
+                            }
+                            if (ch.pin2_source >= 1 && ch.pin2_source <= 4 && ch.pin2_addr == addr) {
+                                if (usedBy.length() > 0) usedBy += ", ";
+                                usedBy += "CH" + String(idx) + "(P2)";
+                            }
+                            if (ch.pin3_source >= 1 && ch.pin3_source <= 4 && ch.pin3_addr == addr) {
+                                if (usedBy.length() > 0) usedBy += ", ";
+                                usedBy += "CH" + String(idx) + "(P3)";
+                            }
+                            if (ch.pin4_source >= 2 && ch.pin4_source <= 4 && ch.pin4_addr == addr) {
+                                if (usedBy.length() > 0) usedBy += ", ";
+                                usedBy += "CH" + String(idx) + "(HOM)";
+                            }
                         }
-                        if (ch.pin2_source >= 1 && ch.pin2_source <= 4 && ch.pin2_addr == addr) {
-                            if (usedBy.length() > 0) usedBy += ", ";
-                            usedBy += "CH" + String(idx) + "(P2)";
-                        }
-                        if (ch.pin3_source >= 1 && ch.pin3_source <= 4 && ch.pin3_addr == addr) {
-                            if (usedBy.length() > 0) usedBy += ", ";
-                            usedBy += "CH" + String(idx) + "(P3)";
-                        }
-                        if (ch.pin4_source >= 2 && ch.pin4_source <= 4 && ch.pin4_addr == addr) {
-                            if (usedBy.length() > 0) usedBy += ", ";
-                            usedBy += "CH" + String(idx) + "(HOM)";
-                        }
+                        if (usedBy.length() > 0) obj["used_by"] = usedBy;
                     }
-                    if (usedBy.length() > 0) obj["used_by"] = usedBy;
                 }
+                xSemaphoreGive(i2cMutex);
             }
-            if (i2cMutex) xSemaphoreGive(i2cMutex);
 
             String result;
             serializeJson(doc, result);
