@@ -107,26 +107,146 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 
 ## Resource Scoring System (v3)
 
-ระบบตรวจวัดคะแนนการใช้งานทรัพยากร (Resource Scoring) จำกัดคะแนนรวมทุกแชนเนลไม่เกิน **100 คะแนน** เพื่อป้องกันภาระงานของไมโครคอนโทรลเลอร์ (CPU/LEDC/RMT) สูงเกินไปจนทำให้สัญญาณแกว่ง (Jitter) หรือระบบดับเนื่องจาก OOM โดยมีคะแนนแบ่งตามประเภทช่องสัญญาณดังนี้:
+**Resource-Based Scoring (เปลี่ยนจาก type-based เป็น resource-based ตั้งแต่ v1.24)**
 
-- **RGB LED (Type 3):** `2.0` คะแนนพื้นฐาน + `1.0` คะแนนต่อทุก ๆ 100 เม็ดพิกเซล
-- **DMX Output (Type 1):** `4.0` คะแนนต่อหนึ่งพอร์ตแชนเนล (เนื่องจากกินช่องสัญญาณ UART/RMT และบัฟเฟอร์ขนาด 512 ไบต์)
-- **AC Dimmer (Type 0) / RC Servo (Type 8) / 7-Segment 2-Pin (Type 11) / DFPlayer MP3 (Type 10):** `2.0` คะแนนต่อช่องสัญญาณ
-- **Single Color LED (Type 4) / DC Motor (Type 6) / Analog RGB (Type 5):** `3.0` คะแนนต่อช่องสัญญาณ (ใช้ทรัพยากร LEDC หลายแชนเนล)
-- **Stepper Motor (Type 7):** `8.0` คะแนนต่อแชนเนล (ใช้ FastAccelStepper ขัดจังหวะความถี่สูง)
-- **Passive Buzzer (Type 9) / Smoke Shooter (Type 18):** `1.5` คะแนนต่อช่องสัญญาณ
-- **Function Generator (Type 16):** `3.0` คะแนนต่อช่องสัญญาณ (ใช้ LEDC + Timer)
-- **PWM DAC (Type 15) / 7-Seg DD PWM (Type 12/13):** `3.0` คะแนนต่อช่องสัญญาณ (ใช้ LEDC หลายแชนเนล)
-- **DAC (Type 14) / Relay (Type 2) / Solenoid (Type 17):** `0.5` คะแนนต่อช่องสัญญาณ (เอาต์พุตเปิด/ปิดทั่วไป)
+คะแนนคำนวณจากทรัพยากรจริงที่แต่ละแชนเนลใช้ (`scoring.h:estimateResources()`) ไม่ใช่ค่า hardcode ตาม type อีกต่อไป มี weight ปรับได้ที่เดียว:
+
+### Resource Weights
+
+| Resource | Weight | คำอธิบาย |
+|----------|--------|----------|
+| GPIO | 0.5 | ต่อ pin output ปกติ |
+| LEDC | 2.5 | ต่อ channel PWM (มี 16 ch. ทั้งหมด) |
+| RMT | 3.0 | ต่อ channel (มี 8 ch. ทั้งหมด) |
+| UART | 8.0 | ต่อ port (มีแค่ 2 port) |
+| DAC | 2.0 | ต่อ channel (GPIO25/26 โดน LAN8720 จองไว้) |
+| PCA9685 | 0.25 | ต่อ channel (ถูกเพราะ I2C, มี 16 ch./chip) |
+| I2C Expander | 0.125 | ต่อ pin (ถูกมาก) |
+
+### หลักการคิดคะแนนต่อ channel
+
+แต่ละ output type จะถูกนับทรัพยากรที่ใช้ (`estimateResources()`) ตาม pin/source/mode ที่เลือก เช่น:
+
+| Type | GPIO | LEDC | RMT | UART | DAC | PCA | Exp |
+|------|------|------|-----|------|-----|-----|-----|
+| 0 AC Dimmer | 1 | - | - | - | - | - | - |
+| 1 DMX | 1 | - | - | 1 | - | - | - |
+| 2 Relay | 1* | - | - | - | - | 1* | 1* |
+| 3 RGB LED | 1 | - | - | - | - | - | - |
+| 4 Single LED | 1* | 1* | - | - | - | 1* | 1* |
+| 5 Analog RGB | 3* | 3* | - | - | - | 3* | - |
+| 6 Motor | 2-3* | 1-2* | - | - | - | 2-3* | - |
+| 7 Stepper | 2-3 | - | 2 | - | - | 2 | - |
+| 8 Servo | 1* | 1* | - | - | - | 1* | - |
+| 9 Buzzer | 1 | 1 | - | - | - | - | - |
+| 10 DFPlayer | 2 | - | - | 1 | - | - | - |
+| 11 7-Seg 2-Pin | 2 | - | - | - | - | - | 2 |
+| 12 7-Seg 7-Pin | 7 | 7 | - | - | - | - | - |
+| 13 7-Seg 8-Pin | 8 | 8 | - | - | - | - | - |
+| 14 DAC | 1 | - | - | - | 1 | - | - |
+| 15 PWM DAC | 1* | 1* | - | - | - | 1* | - |
+| 16 Func Gen | 1 | 1 | - | - | - | - | - |
+| 17 Solenoid | 1* | - | - | - | - | 1* | 1* |
+| 18 Smoke | 2* | - | - | - | - | 2* | 2* |
+
+*หมายเหตุ: ตัวเลขเปลี่ยนตาม source ที่เลือก (0=GPIO+LEDC, 1=PCA, 2-4=Expander)
+
+### สูตรคำนวณ
+```
+score = GPIO×0.5 + LEDC×2.5 + RMT×3.0 + UART×8.0 + DAC×2.0 + PCA×0.25 + EXP×0.125
+```
+รวมทุก channel ต้องไม่เกิน **SCORE_LIMIT = 100**
+
+### Resource Max (ไม่รวม PCA/Expander)
+| Resource | Available | คะแนนเต็ม |
+|----------|-----------|-----------|
+| GPIO | ~15 usable | 7.5 |
+| LEDC | 16 | 40 |
+| RMT | 8 | 24 |
+| UART | 2 | 16 |
+| DAC | 2 (blocked by ETH) | 4 |
+| **รวม max** | | **≈ 92** |
+
+### ตัวอย่างคะแนนเปรียบเทียบ (source=GPIO)
+
+| Type | เก่า (type-based) | ใหม่ (resource-based) |
+|------|-------------------|----------------------|
+| AC Dimmer | 2.0 | **0.5** (แค่ 1 GPIO) |
+| DMX Output | 4.0 | **8.5** (UART ราคาแพง) |
+| Stepper | 8.0 | **7.0** (2 GPIO + 2 RMT) |
+| 7-Seg 8-Pin | 3.0 | **24.0** (8 GPIO + 8 LEDC) |
+| Single LED | 3.0 | **3.0** (1 GPIO + 1 LEDC) |
+| Servo | 2.0 | **3.0** (1 GPIO + 1 LEDC) |
+| Relay | 0.5 | **0.5** (1 GPIO) |
+| Analog RGB | 3.0 | **9.0** (3 GPIO + 3 LEDC) |
+
+### Weight อยู่ที่ไฟล์ไหน
+- **C++:** `scoring.h` → `resourceScore()` (constexpr W_GPIO ฯลฯ)
+- **JS:** `web/index.html` → `channelScore()` (object `W`)
+
+เปลี่ยน weight ที่ไฟล์เดียว ทุก channel คำนวณใหม่หมดอัตโนมัติ
+
+### PCA9685 Frequency Interlock (Shared Frequency)
+
+PCA9685 แต่ละตัว (I2C address) แชร์ความถี่ PWM เดียวกันทั้ง chip ถ้ามี channel หลายประเภทบน PCA เดียวกัน ต้องจัดการความถี่ตาม priority:
+
+1. **Servo (Type 8) — Priority HIGHEST:** ถ้ามี Servo บน PCA นี้ → บังคับ 50 Hz (RC servo ต้องการ 50 Hz เท่านั้น)
+2. **Function Generator (Type 16), PWM DAC (Type 15), DC Motor (Type 6), Single Color LED (Type 4), Analog RGB (Type 5), Smoke Shooter (Type 18):** ใช้ `mc_freq` ของ channel แรกที่พบบน PCA นี้
+3. **Default:** ถ้าไม่มี channel ข้างต้น → 1000 Hz
+
+**ข้อจำกัด:** ไม่สามารถต่อ Servo ร่วมกับ type อื่นบน PCA เดียวกันได้ เพราะ 50 Hz ไม่เหมาะกับ PWM ปกติ
+
+**Validation ใน Web UI:** `index.html:2391-2415` — ถ้าผู้ใช้ตั้ง `mc_freq` ต่างกันบน PCA เดียวกัน จะแสดง warning
+
+## Interlocking System
+
+ระบบป้องกันการทำงานขัดแย้งของฮาร์ดแวร์ (Interlocking) ประกอบด้วย:
+
+### 1. GPIO Interlock (Pin Conflict Prevention)
+
+ป้องกันไม่ให้ output channel หลาย channel ใช้ GPIO pin เดียวกัน:
+
+| กฎ | C++ | JS |
+|----|-----|-----|
+| ห้าม duplicate GPIO ระหว่าง channel | main.cpp:1098-1108 | index.html:2292-2299 |
+| ห้ามใช้ pin เดียวกับ Status LED (GPIO 5) | main.cpp:500-519 | index.html:2300-2309 |
+| ห้ามใช้ pin เดียวกับ ZC pin | main.cpp:1098-1108 | index.html:2292-2299 |
+| ห้าม Status LED กับ ZC pin ใช้ pin เดียวกัน | main.cpp:500-519 | - |
+| ห้ามใช้ pin 255 (unconfigured) สำหรับ type ที่ต้องใช้ GPIO | main.cpp:1110-1125 | index.html:2281-2284 |
+
+เตือนใน Web UI ถ้ามี AC Dimmer แต่ ZC pin = 255 (Disabled) — `index.html:1690-1695`
+
+### 2. PCA9685 Frequency Interlock
+
+- **Shared frequency per chip:** PCA9685 ทุก 16 ch. บน I2C address เดียวกันใช้ freq เดียวกัน (`output_control.h:getPcaSharedFrequency()`)
+- **Servo lock:** Type 8 บน PCA → บังคับ 50 Hz ทุก channel บน chip นั้น
+- **Web UI validation:** ถ้า `mc_freq` ต่างกันบน PCA เดียวกัน → แสดง warning ตอน save (`index.html:2391-2415`)
+- **ต้องจัดการให้ channel ใช้ PCA ร่วมกันได้เฉพาะ type ที่ใช้ freq เดียวกันเท่านั้น**
+
+### 3. UART Interlock
+
+- UART0 = console (jack)
+- DFPlayer (Type 10) มี priority สูงสุด → UART2 → UART1
+- DMX (Type 1) ใช้ UART ที่เหลือ ถ้าไม่มี → fallback เป็น RMT
+- รายงานสถานะผ่าน `/api/resources` API
+
+### 4. Smoke Shooter State Machine Lock (Cooldown Interlock)
+
+- IDLE → SMOKE → SETTLE → SHOOT → COOLDOWN → IDLE
+- `smoke_lockout_ms` (default 2000ms) ป้องกันยิงซ้ำระหว่าง COOLDOWN phase
+- DMX trigger ต้อง < 127 และ > 127 ใหม่ถึงเริ่ม cycle ใหม่
+- ดู logic ได้ที่ `output_control.h:updateSmokeShooters()`
 
 ---
 
 ## Critical Code Patterns — MUST KNOW
 
 1. **i2cMutex** — Every `Wire` operation must be wrapped with `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100))` (100ms timeout, no longer `portMAX_DELAY`)
-2. **Scoring duplication** — Some JS `channelScore()` values may differ from C++ `scoreForType()` — verify when adding new types
+2. **Resource-based scoring** — C++ `scoring.h` / JS `channelScore()` คำนวณคะแนนจาก resource จริง ใช้ weight ค่าเดียวกันทั้งสองฝั่ง ถ้าแก้ weight ต้องแก้ทั้งสองไฟล์
 3. **Layout versioning** — Config file `/outputs.json` has `version: 3` with v1→v3 and v2→v3 migration paths
-4. **Dead code cleanup** — v1.x deprecated types removed, no backward compat needed
+4. **PCA frequency interlock** — `getPcaSharedFrequency()` ใช้ shared frequency ต่อ PCA chip ถ้ามี Servo บน chip → บังคับ 50 Hz
+5. **GPIO interlock validation** — ต้อง validate ตอน save ทั้ง C++ (`main.cpp:1098-1125`) และ JS (`index.html:2292-2309`)
+6. **Dead code cleanup** — v1.x deprecated types removed, no backward compat needed
 
 ## P0 Bugs (all fixed in v1.16.00)
 
