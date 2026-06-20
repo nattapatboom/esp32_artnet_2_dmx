@@ -54,4 +54,5 @@ handover/
 | 1.21.00 | 2026-06-20 | DAC (Type 14), Function Generator (Type 16), 7-segment DD GPIO, I2C/Display toggle, skill registration |
 | 1.22.00 | 2026-06-20 | Type 15 PWM DAC, RC Filter Calculator, Complete Test Mode, Func Gen PWM Carrier configurable |
 | 1.23.00 | 2026-06-20 | v3 Layout Migration — types renumbered 0-18 with grouped categories, type 12/13 PWM DD impl, PCA support for type 15 |
-
+| 1.24.00 | 2026-06-20 | Session: Code Audit & Bug Fixes (5 bugs) |
+| 1.25.00 | 2026-06-20 | 7-segment separate pin config, expander DD compatibility, 7-segment PWM dimming modes |

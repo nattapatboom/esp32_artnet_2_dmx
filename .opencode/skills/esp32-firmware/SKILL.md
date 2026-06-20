@@ -58,9 +58,9 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 | 8 | RC Servo | 1 | GPIO, PCA | LEDC 1ch (50Hz) |
 | 9 | Passive Buzzer | 2 | GPIO only | LEDC 1ch |
 | 10 | DFPlayer MP3 Module | 3 | GPIO only (UART) | UART 1 |
-| 11 | 7-Segment 2-Pin (TM1637) | 2-4 | GPIO, Expander | GPIO 2 |
-| 12 | 7-Segment DD 7-Pin PWM | 1 (Direct) | GPIO only | LEDC 7ch |
-| 13 | 7-Segment DD 8-Pin PWM | 1 (Direct) | GPIO only | LEDC 8ch |
+| 11 | 7-Segment 2-Pin (TM1637) | 2-4 | GPIO only | GPIO 2 |
+| 12 | 7-Segment DD 7-Pin PWM | 1-2 (Direct) | GPIO, Expander | LEDC 7ch or Expander GPIO |
+| 13 | 7-Segment DD 8-Pin PWM | 1-2 (Direct) | GPIO, Expander | LEDC 8ch or Expander GPIO |
 | 14 | DAC (Analog Out) | 1 | GPIO only (GPIO25/26) | DAC 1ch (blocked on WT32-ETH01) |
 | 15 | PWM DAC (RC Filter) | 1-2 | GPIO, PCA | LEDC 1ch |
 | 16 | Function Generator | 5 | GPIO only | LEDC 1ch + esp_timer |
@@ -311,9 +311,14 @@ tools/
 - **Pinout:** Board TX → Module RX (via 1KΩ series resistor), Board RX → Module TX
 - **DMX:** 3 bytes (Byte 1 = command, Byte 2 = folder/track, Byte 3 = volume 0-30)
 
-### 3. TM1637 (4-Digit 7-Segment Display)
-- **Interface:** 2-wire serial (CLK, DIO)
-- **Usage:** ตัวเลข/เวลา — TM1637 mode (Type 11, mc_mode 0)
+### 3. TM1637 & Direct Drive 7-Segment Displays (Type 11, 12, 13)
+- **TM1637 (Type 11):** 2-wire serial CLK/DIO display (uses 2 or 4 DMX channels for Numeric or ASCII text mode).
+- **Direct Drive (Type 12 / 13):** Direct Pin Drive 7-Segment (7-pin or 8-pin with Decimal Point).
+  - **GPIO Mode:** Supports mapping each segment (A to DP) to individual, non-consecutive ESP32 GPIO pins or using consecutive pins from a base pin.
+  - **Expander Mode:** Supports driving segments from consecutive expander pins (MCP23017, TCA9555, PCF857x).
+  - **Dimming Modes:**
+    - **No Dimming (1 Ch):** 1 DMX channel controls segment char/state at full brightness.
+    - **Dimmed Mode (2 Ch):** DMX Channel 1 controls character, DMX Channel 2 controls PWM duty cycle brightness level (0-255).
 
 ### 4. MCP23017 / TCA9555 / PCF857x (I2C GPIO Expander)
 - **Interface:** I2C (Address 0x20 - 0x27)

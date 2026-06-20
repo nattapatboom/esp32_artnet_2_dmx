@@ -282,6 +282,29 @@ bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
     if (source == 0) {
         uint8_t pin2Source = output["pin2_source"] | 0;
         uint8_t pin3Source = output["pin3_source"] | 0;
+        
+        if ((type == 12 || type == 13) && pin2Source == 0) {
+            uint8_t numSeg = (type == 13) ? 8 : 7;
+            if (output.containsKey("seg_pins")) {
+                JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
+                for (int s = 0; s < numSeg; s++) {
+                    if (s < segArr.size()) {
+                        if (jsonPinMatches(segArr[s], reservedPin)) return true;
+                    } else {
+                        int basePin = output["pin"] | 255;
+                        if (basePin != 255 && reservedPin != 255 && (basePin + s) == reservedPin) return true;
+                    }
+                }
+            } else {
+                int basePin = output["pin"] | 255;
+                if (basePin != 255 && reservedPin != 255) {
+                    for (int s = 0; s < numSeg; s++) {
+                        if ((basePin + s) == reservedPin) return true;
+                    }
+                }
+            }
+        }
+        
         if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10 ||
              (type == 7 && pin2Source == 0)) &&
             jsonPinMatches(output["pin2"], reservedPin)) return true;
@@ -356,14 +379,39 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
         uint8_t colorOrder = output["color_order"] | 0;
         uint8_t pin2Source = output["pin2_source"] | 0;
         uint8_t pin3Source = output["pin3_source"] | 0;
-        if (addPin(output["pin"] | 255, channel)) return true;
-        if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10 ||
-             (type == 7 && pin2Source == 0)) &&
-            addPin(output["pin2"] | 255, channel)) return true;
-        if ((type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2) ||
-             (type == 7 && pin3Source == 0)) &&
-            addPin(output["pin3"] | 255, channel)) return true;
-        if (((type == 7 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && addPin(output["pin4"] | 255, channel)) return true;
+        
+        if ((type == 12 || type == 13) && pin2Source == 0) {
+            uint8_t numSeg = (type == 13) ? 8 : 7;
+            if (output.containsKey("seg_pins")) {
+                JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
+                for (int s = 0; s < numSeg; s++) {
+                    int pVal = 255;
+                    if (s < segArr.size()) {
+                        pVal = segArr[s] | 255;
+                    }
+                    if (pVal == 255) {
+                        int basePin = output["pin"] | 255;
+                        pVal = (basePin != 255) ? (basePin + s) : 255;
+                    }
+                    if (addPin(pVal, channel)) return true;
+                }
+            } else {
+                int basePin = output["pin"] | 255;
+                for (int s = 0; s < numSeg; s++) {
+                    int pVal = (basePin != 255) ? (basePin + s) : 255;
+                    if (addPin(pVal, channel)) return true;
+                }
+            }
+        } else {
+            if (addPin(output["pin"] | 255, channel)) return true;
+            if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10 ||
+                 (type == 7 && pin2Source == 0)) &&
+                addPin(output["pin2"] | 255, channel)) return true;
+            if ((type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2) ||
+                 (type == 7 && pin3Source == 0)) &&
+                addPin(output["pin3"] | 255, channel)) return true;
+            if (((type == 7 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && addPin(output["pin4"] | 255, channel)) return true;
+        }
         channel++;
     }
     return false;

@@ -340,9 +340,10 @@ public:
                     uint8_t baseChan = allocateLedc();
                     if (baseChan != 255) {
                         for (uint8_t s = 0; s < numSeg; s++) {
-                            if (baseChan + s <= 15) {
+                            uint8_t segPin = (ch.seg_pins[s] != 255) ? ch.seg_pins[s] : (ch.pin + s);
+                            if (segPin != 255 && baseChan + s <= 15) {
                                 ledcSetup(baseChan + s, ch.mc_freq ? ch.mc_freq : 1000, 8);
-                                ledcAttachPin(ch.pin + s, baseChan + s);
+                                ledcAttachPin(segPin, baseChan + s);
                                 ledcWrite(baseChan + s, 0);
                             }
                         }
@@ -352,8 +353,11 @@ public:
                     }
                 } else {
                     for (uint8_t s = 0; s < (ch.mc_mode == 3 ? 8 : 7); s++) {
-                        pinMode(ch.pin + s, OUTPUT);
-                        digitalWrite(ch.pin + s, LOW);
+                        uint8_t segPin = (ch.seg_pins[s] != 255) ? ch.seg_pins[s] : (ch.pin + s);
+                        if (segPin != 255) {
+                            pinMode(segPin, OUTPUT);
+                            digitalWrite(segPin, LOW);
+                        }
                     }
                     Serial.printf("7-Segment Direct Drive: GPIO base=%d pins=%d\n",
                                   ch.pin, ch.mc_mode == 3 ? 8 : 7);
@@ -680,26 +684,33 @@ public:
                     ch.prev_7seg_valid = true;
                     if (ch.mc_mode >= 2 && ch.pin2_source >= 2 && ch.pin2_source <= 4) {
                         // Direct Drive via Expander (1 digit, 7 or 8 pins)
-                        uint8_t numSeg = (ch.mc_mode == 3) ? 8 : 7;
+                        uint8_t numSeg = (ch.mc_mode == 3 || ch.mc_mode == 5) ? 8 : 7;
                         uint8_t segByte = asciiToSegment(ch.dmxBuffer[0]);
                         for (uint8_t b = 0; b < numSeg; b++) {
                             digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + b, (segByte >> b) & 1);
                         }
                     } else if (ch.mc_mode >= 2 && ch.pin2_source == 0) {
-                        // Direct Drive via GPIO (consecutive pins starting from ch.pin)
-                        uint8_t numSeg = (ch.mc_mode == 3) ? 8 : 7;
+                        // Direct Drive via GPIO
+                        uint8_t numSeg = (ch.mc_mode == 3 || ch.mc_mode == 5) ? 8 : 7;
                         uint8_t segByte = asciiToSegment(ch.dmxBuffer[0]);
                         if (ch.type == 12 || ch.type == 13) {
                             // PWM Direct Drive via LEDC
+                            uint8_t brightness = 255;
+                            if (ch.mc_mode == 4 || ch.mc_mode == 5) {
+                                brightness = ch.dmxBuffer[1]; // DMX Channel 2
+                            }
                             for (uint8_t b = 0; b < numSeg; b++) {
-                                uint32_t duty = ((segByte >> b) & 1) ? 255 : 0;
+                                uint32_t duty = ((segByte >> b) & 1) ? brightness : 0;
                                 if (ch.dmxPort + b <= 15) {
                                     ledcWrite(ch.dmxPort + b, duty);
                                 }
                             }
                         } else {
                             for (uint8_t b = 0; b < numSeg; b++) {
-                                digitalWrite(ch.pin + b, (segByte >> b) & 1);
+                                uint8_t segPin = (ch.seg_pins[b] != 255) ? ch.seg_pins[b] : (ch.pin + b);
+                                if (segPin != 255) {
+                                    digitalWrite(segPin, (segByte >> b) & 1);
+                                }
                             }
                         }
                     } else {

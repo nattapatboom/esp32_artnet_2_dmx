@@ -171,6 +171,7 @@ struct OutputChannel {
     uint8_t ledc_chan2 = 255; // 2nd LEDC channel for DC Motor PWM+PWM mode (255 = unused)
     uint8_t ledc_chan3 = 255; // 3rd LEDC channel for Analog RGB Blue (255 = unused)
     uint8_t ledc_chan4 = 255; // 4th LEDC channel for Analog RGBW White (255 = unused)
+    uint8_t seg_pins[8] = {255,255,255,255,255,255,255,255}; // 7-Seg DD individual segment pins A-G+DP (255=use base pin+offset)
     
     uint8_t* dmxBuffer = nullptr;
     uint16_t bufferSize = 0;
@@ -650,6 +651,21 @@ public:
             ch.shoot_duration_ms = item["shoot_duration_ms"] | 1000;
             ch.smoke_lockout_ms = item["smoke_lockout_ms"] | 2000;
             
+            if (item.containsKey("seg_pins")) {
+                JsonArray segArr = item["seg_pins"].as<JsonArray>();
+                for (int s = 0; s < 8; s++) {
+                    if (s < segArr.size()) {
+                        ch.seg_pins[s] = segArr[s] | 255;
+                    } else {
+                        ch.seg_pins[s] = 255;
+                    }
+                }
+            } else {
+                for (int s = 0; s < 8; s++) {
+                    ch.seg_pins[s] = 255;
+                }
+            }
+            
             if (ch.type == 3) { // RGB LED strip (v3)
                 uint16_t numUniverses = getUniverseCount(ch);
                 ch.bufferSize = numUniverses * 512;
@@ -756,6 +772,12 @@ public:
                 item["pin2_addr"] = ch.pin2_addr;
                 item["pin2_channel"] = ch.pin2_channel;
                 item["mc_mode"] = ch.mc_mode;
+                if (ch.type == 12 || ch.type == 13) {
+                    JsonArray segArr = item["seg_pins"].to<JsonArray>();
+                    for (int s = 0; s < 8; s++) {
+                        segArr.add(ch.seg_pins[s]);
+                    }
+                }
             } else if (ch.type == 10) {  // DFPlayer (v3)
                 item["pin2"] = ch.pin2;
             } else if (ch.type == 15 || ch.type == 16) {  // PWM DAC / FuncGen

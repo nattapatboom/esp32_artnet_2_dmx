@@ -1196,7 +1196,15 @@ function outputGpios(o){
   const add=p=>{p=parseInt(p); if(!isNaN(p)&&p!==255&&!pins.includes(p)) pins.push(p);};
   if(parseInt(o.source||0)!==0) return pins;
   add(o.pin);
-  const is7SegDD = (t===12||t===13) && (parseInt(o.mc_mode||0)===2||parseInt(o.mc_mode||0)===3);
+  const is7SegDD = (t===12||t===13) && (parseInt(o.mc_mode||0)>=2 && parseInt(o.mc_mode||0)<=5);
+  if(is7SegDD && parseInt(o.pin2_source||0)===0){
+    const numSeg = (t===13) ? 8 : 7;
+    const sps = o.seg_pins || [];
+    for(let s=0; s<numSeg; s++){
+      const sp = (sps[s] !== undefined && sps[s] !== 255) ? sps[s] : (parseInt(o.pin) + s);
+      add(sp);
+    }
+  }
   if(t===6||t===5||t===18||t===10||(t===11&&!is7SegDD)||(t===7&&parseInt(o.pin2_source||0)===0)) add(o.pin2);
   if(t===5||(t===6&&parseInt(o.mc_mode||0)===2)||(t===7&&parseInt(o.pin3_source||0)===0)) add(o.pin3);
   if((t===7&&parseInt(o.mc_homing_mode||0)===0)||(t===5&&parseInt(o.color_order||0)>=4)) add(o.pin4);
@@ -1219,6 +1227,7 @@ function renderPinRows(){
   const saved={};
   ['no_source','no_pin','no_pca_addr','no_pca_channel','no_pin2','no_pin2_source','no_pin2_addr','no_pin2_channel','no_pin3','no_pin3_source','no_pin3_addr','no_pin3_channel','no_pin4','no_pin4_source','no_pin4_addr','no_pin4_channel'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.value;});
   ['no_pin_invert','no_pin2_invert','no_pin3_invert','no_pin4_invert'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.checked;});
+  for(let s=1; s<=7; s++){const el=document.getElementById('no_seg_pin_'+s);if(el)saved['no_seg_pin_'+s]=el.value;}
   const t=parseInt(document.getElementById('no_type').value);
   const src=parseInt(saved.no_source||0);
   const mcMode=parseInt(document.getElementById('mc_mode')?.value||0);
@@ -1227,7 +1236,7 @@ function renderPinRows(){
   const pin3Src=parseInt(saved.no_pin3_source||0);
   const pin4Src=parseInt(saved.no_pin4_source||0);
   const isStepper=t===7, isMotor=t===6, is7Seg=t>=11&&t<=13, isAnalog=t===5, isSmoke=t===18, isDfPlayer=t===10, isDac=t===14, isFuncGen=t===16;
-  const is7SegDD=is7Seg&&(mcMode===2||mcMode===3);
+  const is7SegDD=is7Seg&&(mcMode>=2&&mcMode<=5);
   const canUsePca=(t===2||t===4||t===6||t===8||t===5||t===15||t===18);
   const canUseDig=(t===2||t===6||t===17||t===18);
   const usePin2=(isMotor||isAnalog||t===18||is7Seg||isDfPlayer||(isStepper&&(pin2Src===0||pin2Src!==0)));
@@ -1261,6 +1270,9 @@ function renderPinRows(){
 
   // Pin 1 (Main)
   const p1Src=src;
+  const isSegADirect = is7SegDD && pin2Src === 0;
+  const p1Label = isSegADirect ? 'Seg A' : 'Pin 1';
+  const p1DescText = isSegADirect ? 'Segment A' : p1Desc;
   if (isDac) {
     pinDefs.push({label:'Pin 1',desc:p1Desc,srcHtml:localBadge('ESP32 GPIO'),addrHtml:localBadge('DAC only'),pinHtml:mkSel('no_pin',['25','26'].map(v=>`<option value="${v}">GPIO ${v} (DAC${v===25?'1':'2'})</option>`).join('')),invId:'no_pin_invert'});
   } else if (t===15) { // PWM DAC
@@ -1268,7 +1280,7 @@ function renderPinRows(){
   } else if (isFuncGen) {
     pinDefs.push({label:'Pin 1',desc:p1Desc,srcHtml:localBadge('ESP32 GPIO'),addrHtml:localBadge('GPIO only'),pinHtml:mkSel('no_pin',PIN_GPIOS.concat(['25','26','27']).map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')),invId:'no_pin_invert'});
   } else {
-    pinDefs.push({label:'Pin 1',desc:p1Desc,srcHtml:mkSel('no_source',srcOpts(canUsePca,canUseDig)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
+    pinDefs.push({label:p1Label,desc:p1DescText,srcHtml:mkSel('no_source',srcOpts(canUsePca,canUseDig)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
   }
 
   // Pin 2
@@ -1277,18 +1289,38 @@ function renderPinRows(){
     let showAddr=p2Src!==0;
     if(is7Seg&&!is7SegDD) p2Src=0;
     if(is7SegDD) p2Src=pin2Src;
-    const srcSel=mkSel('no_pin2_source',srcOpts(isStepper||isMotor,isStepper||isMotor||is7SegDD));
-    const addrEl=showAddr?mkSel('no_pin2_addr',addrOpts(p2Src)):localBadge('ESP32 GPIO');
-    let pinOpts;
-    if(showAddr){
-      pinOpts=mkSel('no_pin2_channel',`<option value="255">None</option>${chOpts}`);
-    } else if(is7SegDD){
-      const pinCount = mcMode===3 ? 7 : 6;
-      pinOpts=`<span style="display:inline-block;width:100%;background:#fef9c3;color:#854d0e;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #fef08a">base+0..${pinCount}</span>`;
+    if(isSegADirect){
+      const srcSel=mkSel('no_pin2_source',srcOpts(false,is7SegDD));
+      const addrEl=localBadge('ESP32 GPIO');
+      const pinOpts=localBadge('See below');
+      pinDefs.push({label:'Segs Src',desc:'Segments B-DP',srcHtml:srcSel,addrHtml:addrEl,pinHtml:pinOpts,invId:''});
+      
+      const numSeg = (t === 13) ? 8 : 7;
+      const segLabels = ['Seg A', 'Seg B', 'Seg C', 'Seg D', 'Seg E', 'Seg F', 'Seg G', 'Seg DP'];
+      for (let s = 1; s < numSeg; s++) {
+        pinDefs.push({
+          label: segLabels[s],
+          desc: 'Segment ' + segLabels[s].split(' ')[1],
+          srcHtml: localBadge('ESP32 GPIO'),
+          addrHtml: localBadge('GPIO Only'),
+          pinHtml: mkSel('no_seg_pin_' + s, `<option value="255">None</option>` + PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')),
+          invId: ''
+        });
+      }
     } else {
-      pinOpts=mkSel('no_pin2',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`);
+      const srcSel=mkSel('no_pin2_source',srcOpts(isStepper||isMotor,isStepper||isMotor||is7SegDD));
+      const addrEl=showAddr?mkSel('no_pin2_addr',addrOpts(p2Src)):localBadge('ESP32 GPIO');
+      let pinOpts;
+      if(showAddr){
+        pinOpts=mkSel('no_pin2_channel',`<option value="255">None</option>${chOpts}`);
+      } else if(is7SegDD){
+        const pinCount = (mcMode===3||mcMode===5) ? 7 : 6;
+        pinOpts=`<span style="display:inline-block;width:100%;background:#fef9c3;color:#854d0e;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #fef08a">base+0..${pinCount}</span>`;
+      } else {
+        pinOpts=mkSel('no_pin2',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`);
+      }
+      pinDefs.push({label:'Pin 2',desc:p2Desc,srcHtml:srcSel,addrHtml:addrEl,pinHtml:pinOpts,invId:'no_pin2_invert'});
     }
-    pinDefs.push({label:'Pin 2',desc:p2Desc,srcHtml:srcSel,addrHtml:addrEl,pinHtml:pinOpts,invId:'no_pin2_invert'});
   }
 
   // Pin 3
@@ -1327,9 +1359,9 @@ function renderPinRows(){
       <div class="f" style="flex:1;min-width:120px;margin:0">${p.srcHtml}</div>
       <div class="f" style="flex:1;min-width:100px;margin:0">${p.addrHtml}</div>
       <div class="f" style="flex:1;min-width:100px;margin:0">${p.pinHtml}</div>
-      <div class="f" style="flex:0 0 auto;margin:0;padding-bottom:4px;display:flex;align-items:center;gap:4px">
-        <input type="checkbox" id="${p.invId}">
-        <label for="${p.invId}" style="font-size:0.75rem;margin:0">Invert</label>
+      <div class="f" style="flex:0 0 auto;margin:0;padding-bottom:4px;display:flex;align-items:center;gap:4px;${p.invId?'':'visibility:hidden'}">
+        <input type="checkbox" id="${p.invId||''}">
+        <label for="${p.invId||''}" style="font-size:0.75rem;margin:0">Invert</label>
       </div>
     </div>`).join('');
   // Restore all saved values on newly created elements
@@ -1426,6 +1458,7 @@ function autoAssignOutputPins(){
   const hMode=parseInt(document.getElementById('mc_homing_mode').value);
   const colorOrder = parseInt(document.getElementById('no_ord')?.value||0);
   ['no_pin','no_pin2','no_pin3','no_pin4'].forEach(id=>setSelectIfOption(id,255));
+  for(let s=1; s<=7; s++){setSelectIfOption('no_seg_pin_'+s,255);}
   const picked=[];
   const takeOutput=()=>{
     const used=reservedPins(picked);
@@ -1441,9 +1474,22 @@ function autoAssignOutputPins(){
     return p;
   };
 
-  if (t !== 14) setSelectIfOption('no_pin',takeOutput()); // DAC requires manual pin selection (GPIO 25/26 only)
   const pin2Source=parseInt(document.getElementById('no_pin2_source')?.value||0);
   const pin3Source=parseInt(document.getElementById('no_pin3_source')?.value||0);
+  
+  if((t===12||t===13) && pin2Source===0){
+    const numSeg = t === 13 ? 8 : 7;
+    const basePin = takeOutput();
+    setSelectIfOption('no_pin', basePin);
+    if(basePin !== 255){
+      for(let s = 1; s < numSeg; s++){
+        setSelectIfOption('no_seg_pin_' + s, takeOutput());
+      }
+    }
+    return;
+  }
+
+  if (t !== 14) setSelectIfOption('no_pin',takeOutput()); // DAC requires manual pin selection (GPIO 25/26 only)
   if(t===6||t===5||t===18||(t>=11&&t<=13)||t===10||(t===7&&pin2Source===0)) setSelectIfOption('no_pin2',takeOutput());
   if(t===5||(t===6&&mcMode===2)||(t===7&&pin3Source===0)) setSelectIfOption('no_pin3',takeOutput());
   if((t===7&&hMode===0)||(t===5&&colorOrder>=4)) setSelectIfOption('no_pin4',takeOutput());
@@ -1630,7 +1676,7 @@ function updateScoreBar(){
   const pct=Math.min(s/limit*100,100);
   bar.style.width=pct+'%';
   bar.style.background=s>limit?'#ef4444':s>limit*0.8?'#eab308':'#22c55e';
-  txt.textContent='R'+rs.toFixed(0)+'+C'+cs.toFixed(0)+'='+s.toFixed(0)+' / '+limit;
+  txt.textContent='R'+Math.round(rs)+'+C'+Math.round(cs)+'='+Math.round(s)+' / '+Math.round(limit);
 
   // Calculate hardware resource metrics
   let ledCount = 0;
@@ -1713,7 +1759,7 @@ function updateScoreBar(){
   updateHwCard('hw-rmt-val', 'hw-rmt-bar', rmtUsed, rmtLimit);
   updateHwCard('hw-uart-val', 'hw-uart-bar', uartUsed, uartLimit);
   updateHwCard('hw-ledc-val', 'hw-ledc-bar', ledcUsed, ledcLimit);
-  updateHwCard('hw-score-val', 'hw-score-bar', s, limit);
+  updateHwCard('hw-score-val', 'hw-score-bar', Math.round(s), Math.round(limit));
 
   const saveBtn = document.getElementById('out-save-btn');
   if (saveBtn) saveBtn.disabled = hasError;
@@ -2030,10 +2076,11 @@ function setModeOptions(kind, type){
   const current=parseInt(sel.value||0);
   const opts=kind==='7seg'
     ? type===11?[[0,'TM1637 Numeric (2 Ch)'],[1,'TM1637 ASCII Text (4 Ch)']]
-      :type===12?[[2,'Direct 7-pin (A-G)']]
-      :type===13?[[3,'Direct 8-pin (A-G+DP)']]
+      :type===12?[[2,'Direct 7-pin (1 Ch - No Dim)'],[4,'Direct 7-pin Dim (2 Ch - Char+Dim)']]
+      :type===13?[[3,'Direct 8-pin (1 Ch - No Dim)'],[5,'Direct 8-pin Dim (2 Ch - Char+Dim)']]
       :[[0,'TM1637 Numeric (2 Ch)'],[1,'TM1637 ASCII Text (4 Ch)'],
-       [2,'Direct 7-pin (A-G)'],[3,'Direct 8-pin (A-G+DP)']]
+       [2,'Direct 7-pin (1 Ch - No Dim)'],[3,'Direct 8-pin (1 Ch - No Dim)'],
+       [4,'Direct 7-pin Dim (2 Ch - Char+Dim)'],[5,'Direct 8-pin Dim (2 Ch - Char+Dim)']]
     : [[0,'PWM + PWM (2 pins)'],[1,'PWM + DIR (2 pins)'],[2,'IN1 + IN2 + EN (3 pins)']];
   if(lbl) lbl.textContent=kind==='7seg'?'Display Mode':'Motor Sub-Mode';
   sel.innerHTML=opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
@@ -2248,6 +2295,12 @@ function editOutput(idx){
   // Re-render to apply visibility with correct values
   toggleOutFields();
   
+  // Set segment pins if editing 7-seg DD channel
+  const sps = o.seg_pins || [];
+  for (let s = 1; s <= 7; s++) {
+    setVal('no_seg_pin_' + s, sps[s] !== undefined ? sps[s] : 255);
+  }
+  
   document.getElementById('out-add-btn').textContent='Update Channel';
   document.getElementById('out-cancel-btn').style.display='';
   document.getElementById('edit-idx-label').textContent=idx+1;
@@ -2268,6 +2321,10 @@ function cancelEditOutput(){
   document.getElementById('no_pin2_channel').value=255;
   document.getElementById('no_pin3_source').value=0;
   document.getElementById('no_pin3_channel').value=255;
+  for(let s=1; s<=7; s++){
+    const el=document.getElementById('no_seg_pin_'+s);
+    if(el) el.value=255;
+  }
   ['no_pin_invert','no_pin2_invert','no_pin3_invert','no_pin4_invert'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
   document.getElementById('out-add-btn').textContent='Add Channel';
   document.getElementById('out-cancel-btn').style.display='none';
@@ -2338,7 +2395,17 @@ function addOrUpdateOutput(){
     smoke_duration_ms: parseInt(document.getElementById('smoke_dur')?.value || 1000),
     settle_delay_ms: parseInt(document.getElementById('smoke_settle')?.value || 500),
     shoot_duration_ms: parseInt(document.getElementById('smoke_shoot')?.value || 1000),
-    smoke_lockout_ms: parseInt(document.getElementById('smoke_lockout')?.value || 2000)
+    smoke_lockout_ms: parseInt(document.getElementById('smoke_lockout')?.value || 2000),
+    seg_pins: (type===12||type===13)? [
+      gv('no_pin', 255),
+      gv('no_seg_pin_1', 255),
+      gv('no_seg_pin_2', 255),
+      gv('no_seg_pin_3', 255),
+      gv('no_seg_pin_4', 255),
+      gv('no_seg_pin_5', 255),
+      gv('no_seg_pin_6', 255),
+      gv('no_seg_pin_7', 255)
+    ] : [255, 255, 255, 255, 255, 255, 255, 255]
   };
 
   const statusPin=parseInt(document.getElementById('status_led_pin').value);
