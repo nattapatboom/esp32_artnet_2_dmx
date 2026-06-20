@@ -124,7 +124,8 @@ struct OutputChannel {
     uint8_t smoke_state = 0; // 0=IDLE, 1=SMOKE, 2=SETTLE, 3=SHOOT, 4=COOLDOWN
     unsigned long smoke_timer = 0;
     bool smoke_prev_trigger = false;
-    uint32_t prev_7seg_val = 0xFFFFFFFFUL;
+    uint32_t prev_7seg_val = 0;
+    bool prev_7seg_valid = false;
     
     // Motion Control (Phase 5.5) fields
     uint8_t pin2;

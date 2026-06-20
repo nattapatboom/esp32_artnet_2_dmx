@@ -13,19 +13,19 @@ private:
     void start() {
         pinMode(dio_pin, OUTPUT);
         digitalWrite(dio_pin, LOW);
-        delayMicroseconds(50);
+        delayMicroseconds(5);
         digitalWrite(clk_pin, LOW);
-        delayMicroseconds(50);
+        delayMicroseconds(5);
     }
     
     void stop() {
         pinMode(dio_pin, OUTPUT);
         digitalWrite(dio_pin, LOW);
-        delayMicroseconds(50);
+        delayMicroseconds(5);
         digitalWrite(clk_pin, HIGH);
-        delayMicroseconds(50);
+        delayMicroseconds(5);
         digitalWrite(dio_pin, HIGH);
-        delayMicroseconds(50);
+        delayMicroseconds(5);
     }
     
     bool writeByte(uint8_t b) {
@@ -33,17 +33,17 @@ private:
             digitalWrite(clk_pin, LOW);
             pinMode(dio_pin, OUTPUT);
             digitalWrite(dio_pin, (b & 0x01) ? HIGH : LOW);
-            delayMicroseconds(50);
+            delayMicroseconds(5);
             digitalWrite(clk_pin, HIGH);
-            delayMicroseconds(50);
+            delayMicroseconds(5);
             b >>= 1;
         }
         // Read ACK
         digitalWrite(clk_pin, LOW);
         pinMode(dio_pin, INPUT_PULLUP);
-        delayMicroseconds(50);
+        delayMicroseconds(5);
         digitalWrite(clk_pin, HIGH);
-        delayMicroseconds(50);
+        delayMicroseconds(5);
         bool ack = (digitalRead(dio_pin) == LOW);
         digitalWrite(clk_pin, LOW);
         return ack;
@@ -325,12 +325,13 @@ public:
                     ch.dmxPort = pwmChan;
                     Serial.printf("Passive Buzzer initialized: GPIO %d, LEDC %d\n", ch.pin, pwmChan);
                 }
-            } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) { // 7-Segment Display (v3)
-                if (ch.mc_mode >= 2 && ch.pin2_source >= 2 && ch.pin2_source <= 4) { // Direct Drive via Expander
-                    for (uint8_t s = 0; s < (ch.mc_mode == 3 ? 8 : 7); s++) {
-                        digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + s, false, true);
-                    }
-                    ch.prev_7seg_val = 0xFFFFFFFFUL;
+        } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) { // 7-Segment Display (v3)
+            if (ch.mc_mode >= 2 && ch.pin2_source >= 2 && ch.pin2_source <= 4) { // Direct Drive via Expander
+                for (uint8_t s = 0; s < (ch.mc_mode == 3 ? 8 : 7); s++) {
+                    digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + s, false, true);
+                }
+                ch.prev_7seg_val = 0;
+                ch.prev_7seg_valid = false;
                     Serial.printf("7-Segment Direct Drive: expander src=%d addr=0x%02X baseCh=%d pins=%d\n",
                                   ch.pin2_source, ch.pin2_addr, ch.pin2_channel, ch.mc_mode == 3 ? 8 : 7);
                 } else if (ch.mc_mode >= 2 && ch.pin2_source == 0) { // Direct Drive via GPIO
@@ -357,11 +358,13 @@ public:
                         Serial.printf("7-Segment Direct Drive: GPIO base=%d pins=%d\n",
                                       ch.pin, ch.mc_mode == 3 ? 8 : 7);
                     }
-                    ch.prev_7seg_val = 0xFFFFFFFFUL;
+                    ch.prev_7seg_val = 0;
+                    ch.prev_7seg_valid = false;
                 } else { // TM1637
                     TM1637Driver tm(ch.pin, ch.pin2);
                     tm.begin();
-                    ch.prev_7seg_val = 0xFFFFFFFFUL;
+                    ch.prev_7seg_val = 0;
+                    ch.prev_7seg_valid = false;
                     Serial.printf("7-Segment Display initialized: CLK %d, DIO %d\n", ch.pin, ch.pin2);
                 }
             }
@@ -662,7 +665,7 @@ public:
                     }
                 }
             } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) { // 7-Segment Display (v3)
-                uint8_t bytes;
+                uint8_t bytes = 0;
                 if (ch.type >= 12) {
                     bytes = 1;
                 } else {
@@ -672,8 +675,9 @@ public:
                 for (uint8_t i = 0; i < bytes; i++) {
                     val = (val << 8) | ch.dmxBuffer[i];
                 }
-                if (val != ch.prev_7seg_val) {
+                if (!ch.prev_7seg_valid || val != ch.prev_7seg_val) {
                     ch.prev_7seg_val = val;
+                    ch.prev_7seg_valid = true;
                     if (ch.mc_mode >= 2 && ch.pin2_source >= 2 && ch.pin2_source <= 4) {
                         // Direct Drive via Expander (1 digit, 7 or 8 pins)
                         uint8_t numSeg = (ch.mc_mode == 3) ? 8 : 7;
@@ -700,7 +704,6 @@ public:
                         }
                     } else {
                         TM1637Driver tm(ch.pin, ch.pin2);
-                        tm.begin();
                         if (ch.mc_mode == 1) {
                             uint8_t segments[4];
                             for (uint8_t i = 0; i < 4; i++) {
