@@ -493,6 +493,10 @@ public:
             uint16_t numUniverses = getUniverseCount(defCh);
             defCh.bufferSize = numUniverses * 512;
             defCh.dmxBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);
+            if (defCh.dmxBuffer == nullptr) {
+                Serial.println("OOM error allocating default channel DMX buffer!");
+                return;
+            }
             defCh.pixelStrip = nullptr;
             defCh.dmxPort = 255;
             
@@ -517,6 +521,10 @@ public:
             uint16_t numUniverses = getUniverseCount(defCh);
             defCh.bufferSize = numUniverses * 512;
             defCh.dmxBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);
+            if (defCh.dmxBuffer == nullptr) {
+                Serial.println("OOM error allocating default fallback DMX buffer!");
+                return;
+            }
             defCh.pixelStrip = nullptr;
             defCh.dmxPort = 255;
             
@@ -608,6 +616,10 @@ public:
                 ch.bufferSize = 512;
             }
             ch.dmxBuffer = (uint8_t*)calloc(ch.bufferSize, 1);
+            if (ch.dmxBuffer == nullptr) {
+                Serial.printf("OOM error allocating DMX buffer for channel type %d!\n", ch.type);
+                continue;
+            }
             
             channels.push_back(ch);
         }
@@ -736,6 +748,22 @@ public:
         uint8_t dmxIdx = 0;
         pcaManager.clear();
         digitalExpanderManager.clear();
+
+        // Detect DMX UART requirements beforehand to avoid conflicts with DFPlayer
+        bool dmxNeedsUart2 = false;
+        bool dmxNeedsUart1 = false;
+        uint8_t dmxUartCount = 0;
+        for (const auto& c : channels) {
+            if (c.type == 1 && c.source == 0) { // DMX on local GPIO
+                if (dmxUartCount == 0) {
+                    dmxNeedsUart2 = true;
+                } else if (dmxUartCount == 1) {
+                    dmxNeedsUart1 = true;
+                }
+                dmxUartCount++;
+            }
+        }
+
         for (auto& ch : channels) {
             if (ch.source == 1) { // PCA9685 Expander
                 uint16_t freq = getPcaSharedFrequency(ch.pca_addr);
@@ -835,8 +863,16 @@ public:
                 Serial.printf("Smoke Shooter initialized: Smoke Pin %d, Shooter Pin %d\n", ch.pin, ch.pin2);
             } else if (ch.type == 15) { // DFPlayer MP3
                 ch.dfPlayer = new DFPlayerController();
-                ch.dfPlayer->begin(Serial2, ch.pin, ch.pin2);
-                Serial.printf("DFPlayer MP3 initialized: TX Pin %d, RX Pin %d\n", ch.pin, ch.pin2);
+                // Dynamic UART assignment to prevent conflict
+                if (!dmxNeedsUart2) {
+                    ch.dfPlayer->begin(Serial2, ch.pin, ch.pin2);
+                    Serial.printf("DFPlayer MP3 initialized on Serial2: TX Pin %d, RX Pin %d\n", ch.pin, ch.pin2);
+                } else if (!dmxNeedsUart1) {
+                    ch.dfPlayer->begin(Serial1, ch.pin, ch.pin2);
+                    Serial.printf("DFPlayer MP3 initialized on Serial1: TX Pin %d, RX Pin %d\n", ch.pin, ch.pin2);
+                } else {
+                    Serial.println("Error: No available UART port for DFPlayer MP3! UART1 and UART2 are both used by DMX.");
+                }
             }
         }
     }
@@ -845,7 +881,8 @@ public:
         // Trigger DMX Serial Frame send periodically based on target FPS
         static unsigned long lastDmxSend = 0;
         unsigned long now = millis();
-        unsigned long interval = 1000 / sysCfg.output_fps;
+        uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
+        unsigned long interval = 1000 / fps;
         if (now - lastDmxSend >= interval) {
             lastDmxSend = now; // Update before send to avoid drift accumulation
             sendDmxFrames();
@@ -973,7 +1010,8 @@ public:
     void updateLeds() {
         static unsigned long lastUpdate = 0;
         unsigned long now = millis();
-        if (now - lastUpdate < (1000 / sysCfg.output_fps)) return;
+        uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
+        if (now - lastUpdate < (1000 / fps)) return;
         lastUpdate = now;
 
         for (auto& ch : channels) {

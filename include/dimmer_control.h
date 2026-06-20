@@ -8,8 +8,10 @@
 #define ZC_PULSE_WIDTH_US 20
 #define DIMMER_TICK_US 39 // 10000us / 255 steps = 39.2us for 50Hz
 
-static hw_timer_t *dimmerTimer = NULL;
-static volatile uint32_t dimmer_tick = 0;
+#include <driver/gpio.h>
+
+extern hw_timer_t *dimmerTimer;
+extern volatile uint32_t dimmer_tick;
 
 // Maximum number of dimmer channels for quick ISR access
 #define MAX_DIMMER_CHANNELS 8
@@ -18,9 +20,9 @@ struct DimmerCh {
     volatile uint8_t* dmxVal;
 };
 
-static DimmerCh dimmerChannels[MAX_DIMMER_CHANNELS];
-static volatile uint8_t numDimmerChannels = 0;
-static volatile bool dimmerEnabled = false;
+extern DimmerCh dimmerChannels[MAX_DIMMER_CHANNELS];
+extern volatile uint8_t numDimmerChannels;
+extern volatile bool dimmerEnabled;
 
 // IRAM_ATTR is required for hardware interrupt handlers
 void IRAM_ATTR onDimmerTimer() {
@@ -33,7 +35,7 @@ void IRAM_ATTR onDimmerTimer() {
         if (val > 0) {
             uint32_t targetTick = 255 - val;
             if (dimmer_tick == targetTick) {
-                digitalWrite(dimmerChannels[i].pin, HIGH);
+                gpio_set_level((gpio_num_t)dimmerChannels[i].pin, HIGH);
             }
         }
     }
@@ -42,16 +44,24 @@ void IRAM_ATTR onDimmerTimer() {
 void IRAM_ATTR onZeroCross() {
     if (!dimmerEnabled) return;
     
+    // Rate limit to prevent interrupt storm from floating pin (noise debounce)
+    static volatile uint64_t lastZcTime = 0;
+    uint64_t now = esp_timer_get_time(); // microseconds
+    if (now - lastZcTime < 5000) { // 5ms rate limit
+        return;
+    }
+    lastZcTime = now;
+    
     // Reset tick
     dimmer_tick = 0;
     
     // Turn off all gates at zero cross
     for (uint8_t i = 0; i < numDimmerChannels; i++) {
-        digitalWrite(dimmerChannels[i].pin, LOW);
+        gpio_set_level((gpio_num_t)dimmerChannels[i].pin, LOW);
         
         // If 100% full brightness, turn it back on immediately
         if (*(dimmerChannels[i].dmxVal) == 255) {
-            digitalWrite(dimmerChannels[i].pin, HIGH);
+            gpio_set_level((gpio_num_t)dimmerChannels[i].pin, HIGH);
         }
     }
     

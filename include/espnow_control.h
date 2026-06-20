@@ -30,6 +30,10 @@ struct PeerRoute {
     uint16_t endAddress = 512;
 };
 
+#include <freertos/queue.h>
+
+extern QueueHandle_t espNowQueue;
+
 class EspNowControl {
 private:
     bool initialized = false;
@@ -206,32 +210,30 @@ private:
     }
 
     static void onDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
-        size_t minHeaderLen = sizeof(EspNowDmxPacket::header) + sizeof(EspNowDmxPacket::universe) +
-                              sizeof(EspNowDmxPacket::offset) + sizeof(EspNowDmxPacket::totalLength) +
-                              sizeof(EspNowDmxPacket::length);
+        size_t minHeaderLen = 4 + 2 + 2 + 2 + 2; // header(4) + universe(2) + offset(2) + totalLength(2) + length(2)
         if (len < (int)minHeaderLen) {
             return;
         }
 
-        const EspNowDmxPacket* packet = (const EspNowDmxPacket*)incomingData;
-        if (strncmp(packet->header, "DMX", 3) == 0) {
-            if (packet->offset >= 512) return;
-            uint16_t available = 512 - packet->offset;
-            uint16_t dmxLen = packet->length > available ? available : packet->length;
-            if ((int)(minHeaderLen + dmxLen) > len) return;
+        // Copy safely into aligned local struct to prevent Xtensa alignment exception
+        EspNowDmxPacket packet;
+        memcpy(packet.header, incomingData, 4);
+        memcpy(&packet.universe, incomingData + 4, 2);
+        memcpy(&packet.offset, incomingData + 6, 2);
+        memcpy(&packet.totalLength, incomingData + 8, 2);
+        memcpy(&packet.length, incomingData + 10, 2);
 
-            bool matched = outputCtrl.mapDmxDataToChannels(packet->universe, packet->data, dmxLen, false, packet->offset);
+        if (strncmp(packet.header, "DMX", 3) == 0) {
+            if (packet.offset >= 512) return;
+            uint16_t available = 512 - packet.offset;
+            packet.length = packet.length > available ? available : packet.length;
+            if ((int)(minHeaderLen + packet.length) > len) return;
 
-            // Keep the local universe-0 frame buffer available for shared output state.
-            if (packet->universe == 0) {
-                memcpy(rxDmxBuffer + packet->offset, packet->data, dmxLen);
-                rxDmxLength = min((uint16_t)512, packet->totalLength);
-                matched = true;
-            }
+            memcpy(packet.data, incomingData + minHeaderLen, packet.length);
 
-            if (matched) {
-                lastRxTime = millis();
-                newRxData = true;
+            // Queue for thread-safe processing on Core 1 loop
+            if (espNowQueue != nullptr) {
+                xQueueSend(espNowQueue, &packet, 0);
             }
         }
     }

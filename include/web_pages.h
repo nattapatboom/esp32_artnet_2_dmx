@@ -1410,7 +1410,8 @@ function channelScore(o){
   if(t===0) return 2+(o.led_count||170)/100;
   if(t===1) return 4;
   if(t===2||t===9) return 0.5;
-  if(t===3||t===5||t===6||t===8||t===10||t===13||t===14) return 2;
+  if(t===5||t===6||t===10) return 3;
+  if(t===3||t===8||t===13||t===14) return 2;
   if(t===7) return 8;
   if(t===11||t===12) return 1.5;
   return 0;

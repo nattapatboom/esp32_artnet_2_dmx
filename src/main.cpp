@@ -55,6 +55,12 @@ SACNControl sacnCtrl;
 EspNowControl espNowCtrl;
 MotionControl motionCtrl;
 DimmerControl dimmerCtrl;
+hw_timer_t *dimmerTimer = NULL;
+volatile uint32_t dimmer_tick = 0;
+DimmerCh dimmerChannels[MAX_DIMMER_CHANNELS];
+volatile uint8_t numDimmerChannels = 0;
+volatile bool dimmerEnabled = false;
+
 PCA9685Manager pcaManager;
 DigitalExpanderManager digitalExpanderManager;
 
@@ -85,6 +91,7 @@ SemaphoreHandle_t i2cScanMutex = NULL;
 String i2cScanJson = "[]";
 volatile bool i2cScanRequested = false;
 volatile bool i2cScanPending = false;
+QueueHandle_t espNowQueue = NULL;
 DisplayDriver display;
 volatile bool outputTestActive = false;
 volatile bool outputTestClearRequested = false;
@@ -229,6 +236,10 @@ void copyConfigString(char* dest, size_t destSize, const char* src) {
 }
 
 bool collectRequestBody(AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total, String& body) {
+    if (total > 65536) { // Reject requests larger than 64KB
+        request->send(413, "application/json", "{\"status\":\"error\",\"message\":\"Payload too large\"}");
+        return false;
+    }
     if (index == 0) {
         if (request->_tempObject != nullptr) {
             delete static_cast<String*>(request->_tempObject);
@@ -486,6 +497,13 @@ void applySettingsFromJson(JsonObjectConst doc) {
 }
 
 bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, String& message) {
+    if (settings.containsKey("output_fps")) {
+        int fps = settings["output_fps"] | 0;
+        if (fps <= 0 || fps > 100) {
+            message = "Global Output FPS must be between 1 and 100";
+            return false;
+        }
+    }
     uint8_t statusPin = settings["status_led_pin"].is<int>() ? (uint8_t)(int)settings["status_led_pin"] : sysCfg.status_led_pin;
     uint8_t zcPin = settings["zc_pin"].is<int>() ? (uint8_t)(int)settings["zc_pin"] : sysCfg.zc_pin;
     uint8_t sdaPin = settings["i2c_sda"].is<int>() ? (uint8_t)(int)settings["i2c_sda"] : sysCfg.i2c_sda;
@@ -519,6 +537,22 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
 bool validateOutputJson(JsonArray outputs, String& message) {
     if (outputs.size() > 16) {
         message = "Maximum 16 output channels";
+        return false;
+    }
+    // Check UART conflict between DMX and DFPlayer
+    uint8_t dmxUartCount = 0;
+    uint8_t dfPlayerCount = 0;
+    for (JsonObject output : outputs) {
+        uint8_t type = output["type"] | 0;
+        uint8_t source = output["source"] | 0;
+        if (type == 1 && source == 0) {
+            dmxUartCount++;
+        } else if (type == 15) {
+            dfPlayerCount++;
+        }
+    }
+    if (dmxUartCount + dfPlayerCount > 2) {
+        message = "Hardware limit exceeded: Maximum 2 channels can use UART (DMX on local GPIO and DFPlayer). Current configuration requires " + String(dmxUartCount + dfPlayerCount);
         return false;
     }
     uint8_t channelNumber = 1;
@@ -1629,6 +1663,27 @@ void outputTask(void* pvParameters) {
             }
         }
 
+        // Process queued ESP-NOW packets (Core 1 safe processing)
+        if (espNowQueue != NULL) {
+            EspNowDmxPacket packet;
+            while (xQueueReceive(espNowQueue, &packet, 0) == pdTRUE) {
+                uint16_t dmxLen = packet.length;
+                bool matched = outputCtrl.mapDmxDataToChannels(packet.universe, packet.data, dmxLen, false, packet.offset);
+
+                // Keep the local universe-0 frame buffer available for shared output state.
+                if (packet.universe == 0) {
+                    memcpy(EspNowControl::rxDmxBuffer + packet.offset, packet.data, dmxLen);
+                    EspNowControl::rxDmxLength = min((uint16_t)512, packet.totalLength);
+                    matched = true;
+                }
+
+                if (matched) {
+                    EspNowControl::lastRxTime = millis();
+                    EspNowControl::newRxData = true;
+                }
+            }
+        }
+
         // If in ESP-NOW Slave mode, check for incoming wireless packages
         if (sysCfg.device_mode == MODE_ESPNOW_SLAVE) {
             if (EspNowControl::newRxData) {
@@ -1728,6 +1783,7 @@ void setup() {
 
     // Initialize ESP-NOW wireless transceiver if device mode requires it.
     if (sysCfg.device_mode == MODE_ESPNOW_MASTER || sysCfg.device_mode == MODE_ESPNOW_SLAVE) {
+        espNowQueue = xQueueCreate(16, sizeof(EspNowDmxPacket));
         espNowCtrl.begin();
     }
 
