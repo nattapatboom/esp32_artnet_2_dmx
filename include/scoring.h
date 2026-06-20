@@ -21,7 +21,6 @@ inline float scoreForType(uint8_t type, uint16_t ledCount = 0) {
         case 11: return 1.5f;
         case 12: return 1.5f;
         case 13: return 2.0f;
-        case 14: return 2.0f;
         case 15: return 2.0f;
         default: return 0.0f;
     }

@@ -697,6 +697,9 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
 <!-- Edit Output Modal (not used, editing inline instead) -->
 
 <script>
+// ==========================================
+// === SECTION 1: GLOBAL STATE & UI TABS ===
+// ==========================================
 // State
 let outputs = [];
 let wizBulbs = [];
@@ -721,6 +724,9 @@ function showTab(e,id){
   if(id==='diag') diagRefreshSysInfo();
 }
 
+// ==========================================
+// === SECTION 2: DIAGNOSTICS & TELEMETRY ===
+// ==========================================
 // Diagnostics
 async function diagRefreshSysInfo(){
   try{
@@ -834,6 +840,9 @@ async function updateTelemetry(){
   }catch(e){}
 }
 
+// ==========================================
+// === SECTION 3: SYSTEM SETTINGS MANAGEMENT ===
+// ==========================================
 // Network form toggle
 function toggleEth(){
   const dhcp=document.getElementById('eth_dhcp').checked;
@@ -1033,6 +1042,9 @@ function pickSsid(){
   if(v) document.getElementById('wifi_ssid').value=v;
 }
 
+// ==========================================
+// === SECTION 4: OUTPUT CHANNELS MANAGER ===
+// ==========================================
 // Output Channels
 const ORDERS=['GRB','RGB','BRG','RBG','RGBW','GRBW','BRGW','WRGB'];
 const TYPES={0:'LED Strip', 1:'DMX Output', 2:'Relay', 3:'AC Dimmer', 4:'Removed WiZ Channel', 5:'PWM Dimmer', 6:'DC Motor', 7:'Stepper', 8:'RC Servo', 9:'Solenoid Trigger', 10:'Analog RGB / RGBW', 11:'Passive Buzzer', 12:'Sequential Smoke Shooter', 13:'7-Segment Display'};
@@ -2198,6 +2210,9 @@ async function saveOutputs(){
   }
 }
 
+// ==========================================
+// === SECTION 5: ESP-NOW PEERS CONFIGURATION ===
+// ==========================================
 // ESP-NOW Peers
 let espPeers = [];
 function normPeer(p){
@@ -2277,6 +2292,9 @@ function copyMac(){
   }
 }
 
+// ==========================================
+// === SECTION 6: OTA FIRMWARE UPLOAD ===
+// ==========================================
 // OTA
 function otaFileSelected(){
   const input=document.getElementById('ota_file');
