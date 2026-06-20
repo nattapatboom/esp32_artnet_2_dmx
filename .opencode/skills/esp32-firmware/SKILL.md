@@ -88,7 +88,7 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 
 ### Hardware Resource Limits
 - **UART:** 3 total. UART0=console. UART1 and UART2 are dynamically allocated. **DFPlayer has priority on UART** (assigns to UART2, then UART1) because DMX can dynamically fall back to RMT.
-- **LEDC:** 8 channels max (PWM dimmer, motor, servo, RGB, buzzer)
+- **LEDC:** 16 channels max (PWM dimmer, motor, servo, RGB, buzzer, 7-seg DD PWM)
 - **RMT:** 8 channels max (LED strips, extra DMX fallback). Total RMT channels (LEDs + extra DMX fallback) cannot exceed 8.
 - **Timer:** 4 total (AC dimmer uses 1)
 - **I2C:** 1 bus (Wire), shared by all expanders + display
@@ -111,7 +111,7 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 
 - **RGB LED (Type 3):** `2.0` คะแนนพื้นฐาน + `1.0` คะแนนต่อทุก ๆ 100 เม็ดพิกเซล
 - **DMX Output (Type 1):** `4.0` คะแนนต่อหนึ่งพอร์ตแชนเนล (เนื่องจากกินช่องสัญญาณ UART/RMT และบัฟเฟอร์ขนาด 512 ไบต์)
-- **AC Dimmer (Type 0) / RC Servo (Type 8) / 7-Segment (Type 11/12/13) / DFPlayer MP3 (Type 10):** `2.0` คะแนนต่อช่องสัญญาณ
+- **AC Dimmer (Type 0) / RC Servo (Type 8) / 7-Segment 2-Pin (Type 11) / DFPlayer MP3 (Type 10):** `2.0` คะแนนต่อช่องสัญญาณ
 - **Single Color LED (Type 4) / DC Motor (Type 6) / Analog RGB (Type 5):** `3.0` คะแนนต่อช่องสัญญาณ (ใช้ทรัพยากร LEDC หลายแชนเนล)
 - **Stepper Motor (Type 7):** `8.0` คะแนนต่อแชนเนล (ใช้ FastAccelStepper ขัดจังหวะความถี่สูง)
 - **Passive Buzzer (Type 9) / Smoke Shooter (Type 18):** `1.5` คะแนนต่อช่องสัญญาณ
