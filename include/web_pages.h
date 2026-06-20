@@ -1,0 +1,2356 @@
+#ifndef WEB_PAGES_H
+#define WEB_PAGES_H
+
+#include <Arduino.h>
+
+const char CONFIG_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Art-Net Node</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:13px/1.5 system-ui,sans-serif;background:#f0f2f5;color:#222}
+a{color:#1d4ed8}
+.hdr{background:#1e3a8a;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:99}
+.hdr img{height:34px;image-rendering:pixelated}
+.hdr h1{font-size:0.95rem;font-weight:700;flex:1}
+.net-badges{display:flex;gap:6px;font-size:0.7rem}
+.badge{padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.15);font-weight:600}
+.w{max-width:920px;margin:0 auto;padding:10px 12px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px}
+.sc{background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;text-align:center}
+.sc small{color:#64748b;font-size:0.7rem;display:block;margin-bottom:2px}
+.sc strong{font-size:0.95rem;color:#1e3a8a}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.tb{padding:6px 13px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;border-radius:5px;font-size:0.8rem;color:#475569;transition:all .15s}
+.tb.on{background:#1e3a8a;color:#fff;border-color:#1e3a8a}
+.pane{display:none;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px}
+.pane.on{display:block}
+h2{font-size:0.85rem;font-weight:700;color:#1e293b;padding-bottom:7px;border-bottom:1px solid #e2e8f0;margin-bottom:12px}
+h3{font-size:0.8rem;font-weight:600;color:#334155;margin:10px 0 6px}
+.fg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.f{flex:1;min-width:180px}
+label{display:block;font-size:0.72rem;font-weight:600;color:#475569;margin-bottom:3px}
+input,select{width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:0.82rem;background:#fff;color:#222}
+input:focus,select:focus{outline:none;border-color:#3b82f6}
+select option{background:#fff;color:#222}
+.cb{display:flex;align-items:center;gap:6px;padding:4px 0}
+.cb input{width:auto}
+.cb label{margin:0;font-size:0.82rem}
+.hint{font-size:0.68rem;color:#94a3b8;margin-top:2px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn{padding:7px 16px;border:none;border-radius:5px;cursor:pointer;font-size:0.82rem;font-weight:600;transition:opacity .15s}
+.btn:hover{opacity:0.85}
+.bp{background:#1e3a8a;color:#fff}
+.bs{background:#e2e8f0;color:#334155}
+.bd{background:#ef4444;color:#fff}
+.bg{background:#16a34a;color:#fff}
+table{width:100%;border-collapse:collapse;font-size:0.78rem;margin:6px 0}
+th{background:#f8fafc;text-align:left;padding:6px 8px;border-bottom:2px solid #e2e8f0;color:#475569;font-weight:600}
+td{padding:6px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tr:last-child td{border:none}
+.ib{padding:10px 14px;border-radius:6px;font-size:0.78rem;margin-bottom:10px;line-height:1.5}
+.ib-blue{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.ib-green{background:#f0fdf4;border:1px solid #86efac;color:#166534}
+.ib-yellow{background:#fefce8;border:1px solid #fde68a;color:#854d0e}
+.ib-red{background:#fef2f2;border:2px solid #ef4444;color:#991b1b}
+.alert{display:none;padding:8px 12px;border-radius:5px;margin-bottom:8px;font-size:0.8rem}
+.al-ok{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.al-err{background:#fee2e2;color:#dc2626;border:1px solid #fca5a5}
+.section{border-top:1px solid #e2e8f0;padding-top:12px;margin-top:14px}
+.section:first-child{border-top:none;margin-top:0;padding-top:0}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.section-head h3{margin:0}
+.proto-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+.proto-box{border:1px solid #e2e8f0;border-radius:6px;padding:10px;background:#f8fafc}
+.proto-box h4{font-size:0.74rem;color:#1e293b;margin:0 0 8px;font-weight:700}
+.proto-box .fg{margin-bottom:0}
+.table-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:6px;background:#fff}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#e2e8f0;color:#334155;font-size:0.72rem;font-weight:700}
+.pill-warn{background:#fef3c7;color:#92400e}
+.pill-ok{background:#dcfce7;color:#166534}
+tr.test-row td{background:#fefce8}
+tr.unsaved-row td:first-child{border-left:3px solid #f59e0b}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center}
+.modal.on{display:flex}
+.mbox{background:#fff;border-radius:8px;padding:20px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto}
+.mbox h3{font-size:0.9rem;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #e2e8f0}
+progress{width:100%;height:18px;border-radius:4px;margin:8px 0}
+progress::-webkit-progress-bar{background:#e2e8f0;border-radius:4px}
+progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
+@media(max-width:600px){.hdr{flex-wrap:wrap}.stats{grid-template-columns:1fr 1fr}.proto-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABAAQMAAADoGO08AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAGUExURQAAAP///6XZn90AAAAJcEhZcwAAEnMAABJzAYwiuQcAAACNSURBVDjL5dIxDsMgDAXQHzF0zJF6tBJxMXITjsDIUPELyEYkZemGVMYnYcy3wdvBf0EGdkc6emzxAlbgrQCBdIcokBWCQFKAQFAwrAXoPHk0eAic5PkDHKS51LCA8frKSvDVaf/La8ijwbOAlcQqpJpfGCBXiAO0hNMI5X6f3BxKd33YcwgzWGVxF4EPJ6cwIWyZLd0AAAAASUVORK5CYII=" alt="Logo">
+  <h1>Art-Net Node Controller</h1>
+  <div class="net-badges">
+    <span class="badge" id="net-eth">ETH</span>
+    <span class="badge" id="net-wifi">WiFi</span>
+    <span class="badge" id="net-ap">AP</span>
+  </div>
+</div>
+
+<div class="w">
+  <div class="stats" style="margin-top:10px">
+    <div class="sc"><small>IP Address</small><strong id="tel-ip">--</strong></div>
+    <div class="sc"><small>Art-Net Packets</small><strong id="tel-packets">--</strong></div>
+    <div class="sc"><small>Free Heap</small><strong id="tel-heap">--</strong></div>
+    <div class="sc"><small>CPU</small><strong id="tel-cpu">--</strong></div>
+    <div class="sc"><small>Mode</small><strong id="tel-time">--</strong></div>
+  </div>
+
+  <div id="alert-ok" class="alert al-ok">Settings saved successfully.</div>
+  <div id="alert-err" class="alert al-err">Error saving settings.</div>
+
+  <div class="tabs">
+    <button class="tb on" onclick="showTab(event,'net')">Network</button>
+    <button class="tb" onclick="showTab(event,'out')">Outputs</button>
+    <button class="tb" onclick="showTab(event,'espnow')">ESP-NOW</button>
+    <button class="tb" onclick="showTab(event,'ota')">Update</button>
+    <button class="tb" onclick="showTab(event,'diag')">Diagnostics</button>
+  </div>
+
+  <!-- ===== NETWORK ===== -->
+  <div id="pane-net" class="pane on">
+    <h2>Network Settings</h2>
+    <form id="cfgForm" onsubmit="saveSettings(event)">
+      <div class="section">
+      <div class="section-head"><h3>Device Identity</h3><span class="pill">Mode</span></div>
+      <div class="fg">
+        <div class="f">
+          <label for="device_mode">Device Mode</label>
+          <select id="device_mode" name="device_mode">
+            <option value="0">Art-Net (Ethernet)</option>
+            <option value="1">ESP-NOW Master</option>
+            <option value="2">ESP-NOW Slave</option>
+          </select>
+        </div>
+        <div class="f">
+          <label for="mdns_name">mDNS Hostname</label>
+          <input type="text" id="mdns_name" name="mdns_name" placeholder="artnet">
+          <div class="hint">Access via http://<span id="mdns_preview">artnet</span>.local (requires reboot)</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Protocol Settings</h3><span class="pill">Art-Net / sACN</span></div>
+      <div class="proto-grid">
+        <div class="proto-box">
+          <h4>Art-Net</h4>
+          <div class="fg">
+            <div class="f">
+              <label for="artnet_port">UDP Port</label>
+              <input type="number" id="artnet_port" name="artnet_port" value="6454" min="1" max="65535">
+              <div class="hint">Standard Art-Net port is 6454. Change only if the sender uses a custom port. Reboot required.</div>
+            </div>
+          </div>
+        </div>
+        <div class="proto-box">
+          <h4>sACN / E1.31</h4>
+          <div class="fg">
+            <div class="f" style="flex-basis:100%">
+              <div class="cb"><input type="checkbox" id="sacn_enabled" name="sacn_enabled"><label for="sacn_enabled">Enable sACN input</label></div>
+              <div class="hint">Art-Net remains available. Enable only when an sACN sender is used.</div>
+            </div>
+            <div class="f" style="flex-basis:100%">
+              <div class="cb"><input type="checkbox" id="sacn_multicast" name="sacn_multicast"><label for="sacn_multicast">Join sACN multicast groups</label></div>
+              <div class="hint">Joins multicast groups for configured output universes. Disable for unicast-only senders.</div>
+            </div>
+            <div class="f">
+              <label for="sacn_port">UDP Port</label>
+              <input type="number" id="sacn_port" name="sacn_port" value="5568" min="1" max="65535">
+              <div class="hint">Standard sACN port is 5568. Match your sender. Reboot required.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Ethernet (LAN)</h3><span class="pill">Wired</span></div>
+      <div class="fg">
+        <div class="f" style="flex:0 0 auto">
+          <div class="cb"><input type="checkbox" id="eth_dhcp" name="eth_dhcp" onchange="toggleEth()"><label for="eth_dhcp">Enable DHCP</label></div>
+        </div>
+      </div>
+      <div id="eth-static" class="fg">
+        <div class="f"><label for="eth_ip">IP Address</label><input type="text" id="eth_ip" name="eth_ip" placeholder="192.168.1.200"></div>
+        <div class="f"><label for="eth_netmask">Subnet Mask</label><input type="text" id="eth_netmask" name="eth_netmask" placeholder="255.255.255.0"></div>
+        <div class="f"><label for="eth_gateway">Gateway</label><input type="text" id="eth_gateway" name="eth_gateway" placeholder="192.168.1.1"></div>
+        <div class="f"><label for="eth_dns">DNS</label><input type="text" id="eth_dns" name="eth_dns" placeholder="8.8.8.8"></div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Wi-Fi Client (STA)</h3><span class="pill">Wireless</span></div>
+      <div class="hint">Wi-Fi radio startup can brownout weak 3.3V supplies. Keep disabled in Ethernet mode until power is confirmed stable.</div>
+      <div class="fg">
+        <div class="f">
+          <label for="wifi_ssid">SSID</label>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="wifi_ssid" name="wifi_ssid" placeholder="Leave blank to disable" style="flex:1">
+            <button type="button" class="btn bs" onclick="startScan()" style="white-space:nowrap">Scan</button>
+          </div>
+          <select id="scan_results" style="margin-top:4px;display:none" onchange="pickSsid()">
+            <option value="">-- Select network --</option>
+          </select>
+        </div>
+        <div class="f"><label for="wifi_pass">Password</label><input type="password" id="wifi_pass" name="wifi_pass"></div>
+      </div>
+      <div class="fg">
+        <div class="f" style="flex:0 0 auto">
+          <div class="cb"><input type="checkbox" id="wifi_dhcp" name="wifi_dhcp" onchange="toggleWifiIp()"><label for="wifi_dhcp">Enable DHCP</label></div>
+        </div>
+      </div>
+      <div id="wifi-static" class="fg">
+        <div class="f"><label for="wifi_ip">IP Address</label><input type="text" id="wifi_ip" name="wifi_ip" placeholder="192.168.1.201"></div>
+        <div class="f"><label for="wifi_netmask">Subnet Mask</label><input type="text" id="wifi_netmask" name="wifi_netmask" placeholder="255.255.255.0"></div>
+        <div class="f"><label for="wifi_gateway">Gateway</label><input type="text" id="wifi_gateway" name="wifi_gateway" placeholder="192.168.1.1"></div>
+        <div class="f"><label for="wifi_dns">DNS</label><input type="text" id="wifi_dns" name="wifi_dns" placeholder="8.8.8.8"></div>
+      </div>
+      <div class="fg">
+        <div class="f" style="flex:0 0 auto">
+          <div class="cb"><input type="checkbox" id="wifi_enable_in_eth_mode" name="wifi_enable_in_eth_mode"><label for="wifi_enable_in_eth_mode">Allow Wi-Fi STA in Art-Net Ethernet mode</label></div>
+          <div class="hint">Default ON after power supply validation. Turn off if Wi-Fi radio startup causes brownout.</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Access Point (AP)</h3><span class="pill">Fallback setup</span></div>
+      <div class="fg">
+        <div class="f"><label for="ap_ssid">AP SSID</label><input type="text" id="ap_ssid" name="ap_ssid"></div>
+        <div class="f"><label for="ap_pass">AP Password (min 8 chars or leave blank)</label><input type="password" id="ap_pass" name="ap_pass"></div>
+      </div>
+      <div class="fg">
+        <div class="f" style="flex:0 0 auto">
+          <div class="cb"><input type="checkbox" id="ap_enable_in_eth_mode" name="ap_enable_in_eth_mode"><label for="ap_enable_in_eth_mode">Allow setup AP fallback in Art-Net Ethernet mode</label></div>
+          <div class="hint">Default ON after power supply validation. AP also starts the Wi-Fi radio.</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Output Timing</h3><span class="pill">Render</span></div>
+      <div class="fg">
+        <div class="f"><label for="output_fps">Global Output FPS</label><input type="number" id="output_fps" name="output_fps" min="1" max="44"></div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Status LED &amp; Dimmer Sync</h3><span class="pill">Diagnostics</span></div>
+      <div class="fg">
+        <div class="f">
+          <label for="status_led_pin">Status LED GPIO</label>
+          <select id="status_led_pin" name="status_led_pin">
+            <option value="255">Disabled</option>
+            <option value="5">GPIO 5 (LED3 on-board)</option>
+            <option value="2">GPIO 2</option>
+            <option value="4">GPIO 4</option>
+            <option value="12">GPIO 12</option>
+            <option value="14">GPIO 14</option>
+            <option value="15">GPIO 15</option>
+            <option value="17">GPIO 17 (LED4 on-board)</option>
+            <option value="32">GPIO 32</option>
+            <option value="33">GPIO 33</option>
+          </select>
+          <div class="hint">Pattern codes: 1=Idle, 2=AP, 3=Ethernet, 4=Wi-Fi, 5=ESP-NOW RX, 6=Output Test. All modes blink with a pause gap.</div>
+        </div>
+        <div class="f">
+          <label for="zc_pin">Zero-Crossing GPIO</label>
+          <select id="zc_pin" name="zc_pin">
+            <option value="255">Disabled</option>
+            <option value="36">GPIO 36</option>
+            <option value="39">GPIO 39</option>
+            <option value="34">GPIO 34</option>
+            <option value="35">GPIO 35</option>
+            <option value="32">GPIO 32</option>
+            <option value="33">GPIO 33</option>
+          </select>
+          <div class="hint">Global ZC pin used for TRIAC AC Dimmer outputs.</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>I2C Bus Settings</h3><span class="pill">Expanders</span></div>
+      <div class="fg">
+        <div class="f">
+          <label for="i2c_sda">I2C SDA GPIO</label>
+          <select id="i2c_sda" name="i2c_sda">
+            <option value="255">Disabled</option>
+            <option value="4">GPIO 4</option>
+            <option value="12">GPIO 12</option>
+            <option value="14">GPIO 14</option>
+            <option value="15">GPIO 15</option>
+            <option value="2">GPIO 2</option>
+            <option value="17">GPIO 17</option>
+            <option value="32">GPIO 32</option>
+            <option value="33">GPIO 33</option>
+          </select>
+          <div class="hint">Shared I2C data pin. Default is GPIO 14.</div>
+        </div>
+        <div class="f">
+          <label for="i2c_scl">I2C SCL GPIO</label>
+          <select id="i2c_scl" name="i2c_scl">
+            <option value="255">Disabled</option>
+            <option value="4">GPIO 4</option>
+            <option value="12">GPIO 12</option>
+            <option value="14">GPIO 14</option>
+            <option value="15">GPIO 15</option>
+            <option value="2">GPIO 2</option>
+            <option value="17">GPIO 17</option>
+            <option value="32">GPIO 32</option>
+            <option value="33">GPIO 33</option>
+          </select>
+          <div class="hint">Shared I2C clock pin. Default is GPIO 15.</div>
+        </div>
+        <div class="f">
+          <label for="i2c_speed">I2C Frequency (Speed)</label>
+          <select id="i2c_speed" name="i2c_speed">
+            <option value="100000">100 kHz (Standard)</option>
+            <option value="400000">400 kHz (Fast Mode)</option>
+            <option value="1000000">1000 kHz (Fast Mode Plus)</option>
+          </select>
+          <div class="hint">Standard speed is 100kHz, Fast is 400kHz. Fast Plus is 1MHz.</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>I2C Display</h3><span class="pill">OLED</span></div>
+      <div class="fg">
+        <div class="f">
+          <label for="display_enabled">Display Type</label>
+          <select id="display_enabled" name="display_enabled">
+            <option value="0">Disabled</option>
+            <option value="1">SSD1306 OLED (128x64)</option>
+            <option value="2">SH1106 OLED (128x64)</option>
+            <option value="3">PCF8574 LCD (20x4 Character)</option>
+          </select>
+          <div class="hint">Shares I2C bus with expanders. PCF8574 LCD default address 0x27 or 0x3F. Reboot to apply.</div>
+        </div>
+        <div class="f">
+          <label for="display_i2c_addr">I2C Address</label>
+          <select id="display_i2c_addr" name="display_i2c_addr">
+            <option value="60">0x3C (OLED default)</option>
+            <option value="61">0x3D</option>
+            <option value="39">0x27 (LCD default)</option>
+            <option value="63">0x3F (LCD alt)</option>
+          </select>
+        </div>
+        <div class="f">
+          <label for="display_brightness">Brightness (0-255)</label>
+          <input type="number" id="display_brightness" name="display_brightness" value="128" min="0" max="255">
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Backup &amp; Restore Configuration</h3><span class="pill">JSON</span></div>
+      <div class="ib ib-blue" id="backup_status" style="font-size:0.72rem">Export downloads current Settings and Output Channels. Import replaces both and reboots the device.</div>
+      <div class="btns">
+        <button type="button" class="btn bs" onclick="exportConfig()">Export Settings</button>
+        <button type="button" class="btn bp" onclick="document.getElementById('import_file').click()">Import Settings</button>
+        <input type="file" id="import_file" accept=".json,application/json" style="display:none" onchange="importConfigFile(this)">
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Reset Configuration</h3><span class="pill">Danger</span></div>
+      <div class="btns">
+        <button type="button" class="btn bd" onclick="resetOutputs()">Reset Outputs to Default</button>
+        <button type="button" class="btn bd" onclick="factoryReset()">Factory Reset (All Settings)</button>
+      </div>
+      </div>
+
+      <div class="btns">
+        <button type="submit" class="btn bp">Save &amp; Restart</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ===== OUTPUTS ===== -->
+  <div id="pane-out" class="pane">
+    <h2>Output Drivers</h2>
+    <div class="ib ib-blue" style="font-size:0.72rem">Max: 16 channels total | LED Strip: max 8 (RMT limit) | DMX Serial: first 2 use UART, extra ports use RMT fallback | Reboot required after changes.</div>
+    <div id="out-test-state" class="ib ib-blue" style="font-size:0.78rem">Normal output mode. Test tools are idle.</div>
+    <div id="zc-warning" class="ib ib-red" style="display:none;font-size:0.72rem">Warning: AC Dimmer output(s) configured but Zero-Crossing pin is set to Disabled. AC Dimmer will NOT function. Set ZC pin in Network tab.</div>
+
+    <div class="section">
+      <div class="section-head">
+        <h3>Configured Channels</h3>
+        <div>
+          <span id="out-count" class="pill">0 / 16 channels</span>
+          <span id="out-save-state" class="pill pill-ok">Saved</span>
+        </div>
+      </div>
+      <div id="score-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem">
+        <span style="font-weight:600;white-space:nowrap">Resource Score:</span>
+        <div style="flex:1;height:16px;background:#e2e8f0;border-radius:8px;overflow:hidden;position:relative">
+          <div id="score-fill" style="height:100%;width:0%;border-radius:8px;transition:width .3s"></div>
+          <span id="score-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:600;color:#1e293b">0 / 100</span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="out-table">
+          <thead><tr><th>#</th><th>Device</th><th>GPIOs</th><th>Address</th><th>Size</th><th>Score</th><th>Actions</th></tr></thead>
+          <tbody id="out-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="toolbar">
+        <button type="button" class="btn bs" onclick="loadOutputs()">Refresh</button>
+        <button type="button" class="btn bp" id="out-save-btn" onclick="saveOutputs()">Save Channels &amp; Restart</button>
+        <button type="button" class="btn bd" onclick="stopOutputTest()">Stop Test</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h3>Test Tool</h3><span id="test-mode-pill" class="pill">Idle</span></div>
+      <div id="out-test-panel" class="ib ib-green" style="display:none;margin-top:0">
+        <h3 style="margin-top:0">Output Test: <span id="test-title">--</span></h3>
+        <div id="test-controls"></div>
+        <div class="hint" style="margin-top:6px">Test values are applied directly to the selected output buffer. Test auto-stops after the selected duration.</div>
+      </div>
+    </div>
+
+    <div class="section">
+    <div class="section-head"><h3>Add / Edit Channel</h3><span class="pill">Hardware setup</span></div>
+    <div id="edit-banner" style="display:none" class="ib ib-yellow">Editing channel <span id="edit-idx-label"></span> - click <strong>Update</strong> to apply or <strong>Cancel</strong> to discard.</div>
+    <div class="fg">
+      <div class="f">
+        <label for="no_type">Type</label>
+        <select id="no_type" onchange="toggleOutFields()">
+          <option value="0">LED Strip (NeoPixel)</option>
+          <option value="1">DMX Serial Output</option>
+          <option value="2">Relay (On/Off)</option>
+          <option value="3">AC Dimmer (TRIAC)</option>
+          <option value="5">DC PWM Dimmer</option>
+          <option value="6">DC Motor (H-Bridge)</option>
+          <option value="7">Stepper Motor</option>
+          <option value="8">RC Servo</option>
+          <option value="9">Solenoid Trigger (Pulse)</option>
+          <option value="10">Analog RGB / RGBW Strip</option>
+          <option value="11">Passive Buzzer</option>
+          <option value="12">Sequential Smoke Shooter</option>
+          <option value="13">7-Segment Display</option>
+          <option value="15">DFPlayer MP3 Module</option>
+        </select>
+      </div>
+      <!-- Source dropdown rendered inside #pin-mapping-container -->
+      <div id="pin-mapping-container"></div>
+      <div class="f" id="no_pca_channel2_grp" style="display:none"><label for="no_pca_channel2">Addl Channel 2</label><select id="no_pca_channel2"><option value="255">None</option><option value="0">CH 0</option><option value="1">CH 1</option><option value="2">CH 2</option><option value="3">CH 3</option><option value="4">CH 4</option><option value="5">CH 5</option><option value="6">CH 6</option><option value="7">CH 7</option><option value="8">CH 8</option><option value="9">CH 9</option><option value="10">CH 10</option><option value="11">CH 11</option><option value="12">CH 12</option><option value="13">CH 13</option><option value="14">CH 14</option><option value="15">CH 15</option></select></div>
+      <div class="f" id="no_pca_channel3_grp" style="display:none"><label for="no_pca_channel3">Addl Channel 3</label><select id="no_pca_channel3"><option value="255">None</option><option value="0">CH 0</option><option value="1">CH 1</option><option value="2">CH 2</option><option value="3">CH 3</option><option value="4">CH 4</option><option value="5">CH 5</option><option value="6">CH 6</option><option value="7">CH 7</option><option value="8">CH 8</option><option value="9">CH 9</option><option value="10">CH 10</option><option value="11">CH 11</option><option value="12">CH 12</option><option value="13">CH 13</option><option value="14">CH 14</option><option value="15">CH 15</option></select></div>
+      <div class="f" id="no_pca_channel4_grp" style="display:none"><label for="no_pca_channel4">Addl Channel 4</label><select id="no_pca_channel4"><option value="255">None</option><option value="0">CH 0</option><option value="1">CH 1</option><option value="2">CH 2</option><option value="3">CH 3</option><option value="4">CH 4</option><option value="5">CH 5</option><option value="6">CH 6</option><option value="7">CH 7</option><option value="8">CH 8</option><option value="9">CH 9</option><option value="10">CH 10</option><option value="11">CH 11</option><option value="12">CH 12</option><option value="13">CH 13</option><option value="14">CH 14</option><option value="15">CH 15</option></select></div>
+      <div class="f" id="no_led_proto_grp">
+        <label for="no_led_proto">LED Protocol</label>
+        <select id="no_led_proto">
+          <option value="0">WS2812 / WS2812B / SK6812 (800kHz)</option>
+          <option value="1">WS2811 Low-Speed (400kHz)</option>
+        </select>
+      </div>
+      <div class="f">
+        <label for="no_uni">Start Universe</label>
+        <input type="number" id="no_uni" value="0" min="0" max="32767">
+      </div>
+      <div class="f" id="no_addr_grp">
+        <label for="no_addr">Start Address</label>
+        <input type="number" id="no_addr" value="1" min="1" max="512">
+        <div class="hint">DMX channel inside the universe for relay, dimmer, motion, and solenoid outputs.</div>
+      </div>
+      <div class="f" id="no_cnt_grp">
+        <label for="no_cnt">LED Count</label>
+        <input type="number" id="no_cnt" value="170" min="1" max="1360">
+      </div>
+      <div class="f" id="no_ord_grp">
+        <label for="no_ord">Color Order</label>
+        <select id="no_ord">
+          <optgroup label="RGB Strips (3-channel)">
+            <option value="0">GRB</option>
+            <option value="1">RGB</option>
+            <option value="2">BRG</option>
+            <option value="3">RBG</option>
+          </optgroup>
+          <optgroup label="RGBW Strips (4-channel)">
+            <option value="4">RGBW</option>
+            <option value="5">GRBW</option>
+            <option value="6">BRGW</option>
+            <option value="7">WRGB</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="f" id="no_mc_grp" style="display:none; flex-basis: 100%;">
+        <div class="ib ib-green" style="margin-top:8px">
+          <strong>Motion Control Parameters</strong>
+        </div>
+        <div class="fg">
+          <div class="f" id="mc_mode_grp"><label for="mc_mode" id="mc_mode_lbl">Motor Sub-Mode</label>
+            <select id="mc_mode">
+              <option value="0">PWM + PWM (2 pins)</option>
+              <option value="1">PWM + DIR (2 pins)</option>
+              <option value="2">IN1 + IN2 + EN (3 pins)</option>
+            </select>
+          </div>
+          <div class="f" id="mc_res_grp"><label for="mc_resolution">Resolution</label>
+            <select id="mc_resolution">
+              <option value="8">8-bit (1 DMX Ch)</option>
+              <option value="10">10-bit (2 DMX Ch)</option>
+              <option value="12">12-bit (2 DMX Ch)</option>
+              <option value="16">16-bit (2 DMX Ch)</option>
+            </select>
+          </div>
+          <div class="f" id="mc_freq_grp"><label for="mc_freq" id="mc_freq_lbl">Frequency (Hz) / Max Speed</label><input type="number" id="mc_freq" value="1000" min="1" max="40000"></div>
+          <div class="f" id="mc_deadband_grp"><label for="mc_deadband">Center Deadband</label><input type="number" id="mc_deadband" value="10" min="0" max="255"></div>
+          <div class="f" id="mc_min_us_grp"><label for="mc_min_us">Servo Min &micro;s</label><input type="number" id="mc_min_us" value="1000" min="500" max="1500"></div>
+          <div class="f" id="mc_max_us_grp"><label for="mc_max_us">Servo Max &micro;s</label><input type="number" id="mc_max_us" value="2000" min="1500" max="2500"></div>
+          <div id="mc_stepper_scale_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:4px 0 2px">Position &amp; Scaling</div></div>
+          <div class="f" id="mc_steps_grp"><label for="mc_steps_per_rev">Steps / Rev</label><input type="number" id="mc_steps_per_rev" value="200" min="1" max="10000"></div>
+          <div class="f" id="mc_unit_type_grp" style="display:none"><label for="mc_unit_type">Unit Type</label><select id="mc_unit_type"><option value="0">Steps</option><option value="1">Degrees (&deg;)</option><option value="2">Millimeters (mm)</option></select></div>
+          <div class="f" id="mc_scale_factor_grp" style="display:none"><label for="mc_scale_factor">Scale Factor</label><input type="number" id="mc_scale_factor" value="0.0" step="any" min="0" max="10000"><div class="hint">Steps = DMX * Scale (0 = use Steps/Rev)</div></div>
+          <div id="mc_stepper_homing_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:4px 0 2px">Homing Settings</div></div>
+          <div class="f" id="mc_homing_mode_grp" style="display:none"><label for="mc_homing_mode">Homing Mode</label>
+            <select id="mc_homing_mode">
+              <option value="0">Sensor Mode (Pin 4)</option>
+              <option value="1">Time / Stall Mode</option>
+            </select>
+          </div>
+          <div class="f" id="mc_homing_dir_grp" style="display:none"><label for="mc_homing_dir">Homing Direction</label>
+            <select id="mc_homing_dir">
+              <option value="0">Normal / Forward</option>
+              <option value="1">Reverse</option>
+            </select>
+          </div>
+          <div class="f" id="mc_homing_speed_grp" style="display:none"><label for="mc_homing_speed">Homing Speed (Hz)</label><input type="number" id="mc_homing_speed" value="500" min="1" max="40000"></div>
+          <div class="f" id="mc_homing_timeout_grp" style="display:none"><label for="mc_homing_timeout">Homing Timeout (s)</label><input type="number" id="mc_homing_timeout" value="5" min="1" max="100"></div>
+          <div class="f" id="mc_invert_grp" style="flex:0 0 auto"><div class="cb"><input type="checkbox" id="mc_invert"><label for="mc_invert">Invert Direction</label></div></div>
+          <div class="f" id="mc_brake_grp" style="flex:0 0 auto"><div class="cb"><input type="checkbox" id="mc_brake" checked><label for="mc_brake">Brake when stopped</label></div></div>
+        </div>
+      </div>
+      <div class="f" id="no_sol_grp" style="display:none; flex-basis: 100%;">
+        <div class="ib ib-orange" style="margin-top:8px">
+          <strong>Solenoid Trigger Parameters</strong>
+        </div>
+        <div class="fg">
+          <div class="f"><label for="sol_mode">Trigger Mode</label>
+            <select id="sol_mode">
+              <option value="0">Threshold (DMX > value)</option>
+              <option value="1">Frame-Sync (every frame if DMX > 127)</option>
+            </select>
+          </div>
+          <div class="f"><label for="sol_threshold">Threshold Value (0-255)</label><input type="number" id="sol_threshold" value="127" min="0" max="255"></div>
+          <div class="f"><label for="sol_pulse_ms">Pulse Width (ms)</label><input type="number" id="sol_pulse_ms" value="50" min="1" max="500"></div>
+          <div class="f"><label for="sol_pre_delay">Pre-Delay (ms)</label><input type="number" id="sol_pre_delay" value="0" min="0" max="1000"></div>
+          <div class="f"><label for="sol_post_delay">Post-Delay / Cooldown (ms)</label><input type="number" id="sol_post_delay" value="100" min="0" max="5000"></div>
+          <div class="hint">Solenoid triggers pulse for precise frame-accurate control. Pre-Delay is hold time before pulse. Post-Delay prevents rapid re-triggering.</div>
+        </div>
+      </div>
+      <div class="f" id="no_smoke_grp" style="display:none; flex-basis: 100%;">
+        <div class="ib ib-blue" style="margin-top:8px">
+          <strong>Sequential Smoke Shooter Parameters</strong>
+        </div>
+        <div class="fg">
+          <div class="f"><label for="smoke_dur">Smoke Duration (ms)</label><input type="number" id="smoke_dur" value="1000" min="0" max="10000"></div>
+          <div class="f"><label for="smoke_settle">Settle Delay (ms)</label><input type="number" id="smoke_settle" value="500" min="0" max="10000"></div>
+          <div class="f"><label for="smoke_shoot">Shoot Duration (ms)</label><input type="number" id="smoke_shoot" value="1000" min="0" max="10000"></div>
+          <div class="f"><label for="smoke_lockout">Cooldown Lockout (ms)</label><input type="number" id="smoke_lockout" value="2000" min="0" max="30000"></div>
+          <div class="hint">Sequence: Smoke ON -> delay (Settle) -> Shoot ON -> both OFF -> Cooldown. Pin 1 is Smoke, Pin 2 is Shoot. Triggered when DMX > 127.</div>
+        </div>
+      </div>
+    </div>
+    <div class="btns">
+      <button type="button" class="btn bp" id="out-add-btn" onclick="addOrUpdateOutput()">Add Channel</button>
+      <button type="button" class="btn bs" id="out-cancel-btn" style="display:none" onclick="cancelEditOutput()">Cancel</button>
+    </div>
+    </div>
+  </div>
+
+  <!-- ===== ESP-NOW ===== -->
+  <div id="pane-espnow" class="pane">
+    <h2>ESP-NOW Wireless Bridge</h2>
+
+    <div class="ib ib-blue">
+      <strong>MAC Address of this board:</strong>
+      <code id="board_mac_display" style="font-size:1rem;font-weight:700;letter-spacing:2px;margin-left:8px">--:--:--:--:--:--</code>
+      <button type="button" onclick="copyMac()" style="margin-left:8px;padding:2px 8px;font-size:0.72rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:4px;cursor:pointer;color:#1e40af">Copy</button>
+      <div class="hint" style="margin-top:4px">Copy this MAC and paste into the Master board's Peer MAC field.</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;font-size:0.78rem">
+      <div class="ib ib-blue" style="margin:0">
+        <strong>ESP-NOW Master</strong><br>
+        Receive Art-Net from LAN and forward DMX to slave boards over ESP-NOW.<br>
+        <em>Add slave board MAC addresses below.</em>
+      </div>
+      <div class="ib ib-green" style="margin:0">
+        <strong>ESP-NOW Slave</strong><br>
+        Receive DMX from the master and drive local LED/DMX outputs directly.<br>
+        <em>No LAN cable required. Power the board and set Device Mode to Slave.</em>
+      </div>
+    </div>
+
+    <h3>Registered Peer MACs (Master Mode)</h3>
+    <div class="ib ib-yellow" style="font-size:0.72rem;margin-top:0">
+      If no peers are added, Master will fallback to broadcasting all DMX data. For real installs, add peers with a limited Universe/Channel range to reduce ESP-NOW traffic.
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>MAC Address</th><th>DMX Range</th><th>Action</th></tr></thead>
+      <tbody id="peer-tbody"></tbody>
+    </table>
+    <div class="btns" style="margin-top:8px">
+      <button type="button" class="btn bs" onclick="loadPeers()">Refresh</button>
+      <button type="button" class="btn bp" onclick="savePeers()">Save Peers</button>
+    </div>
+
+    <h3>Add Peer</h3>
+    <div class="fg">
+      <div class="f"><label for="np_mac">MAC Address</label><input type="text" id="np_mac" placeholder="AA:BB:CC:DD:EE:FF"></div>
+      <div class="f"><label for="np_start_uni">Start Universe</label><input type="number" id="np_start_uni" min="0" max="32767" value="0"></div>
+      <div class="f"><label for="np_start_addr">Start Channel</label><input type="number" id="np_start_addr" min="1" max="512" value="1"></div>
+      <div class="f"><label for="np_end_uni">End Universe</label><input type="number" id="np_end_uni" min="0" max="32767" value="0"></div>
+      <div class="f"><label for="np_end_addr">End Channel</label><input type="number" id="np_end_addr" min="1" max="512" value="512"></div>
+      <div class="f" style="display:flex;align-items:flex-end;min-width:140px">
+        <button type="button" class="btn bp" onclick="addPeer()" style="width:100%">Add Peer</button>
+      </div>
+    </div>
+    <div class="hint">Example: U0:CH1 to U2:CH170 sends only that range to this slave. Use each peer's actual output range to save airtime.</div>
+  </div>
+
+  <!-- ===== OTA UPDATE ===== -->
+  <div id="pane-ota" class="pane">
+    <h2>OTA Firmware Update</h2>
+    <div class="ib ib-green" style="margin-bottom:12px">
+      <strong>Configuration is preserved after OTA</strong> - firmware OTA flashes only the application partition.<br>
+      These data remain intact: Network Settings, Output Channels, and NVS Config.<br>
+      <span style="color:#166534">The board restarts automatically after flashing completes.</span>
+    </div>
+
+    <div class="ib ib-blue" style="margin-bottom:12px">
+      <strong>Current Firmware:</strong>
+      <code id="firmware_version">Loading...</code>
+      <div class="hint">Version name is generated from the firmware build date and time.</div>
+    </div>
+
+    <div class="ib ib-yellow" style="margin-bottom:12px;font-size:0.72rem">
+      Create a firmware file: <code>build_firmware_bin.bat</code><br>
+      Output file path: <code>dist\firmware_YYYYMMDD_HHMMSS.bin</code>
+    </div>
+
+    <div class="f" style="margin-bottom:10px">
+      <label for="ota_file">Select Firmware File (.bin)</label>
+      <input type="file" id="ota_file" accept=".bin" onchange="otaFileSelected()">
+      <div class="hint" id="ota-file-info"></div>
+    </div>
+
+    <progress id="ota-prog" value="0" max="100" style="display:none"></progress>
+    <div id="ota-status" style="font-size:0.82rem;margin:6px 0;color:#475569"></div>
+
+    <div class="btns">
+      <button type="button" class="btn bp" id="ota-btn" onclick="flashOta()" disabled>Flash Firmware</button>
+    </div>
+  </div>
+  <!-- ===== DIAGNOSTICS ===== -->
+  <div id="pane-diag" class="pane">
+    <h2>Diagnostics</h2>
+
+    <div class="section-head"><h3>System Resource</h3><span class="pill">Live</span></div>
+    <div id="diag-sysinfo" style="margin-bottom:12px">
+      <div class="fg" style="grid-template-columns:repeat(4,1fr)">
+        <div class="f"><label>Free Heap</label><span id="diag-heap" style="font-weight:600">-</span></div>
+        <div class="f"><label>Min Heap</label><span id="diag-minheap" style="font-weight:600">-</span></div>
+        <div class="f"><label>CPU Freq</label><span id="diag-cpu" style="font-weight:600">-</span></div>
+        <div class="f"><label>Board MAC</label><span id="diag-mac" style="font-family:monospace;font-size:0.72rem">-</span></div>
+      </div>
+    </div>
+    <div class="btns" style="margin-bottom:12px">
+      <button type="button" class="btn bs" onclick="diagRefreshSysInfo()">Refresh</button>
+    </div>
+
+    <div class="section-head"><h3>Network Status</h3><span class="pill">Live</span></div>
+    <div id="diag-net" style="margin-bottom:12px">
+      <table>
+        <tr><th>Interface</th><th>Status</th><th>IP</th></tr>
+        <tr id="diag-net-eth"><td>Ethernet</td><td id="diag-eth-status">-</td><td id="diag-eth-ip">-</td></tr>
+        <tr id="diag-net-wifi"><td>Wi-Fi</td><td id="diag-wifi-status">-</td><td id="diag-wifi-ip">-</td></tr>
+        <tr id="diag-net-ap"><td>SoftAP</td><td id="diag-ap-status">-</td><td id="diag-ap-ip">-</td></tr>
+      </table>
+    </div>
+
+    <div class="section-head"><h3>I2C Bus Scan</h3><span class="pill">0x01 - 0x7F</span></div>
+    <div class="ib ib-blue" style="margin-bottom:12px">Scans the I2C bus for connected devices. Click scan while your expanders are powered and wired.</div>
+    <div class="btns" style="margin-bottom:8px">
+      <button type="button" class="btn bs" onclick="scanI2c()">Scan I2C Bus</button>
+    </div>
+    <div id="i2c-scan-result" style="margin-top:4px;font-size:0.82rem"></div>
+  </div>
+
+</div><!-- /w -->
+
+<!-- Edit Output Modal (not used, editing inline instead) -->
+
+<script>
+// State
+let outputs = [];
+let wizBulbs = [];
+let editOutIdx = -1;
+let outputsDirty = false;
+let savedOutputsJson = '';
+let currentTestIdx = -1;
+
+function setSaveState(label,kind='ok'){
+  const el=document.getElementById('out-save-state');
+  if(!el) return;
+  el.className='pill '+(kind==='warn'?'pill-warn':kind==='err'?'ib-red':'pill-ok');
+  el.textContent=label;
+}
+
+// Tabs
+function showTab(e,id){
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('pane-'+id).classList.add('on');
+  e.currentTarget.classList.add('on');
+  if(id==='diag') diagRefreshSysInfo();
+}
+
+// Diagnostics
+async function diagRefreshSysInfo(){
+  try{
+    const res=await fetch('/api/status');
+    const d=await res.json();
+    document.getElementById('diag-heap').textContent=(d.heap_free>>10)+' KB';
+    document.getElementById('diag-minheap').textContent=(d.min_heap>>10)+' KB';
+    document.getElementById('diag-cpu').textContent=d.cpu_freq+' MHz';
+    document.getElementById('diag-mac').textContent=d.board_mac;
+    document.getElementById('diag-eth-status').innerHTML=d.eth_up?'<span style="color:#16a34a">Connected</span>':'<span style="color:#94a3b8">Down</span>';
+    document.getElementById('diag-eth-ip').textContent=d.eth_up?d.ip:'-';
+    document.getElementById('diag-wifi-status').innerHTML=d.wifi_up?'<span style="color:#16a34a">Connected</span>':'<span style="color:#94a3b8">Down</span>';
+    document.getElementById('diag-wifi-ip').textContent=d.wifi_up?d.ip:'-';
+    document.getElementById('diag-ap-status').innerHTML=d.ap_up?'<span style="color:#16a34a">Active</span>':'<span style="color:#94a3b8">Off</span>';
+    document.getElementById('diag-ap-ip').textContent=d.ap_up?d.ip:'-';
+  }catch(e){
+    document.getElementById('diag-heap').textContent='Error';
+  }
+}
+// I2C Bus Scan
+const I2C_DEVICES={
+  '0x20':'MCP23017 / TCA9555 / PCF8574',
+  '0x21':'MCP23017 / TCA9555 / PCF8574',
+  '0x22':'MCP23017 / TCA9555 / PCF8574',
+  '0x23':'MCP23017 / TCA9555 / PCF8574',
+  '0x24':'MCP23017 / TCA9555 / PCF8574',
+  '0x25':'MCP23017 / TCA9555 / PCF8574',
+  '0x26':'MCP23017 / TCA9555 / PCF8574',
+  '0x27':'MCP23017 / TCA9555 / PCF8574',
+  '0x3C':'SSD1306 OLED',
+  '0x3D':'SSD1306 OLED',
+  '0x3F':'PCF8574 LCD Backpack',
+  '0x40':'PCA9685 PWM Driver',
+  '0x41':'PCA9685 PWM Driver',
+  '0x42':'PCA9685 PWM Driver',
+  '0x43':'PCA9685 PWM Driver',
+  '0x44':'PCA9685 PWM Driver',
+  '0x45':'PCA9685 PWM Driver',
+  '0x46':'PCA9685 PWM Driver',
+  '0x47':'PCA9685 PWM Driver',
+  '0x48':'ADS1115 / PCF8591',
+  '0x49':'ADS1115 / PCF8591',
+  '0x4A':'ADS1115 / PCF8591',
+  '0x4B':'ADS1115 / PCF8591',
+  '0x50':'AT24C EEPROM',
+  '0x51':'AT24C EEPROM',
+  '0x57':'AT24C EEPROM',
+  '0x68':'DS3231 RTC / MPU6050',
+  '0x76':'BME280 / BMP280',
+  '0x77':'BME280 / BMP280',
+};
+async function scanI2c(){
+  const resultDiv=document.getElementById('i2c-scan-result');
+  resultDiv.innerHTML='<span style="color:#475569">Scanning...</span>';
+  try{
+    const res=await fetch('/api/i2c-scan?refresh=1');
+    const data=await res.json();
+    if(data.status==='scanning'){
+      // Retry after 500ms (scan runs on background task)
+      setTimeout(scanI2c,500);
+      return;
+    }
+    if(!Array.isArray(data)||data.length===0){
+      resultDiv.innerHTML='<span style="color:#94a3b8">No I2C devices found. Check wiring and pull-up resistors.</span>';
+      return;
+    }
+    let html='<table><tr><th>Address</th><th>Hex</th><th>Guessed Device</th><th>Used By Output</th></tr>';
+    for(const d of data){
+      const guess=I2C_DEVICES[d.hex]||'Unknown device';
+      const used=d.used_by||'-';
+      html+=`<tr><td>${d.address}</td><td><code>${d.hex}</code></td><td>${guess}</td><td>${used}</td></tr>`;
+    }
+    html+=`</table><div class="hint">Found ${data.length} device(s)</div>`;
+    resultDiv.innerHTML=html;
+  }catch(e){
+    resultDiv.innerHTML='<span style="color:#dc2626">Scan failed: '+e.message+'</span>';
+  }
+}
+// Alert
+function showAlert(ok){
+  const el=document.getElementById(ok?'alert-ok':'alert-err');
+  el.style.display='block';
+  setTimeout(()=>el.style.display='none',3500);
+}
+
+function setOutputsDirty(dirty){
+  outputsDirty=dirty;
+  setSaveState(dirty?'Unsaved changes':'Saved',dirty?'warn':'ok');
+}
+
+function markOutputsSaved(){
+  savedOutputsJson=JSON.stringify(outputs);
+  setOutputsDirty(false);
+}
+
+// Telemetry
+async function updateTelemetry(){
+  try{
+    const d=await(await fetch('/api/status')).json();
+    const g=id=>document.getElementById(id);
+    if(g('tel-ip'))       g('tel-ip').textContent=d.ip||'--';
+    if(g('tel-packets'))  g('tel-packets').textContent=d.packets_received??'--';
+    if(g('tel-heap'))     g('tel-heap').textContent=d.heap_free?Math.round(d.heap_free/1024)+' KB':'--';
+    if(g('tel-cpu'))      g('tel-cpu').textContent=d.cpu_freq?d.cpu_freq+' MHz':'--';
+    if(g('tel-time'))     g('tel-time').textContent=d.time||'--';
+    const eth=g('net-eth'),wifi=g('net-wifi'),ap=g('net-ap');
+    if(eth){eth.textContent=d.eth_up?'ETH ON':'ETH OFF';eth.style.background=d.eth_up?'#166534':'#991b1b';}
+    if(wifi){wifi.textContent=d.wifi_up?'WiFi ON':'WiFi OFF';wifi.style.background=d.wifi_up?'#166534':'#991b1b';}
+    if(ap){ap.textContent=d.ap_up?'AP ON':'AP OFF';ap.style.background=d.ap_up?'#854d0e':'rgba(255,255,255,.15)';}
+    if(g('board_mac_display')&&d.board_mac) g('board_mac_display').textContent=d.board_mac;
+  }catch(e){}
+}
+
+// Network form toggle
+function toggleEth(){
+  const dhcp=document.getElementById('eth_dhcp').checked;
+  document.querySelectorAll('#eth-static input').forEach(i=>i.disabled=dhcp);
+}
+function toggleWifiIp(){
+  const dhcp=document.getElementById('wifi_dhcp').checked;
+  document.querySelectorAll('#wifi-static input').forEach(i=>i.disabled=dhcp);
+}
+function updateMdnsPreview(){
+  const v=document.getElementById('mdns_name').value||'artnet';
+  document.getElementById('mdns_preview').textContent=v;
+}
+
+// Settings load / save
+async function loadSettings(){
+  try{
+    const d=await(await fetch('/api/settings')).json();
+    const s=(id,val)=>{const e=document.getElementById(id);if(e&&val!==undefined)e.value=val};
+    const c=(id,val)=>{const e=document.getElementById(id);if(e)e.checked=!!val};
+    s('device_mode',d.device_mode); s('mdns_name',d.mdns_name);
+    const fw=document.getElementById('firmware_version');
+    if(fw) fw.textContent=d.firmware_version||'Unknown';
+    s('artnet_port',d.artnet_port);
+    s('sacn_port',d.sacn_port);
+    c('sacn_enabled',d.sacn_enabled); c('sacn_multicast',d.sacn_multicast);
+    c('eth_dhcp',d.eth_dhcp);
+    s('eth_ip',d.eth_ip); s('eth_netmask',d.eth_netmask); s('eth_gateway',d.eth_gateway); s('eth_dns',d.eth_dns);
+    s('wifi_ssid',d.wifi_ssid); s('wifi_pass',d.wifi_pass);
+    c('wifi_dhcp',d.wifi_dhcp);
+    s('wifi_ip',d.wifi_ip); s('wifi_netmask',d.wifi_netmask); s('wifi_gateway',d.wifi_gateway); s('wifi_dns',d.wifi_dns);
+    c('wifi_enable_in_eth_mode',d.wifi_enable_in_eth_mode);
+    c('ap_enable_in_eth_mode',d.ap_enable_in_eth_mode);
+    s('ap_ssid',d.ap_ssid); s('ap_pass',d.ap_pass);
+    s('output_fps',d.output_fps);
+    s('status_led_pin',d.status_led_pin);
+    s('zc_pin',d.zc_pin);
+    s('i2c_sda',d.i2c_sda);
+    s('i2c_scl',d.i2c_scl);
+    s('i2c_speed',d.i2c_speed);
+    s('display_enabled',d.display_enabled);
+    s('display_i2c_addr',d.display_i2c_addr);
+    s('display_brightness',d.display_brightness);
+    toggleEth(); toggleWifiIp(); updateMdnsPreview();
+    autoAssignOutputPins();
+    document.getElementById('mdns_name').addEventListener('input',updateMdnsPreview);
+  }catch(e){console.error('loadSettings',e);}
+}
+
+async function saveSettings(e){
+  e.preventDefault();
+  const fd=new FormData(e.target||document.getElementById('cfgForm'));
+  const obj={};
+  fd.forEach((v,k)=>{
+    if(['eth_dhcp','wifi_dhcp','sacn_enabled','sacn_multicast','wifi_enable_in_eth_mode','ap_enable_in_eth_mode'].includes(k)) obj[k]=true;
+    else if(['device_mode','status_led_pin','zc_pin','eth_dhcp','wifi_dhcp',
+             'artnet_port','sacn_port',
+             'output_fps','i2c_sda','i2c_scl','i2c_speed',
+             'display_enabled','display_i2c_addr','display_brightness'].includes(k))
+      obj[k]=parseInt(v,10);
+    else obj[k]=v;
+  });
+  ['eth_dhcp','wifi_dhcp','sacn_enabled','sacn_multicast','wifi_enable_in_eth_mode','ap_enable_in_eth_mode'].forEach(k=>{
+    if (e.target.querySelector('#' + k)) {
+      if (!obj.hasOwnProperty(k)) obj[k] = false;
+    }
+  });
+  if(obj.status_led_pin!==255&&obj.zc_pin!==255&&obj.status_led_pin===obj.zc_pin){
+    alert('Status LED GPIO and Zero-Crossing GPIO cannot use the same pin.');
+    return;
+  }
+  if(obj.i2c_sda!==255&&obj.i2c_scl!==255&&obj.i2c_sda===obj.i2c_scl){
+    alert('I2C SDA and SCL pins cannot be the same.');
+    return;
+  }
+  if(obj.status_led_pin!==255&&(obj.status_led_pin===obj.i2c_sda||obj.status_led_pin===obj.i2c_scl)){
+    alert('Status LED GPIO cannot overlap with I2C SDA or SCL.');
+    return;
+  }
+  if(obj.zc_pin!==255&&(obj.zc_pin===obj.i2c_sda||obj.zc_pin===obj.i2c_scl)){
+    alert('Zero-Crossing GPIO cannot overlap with I2C SDA or SCL.');
+    return;
+  }
+  const conflict=outputReservedPinConflict(outputs,obj.status_led_pin);
+  if(conflict>=0){
+    alert('Status LED GPIO '+obj.status_led_pin+' is already used by output channel '+(conflict+1)+'. Disable Status LED or select another GPIO.');
+    return;
+  }
+  const zcConflict=outputReservedPinConflict(outputs,obj.zc_pin);
+  if(zcConflict>=0){
+    alert('Zero-Crossing GPIO '+obj.zc_pin+' is already used by output channel '+(zcConflict+1)+'. Disable Zero-Crossing or select another GPIO.');
+    return;
+  }
+  const sdaConflict=outputReservedPinConflict(outputs,obj.i2c_sda);
+  if(sdaConflict>=0){
+    alert('I2C SDA GPIO '+obj.i2c_sda+' is already used by output channel '+(sdaConflict+1)+'. Select another GPIO.');
+    return;
+  }
+  const sclConflict=outputReservedPinConflict(outputs,obj.i2c_scl);
+  if(sclConflict>=0){
+    alert('I2C SCL GPIO '+obj.i2c_scl+' is already used by output channel '+(sclConflict+1)+'. Select another GPIO.');
+    return;
+  }
+  try{
+    const res=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});
+    showAlert(res.ok);
+    if(res.ok) setTimeout(()=>location.reload(),1500);
+  }catch(err){showAlert(false);}
+}
+
+function setBackupStatus(text,kind='blue'){
+  const el=document.getElementById('backup_status');
+  if(!el) return;
+  el.className='ib ib-'+kind;
+  el.textContent=text;
+}
+function exportConfig(){
+  setBackupStatus('Preparing configuration download...','blue');
+  window.location.href='/api/config/backup';
+}
+async function resetOutputs(){
+  if(!confirm('Reset ALL output channels to default (single LED strip)? This cannot be undone.')) return;
+  try{
+    const res=await fetch('/api/outputs/clear',{method:'POST'});
+    const ok=res.ok;
+    showAlert(ok);
+    if(ok) setTimeout(()=>location.reload(),1000);
+  }catch(e){showAlert(false);}
+}
+async function factoryReset(){
+  if(!confirm('FACTORY RESET: This will clear ALL settings and output channels and reboot. Are you sure?')) return;
+  if(!confirm('Really? All WiFi, Ethernet, Art-Net, Dimmer, and output settings will be lost.')) return;
+  try{
+    const res=await fetch('/api/config/factory-reset',{method:'POST'});
+    const ok=res.ok;
+    showAlert(ok);
+    if(ok) setTimeout(()=>location.reload(),1500);
+  }catch(e){showAlert(false);}
+}
+async function importConfigFile(input){
+  const file=input.files&&input.files[0];
+  input.value='';
+  if(!file) return;
+  let text='';
+  try{
+    text=await file.text();
+    const parsed=JSON.parse(text);
+    if(!parsed.settings||!Array.isArray(parsed.outputs)){
+      throw new Error('Backup must contain settings and outputs.');
+    }
+    if(!confirm('Import this backup and replace current settings/output channels? The device will reboot.')) return;
+    setBackupStatus('Importing configuration...','yellow');
+    const res=await fetch('/api/config/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(parsed)});
+    let msg='';
+    try{const d=await res.json(); msg=d.message||'';}catch(e){}
+    if(!res.ok){
+      setBackupStatus('Import failed','red');
+      alert(msg||'Import failed.');
+      showAlert(false);
+      return;
+    }
+    setBackupStatus('Import complete. Device is rebooting. This page will reload automatically.','green');
+    showAlert(true);
+    setTimeout(()=>location.reload(),9000);
+  }catch(err){
+    setBackupStatus('Import failed: invalid JSON file','red');
+    alert(err.message||'Invalid JSON file.');
+    showAlert(false);
+  }
+}
+
+// WiFi Scan
+let scanTimer=null;
+async function startScan(){
+  document.getElementById('scan_results').style.display='block';
+  document.getElementById('scan_results').innerHTML='<option>Scanning...</option>';
+  if(scanTimer) clearInterval(scanTimer);
+  await fetch('/api/wifi-scan');
+  scanTimer=setInterval(async()=>{
+    try{
+      const d=await(await fetch('/api/wifi-scan')).json();
+      if(d.status==='scanning') return;
+      clearInterval(scanTimer);
+      const sel=document.getElementById('scan_results');
+      sel.innerHTML='<option value="">-- Select network --</option>';
+      (d.networks||[]).sort((a,b)=>b.rssi-a.rssi).forEach(n=>{
+        const opt=document.createElement('option');
+        opt.value=n.ssid;
+        opt.textContent=n.ssid+' ('+n.rssi+' dBm'+(n.secure?' secure':' open')+')';
+        sel.appendChild(opt);
+      });
+    }catch(e){}
+  },2000);
+}
+function pickSsid(){
+  const v=document.getElementById('scan_results').value;
+  if(v) document.getElementById('wifi_ssid').value=v;
+}
+
+// Output Channels
+const ORDERS=['GRB','RGB','BRG','RBG','RGBW','GRBW','BRGW','WRGB'];
+const TYPES={0:'LED Strip', 1:'DMX Output', 2:'Relay', 3:'AC Dimmer', 4:'Removed WiZ Channel', 5:'PWM Dimmer', 6:'DC Motor', 7:'Stepper', 8:'RC Servo', 9:'Solenoid Trigger', 10:'Analog RGB / RGBW', 11:'Passive Buzzer', 12:'Sequential Smoke Shooter', 13:'7-Segment Display'};
+const SOURCES={0:'ESP32',1:'PCA9685',2:'MCP23017',3:'TCA9555',4:'PCF857x'};
+const OUTPUT_GPIOS=[4,12,14,15,2,17,32,33];
+const INPUT_GPIOS=[36,39,34,35,32,33];
+const INPUT_ONLY_GPIOS=[36,39,34,35];
+
+function typeId(o){
+  const t=parseInt(o.type);
+  return isNaN(t)?-1:t;
+}
+
+function deviceLabel(o){
+  const t=typeId(o);
+  return TYPES[t]||'Unknown';
+}
+
+function ledUniverseCount(o){
+  const bytesPerPixel=(o.color_order||0)>=4?4:3;
+  const pixelsPerUniverse=Math.floor(512/bytesPerPixel);
+  return Math.ceil((o.led_count||170)/pixelsPerUniverse);
+}
+
+function outputChannelCount(o){
+  const t=typeId(o);
+  if(t===0) return `${o.led_count||170} LEDs / ${ledUniverseCount(o)}U`;
+  if(t===1) return '512 Ch';
+  if(t===4) return 'Removed';
+  if(t===7){
+    const posBytes=valueByteCount(parseInt(o.mc_resolution||8));
+    return `${posBytes+2} Ch (${posBytes} Pos + Speed + Cmd)`;
+  }
+  if(t>=5&&t<=8) return `${valueByteCount(parseInt(o.mc_resolution||8))} Ch`;
+  if(t===10) return (o.color_order||0)>=4 ? '4 Ch (RGBW)' : '3 Ch (RGB)';
+  if(t===11) return '2 Ch';
+  if(t===12) return '1 Ch';
+  if(t===13){const m=parseInt(o.mc_mode||0);return m===1?'4 Ch (ASCII)':m>=2?'1 Ch (Direct)':'2 Ch (Numeric)';}
+  return '1 Ch';
+}
+
+function outputByteCount(o){
+  const t=typeId(o);
+  if(t===4) return 0;
+  if(t===7) return valueByteCount(parseInt(o.mc_resolution||8))+2;
+  if(t>=5&&t<=8) return valueByteCount(parseInt(o.mc_resolution||8));
+  if(t===10) return (o.color_order||0)>=4 ? 4 : 3;
+  if(t===11) return 2;
+  if(t===12) return 1;
+  if(t===13){const m=parseInt(o.mc_mode||0);return m===1?4:m>=2?1:2;}
+  return 1;
+}
+
+function outputGpios(o){
+  const t=typeId(o);
+  const pins=[];
+  const add=p=>{p=parseInt(p); if(!isNaN(p)&&p!==255&&!pins.includes(p)) pins.push(p);};
+  if(t===4||parseInt(o.source||0)!==0) return pins;
+  add(o.pin);
+  const is7SegDD = t===13 && (parseInt(o.mc_mode||0)===2||parseInt(o.mc_mode||0)===3);
+  if(t===6||t===10||t===12||(t===13&&!is7SegDD)||(t===7&&parseInt(o.pin2_source||0)===0)) add(o.pin2);
+  if(t===10||(t===6&&parseInt(o.mc_mode||0)===2)||(t===7&&parseInt(o.pin3_source||0)===0)) add(o.pin3);
+  if((t===7&&parseInt(o.mc_homing_mode||0)===0)||(t===10&&parseInt(o.color_order||0)>=4)) add(o.pin4);
+  return pins;
+}
+
+function parseAddrInput(id, fallback){
+  const raw=(document.getElementById(id)?.value||'').trim();
+  const val=parseInt(raw || fallback);
+  return isNaN(val)?fallback:val;
+}
+
+const PIN_GPIOS=['4','12','14','15','2','17','32','33'];
+const PIN_CHANS=['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15'];
+
+function renderPinRows(){
+  const container=document.getElementById('pin-mapping-container');
+  if(!container) return;
+  // Save all pin field values before destroying elements
+  const saved={};
+  ['no_source','no_pin','no_pca_addr','no_pca_channel','no_pin2','no_pin2_source','no_pin2_addr','no_pin2_channel','no_pin3','no_pin3_source','no_pin3_addr','no_pin3_channel','no_pin4','no_pin4_source','no_pin4_addr','no_pin4_channel'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.value;});
+  ['no_pin_invert','no_pin2_invert','no_pin3_invert','no_pin4_invert'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.checked;});
+  const t=parseInt(document.getElementById('no_type').value);
+  const src=parseInt(saved.no_source||0);
+  const mcMode=parseInt(document.getElementById('mc_mode')?.value||0);
+  const hMode=parseInt(document.getElementById('mc_homing_mode')?.value||0);
+  const pin2Src=parseInt(saved.no_pin2_source||0);
+  const pin3Src=parseInt(saved.no_pin3_source||0);
+  const pin4Src=parseInt(saved.no_pin4_source||0);
+  const isStepper=t===7, isMotor=t===6, is7Seg=t===13, isAnalog=t===10, isSmoke=t===12, isDfPlayer=t===15;
+  const is7SegDD=is7Seg&&(mcMode===2||mcMode===3);
+  const canUsePca=(t===2||t===5||t===6||t===8||t===10||t===12);
+  const canUseDig=(t===2||t===6||t===9||t===12);
+  const usePin2=(isMotor||isAnalog||t===12||t===11||t===9||is7Seg||isDfPlayer||(isStepper&&(pin2Src===0||pin2Src!==0)));
+  const usePin3=(isAnalog||(isMotor&&mcMode===2)||isStepper||(is7Seg&&mcMode===1));
+  const showPin4=isStepper&&hMode===0;
+  const pinDefs=[];
+  const srcOpts=(allowPca,allowDig)=>{
+    let h=`<option value="0">ESP32 GPIO</option>`;
+    if(allowPca) h+=`<option value="1">PCA9685</option>`;
+    if(allowDig) h+=`<option value="2">MCP23017</option><option value="3">TCA9555</option><option value="4">PCF857x</option>`;
+    return h;
+  };
+  const mkSel=(id,opts)=>`<select id="${id}" onchange="toggleOutFields()" style="width:100%">${opts}</select>`;
+  const addrOpts=(f)=>{
+    const gs=[
+      {l:'GPIO Expanders 0x20-0x27 (MCP23017/TCA9555/PCF857x)', s:[2,3,4], r:[0x20,0x27]},
+      {l:'PCA9685 PWM 0x40-0x47', s:[1], r:[0x40,0x47]},
+      {l:'Other I2C 0x38-0x3F', s:[1,2,3,4], r:[0x38,0x3F]}
+    ];
+    return gs.filter(g=>f===undefined||g.s.includes(f)).map(g=>`<optgroup label="${g.l}">${Array.from({length:g.r[1]-g.r[0]+1},(_,i)=>`<option value="${g.r[0]+i}">0x${(g.r[0]+i).toString(16).toUpperCase()}</option>`).join('')}</optgroup>`).join('');
+  };
+  const chOpts=PIN_CHANS.map(v=>`<option value="${v}">CH ${v}</option>`).join('');
+
+  // Build pin descriptions based on type
+  const p1Desc = isAnalog ? 'R' : isSmoke ? 'Smoke Valve' : is7Seg ? 'CLK / Segment' : isStepper ? 'Step' : isMotor ? 'PWM' : isDfPlayer ? 'TX' : 'Main';
+  const p2Desc = isAnalog ? 'G' : isSmoke ? 'Shoot Valve' : is7SegDD ? 'Seg Base Ch' : is7Seg ? 'DIO' : isStepper ? (pin2Src===0?'DIR Pin':'DIR Ch') : isMotor ? (mcMode===1?'DIR':'IN1') : t===12?'Shoot Val':isDfPlayer?'RX':'Pin 2';
+  const p3Desc = isAnalog ? 'B' : isStepper ? (pin3Src===0?'EN Pin':'EN Ch') : isMotor && mcMode===2?'IN2/EN':'Pin 3';
+  const p4Desc = isAnalog ? 'W' : isStepper ? 'Homing' : 'Pin 4';
+
+  const localBadge = (label) => `<span style="display:inline-block;width:100%;background:#f1f5f9;color:#64748b;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #e2e8f0">${label}</span>`;
+
+  // Pin 1 (Main)
+  const p1Src=src;
+  pinDefs.push({label:'Pin 1',desc:p1Desc,srcHtml:mkSel('no_source',srcOpts(canUsePca,canUseDig)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
+
+  // Pin 2
+  if(usePin2){
+    let p2Src=isStepper||isMotor?pin2Src:0;
+    let showAddr=p2Src!==0;
+    if(is7Seg&&!is7SegDD) p2Src=0;
+    if(is7SegDD) p2Src=pin2Src;
+    const srcSel=mkSel('no_pin2_source',srcOpts(isStepper||isMotor,isStepper||isMotor||is7SegDD));
+    const addrEl=showAddr?mkSel('no_pin2_addr',addrOpts(p2Src)):localBadge('ESP32 GPIO');
+    let pinOpts;
+    if(showAddr){
+      pinOpts=mkSel('no_pin2_channel',`<option value="255">None</option>${chOpts}`);
+    } else if(is7SegDD){
+      pinOpts=`<span style="display:inline-block;width:100%;background:#fef9c3;color:#854d0e;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #fef08a">base+0..6</span>`;
+    } else {
+      pinOpts=mkSel('no_pin2',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`);
+    }
+    pinDefs.push({label:'Pin 2',desc:p2Desc,srcHtml:srcSel,addrHtml:addrEl,pinHtml:pinOpts,invId:'no_pin2_invert'});
+  }
+
+  // Pin 3
+  if(usePin3){
+    const showSrc=isStepper;
+    let p3Src=isStepper?pin3Src:0;
+    const srcSel=mkSel('no_pin3_source',srcOpts(showSrc,showSrc));
+    const addrEl=showSrc&&p3Src!==0?mkSel('no_pin3_addr',addrOpts(p3Src)):localBadge('ESP32 GPIO');
+    let pinOpts;
+    if(showSrc&&p3Src!==0){
+      pinOpts=mkSel('no_pin3_channel',`<option value="255">None</option>${chOpts}`);
+    } else {
+      pinOpts=mkSel('no_pin3',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`);
+    }
+    pinDefs.push({label:'Pin 3',desc:p3Desc,srcHtml:srcSel,addrHtml:addrEl,pinHtml:pinOpts,invId:'no_pin3_invert'});
+  }
+
+  // Pin 4
+  if(showPin4){
+    const showSrc=isStepper;
+    const srcSel=mkSel('no_pin4_source',srcOpts(false,true));
+    const addrEl=pin4Src!==0?mkSel('no_pin4_addr',addrOpts(pin4Src)):localBadge('ESP32 GPIO');
+    let pinOpts;
+    if(pin4Src!==0){
+      pinOpts=mkSel('no_pin4_channel',`<option value="255">None</option>${chOpts}`);
+    } else {
+      pinOpts=mkSel('no_pin4',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}<option value="36">GPIO 36</option><option value="39">GPIO 39</option><option value="34">GPIO 34</option><option value="35">GPIO 35</option>`);
+    }
+    pinDefs.push({label:'Pin 4',desc:p4Desc,srcHtml:srcSel,addrHtml:addrEl,pinHtml:pinOpts,invId:'no_pin4_invert'});
+  }
+
+  // Render
+  container.innerHTML=pinDefs.map((p,i)=>`
+    <div class="pin-row" style="display:flex;gap:6px;align-items:end;margin-bottom:6px;flex-wrap:wrap">
+      <div style="min-width:44px;padding-bottom:4px"><div style="font-weight:600;font-size:0.82rem;color:#475569">${p.label}</div><div style="font-size:0.62rem;color:#94a3b8">${p.desc}</div></div>
+      <div class="f" style="flex:1;min-width:120px;margin:0">${p.srcHtml}</div>
+      <div class="f" style="flex:1;min-width:100px;margin:0">${p.addrHtml}</div>
+      <div class="f" style="flex:1;min-width:100px;margin:0">${p.pinHtml}</div>
+      <div class="f" style="flex:0 0 auto;margin:0;padding-bottom:4px;display:flex;align-items:center;gap:4px">
+        <input type="checkbox" id="${p.invId}">
+        <label for="${p.invId}" style="font-size:0.75rem;margin:0">Invert</label>
+      </div>
+    </div>`).join('');
+  // Restore all saved values on newly created elements
+  Object.keys(saved).forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    if(el.type==='checkbox'){
+      el.checked=!!saved[id];
+    } else if(el.tagName==='SELECT'){
+      el.value=saved[id];
+      if(el.value!==saved[id]){
+        // If saved value is not an option (e.g., expander addr not in local view), reset
+        if(el.options.length) el.value=el.options[0].value;
+      }
+    }
+  });
+}
+
+function populateExpanderAddresses(el, filterSource){
+  const groups=[
+    {label:'GPIO Expanders 0x20-0x27 (MCP23017/TCA9555/PCF857x)', sources:[2,3,4], range:[0x20,0x27]},
+    {label:'PCA9685 PWM 0x40-0x47', sources:[1], range:[0x40,0x47]},
+    {label:'Other I2C 0x38-0x3F', sources:[1,2,3,4], range:[0x38,0x3F]}
+  ];
+  el.innerHTML='';
+  groups.forEach(g=>{
+    if(filterSource!==undefined && !g.sources.includes(filterSource)) return;
+    const og=document.createElement('optgroup');
+    og.label=g.label;
+    for(let a=g.range[0]; a<=g.range[1]; a++){
+      const opt=document.createElement('option');
+      opt.value=a;
+      opt.textContent='0x'+a.toString(16).toUpperCase();
+      og.appendChild(opt);
+    }
+    el.appendChild(og);
+  });
+}
+
+function setHybridDefaultAddr(sourceId, addrId){
+  const src=parseInt(document.getElementById(sourceId)?.value||0);
+  const addrEl=document.getElementById(addrId);
+  if(!addrEl) return;
+  const addr=parseInt(addrEl.value||'0');
+  if(src===1 && addr<64) addrEl.value='64';
+  if(src>=2 && src<=4 && addr>=64) addrEl.value='32';
+}
+
+function expanderPinLabel(src, addr, channel){
+  src=parseInt(src||0);
+  channel=parseInt(channel);
+  if(src===0||isNaN(channel)||channel===255) return '';
+  const srcName=SOURCES[src]||'Expander';
+  return `${srcName} 0x${parseInt(addr||32).toString(16).toUpperCase()}:CH${channel}`;
+}
+
+function outputReservedPinConflict(list,pin){
+  pin=parseInt(pin);
+  if(isNaN(pin)||pin===255) return -1;
+  return list.findIndex(o=>outputGpios(o).includes(pin));
+}
+
+function reservedPins(extra=[]){
+  const pins=new Set();
+  outputs.forEach((o,i)=>{
+    if(i===editOutIdx) return;
+    outputGpios(o).forEach(p=>pins.add(p));
+  });
+  ['status_led_pin','zc_pin','i2c_sda','i2c_scl'].forEach(id=>{
+    const e=document.getElementById(id);
+    if(!e) return;
+    const p=parseInt(e.value);
+    if(!isNaN(p)&&p!==255) pins.add(p);
+  });
+  extra.forEach(p=>{p=parseInt(p); if(!isNaN(p)&&p!==255) pins.add(p);});
+  return pins;
+}
+
+function firstFreeGpio(pool, used){
+  for(const p of pool){ if(!used.has(p)) return p; }
+  return 255;
+}
+
+function setSelectIfOption(id,value){
+  const e=document.getElementById(id);
+  if(!e) return;
+  if([...e.options].some(o=>parseInt(o.value)===value)) e.value=value;
+}
+
+function autoAssignOutputPins(){
+  if(editOutIdx!==-1) return;
+  const t=parseInt(document.getElementById('no_type').value);
+  const mcMode=parseInt(document.getElementById('mc_mode').value);
+  const hMode=parseInt(document.getElementById('mc_homing_mode').value);
+  const colorOrder = parseInt(document.getElementById('no_ord')?.value||0);
+  ['no_pin','no_pin2','no_pin3','no_pin4'].forEach(id=>setSelectIfOption(id,255));
+  const picked=[];
+  const takeOutput=()=>{
+    const used=reservedPins(picked);
+    const p=firstFreeGpio(OUTPUT_GPIOS,used);
+    if(p!==255) picked.push(p);
+    return p;
+  };
+  const takeInput=()=>{
+    const used=reservedPins(picked);
+    let p=firstFreeGpio(INPUT_ONLY_GPIOS,used);
+    if(p===255) p=firstFreeGpio(INPUT_GPIOS,used);
+    if(p!==255) picked.push(p);
+    return p;
+  };
+
+  setSelectIfOption('no_pin',takeOutput());
+  const pin2Source=parseInt(document.getElementById('no_pin2_source')?.value||0);
+  const pin3Source=parseInt(document.getElementById('no_pin3_source')?.value||0);
+  if(t===6||t===10||t===12||t===13||(t===7&&pin2Source===0)) setSelectIfOption('no_pin2',takeOutput());
+  if(t===10||(t===6&&mcMode===2)||(t===7&&pin3Source===0)) setSelectIfOption('no_pin3',takeOutput());
+  if((t===7&&hMode===0)||(t===10&&colorOrder>=4)) setSelectIfOption('no_pin4',takeOutput());
+}
+
+function outputAddressLabel(o){
+  const t=typeId(o);
+  if(t===0||t===1) return `U${o.start_universe}`;
+  return `U${o.start_universe}:CH${o.start_address||1}`;
+}
+
+function gpioLabel(o){
+  const t=typeId(o);
+  if(t===4) return '--';
+  if(t===7&&parseInt(o.source||0)===0){
+    const parts=[];
+    parts.push('STEP GPIO '+o.pin);
+    if(parseInt(o.pin2_source||0)===0) parts.push('DIR GPIO '+o.pin2);
+    else parts.push('DIR '+expanderPinLabel(o.pin2_source,o.pin2_addr,o.pin2_channel));
+    if(parseInt(o.pin3_source||0)===0){
+      if(parseInt(o.pin3)!==255) parts.push('EN GPIO '+o.pin3);
+    } else {
+      parts.push('EN '+expanderPinLabel(o.pin3_source,o.pin3_addr,o.pin3_channel));
+    }
+    return parts.filter(Boolean).join(' / ');
+  }
+  if(parseInt(o.source||0)!==0){
+    const formatAddr=addr=>'0x'+parseInt(addr).toString(16).toUpperCase();
+    const srcName=SOURCES[parseInt(o.source||0)]||'Expander';
+    const addrs = formatAddr(o.pca_addr || 0x40);
+    const channels = [o.pca_channel];
+    if(t===6||t===7||t===10||t===12) { if(o.pca_channel2!==255) channels.push(o.pca_channel2); }
+    if(t===7||t===10||(t===6&&parseInt(o.mc_mode||0)===2)) { if(o.pca_channel3!==255) channels.push(o.pca_channel3); }
+    if(t===10&&parseInt(o.color_order||0)>=4) { if(o.pca_channel4!==255) channels.push(o.pca_channel4); }
+    return `${srcName} ${addrs}:CH` + channels.join('/');
+  }
+  const pins=outputGpios(o);
+  return pins.length?pins.map(p=>'GPIO '+p).join(' / '):'--';
+}
+
+function outputConfigLabel(o){
+  const t=typeId(o);
+  if(t===0) return `${ORDERS[o.color_order]||'GRB'} order`;
+  if(t===1) return 'DMX512 serial';
+  if(t===2) return 'Threshold 128';
+  if(t===3) return 'ZC dimmer';
+  if(t===4) return 'Removed - delete or reconfigure';
+  if(t===5) return `${o.mc_resolution||8}-bit PWM @ ${o.mc_freq||1000}Hz`;
+  if(t===6){
+    const modes=['PWM/PWM','PWM/DIR','IN1/IN2/EN'];
+    return `${modes[parseInt(o.mc_mode||0)]||'Motor'} ${o.mc_resolution||8}-bit`;
+  }
+  if(t===7) return `${o.mc_resolution||8}-bit position`;
+  if(t===8) return `${o.mc_min_us||1000}-${o.mc_max_us||2000}us`;
+  if(t===9) return `${o.solenoid_pulse_ms||50}ms pulse`;
+  if(t===10) return `${(o.color_order||0)>=4?'RGBW':'RGB'} Analog @ ${o.mc_freq||1000}Hz`;
+  if(t===11) return 'Passive Buzzer';
+  if(t===12) return `Smoke Seq (${o.smoke_duration_ms||1000}/${o.settle_delay_ms||500}/${o.shoot_duration_ms||1000} ms)`;
+  if(t===13){const m=parseInt(o.mc_mode||0);return m===1?'TM1637 ASCII':m===2?'Direct 7-pin':m===3?'Direct 8-pin':'TM1637 Numeric';}
+  if(t===15) return 'Ultrasonic Sensor (HC-SR04)';
+  if(t===16) return 'Analog Microphone';
+  return `Raw type: ${o.type}`;
+}
+
+async function loadOutputs(){
+  try{
+    const d=await(await fetch('/api/outputs')).json();
+    outputs=d.outputs||[];
+    markOutputsSaved();
+    renderOutputs();
+    autoAssignOutputPins();
+  }catch(e){}
+}
+
+function channelScore(o){
+  const t=typeId(o);
+  if(t===0) return 2+(o.led_count||170)/100;
+  if(t===1) return 4;
+  if(t===2||t===9) return 0.5;
+  if(t===3||t===5||t===6||t===8||t===10||t===13||t===14) return 2;
+  if(t===7) return 8;
+  if(t===11||t===12) return 1.5;
+  return 0;
+}
+function totalScore(arr){
+  return arr.reduce((s,o)=>s+channelScore(o),0);
+}
+function updateScoreBar(){
+  const bar=document.getElementById('score-fill');
+  const txt=document.getElementById('score-text');
+  if(!bar||!txt) return;
+  const s=totalScore(outputs);
+  const limit=100;
+  const pct=Math.min(s/limit*100,100);
+  bar.style.width=pct+'%';
+  bar.style.background=s>limit?'#ef4444':s>80?'#eab308':'#22c55e';
+  txt.textContent=s.toFixed(1)+' / '+limit;
+  const saveBtn=document.getElementById('out-save-btn');
+  if(saveBtn) saveBtn.disabled=s>limit;
+}
+function renderOutputs(){
+  const tb=document.getElementById('out-tbody');
+  const cnt=document.getElementById('out-count');
+  if(cnt) cnt.textContent=`${outputs.length} / 16 channels`;
+  updateScoreBar();
+  // ZC pin warning
+  const zcWarn=document.getElementById('zc-warning');
+  if(zcWarn){
+    const hasDimmer=outputs.some(o=>typeId(o)===3);
+    const zcPin=parseInt(document.getElementById('zc_pin')?.value||'255');
+    zcWarn.style.display=hasDimmer&&zcPin===255?'':'none';
+  }
+  tb.innerHTML='';
+  if(!outputs.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:12px">No channels configured.</td></tr>';return;}
+  outputs.forEach((o,i)=>{
+    const tr=document.createElement('tr');
+    if(i===currentTestIdx) tr.classList.add('test-row');
+    if(outputsDirty) tr.classList.add('unsaved-row');
+    const removed=typeId(o)===4;
+    const sc=channelScore(o);
+    const scClass=sc>10?'pill-warn':'pill-ok';
+    tr.innerHTML=`<td>${i+1}</td><td>${deviceLabel(o)}</td><td>${gpioLabel(o)}</td><td>${outputAddressLabel(o)}</td>
+      <td>${outputChannelCount(o)}</td><td><span class="pill ${scClass}" style="font-size:0.65rem">${sc.toFixed(1)}</span></td>
+      <td>${i===currentTestIdx?'<span class="pill pill-warn" style="margin-right:4px">TEST</span>':''}${removed?'<span class="pill pill-warn" style="margin-right:4px">DELETE</span>':`<button class="btn bg" style="padding:3px 8px;font-size:0.72rem;margin-right:4px" onclick="showOutputTest(${i})">Test</button>
+          <button class="btn bs" style="padding:3px 8px;font-size:0.72rem;margin-right:4px" onclick="editOutput(${i})">Edit</button>`}
+          <button class="btn bd" style="padding:3px 8px;font-size:0.72rem" onclick="delOutput(${i})">Delete</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function valueByteCount(res){
+  res=parseInt(res||8);
+  if(res<=8) return 1;
+  if(res<=16) return 2;
+  if(res<=24) return 3;
+  return 4;
+}
+function maxDmxFor(o){
+  const res=parseInt(o.mc_resolution||8);
+  return Math.pow(2,Math.min(res,32))-1;
+}
+function valueBytes(v,res){
+  const bytes=valueByteCount(res);
+  const max=Math.pow(2,Math.min(parseInt(res||8),32))-1;
+  v=Math.max(0,Math.min(Math.round(Number(v)||0),max));
+  const out=[];
+  for(let i=bytes-1;i>=0;i--) out.push(Math.floor(v/Math.pow(256,i))&255);
+  return out;
+}
+function setTestState(active,label=''){
+  const el=document.getElementById('out-test-state');
+  const pill=document.getElementById('test-mode-pill');
+  if(el){
+    el.className='ib '+(active?'ib-red':'ib-blue');
+    el.textContent=active?`TEST MODE ACTIVE: ${label}. Output is being overridden. Press Stop Test to return to normal mode.`:'Normal output mode. Test tools are idle.';
+  }
+  if(pill){
+    pill.className='pill '+(active?'pill-warn':'pill-ok');
+    pill.textContent=active?'TEST ACTIVE':'Idle';
+  }
+}
+async function sendOutputTest(idx,values,durationMs=30000){
+  try{
+    const res=await fetch('/api/output-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:idx,values:values,duration_ms:durationMs})});
+    if(res.ok){
+      currentTestIdx=idx;
+      setTestState(true,`#${idx+1} ${deviceLabel(outputs[idx]||{})}`);
+      renderOutputs();
+      clearTimeout(window.outputTestTimer);
+      window.outputTestTimer=setTimeout(()=>{currentTestIdx=-1;setTestState(false);renderOutputs();},durationMs+500);
+    }
+    showAlert(res.ok);
+  }catch(e){showAlert(false);}
+}
+async function stopOutputTest(){
+  try{
+    const res=await fetch('/api/output-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({off:true})});
+    if(res.ok){
+      currentTestIdx=-1;
+      clearTimeout(window.outputTestTimer);
+      setTestState(false);
+      const p=document.getElementById('out-test-panel');
+      if(p) p.style.display='none';
+      renderOutputs();
+    }
+    showAlert(res.ok);
+  }catch(e){showAlert(false);}
+}
+function showOutputTest(idx){
+  const o=outputs[idx];
+  const p=document.getElementById('out-test-panel');
+  const c=document.getElementById('test-controls');
+  document.getElementById('test-title').textContent=`#${idx+1} ${deviceLabel(o)}`;
+  p.style.display='block';
+  const dur=`<div class="f"><label for="test_duration">Duration (seconds)</label><input type="number" id="test_duration" value="30" min="1" max="300"></div>`;
+  const runBtn=(label,js,cls='bp')=>`<button type="button" class="btn ${cls}" onclick="${js}">${label}</button>`;
+  let html='';
+  if(o.type===0||o.type===10){
+    const rgbw=(o.color_order||0)>=4;
+    const isLed = o.type===0;
+    html=`<div class="fg">${dur}<div class="f"><label for="test_color">Custom Color</label><input type="color" id="test_color" value="#ff0000"></div>
+      <div class="f" style="display:${rgbw?'':'none'}"><label for="test_white">White</label><input type="number" id="test_white" value="0" min="0" max="255"></div>
+      ${isLed ? `<div class="f"><label for="test_pixel">Single Pixel Number</label><input type="number" id="test_pixel" value="1" min="1" max="${o.led_count||170}"><div class="hint">Use one lit pixel to count LEDs. Pixel numbering starts at 1.</div></div>` : ''}</div>
+      <div class="btns">${runBtn(isLed ? 'All Custom' : 'Apply Color',isLed ? `testLed(${idx},'all')` : `testLed(${idx})`)}
+      ${runBtn(isLed ? 'All Red' : 'Red',isLed ? `testLedPreset(${idx},255,0,0,'all')` : `testLedPreset(${idx},255,0,0)`,'bd')}
+      ${runBtn(isLed ? 'All Green' : 'Green',isLed ? `testLedPreset(${idx},0,255,0,'all')` : `testLedPreset(${idx},0,255,0)`,'bg')}
+      ${runBtn(isLed ? 'All Blue' : 'Blue',isLed ? `testLedPreset(${idx},0,0,255,'all')` : `testLedPreset(${idx},0,0,255)`,'bp')}
+      ${isLed ? `${runBtn('Pixel Custom',`testLed(${idx},'pixel')`)}${runBtn('Pixel Red',`testLedPreset(${idx},255,0,0,'pixel')`,'bd')}${runBtn('Pixel Green',`testLedPreset(${idx},0,255,0,'pixel')`,'bg')}${runBtn('Pixel Blue',`testLedPreset(${idx},0,0,255,'pixel')`,'bp')}` : ''}
+      ${runBtn(isLed ? 'Blackout' : 'Off',`sendOutputTest(${idx},[],1000)`,'bd')}</div>`;
+  } else if(o.type===1){
+    html=`<div class="fg">${dur}<div class="f"><label for="test_dmx_ch">DMX Channel</label><input type="number" id="test_dmx_ch" value="1" min="1" max="512"></div><div class="f"><label for="test_level">Value</label><input type="range" id="test_level" min="0" max="255" value="255" oninput="test_level_num.value=this.value"></div><div class="f"><label for="test_level_num">Value Number</label><input type="number" id="test_level_num" value="255" min="0" max="255" oninput="test_level.value=this.value"></div></div>
+      <div class="btns">${runBtn('Send Channel',`testDmx(${idx})`)}${runBtn('Blackout DMX',`sendOutputTest(${idx},[],1000)`,'bd')}</div>`;
+  } else if(o.type===2){
+    html=`<div class="fg">${dur}</div><div class="btns">${runBtn('Relay ON',`sendOutputTest(${idx},[255],testDur())`)}${runBtn('Relay OFF',`sendOutputTest(${idx},[0],1000)`,'bd')}</div>`;
+  } else if(o.type===3||o.type===5||o.type===8){
+    const label=o.type===8?'Servo Position':'Level';
+    const res=parseInt(o.mc_resolution||8);
+    const max=maxDmxFor(o);
+    if(res>8){
+      html=`<div class="fg">${dur}<div class="f"><label for="test_level_num">${label} (0-${max})</label><input type="number" id="test_level_num" value="${Math.floor(max/2)}" min="0" max="${max}"><div class="hint">${valueByteCount(res)} bytes resolution.</div></div></div>
+        <div class="btns">${runBtn('Apply',`testSingleValue(${idx})`)}${runBtn('Min/Off',`testSinglePreset(${idx},0)`,'bs')}${runBtn('Max',`testSinglePreset(${idx},${max})`,'bg')}</div>`;
+    }else{
+      html=`<div class="fg">${dur}<div class="f"><label for="test_level">${label}</label><input type="range" id="test_level" min="0" max="255" value="128" oninput="test_level_num.value=this.value"></div><div class="f"><label for="test_level_num">Value Number</label><input type="number" id="test_level_num" value="128" min="0" max="255" oninput="test_level.value=this.value"></div></div>
+        <div class="btns">${runBtn('Apply',`testSingleValue(${idx})`)}${runBtn('Min/Off',`testSinglePreset(${idx},0)`,'bs')}${runBtn('Max',`testSinglePreset(${idx},255)`,'bg')}</div>`;
+    }
+  } else if(o.type===6){
+    html=`<div class="fg">${dur}<div class="f"><label for="test_level_num">Speed (0-255)</label><input type="number" id="test_level_num" value="200" min="0" max="255"></div></div>
+      <div class="btns">${runBtn('Forward',`testMotor(${idx},1)`,'bg')}${runBtn('Stop',`testMotor(${idx},0)`,'bs')}${runBtn('Reverse',`testMotor(${idx},-1)`,'bd')}</div>`;
+  } else if(o.type===7){
+    const max=maxDmxFor(o);
+    const unitLabel=o.mc_unit_type===1?'°':(o.mc_unit_type===2?' mm':' Steps');
+    html=`<div class="fg">${dur}<div class="f"><label for="test_step_pos">Position (0-${max}${unitLabel})</label><input type="number" id="test_step_pos" value="${Math.floor(max/2)}" min="0" max="${max}"><div class="hint">${valueByteCount(o.mc_resolution)} position byte(s), then Speed, then Cmd.</div></div><div class="f"><label for="test_step_speed">Speed</label><input type="number" id="test_step_speed" value="180" min="0" max="255"></div></div>
+      <div class="btns">${runBtn('Move',`testStepper(${idx},0)`)}${runBtn('Stop Cmd',`testStepper(${idx},120)`,'bs')}${runBtn('Home Cmd',`testStepper(${idx},220)`,'bd')}</div>`;
+  } else if(o.type===9){
+    html=`<div class="fg"><div class="f"><label for="test_duration">Duration (seconds)</label><input type="number" id="test_duration" value="1" min="1" max="10"></div></div>
+      <div class="btns">${runBtn('Trigger Pulse',`sendOutputTest(${idx},[255],testDur())`,'bp')}${runBtn('Stop',`sendOutputTest(${idx},[0],1000)`,'bd')}</div>`;
+  } else if(o.type===13){
+    const m=parseInt(o.mc_mode||0);
+    if(m===1){
+      html=`<div class="fg">${dur}<div class="f"><label for="test_7seg_text">Text (4 chars)</label><input type="text" id="test_7seg_text" value="TEST" maxlength="4"><div class="hint">Sends ASCII bytes to the TM1637 display.</div></div></div>
+        <div class="btns">${runBtn('Show Text',`test7Seg(${idx})`)}${runBtn('Blank',`sendOutputTest(${idx},[32,32,32,32],1000)`,'bd')}</div>`;
+    } else if(m>=2){
+      html=`<div class="fg">${dur}<div class="f"><label for="test_7seg_char">Character</label><input type="text" id="test_7seg_char" value="8" maxlength="1"><div class="hint">Sends 1 byte to direct-drive 7-segment.</div></div></div>
+        <div class="btns">${runBtn('Show',`sendOutputTest(${idx},[document.getElementById('test_7seg_char').value.charCodeAt(0)&255],testDur())`)}${runBtn('Blank',`sendOutputTest(${idx},[32],1000)`,'bd')}</div>`;
+    } else {
+      html=`<div class="fg">${dur}<div class="f"><label for="test_7seg_num">Number (0-9999)</label><input type="number" id="test_7seg_num" value="1234" min="0" max="9999"></div></div>
+        <div class="btns">${runBtn('Show Number',`test7Seg(${idx})`)}${runBtn('Zero',`sendOutputTest(${idx},[0,0],1000)`,'bd')}</div>`;
+    }
+  } else if(o.type===15){
+    html=`<div class="fg">${dur}<div class="f"><label for="test_mp3_track">Track (1-255)</label><input type="number" id="test_mp3_track" value="1" min="0" max="255"></div>
+      <div class="f"><label for="test_mp3_vol">Volume (0-255)</label><input type="range" id="test_mp3_vol" min="0" max="255" value="200" oninput="test_mp3_vol_num.value=this.value"></div>
+      <div class="f"><label for="test_mp3_vol_num">Volume Number</label><input type="number" id="test_mp3_vol_num" value="200" min="0" max="255" oninput="test_mp3_vol.value=this.value"></div></div>
+      <div class="btns">${runBtn('Play Track',`testMp3(${idx},'play')`,'bg')}${runBtn('Stop',`testMp3(${idx},'stop')`,'bd')}${runBtn('Pause',`testMp3(${idx},'pause')`,'bs')}${runBtn('Next',`testMp3(${idx},'next')`)}${runBtn('Prev',`testMp3(${idx},'prev')`)}</div>`;
+  }
+  c.innerHTML=html;
+  p.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function testDur(){return (parseInt(document.getElementById('test_duration')?.value)||30)*1000;}
+function buildLedValues(o,r,g,b,w,mode){
+  const rgbw=(o.color_order||0)>=4;
+  if(o.type===10){
+    return rgbw?[r,g,b,w]:[r,g,b];
+  }
+  const count=o.led_count||170, vals=[];
+  const target=Math.max(1,Math.min(count,parseInt(document.getElementById('test_pixel')?.value)||1))-1;
+  for(let i=0;i<count;i++){
+    const on=mode!=='pixel'||i===target;
+    vals.push(on?r:0,on?g:0,on?b:0);
+    if(rgbw) vals.push(on?w:0);
+  }
+  return vals;
+}
+function testLed(idx,mode='all'){
+  const o=outputs[idx], hex=document.getElementById('test_color').value;
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16), w=parseInt(document.getElementById('test_white').value)||0;
+  sendOutputTest(idx,buildLedValues(o,r,g,b,w,mode),testDur());
+}
+function testLedPreset(idx,r,g,b,mode='all'){
+  const o=outputs[idx];
+  sendOutputTest(idx,buildLedValues(o,r,g,b,0,mode),testDur());
+}
+function testDmx(idx){
+  const ch=Math.max(1,Math.min(512,parseInt(document.getElementById('test_dmx_ch').value)||1));
+  const val=Math.max(0,Math.min(255,parseInt(document.getElementById('test_level_num').value)||0));
+  const vals=new Array(512).fill(0); vals[ch-1]=val; sendOutputTest(idx,vals,testDur());
+}
+function testSingleValue(idx){
+  const o=outputs[idx];
+  const res=parseInt(o.mc_resolution||8);
+  const max=maxDmxFor(o);
+  const val=Math.max(0,Math.min(max,parseInt(document.getElementById('test_level_num').value)||0));
+  testSinglePreset(idx,val);
+}
+function testSinglePreset(idx,val){
+  const o=outputs[idx];
+  const res=parseInt(o.mc_resolution||8);
+  const max=maxDmxFor(o);
+  val=Math.max(0,Math.min(max,parseInt(val)||0));
+  if(o.type===3||o.type===5||o.type===8){
+    sendOutputTest(idx,valueBytes(val,res),testDur());
+  } else {
+    sendOutputTest(idx,[val],testDur());
+  }
+}
+function testMotor(idx,dir){
+  const o=outputs[idx], res=parseInt(o.mc_resolution||8), max=maxDmxFor(o), speed=Math.max(0,Math.min(255,parseInt(document.getElementById('test_level_num').value)||0));
+  const center=Math.floor(max/2), v=dir===0?center:(dir>0?Math.round(center+(speed/255)*(max-center)):Math.round(center-(speed/255)*center));
+  sendOutputTest(idx,valueBytes(v,res),testDur());
+}
+function testStepper(idx,cmd){
+  const o=outputs[idx], res=parseInt(o.mc_resolution||8), max=maxDmxFor(o);
+  const pos=Math.max(0,Math.min(max,Number(document.getElementById('test_step_pos').value)||0)), vals=valueBytes(pos,res);
+  vals.push(Math.max(0,Math.min(255,parseInt(document.getElementById('test_step_speed').value)||0)),cmd);
+  sendOutputTest(idx,vals,testDur());
+}
+function test7Seg(idx){
+  const o=outputs[idx];
+  if(parseInt(o.mc_mode||0)===1){
+    const text=(document.getElementById('test_7seg_text').value||'').padEnd(4,' ').slice(0,4);
+    sendOutputTest(idx,[...text].map(c=>c.charCodeAt(0)&255),testDur());
+  } else {
+    const n=Math.max(0,Math.min(9999,parseInt(document.getElementById('test_7seg_num').value)||0));
+    sendOutputTest(idx,[(n>>8)&255,n&255],testDur());
+  }
+}
+function testMp3(idx,action){
+  const track=parseInt(document.getElementById('test_mp3_track').value)||1;
+  const vol=parseInt(document.getElementById('test_mp3_vol').value)||200;
+  if(action==='play'){
+    sendOutputTest(idx,[track,vol,0],testDur());
+  } else if(action==='stop'){
+    sendOutputTest(idx,[0,vol,0],1000);
+  } else if(action==='pause'){
+    sendOutputTest(idx,[track,vol,3],testDur());
+  } else if(action==='next'){
+    sendOutputTest(idx,[track,vol,1],testDur());
+  } else if(action==='prev'){
+    sendOutputTest(idx,[track,vol,2],testDur());
+  }
+}
+
+function setResolutionOptions(isStepper){
+  const sel=document.getElementById('mc_resolution');
+  const current=parseInt(sel.value||8);
+  const opts=isStepper
+    ? [[8,'8-bit (1 Pos Ch)'],[10,'10-bit (2 Pos Ch)'],[12,'12-bit (2 Pos Ch)'],[16,'16-bit (2 Pos Ch)'],[24,'24-bit (3 Pos Ch)'],[32,'32-bit (4 Pos Ch)']]
+    : [[8,'8-bit (1 DMX Ch)'],[10,'10-bit (2 DMX Ch)'],[12,'12-bit (2 DMX Ch)'],[16,'16-bit (2 DMX Ch)']];
+  sel.innerHTML=opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
+  const allowed=opts.some(([v])=>v===current);
+  sel.value=allowed?current:8;
+}
+
+function setModeOptions(kind){
+  const sel=document.getElementById('mc_mode');
+  const lbl=document.getElementById('mc_mode_lbl');
+  const current=parseInt(sel.value||0);
+  const opts=kind==='7seg'
+    ? [[0,'TM1637 Numeric (2 Ch)'],[1,'TM1637 ASCII Text (4 Ch)'],
+       [2,'Direct Drive 7-pin (A-G)'],[3,'Direct Drive 8-pin (A-G+DP)']]
+    : [[0,'PWM + PWM (2 pins)'],[1,'PWM + DIR (2 pins)'],[2,'IN1 + IN2 + EN (3 pins)']];
+  if(lbl) lbl.textContent=kind==='7seg'?'Display Mode':'Motor Sub-Mode';
+  sel.innerHTML=opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
+  sel.value=opts.some(([v])=>v===current)?current:opts[0][0];
+}
+
+function toggleOutFields(){
+  const t=parseInt(document.getElementById('no_type').value);
+  // Ensure pin rows exist before reading/writing pin field elements
+  if(!document.getElementById('no_source')) renderPinRows();
+  const srcSelect=document.getElementById('no_source');
+  
+  const isDmx = t===1;
+  const isRelay = t===2;
+  const isDimmer = t===3;
+  const isMc = t>=5 && t<=8; // Motion Control
+  const isPwmDimmer = t===5;
+  const isMotor = t===6;
+  const isStepper = t===7;
+  const isServo = t===8;
+  const isSolenoid = t===9;
+  const isAnalogRgb = t===10;
+  const isBuzzer = t===11;
+  const isSmoke = t===12;
+  const is7Seg = t===13;
+  const isDfPlayer = t===15;
+
+  // Expander source compatibility
+  const canUsePca = (t===2 || t===5 || t===6 || t===8 || t===10 || t===12);
+  const canUseDigitalExpander = (t===2 || t===6 || t===9 || t===12);
+  [...srcSelect.options].forEach(opt=>{
+    const v=parseInt(opt.value);
+    opt.disabled=(v===1&&!canUsePca)||(v>=2&&!canUseDigitalExpander);
+  });
+  if (srcSelect.options[srcSelect.selectedIndex]?.disabled) srcSelect.value = 0;
+  if (!canUsePca && !canUseDigitalExpander) {
+    srcSelect.value = 0; // ESP32 GPIO
+    srcSelect.disabled = true;
+  } else {
+    srcSelect.disabled = false;
+  }
+  
+  const src = parseInt(srcSelect.value||0);
+  const isEsp32 = src===0;
+  const isPca = src===1;
+  const isExpander = src!==0;
+  const addrSel=document.getElementById('no_pca_addr');
+  if(addrSel){
+    populateExpanderAddresses(addrSel, isExpander ? src : undefined);
+    if(isPca && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=64;
+    if(src>=2 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=32;
+  }
+  
+  document.getElementById('no_addr_grp').style.display=(isDmx||t===0||isDfPlayer)?'none':'';
+  document.getElementById('no_cnt_grp').style.display=(isDmx||isRelay||isDimmer||isMc||isSolenoid||isAnalogRgb||isBuzzer||isSmoke||is7Seg||isDfPlayer)?'none':'';
+  document.getElementById('no_ord_grp').style.display=(isDmx||isRelay||isDimmer||isMc||isSolenoid||isBuzzer||isSmoke||is7Seg||isDfPlayer)?'none':'';
+  document.getElementById('no_led_proto_grp').style.display=(t===0)?'':'none';
+  
+  setModeOptions(is7Seg?'7seg':'motor');
+  document.getElementById('no_mc_grp').style.display=(isMc||is7Seg)?'':'none';
+  document.getElementById('no_sol_grp').style.display=isSolenoid?'':'none';
+  document.getElementById('no_smoke_grp').style.display=isSmoke?'':'none';
+  if(isDfPlayer) renderPinRows();
+  if(isMc) setResolutionOptions(isStepper);
+  
+  const mcMode = parseInt(document.getElementById('mc_mode').value);
+  const hMode = parseInt(document.getElementById('mc_homing_mode').value);
+  const colorOrder = parseInt(document.getElementById('no_ord').value||0);
+  
+  // Render clean pin mapping rows
+  renderPinRows();
+  
+  // Extra expander channels for multi-channel outputs (analog RGB R/G/B/W, stepper ch2-4, etc.)
+  document.getElementById('no_pca_channel2_grp').style.display=(isExpander && (isMotor||isStepper||isAnalogRgb||isSmoke))?'':'none';
+  document.getElementById('no_pca_channel3_grp').style.display=(isPca && (isStepper || isAnalogRgb || (isMotor && mcMode===2)))?'':'none';
+  document.getElementById('no_pca_channel4_grp').style.display=(isPca && (isAnalogRgb && colorOrder>=4))?'':'none';
+  autoAssignOutputPins();
+
+  // Toggle internal fields of Motion Control
+  if (isMc || is7Seg) {
+    document.getElementById('mc_mode_grp').style.display = (isMotor||is7Seg) ? '' : 'none';
+    document.getElementById('mc_res_grp').style.display = isMc ? '' : 'none'; // used in motion-control types
+    
+    // Freq field and label
+    const freqGrp = document.getElementById('mc_freq_grp');
+    const freqLbl = document.getElementById('mc_freq_lbl');
+    if (is7Seg) {
+      freqGrp.style.display = 'none';
+    } else if (isPwmDimmer || isMotor) {
+      freqGrp.style.display = '';
+      freqLbl.textContent = "Frequency (Hz)";
+    } else if (isStepper) {
+      freqGrp.style.display = '';
+      freqLbl.textContent = "Speed (Hz)";
+    } else if (isAnalogRgb) {
+      freqGrp.style.display = '';
+      freqLbl.textContent = "Frequency (Hz)";
+    } else {
+      freqGrp.style.display = 'none';
+    }
+    
+    document.getElementById('mc_deadband_grp').style.display = isMotor ? '' : 'none';
+    document.getElementById('mc_min_us_grp').style.display = isServo ? '' : 'none';
+    document.getElementById('mc_max_us_grp').style.display = isServo ? '' : 'none';
+    document.getElementById('mc_stepper_scale_grp').style.display = isStepper ? '' : 'none';
+    document.getElementById('mc_steps_grp').style.display = isStepper ? '' : 'none';
+    document.getElementById('mc_unit_type_grp').style.display = isStepper ? '' : 'none';
+    document.getElementById('mc_scale_factor_grp').style.display = isStepper ? '' : 'none';
+    document.getElementById('mc_stepper_homing_grp').style.display = isStepper ? '' : 'none';
+    document.getElementById('mc_homing_mode_grp').style.display = isStepper ? '' : 'none';
+    document.getElementById('mc_homing_dir_grp').style.display = isStepper ? '' : 'none';
+    document.getElementById('mc_homing_speed_grp').style.display = isStepper ? '' : 'none';
+    document.getElementById('mc_homing_timeout_grp').style.display = (isStepper && hMode === 1) ? '' : 'none';
+    document.getElementById('mc_invert_grp').style.display = (isMotor || isStepper) ? '' : 'none';
+    document.getElementById('mc_brake_grp').style.display = (isMotor && (mcMode === 0 || mcMode === 2)) ? '' : 'none';
+  }
+  renderPinRows();
+  autoAssignOutputPins();
+  const pinMapContainer = document.getElementById('pin-mapping-container');
+  if(pinMapContainer) pinMapContainer.style.display = '';
+}
+
+document.getElementById('mc_mode').addEventListener('change', toggleOutFields);
+document.getElementById('mc_homing_mode').addEventListener('change', toggleOutFields);
+document.getElementById('no_ord').addEventListener('change', toggleOutFields);
+document.getElementById('status_led_pin').addEventListener('change', autoAssignOutputPins);
+document.getElementById('zc_pin').addEventListener('change', autoAssignOutputPins);
+
+function editOutput(idx){
+  editOutIdx=idx;
+  const o=outputs[idx];
+  if(typeId(o)===4){
+    alert('WiZ output type has been removed. Delete this channel and add a supported output type.');
+    return;
+  }
+  document.getElementById('no_type').value=o.type;
+  toggleOutFields(); // creates pin rows, auto-restores saved values
+  
+  function setVal(id,val){const el=document.getElementById(id);if(el)el.value=val;}
+  function setChk(id,val){const el=document.getElementById(id);if(el)el.checked=val;}
+  
+  setVal('no_source',o.source??0);
+  setVal('no_pin',o.pin);
+  setVal('no_pca_addr',o.pca_addr??64);
+  setVal('no_pca_channel',o.pca_channel??0);
+  setVal('no_pca_channel2',o.pca_channel2??255);
+  setVal('no_pca_channel3',o.pca_channel3??255);
+  setVal('no_pca_channel4',o.pca_channel4??255);
+  setVal('no_uni',o.start_universe);
+  setVal('no_addr',o.start_address||1);
+  setVal('no_cnt',o.led_count||170);
+  setVal('no_ord',o.color_order||0);
+  setVal('no_led_proto',o.led_protocol??0);
+  if(o.type>=5&&o.type<=8) setResolutionOptions(o.type===7);
+  
+  setVal('no_pin2',o.pin2??255);
+  setVal('no_pin3',o.pin3??255);
+  setVal('no_pin4',o.pin4??255);
+  setVal('no_pin4_source',o.pin4_source??0);
+  setVal('no_pin4_addr',o.pin4_addr??32);
+  setVal('no_pin4_channel',o.pin4_channel??255);
+  setVal('no_pin2_source',o.pin2_source??0);
+  setVal('no_pin2_addr',parseInt(o.pin2_addr??32));
+  setVal('no_pin2_channel',o.pin2_channel??255);
+  setVal('no_pin3_source',o.pin3_source??0);
+  setVal('no_pin3_addr',parseInt(o.pin3_addr??32));
+  setVal('no_pin3_channel',o.pin3_channel??255);
+  setVal('mc_mode',o.mc_mode||0);
+  setVal('mc_resolution',o.mc_resolution||8);
+  setVal('mc_freq',o.mc_freq||1000);
+  setVal('mc_deadband',o.mc_deadband||10);
+  setVal('mc_min_us',o.mc_min_us||1000);
+  setVal('mc_max_us',o.mc_max_us||2000);
+  setVal('mc_steps_per_rev',o.mc_steps_per_rev||200);
+  setVal('mc_unit_type',o.mc_unit_type??0);
+  setVal('mc_scale_factor',o.mc_scale_factor??0.0);
+  setChk('mc_invert',o.mc_invert||false);
+  setChk('mc_brake',o.mc_brake||false);
+  setChk('mc_enable_active_high',o.mc_enable_active_high||false);
+  setChk('mc_dir_invert',o.mc_dir_invert||false);
+  setChk('mc_step_invert',o.mc_step_invert||false);
+  setChk('no_pin_invert',o.pin_invert||false);
+  setChk('no_pin2_invert',o.pin2_invert||false);
+  setChk('no_pin3_invert',o.pin3_invert||false);
+  setChk('no_pin4_invert',o.pin4_invert||false);
+  setVal('mc_homing_mode',o.mc_homing_mode??0);
+  setVal('mc_homing_dir',o.mc_homing_dir??0);
+  setVal('mc_homing_speed',o.mc_homing_speed??500);
+  setVal('mc_homing_timeout',o.mc_homing_timeout??5);
+  setVal('sol_mode',o.solenoid_mode??0);
+  setVal('sol_threshold',o.solenoid_threshold??127);
+  setVal('sol_pulse_ms',o.solenoid_pulse_ms??50);
+  setVal('sol_pre_delay',o.solenoid_pre_delay??0);
+  setVal('sol_post_delay',o.solenoid_post_delay??100);
+  
+  if(document.getElementById('smoke_dur')) setVal('smoke_dur',o.smoke_duration_ms??1000);
+  if(document.getElementById('smoke_settle')) setVal('smoke_settle',o.settle_delay_ms??500);
+  if(document.getElementById('smoke_shoot')) setVal('smoke_shoot',o.shoot_duration_ms??1000);
+  if(document.getElementById('smoke_lockout')) setVal('smoke_lockout',o.smoke_lockout_ms??2000);
+
+  // Re-render to apply visibility with correct values
+  toggleOutFields();
+  
+  document.getElementById('out-add-btn').textContent='Update Channel';
+  document.getElementById('out-cancel-btn').style.display='';
+  document.getElementById('edit-idx-label').textContent=idx+1;
+  document.getElementById('edit-banner').style.display='';
+  document.getElementById('no_type').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function cancelEditOutput(){
+  editOutIdx=-1;
+  document.getElementById('no_pca_channel2').value=255;
+  document.getElementById('no_pca_channel3').value=255;
+  document.getElementById('no_pca_channel4').value=255;
+  document.getElementById('no_led_proto').value=0;
+  document.getElementById('no_pin4_source').value=0;
+  document.getElementById('no_pin4_addr').value=32;
+  document.getElementById('no_pin4_channel').value=255;
+  document.getElementById('no_pin2_source').value=0;
+  document.getElementById('no_pin2_channel').value=255;
+  document.getElementById('no_pin3_source').value=0;
+  document.getElementById('no_pin3_channel').value=255;
+  ['no_pin_invert','no_pin2_invert','no_pin3_invert','no_pin4_invert'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
+  document.getElementById('out-add-btn').textContent='Add Channel';
+  document.getElementById('out-cancel-btn').style.display='none';
+  document.getElementById('edit-banner').style.display='none';
+  autoAssignOutputPins();
+}
+
+function addOrUpdateOutput(){
+  const type=parseInt(document.getElementById('no_type').value);
+  if(type===4){alert('WiZ output type has been removed.');return;}
+  if(outputs.length>=16&&editOutIdx===-1){alert('Max 16 channels');return;}
+  function gv(id,d){const el=document.getElementById(id);return el?parseInt(el.value):d;}
+  const source=parseInt(document.getElementById('no_source').value||0);
+  const ch={
+    type:type,
+    source:source,
+    pin: gv('no_pin',255),
+    pca_addr: gv('no_pca_addr',64),
+    pca_channel: gv('no_pca_channel',0),
+    pca_channel2: gv('no_pca_channel2',255),
+    pca_channel3: gv('no_pca_channel3',255),
+    pca_channel4: gv('no_pca_channel4',255),
+    start_universe:parseInt(document.getElementById('no_uni').value),
+    start_address:parseInt(document.getElementById('no_addr').value)||1,
+    led_count:parseInt(document.getElementById('no_cnt').value)||170,
+    color_order:parseInt(document.getElementById('no_ord').value),
+    led_protocol:parseInt(document.getElementById('no_led_proto').value||0),
+    pin_invert: document.getElementById('no_pin_invert')?.checked || false,
+    pin2_invert: document.getElementById('no_pin2_invert')?.checked || false,
+    pin3_invert: document.getElementById('no_pin3_invert')?.checked || false,
+    pin4_invert: document.getElementById('no_pin4_invert')?.checked || false,
+    pin2: gv('no_pin2',255),
+    pin3: gv('no_pin3',255),
+    pin4: gv('no_pin4',255),
+    pin4_source: gv('no_pin4_source',0),
+    pin4_addr: gv('no_pin4_addr',32),
+    pin4_channel: gv('no_pin4_channel',255),
+    pin2_source: gv('no_pin2_source',0),
+    pin2_addr: gv('no_pin2_addr',32),
+    pin2_channel: gv('no_pin2_channel',255),
+    pin3_source: gv('no_pin3_source',0),
+    pin3_addr: gv('no_pin3_addr',32),
+    pin3_channel: gv('no_pin3_channel',255),
+    mc_mode: parseInt(document.getElementById('mc_mode').value),
+    mc_resolution: parseInt(document.getElementById('mc_resolution').value),
+    mc_freq: parseInt(document.getElementById('mc_freq').value),
+    mc_deadband: parseInt(document.getElementById('mc_deadband').value),
+    mc_min_us: parseInt(document.getElementById('mc_min_us').value),
+    mc_max_us: parseInt(document.getElementById('mc_max_us').value),
+    mc_steps_per_rev: parseInt(document.getElementById('mc_steps_per_rev').value),
+    mc_unit_type: parseInt(document.getElementById('mc_unit_type').value),
+    mc_scale_factor: parseFloat(document.getElementById('mc_scale_factor').value),
+    mc_invert: document.getElementById('mc_invert').checked,
+    mc_brake: document.getElementById('mc_brake').checked,
+    mc_enable_active_high: document.getElementById('no_pin3_invert')?.checked || false,
+    mc_dir_invert: document.getElementById('no_pin2_invert')?.checked || false,
+    mc_step_invert: document.getElementById('no_pin_invert')?.checked || false,
+    mc_homing_mode: parseInt(document.getElementById('mc_homing_mode').value),
+    mc_homing_dir: parseInt(document.getElementById('mc_homing_dir').value),
+    mc_homing_speed: parseInt(document.getElementById('mc_homing_speed').value),
+    mc_homing_timeout: parseInt(document.getElementById('mc_homing_timeout').value),
+    solenoid_mode: parseInt(document.getElementById('sol_mode').value),
+    solenoid_threshold: parseInt(document.getElementById('sol_threshold').value),
+    solenoid_pulse_ms: parseInt(document.getElementById('sol_pulse_ms').value),
+    solenoid_pre_delay: parseInt(document.getElementById('sol_pre_delay').value),
+    solenoid_post_delay: parseInt(document.getElementById('sol_post_delay').value),
+    
+    // v1.11.0 fields
+    smoke_duration_ms: parseInt(document.getElementById('smoke_dur')?.value || 1000),
+    settle_delay_ms: parseInt(document.getElementById('smoke_settle')?.value || 500),
+    shoot_duration_ms: parseInt(document.getElementById('smoke_shoot')?.value || 1000),
+    smoke_lockout_ms: parseInt(document.getElementById('smoke_lockout')?.value || 2000)
+  };
+
+  const statusPin=parseInt(document.getElementById('status_led_pin').value);
+  const zcPin=parseInt(document.getElementById('zc_pin').value);
+  const sdaPin=parseInt(document.getElementById('i2c_sda')?.value||255);
+  const sclPin=parseInt(document.getElementById('i2c_scl')?.value||255);
+  
+  if(statusPin!==255&&zcPin!==255&&statusPin===zcPin){
+    alert('Status LED GPIO and Zero-Crossing GPIO cannot use the same pin.');
+    return;
+  }
+  if(ch.source===0){
+    if(outputGpios(ch).includes(statusPin)){
+      alert('GPIO '+statusPin+' is reserved for Status LED. Disable Status LED or select another output GPIO.');
+      return;
+    }
+    if(outputGpios(ch).includes(zcPin)){
+      alert('GPIO '+zcPin+' is reserved for Zero-Crossing input. Disable Zero-Crossing or select another output GPIO.');
+      return;
+    }
+    if(sdaPin!==255&&outputGpios(ch).includes(sdaPin)){
+      alert('GPIO '+sdaPin+' is reserved for I2C SDA. Select another output GPIO.');
+      return;
+    }
+    if(sclPin!==255&&outputGpios(ch).includes(sclPin)){
+      alert('GPIO '+sclPin+' is reserved for I2C SCL. Select another output GPIO.');
+      return;
+    }
+  }
+  if(type===7){
+    ch.source=0;
+    if(ch.pin2_source!==0 && ch.pin2_channel===255){
+      alert('Stepper DIR expander channel is required.');
+      return;
+    }
+    if(ch.pin3_source!==0 && ch.pin3_channel===255){
+      alert('Stepper ENABLE expander channel is required.');
+      return;
+    }
+  }
+
+  if(ch.start_address<1) ch.start_address=1;
+  if(ch.start_address>512) ch.start_address=512;
+  if(type!==0&&type!==1){
+    const needed=outputByteCount(ch);
+    if(ch.start_address+needed-1>512){
+      alert('Start Address is too high for this output. It needs '+needed+' DMX channel(s), so the last usable start address is '+(513-needed)+'.');
+      return;
+    }
+  }
+
+  // Resource validation
+  const newOutputs = [...outputs];
+  if(editOutIdx>=0) newOutputs[editOutIdx]=ch; else newOutputs.push(ch);
+
+  // ESP32 GPIO duplicate pin validation
+  const usedPins={};
+  for(let i=0;i<newOutputs.length;i++){
+    for(const gp of outputGpios(newOutputs[i])){
+      if(usedPins[gp]!==undefined){
+        alert('GPIO '+gp+' is already used by channel '+(usedPins[gp]+1)+' and channel '+(i+1)+'. Please select another pin.');
+        return;
+      }
+      usedPins[gp]=i;
+    }
+  }
+
+  // Expander duplicate channel validation
+  {
+    const formatAddr=addr=>'0x'+parseInt(addr).toString(16).toUpperCase();
+    const usedExpander = {};
+    const addUsedExpander=(src,addr,chn,i)=>{
+      src=parseInt(src||0); chn=parseInt(chn);
+      if(src===0||isNaN(chn)||chn===255) return false;
+      const key = `${src}_${addr}_${chn}`;
+      if (usedExpander[key] !== undefined) {
+        const srcName=SOURCES[src]||'Expander';
+        alert(`${srcName} Channel ${chn} on Address ${formatAddr(addr)} is already used by channel ${usedExpander[key]+1} and channel ${i+1}. Select another channel.`);
+        return true;
+      }
+      usedExpander[key] = i;
+      return false;
+    };
+    for (let i = 0; i < newOutputs.length; i++) {
+      const o = newOutputs[i];
+      const channels = [o.pca_channel];
+      if (o.type === 6 || o.type === 7 || o.type === 10 || o.type === 12) { if(o.pca_channel2!==255) channels.push(o.pca_channel2); }
+      if (o.type === 7 || o.type === 10 || (o.type === 6 && parseInt(o.mc_mode||0) === 2)) { if(o.pca_channel3!==255) channels.push(o.pca_channel3); }
+      if (o.type === 10 && parseInt(o.color_order||0)>=4) { if(o.pca_channel4!==255) channels.push(o.pca_channel4); }
+
+      if(parseInt(o.source||0)!==0){
+        for (const chn of channels) {
+          if(addUsedExpander(o.source,o.pca_addr,chn,i)) return;
+        }
+      }
+      if(o.type===7&&parseInt(o.source||0)===0){
+        if(addUsedExpander(o.pin2_source,o.pin2_addr,o.pin2_channel,i)) return;
+        if(addUsedExpander(o.pin3_source,o.pin3_addr,o.pin3_channel,i)) return;
+      }
+    }
+
+    // PCA9685 shared frequency validation
+    const pcaInfo = {};
+    for (let i = 0; i < newOutputs.length; i++) {
+      const o = newOutputs[i];
+      if (o.source !== 1) continue;
+
+      let freq = 1000;
+      if (o.type === 8) freq = 50;
+      else if (o.type === 5 || o.type === 6 || o.type === 10 || o.type === 12) freq = parseInt(o.mc_freq || 1000);
+
+      const key=o.pca_addr;
+      if(!pcaInfo[key]) pcaInfo[key]={hasServo:false,firstFreq:null,mixed:false,affected:[]};
+      if(o.type===8) pcaInfo[key].hasServo=true;
+      if(o.type===5||o.type===6||o.type===10||o.type===12){
+        if(pcaInfo[key].firstFreq===null) pcaInfo[key].firstFreq=freq;
+        else if(pcaInfo[key].firstFreq!==freq) pcaInfo[key].mixed=true;
+        if(freq!==50) pcaInfo[key].affected.push(`${deviceLabel(o)} ch ${i+1} (${freq} Hz)`);
+      }
+    }
+    for(const addr in pcaInfo){
+      const info=pcaInfo[addr];
+      if(info.hasServo && info.affected.length){
+        if(!confirm(`PCA9685 address ${formatAddr(addr)} has an RC Servo, so the whole chip will run at 50 Hz. This is OK for relays, but may affect PWM dimmers/DC motors/analog LEDs:\n\n${info.affected.join('\n')}\n\nContinue?`)) return;
+      } else if(!info.hasServo && info.mixed){
+        if(!confirm(`PCA9685 address ${formatAddr(addr)} has mixed PWM frequencies. One PCA9685 chip can use only one shared frequency; firmware will use the first configured frequency on that address. Continue?`)) return;
+      }
+    }
+  }
+  
+  // Count resources
+  let ledChCount = 0, dmxUartCount = 0, dmxRmtCount = 0, rmtUsed = 0;
+  let totalLedPixels = 0, ledcUsed = 0, stepperCount = 0;
+  newOutputs.forEach(o => {
+    if(o.type===0){ ledChCount++; totalLedPixels+=o.led_count||170; rmtUsed++; }
+    else if(o.type===1){ dmxUartCount<=1?dmxUartCount++:dmxRmtCount++; if(dmxUartCount>2)rmtUsed++; }
+    else if(o.type===5||o.type===6){ if(o.source===0) ledcUsed+=(o.mc_mode===0?2:1); }
+    else if(o.type===7){ if(o.source===0) stepperCount++; }
+    else if(o.type===8){ if(o.source===0) ledcUsed++; }
+    else if(o.type===10){ if(o.source===0) ledcUsed+=((o.color_order||0)>=4?4:3); }
+  });
+  
+  let warnings=[];
+  if(ledChCount>8) warnings.push('LED strips exceed RMT hardware limit (max 8).');
+  if(dmxUartCount>2) warnings.push('DMX UARTs exceed hardware limit (max 2, extra use RMT).');
+  if(rmtUsed>8) warnings.push('Total RMT usage exceeds hardware limit (max 8). Some outputs may fail.');
+  if(ledcUsed>16) warnings.push('LEDC PWM channels exceed hardware limit (max 16).');
+  if(stepperCount>2) warnings.push('Multiple stepper motors may cause timing jitter at high speed.');
+  if(totalLedPixels>4000) warnings.push('Total LED pixels ('+totalLedPixels+') may cause RAM exhaustion.');
+  if(ch.type===0&&ch.led_count>1111) warnings.push('Single GPIO LED count >1111 drops refresh rate below 30 FPS.');
+  
+  // Resource scoring check
+  const sc=totalScore(newOutputs);
+  if(sc>100){
+    alert('Resource score '+sc.toFixed(1)+' exceeds limit of 100. Remove some channels or reduce LED pixel count.');
+    return;
+  }
+
+  if(warnings.length>0){
+    const msg='Resource Warnings:\n\n'+warnings.join('\n');
+    if(!confirm(msg)) return;
+  }
+
+  if(editOutIdx>=0){outputs[editOutIdx]=ch;cancelEditOutput();}
+  else {outputs.push(ch); autoAssignOutputPins();}
+  setOutputsDirty(true);
+  renderOutputs();
+}
+
+function delOutput(idx){
+  if(!confirm('Delete channel '+(idx+1)+'?')) return;
+  if(editOutIdx===idx) cancelEditOutput();
+  outputs.splice(idx,1);
+  if(currentTestIdx===idx) currentTestIdx=-1;
+  else if(currentTestIdx>idx) currentTestIdx--;
+  setOutputsDirty(true);
+  renderOutputs();
+}
+
+async function saveOutputs(){
+  const removedIdx=outputs.findIndex(o=>typeId(o)===4);
+  if(removedIdx>=0){
+    alert('Channel '+(removedIdx+1)+' uses removed WiZ output type. Delete it or add a supported replacement before saving.');
+    setSaveState('Remove old WiZ channel','err');
+    return;
+  }
+  try{
+    setSaveState('Saving...','warn');
+    const res=await fetch('/api/outputs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({outputs})});
+    let msg='';
+    try{const d=await res.json(); msg=d.message||'';}catch(e){}
+    if(!res.ok&&msg) {
+      setSaveState('Save failed','err');
+      alert(msg);
+    }
+    if(res.ok){
+      markOutputsSaved();
+      setSaveState('Saved - rebooting','warn');
+      const state=document.getElementById('out-test-state');
+      if(state){
+        state.className='ib ib-yellow';
+        state.textContent='Outputs saved. Device is rebooting. This page will reload automatically.';
+      }
+      setTimeout(()=>location.reload(),9000);
+    }
+    showAlert(res.ok);
+  }catch(e){
+    setSaveState('Reconnecting...','warn');
+    setTimeout(()=>location.reload(),9000);
+  }
+}
+
+// ESP-NOW Peers
+let espPeers = [];
+function normPeer(p){
+  return {
+    mac:(p.mac||'').toUpperCase(),
+    start_universe:parseInt(p.start_universe!==undefined?p.start_universe:0),
+    start_address:parseInt(p.start_address!==undefined?p.start_address:1),
+    end_universe:parseInt(p.end_universe!==undefined?p.end_universe:(p.start_universe!==undefined?p.start_universe:32767)),
+    end_address:parseInt(p.end_address!==undefined?p.end_address:512)
+  };
+}
+function peerRangeLabel(p){
+  p=normPeer(p);
+  return `U${p.start_universe}:CH${p.start_address} - U${p.end_universe}:CH${p.end_address}`;
+}
+async function loadPeers(){
+  try{
+    const d=await(await fetch('/api/espnow-peers')).json();
+    espPeers=(d.peers||[]).map(normPeer);
+    renderPeers();
+  }catch(e){}
+}
+function renderPeers(){
+  const tb=document.getElementById('peer-tbody');
+  tb.innerHTML='';
+  if(!espPeers.length){tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">No peers added (Fallback to Broadcast).</td></tr>';return;}
+  espPeers.forEach((p,i)=>{
+    p=normPeer(p);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td><code style="font-size:0.9rem">${p.mac}</code></td><td>${peerRangeLabel(p)}</td>
+      <td><button class="btn bd" style="padding:3px 8px;font-size:0.72rem" onclick="delPeer(${i})">Delete</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+function addPeer(){
+  const mac=document.getElementById('np_mac').value.trim().toUpperCase();
+  if(!/^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$/.test(mac)){alert('Invalid MAC Address format');return;}
+  const peer={
+    mac:mac,
+    start_universe:parseInt(document.getElementById('np_start_uni').value)||0,
+    start_address:parseInt(document.getElementById('np_start_addr').value)||1,
+    end_universe:parseInt(document.getElementById('np_end_uni').value)||0,
+    end_address:parseInt(document.getElementById('np_end_addr').value)||512
+  };
+  if(peer.start_address<1) peer.start_address=1;
+  if(peer.start_address>512) peer.start_address=512;
+  if(peer.end_address<1) peer.end_address=1;
+  if(peer.end_address>512) peer.end_address=512;
+  if(peer.end_universe<peer.start_universe || (peer.end_universe===peer.start_universe && peer.end_address<peer.start_address)){
+    alert('End range must be after Start range.');
+    return;
+  }
+  espPeers.push(peer);
+  document.getElementById('np_mac').value='';
+  document.getElementById('np_start_uni').value=peer.end_universe;
+  document.getElementById('np_start_addr').value=peer.end_address<512?peer.end_address+1:1;
+  document.getElementById('np_end_uni').value=peer.end_address<512?peer.end_universe:peer.end_universe+1;
+  document.getElementById('np_end_addr').value=512;
+  renderPeers();
+}
+function delPeer(idx){espPeers.splice(idx,1);renderPeers();}
+async function savePeers(){
+  try{
+    const res=await fetch('/api/espnow-peers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({peers:espPeers.map(normPeer)})});
+    showAlert(res.ok);
+  }catch(e){showAlert(false);}
+}
+
+// ESP-NOW Copy MAC
+function copyMac(){
+  const mac=document.getElementById('board_mac_display').textContent;
+  if(mac&&mac!=='--:--:--:--:--:--'){
+    navigator.clipboard.writeText(mac).then(()=>{
+      const btn=event.target; btn.textContent='Copied!';
+      setTimeout(()=>btn.textContent='Copy',1500);
+    });
+  }
+}
+
+// OTA
+function otaFileSelected(){
+  const input=document.getElementById('ota_file');
+  const f=input.files[0];
+  const btn=document.getElementById('ota-btn');
+  const info=document.getElementById('ota-file-info');
+  const status=document.getElementById('ota-status');
+  if(f){
+    const kb=Math.round(f.size/1024);
+    info.textContent=f.name+' ('+kb+' KB)';
+    btn.disabled=false;
+    status.textContent='';
+    status.style.color='#475569';
+  } else {
+    info.textContent='';
+    btn.disabled=true;
+  }
+}
+
+function flashOta(){
+  const f=document.getElementById('ota_file').files[0];
+  if(!f){alert('Select a .bin file first');return;}
+  if(!confirm('Flash '+f.name+' now? Board will restart automatically after success.')) return;
+
+  const btn=document.getElementById('ota-btn');
+  const prog=document.getElementById('ota-prog');
+  const status=document.getElementById('ota-status');
+  btn.disabled=true;
+  prog.style.display='block';
+  prog.value=0;
+  status.style.color='#475569';
+  status.textContent='Uploading...';
+
+  const xhr=new XMLHttpRequest();
+  xhr.upload.onprogress=e=>{
+    if(e.lengthComputable){
+      const pct=Math.round(e.loaded/e.total*100);
+      prog.value=pct;
+      status.textContent='Uploading... '+pct+'%';
+    }
+  };
+  xhr.onload=()=>{
+    if(xhr.status===200){
+      prog.value=100;
+      status.textContent='Flash successful. Board is restarting... (reconnect in ~10s)';
+      status.style.color='#166534';
+      setTimeout(()=>location.reload(),12000);
+    } else {
+      status.textContent='Flash failed: '+(xhr.responseText||'Try again.');
+      status.style.color='#dc2626';
+      btn.disabled=false;
+    }
+  };
+  xhr.onerror=()=>{
+    status.textContent='Upload error. Check network connection and try again.';
+    status.style.color='#dc2626';
+    btn.disabled=false;
+  };
+  xhr.open('POST','/update');
+  const fd=new FormData();
+  fd.append('update',f,f.name);
+  xhr.send(fd);
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  loadSettings();
+  loadOutputs();
+  loadPeers();
+  toggleOutFields();
+  updateTelemetry();
+  setInterval(updateTelemetry,10000);
+});
+</script>
+</body>
+</html>
+)rawliteral";
+
+#endif // WEB_PAGES_H
