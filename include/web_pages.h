@@ -1690,7 +1690,7 @@ function checkStrappingPin() {
 function renderOutputs(){
   const tb=document.getElementById('out-tbody');
   const cnt=document.getElementById('out-count');
-  if(cnt) cnt.textContent=`${outputs.length} / 16 channels`;
+  if(cnt) cnt.textContent=`${outputs.length} channels`;
   updateScoreBar();
   // ZC pin warning
   const zcWarn=document.getElementById('zc-warning');
