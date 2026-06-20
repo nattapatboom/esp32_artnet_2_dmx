@@ -166,7 +166,7 @@ public:
         engine.init();
 
         for (auto& ch : outputCtrl.getChannels()) {
-            if (ch.source != 0 && ch.type != 6) continue; // Stepper STEP must remain ESP32 GPIO; DIR/EN may be hybrid.
+            if (ch.source != 0 && ch.type != 7) continue; // Stepper STEP must remain ESP32 GPIO; DIR/EN may be hybrid.
             if (ch.type == 4) { // CHAN_TYPE_PWM
                 uint8_t pwmChan = allocateLedc();
                 if (pwmChan != 255) {
@@ -176,8 +176,18 @@ public:
                     ch.dmxPort = pwmChan; // Reuse dmxPort variable to store LEDC channel
                     Serial.printf("PWM Output initialized on GPIO %d (LEDC %d)\n", ch.pin, pwmChan);
                 }
+            }
+            else if (ch.type == 15) { // PWM DAC (GPIO-only, 2ch resolution, configurable carrier)
+                uint8_t pwmChan = allocateLedc();
+                if (pwmChan != 255) {
+                    ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
+                    ledcAttachPin(ch.pin, pwmChan);
+                    ledcWrite(pwmChan, 0);
+                    ch.dmxPort = pwmChan;
+                    Serial.printf("PWM DAC initialized on GPIO %d (LEDC %d, %d-bit, %dHz)\n", ch.pin, pwmChan, ch.mc_resolution, ch.mc_freq);
+                }
             } 
-            else if (ch.type == 7) { // CHAN_TYPE_SERVO
+            else if (ch.type == 8) { // CHAN_TYPE_SERVO (v3)
                 uint8_t pwmChan = allocateLedc();
                 if (pwmChan != 255) {
                     // RC Servo is exactly 50Hz, usually 16-bit for smooth control
@@ -188,7 +198,7 @@ public:
                     Serial.printf("Servo Output initialized on GPIO %d (LEDC %d)\n", ch.pin, pwmChan);
                 }
             }
-            else if (ch.type == 5) { // CHAN_TYPE_MOTOR_DC
+            else if (ch.type == 6) { // CHAN_TYPE_MOTOR_DC (v3)
                 if (ch.mc_mode == 0) { // PWM + PWM
                     uint8_t pwmFwd = allocateLedc();
                     uint8_t pwmRev = allocateLedc();
@@ -204,7 +214,7 @@ public:
                         Serial.printf("Motor (PWM+PWM) on GPIO %d, %d\n", ch.pin, ch.pin2);
                     }
                 } 
-                else if (ch.type == 5 && ch.mc_mode == 1) { // PWM + DIR
+                else if (ch.type == 6 && ch.mc_mode == 1) { // PWM + DIR (v3)
                     uint8_t pwmChan = allocateLedc();
                     if (pwmChan != 255) {
                         ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
@@ -220,7 +230,7 @@ public:
                         Serial.printf("Motor (PWM+DIR) src=%d GPIO=%d DIR src=%d\n", ch.source, ch.pin, ch.pin2_source);
                     }
                 }
-                else if (ch.type == 5 && ch.mc_mode == 2) { // IN1 + IN2 + EN
+                else if (ch.type == 6 && ch.mc_mode == 2) { // IN1 + IN2 + EN (v3)
                     uint8_t pwmChan = allocateLedc();
                     if (pwmChan != 255) {
                         ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
@@ -276,7 +286,7 @@ public:
                                   (wChan != 255) ? " (W attached)" : "");
                 }
             }
-            else if (ch.type == 6) { // CHAN_TYPE_STEPPER
+            else if (ch.type == 7) { // CHAN_TYPE_STEPPER (v3)
                 if (ch.source != 0) {
                     Serial.println("Stepper skipped: STEP pin must use ESP32 GPIO source");
                     continue;
@@ -306,7 +316,7 @@ public:
                                   ch.pin3_source == 0 ? String(ch.pin3).c_str() : "expander");
                 }
             }
-            else if (ch.type == 10) { // Passive Buzzer
+            else if (ch.type == 9) { // Passive Buzzer (v3)
                 uint8_t pwmChan = allocateLedc();
                 if (pwmChan != 255) {
                     ledcSetup(pwmChan, 1000, 8); // start at 1000Hz, 8-bit
@@ -315,22 +325,55 @@ public:
                     ch.dmxPort = pwmChan;
                     Serial.printf("Passive Buzzer initialized: GPIO %d, LEDC %d\n", ch.pin, pwmChan);
                 }
-            }
-            else if (ch.type == 12) { // 7-Segment Display
-                if (ch.mc_mode >= 2) { // Direct Drive via Expander
-                    if (ch.pin2_source >= 2 && ch.pin2_source <= 4) {
-                        for (uint8_t s = 0; s < (ch.mc_mode == 3 ? 8 : 7); s++) {
-                            digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + s, false, true);
-                        }
+            } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) { // 7-Segment Display (v3)
+                if (ch.mc_mode >= 2 && ch.pin2_source >= 2 && ch.pin2_source <= 4) { // Direct Drive via Expander
+                    for (uint8_t s = 0; s < (ch.mc_mode == 3 ? 8 : 7); s++) {
+                        digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + s, false, true);
                     }
                     ch.prev_7seg_val = 0xFFFFFFFFUL;
                     Serial.printf("7-Segment Direct Drive: expander src=%d addr=0x%02X baseCh=%d pins=%d\n",
                                   ch.pin2_source, ch.pin2_addr, ch.pin2_channel, ch.mc_mode == 3 ? 8 : 7);
+                } else if (ch.mc_mode >= 2 && ch.pin2_source == 0) { // Direct Drive via GPIO
+                    if (ch.type == 12 || ch.type == 13) {
+                        uint8_t numSeg = (ch.mc_mode == 3) ? 8 : 7;
+                        uint8_t baseChan = allocateLedc();
+                        if (baseChan != 255) {
+                            for (uint8_t s = 0; s < numSeg; s++) {
+                                if (baseChan + s <= 15) {
+                                    ledcSetup(baseChan + s, ch.mc_freq ? ch.mc_freq : 1000, 8);
+                                    ledcAttachPin(ch.pin + s, baseChan + s);
+                                    ledcWrite(baseChan + s, 0);
+                                }
+                            }
+                            ch.dmxPort = baseChan;
+                            Serial.printf("7-Segment DD PWM: GPIO base=%d pins=%d baseLEDC=%d freq=%dHz\n",
+                                          ch.pin, numSeg, baseChan, ch.mc_freq ? ch.mc_freq : 1000);
+                        }
+                    } else {
+                        for (uint8_t s = 0; s < (ch.mc_mode == 3 ? 8 : 7); s++) {
+                            pinMode(ch.pin + s, OUTPUT);
+                            digitalWrite(ch.pin + s, LOW);
+                        }
+                        Serial.printf("7-Segment Direct Drive: GPIO base=%d pins=%d\n",
+                                      ch.pin, ch.mc_mode == 3 ? 8 : 7);
+                    }
+                    ch.prev_7seg_val = 0xFFFFFFFFUL;
                 } else { // TM1637
                     TM1637Driver tm(ch.pin, ch.pin2);
                     tm.begin();
                     ch.prev_7seg_val = 0xFFFFFFFFUL;
                     Serial.printf("7-Segment Display initialized: CLK %d, DIO %d\n", ch.pin, ch.pin2);
+                }
+            }
+            else if (ch.type == 16) { // Function Generator
+                uint8_t pwmChan = allocateLedc();
+                if (pwmChan != 255) {
+                    ch.funcGen = new FuncGenController();
+                    ch.funcGen->begin(ch.pin, pwmChan, ch.mc_freq ? ch.mc_freq : 50000);
+                    ch.dmxPort = pwmChan;
+                    Serial.printf("Function Generator initialized: GPIO %d, LEDC %d, PWM %dHz\n", ch.pin, pwmChan, ch.mc_freq ? ch.mc_freq : 50000);
+                } else {
+                    Serial.println("Error: No LEDC channel available for Function Generator!");
                 }
             }
         }
@@ -344,16 +387,16 @@ public:
             uint32_t max_val = getMaxValue(ch.mc_resolution);
 
             if (ch.source == 1) { // PCA9685 Expander
-                if (ch.type == 4) { // PWM Dimmer
+                if (ch.type == 4 || ch.type == 15) { // PWM Dimmer / PWM DAC
                     uint16_t duty = (uint32_t)((uint64_t)val * 4095) / max_val;
                     pcaManager.write(ch.pca_addr, ch.pca_channel, duty);
                 }
-                else if (ch.type == 7) { // RC Servo (50 Hz)
+                else if (ch.type == 8) { // RC Servo (50 Hz) (v3)
                     uint32_t pulse_us = ch.mc_min_us + (val * (ch.mc_max_us - ch.mc_min_us)) / max_val;
                     uint32_t ticks = (pulse_us * 4096) / 20000;
                     pcaManager.write(ch.pca_addr, ch.pca_channel, ticks > 4095 ? 4095 : ticks);
                 }
-                else if (ch.type == 5) { // DC Motor
+                else if (ch.type == 6) { // DC Motor (v3)
                     int32_t center = max_val / 2;
                     int32_t offset = (int32_t)val - center;
                     bool is_forward = ch.mc_invert ? (offset < 0) : (offset > 0);
@@ -423,14 +466,17 @@ public:
             if (ch.type == 4) { // PWM
                 ledcWrite(ch.dmxPort, val);
             }
-            else if (ch.type == 7) { // SERVO
+            else if (ch.type == 15) { // PWM DAC
+                ledcWrite(ch.dmxPort, val);
+            }
+            else if (ch.type == 8) { // SERVO (v3)
                 // map DMX value to min_us -> max_us
                 uint32_t pulse_us = ch.mc_min_us + (val * (ch.mc_max_us - ch.mc_min_us)) / max_val;
                 // Duty cycle for 16-bit at 50Hz (20,000 us period)
                 uint32_t duty = (pulse_us * 65535) / 20000;
                 ledcWrite(ch.dmxPort, duty);
             }
-            else if (ch.type == 5) { // DC MOTOR
+            else if (ch.type == 6) { // DC MOTOR (v3)
                 int32_t center = max_val / 2;
                 int32_t offset = (int32_t)val - center;
                 bool is_forward = ch.mc_invert ? (offset < 0) : (offset > 0);
@@ -485,7 +531,7 @@ public:
                     ledcWrite(ch.ledc_chan4, ch.dmxBuffer[3]);
                 }
             }
-            else if (ch.type == 6) { // STEPPER
+            else if (ch.type == 7) { // STEPPER (v3)
                 if (ch.dmxPort < stepperCount) {
                     FastAccelStepper* stepper = steppers[ch.dmxPort];
                     if (stepper) {
@@ -602,7 +648,7 @@ public:
                     }
                 }
             }
-            else if (ch.type == 10) { // Passive Buzzer
+            else if (ch.type == 9) { // Passive Buzzer (v3)
                 if (ch.dmxPort != 255) {
                     uint8_t freqDmx = ch.dmxBuffer[0];
                     uint8_t volDmx = ch.dmxBuffer[1];
@@ -615,9 +661,13 @@ public:
                         ledcWrite(ch.dmxPort, duty);
                     }
                 }
-            }
-            else if (ch.type == 12) { // 7-Segment Display
-                uint8_t bytes = (ch.mc_mode == 1) ? 4 : 2;
+            } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) { // 7-Segment Display (v3)
+                uint8_t bytes;
+                if (ch.type >= 12) {
+                    bytes = 1;
+                } else {
+                    bytes = (ch.mc_mode == 1) ? 4 : 2;
+                }
                 uint32_t val = 0;
                 for (uint8_t i = 0; i < bytes; i++) {
                     val = (val << 8) | ch.dmxBuffer[i];
@@ -630,6 +680,23 @@ public:
                         uint8_t segByte = asciiToSegment(ch.dmxBuffer[0]);
                         for (uint8_t b = 0; b < numSeg; b++) {
                             digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + b, (segByte >> b) & 1);
+                        }
+                    } else if (ch.mc_mode >= 2 && ch.pin2_source == 0) {
+                        // Direct Drive via GPIO (consecutive pins starting from ch.pin)
+                        uint8_t numSeg = (ch.mc_mode == 3) ? 8 : 7;
+                        uint8_t segByte = asciiToSegment(ch.dmxBuffer[0]);
+                        if (ch.type == 12 || ch.type == 13) {
+                            // PWM Direct Drive via LEDC
+                            for (uint8_t b = 0; b < numSeg; b++) {
+                                uint32_t duty = ((segByte >> b) & 1) ? 255 : 0;
+                                if (ch.dmxPort + b <= 15) {
+                                    ledcWrite(ch.dmxPort + b, duty);
+                                }
+                            }
+                        } else {
+                            for (uint8_t b = 0; b < numSeg; b++) {
+                                digitalWrite(ch.pin + b, (segByte >> b) & 1);
+                            }
                         }
                     } else {
                         TM1637Driver tm(ch.pin, ch.pin2);
@@ -646,10 +713,20 @@ public:
                     }
                 }
             }
-            else if (ch.type == 13) { // DFPlayer MP3
+            else if (ch.type == 10) { // DFPlayer MP3 (v3)
                 if (ch.dfPlayer != nullptr && ch.dmxBuffer != nullptr) {
                     ch.dfPlayer->update(ch.dmxBuffer[0], ch.dmxBuffer[1], ch.dmxBuffer[2]);
                 }
+            }
+            else if (ch.type == 14) { // DAC
+                dacWrite(ch.pin, ch.dmxBuffer[0]);
+            }
+            else if (ch.type == 16 && ch.funcGen != nullptr && ch.dmxBuffer != nullptr) { // Function Generator
+                uint16_t freq = ch.dmxBuffer[0] | (ch.dmxBuffer[1] << 8);
+                uint8_t wfType = ch.dmxBuffer[2];
+                uint8_t amp = ch.dmxBuffer[3];
+                uint8_t offset = ch.dmxBuffer[4];
+                ch.funcGen->update(wfType, freq, amp, offset);
             }
         }
     }

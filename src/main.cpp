@@ -282,14 +282,14 @@ bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
     if (source == 0) {
         uint8_t pin2Source = output["pin2_source"] | 0;
         uint8_t pin3Source = output["pin3_source"] | 0;
-        if ((type == 5 || type == CHAN_TYPE_ANALOG_RGB || type == 11 || type == 12 || type == 13 ||
-             (type == 6 && pin2Source == 0)) &&
+        if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10 ||
+             (type == 7 && pin2Source == 0)) &&
             jsonPinMatches(output["pin2"], reservedPin)) return true;
-        if ((type == CHAN_TYPE_ANALOG_RGB || (type == 5 && mcMode == 2) ||
-             (type == 6 && pin3Source == 0)) &&
+        if ((type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2) ||
+             (type == 7 && pin3Source == 0)) &&
             jsonPinMatches(output["pin3"], reservedPin)) return true;
         uint8_t colorOrder = output["color_order"] | 0;
-        if (((type == 6 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && jsonPinMatches(output["pin4"], reservedPin)) return true;
+        if (((type == 7 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && jsonPinMatches(output["pin4"], reservedPin)) return true;
     }
     return false;
 }
@@ -357,13 +357,13 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
         uint8_t pin2Source = output["pin2_source"] | 0;
         uint8_t pin3Source = output["pin3_source"] | 0;
         if (addPin(output["pin"] | 255, channel)) return true;
-        if ((type == 5 || type == CHAN_TYPE_ANALOG_RGB || type == 11 || type == 12 || type == 13 ||
-             (type == 6 && pin2Source == 0)) &&
+        if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10 ||
+             (type == 7 && pin2Source == 0)) &&
             addPin(output["pin2"] | 255, channel)) return true;
-        if ((type == CHAN_TYPE_ANALOG_RGB || (type == 5 && mcMode == 2) ||
-             (type == 6 && pin3Source == 0)) &&
+        if ((type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2) ||
+             (type == 7 && pin3Source == 0)) &&
             addPin(output["pin3"] | 255, channel)) return true;
-        if (((type == 6 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && addPin(output["pin4"] | 255, channel)) return true;
+        if (((type == 7 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && addPin(output["pin4"] | 255, channel)) return true;
         channel++;
     }
     return false;
@@ -405,14 +405,14 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
         uint8_t colorOrder = output["color_order"] | 0;
         if (source != 0) {
             if (addChannel(source, address, output["pca_channel"] | 0, outputIndex)) return true;
-            if ((type == 5 || type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 11) &&
+            if ((type == 6 || type == 7 || type == CHAN_TYPE_ANALOG_RGB || type == 18) &&
                 addChannel(source, address, output["pca_channel2"] | 255, outputIndex)) return true;
-            if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || (type == 5 && mcMode == 2)) &&
+            if ((type == 7 || type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2)) &&
                 addChannel(source, address, output["pca_channel3"] | 255, outputIndex)) return true;
             if ((type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4) &&
                 addChannel(source, address, output["pca_channel4"] | 255, outputIndex)) return true;
         }
-        if (type == 6 && source == 0) {
+        if (type == 7 && source == 0) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             uint8_t pin3Source = output["pin3_source"] | 0;
             if (addChannel(pin2Source, output["pin2_addr"] | 0x20, output["pin2_channel"] | 255, outputIndex)) return true;
@@ -536,10 +536,7 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
 }
 
 bool validateOutputJson(JsonArray outputs, String& message) {
-    if (outputs.size() > 16) {
-        message = "Maximum 16 output channels";
-        return false;
-    }
+    // No hard channel limit — enforced by scoring + hardware resource validation
     // Check UART and RMT hardware limits
     uint8_t dmxCount = 0;
     uint8_t dfPlayerCount = 0;
@@ -549,9 +546,9 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         uint8_t source = output["source"] | 0;
         if (type == 1 && source == 0) { // DMX on local GPIO
             dmxCount++;
-        } else if (type == 13) { // DFPlayer
+        } else if (type == 10) { // DFPlayer
             dfPlayerCount++;
-        } else if (type == 0) { // LED Strip
+        } else if (type == 3) { // LED Strip
             ledCount++;
         }
     }
@@ -570,12 +567,12 @@ bool validateOutputJson(JsonArray outputs, String& message) {
     for (JsonObject output : outputs) {
         uint8_t type = output["type"] | 0;
         uint8_t source = output["source"] | 0;
-        if (type > 13) {
+        if (type > 18) {
             message = "Invalid output type on channel " + String(channelNumber) + ".";
             return false;
         }
-        bool pcaOk = (type == 2 || type == 4 || type == 5 || type == 6 || type == 7 || type == CHAN_TYPE_ANALOG_RGB || type == 11);
-        bool digitalOk = (type == 2 || type == 5 || type == 8 || type == 11);
+        bool pcaOk = (type == 2 || type == 4 || type == 6 || type == 7 || type == 8 || type == CHAN_TYPE_ANALOG_RGB || type == 18);
+        bool digitalOk = (type == 2 || type == 6 || type == 17 || type == 18);
         if (source == 1 && !pcaOk) {
             message = "PCA9685 source is not supported by output channel " + String(channelNumber);
             return false;
@@ -588,7 +585,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             message = "Unsupported output source on channel " + String(channelNumber);
             return false;
         }
-        if (type == 6) {
+        if (type == 7) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             uint8_t pin3Source = output["pin3_source"] | 0;
             if (source != 0) {
@@ -1512,7 +1509,7 @@ uint16_t activeUniverseMin() {
     uint16_t minU = 0xFFFF;
     bool found = false;
     for (const auto& ch : outputCtrl.getChannels()) {
-        if (ch.type > 0) {
+        if (ch.type != 3) {
             uint16_t u = ch.start_universe;
             if (u < minU) { minU = u; found = true; }
         }
@@ -1522,7 +1519,7 @@ uint16_t activeUniverseMin() {
 uint16_t activeUniverseMax() {
     uint16_t maxU = 0;
     for (const auto& ch : outputCtrl.getChannels()) {
-        if (ch.type > 0) {
+        if (ch.type != 3) {
             uint16_t u = ch.start_universe;
             if (u > maxU) maxU = u;
         }

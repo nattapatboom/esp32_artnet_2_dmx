@@ -15,7 +15,7 @@ if not exist "%PIO%" (
 
 set "PYTHON=%USERPROFILE%\.platformio\penv\Scripts\python.exe"
 if exist "%PYTHON%" (
-  echo Compiling Web UI assets (web/index.html to include/web_pages.h)...
+  echo Compiling Web UI assets - web/index.html to include/web_pages.h...
   "%PYTHON%" tools/build_web.py
   if errorlevel 1 (
     echo.

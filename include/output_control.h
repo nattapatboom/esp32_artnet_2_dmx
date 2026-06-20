@@ -14,13 +14,14 @@
 #include "dfplayer_control.h"
 #include "pca9685_control.h"
 #include "i2c_gpio_expander.h"
+#include "funcgen_control.h"
 
 extern PCA9685Manager pcaManager;
 extern DigitalExpanderManager digitalExpanderManager;
 
 // Max universes supported per channel
 #define DMX_BUFFER_SIZE 512
-#define CHAN_TYPE_ANALOG_RGB 9
+#define CHAN_TYPE_ANALOG_RGB 5
 
 // Global active DMX channel buffer for current universe-0 frame state
 extern uint8_t activeDmxBuffer[DMX_BUFFER_SIZE];
@@ -189,6 +190,9 @@ struct OutputChannel {
 
     // DFPlayer MP3 state
     DFPlayerController* dfPlayer = nullptr;
+
+    // Function Generator state
+    FuncGenController* funcGen = nullptr;
 };
 
 inline void writeOutputPin(OutputChannel& ch, uint8_t pinNum, bool state) {
@@ -391,11 +395,11 @@ private:
         uint16_t firstConfiguredFreq = 0;
         for (const auto& candidate : channels) {
             if (candidate.source != 1 || candidate.pca_addr != address) continue;
-            if (candidate.type == 7) {
+            if (candidate.type == 8) { // v3 8 = Servo
                 return 50; // PCA9685 frequency is shared per chip; RC servo requires 50 Hz.
             }
-            if ((candidate.type == 4 || candidate.type == 5 ||
-                 candidate.type == CHAN_TYPE_ANALOG_RGB || candidate.type == 11) &&
+            if ((candidate.type == 4 || candidate.type == 6 || // v3 6 = Motor
+                 candidate.type == CHAN_TYPE_ANALOG_RGB || candidate.type == 18 || candidate.type == 15) && // v3 18 = Smoke Shooter, 15 = PWM DAC
                 firstConfiguredFreq == 0) {
                 firstConfiguredFreq = candidate.mc_freq;
             }
@@ -405,7 +409,7 @@ private:
 
 public:
     uint16_t getUniverseCount(const OutputChannel& ch) const {
-        if (ch.type == 0) {
+        if (ch.type == 3) { // RGB LED strip (v3)
             uint8_t bytesPerPixel = (ch.color_order >= 4) ? 4 : 3;
             uint16_t pixelsPerUniverse = 512 / bytesPerPixel;
             return (ch.led_count + pixelsPerUniverse - 1) / pixelsPerUniverse;
@@ -424,7 +428,7 @@ public:
         for (auto& ch : channels) {
             if (ch.dmxBuffer == nullptr) continue;
 
-            if (ch.type == 0) {
+            if (ch.type == 3) { // RGB LED strip (v3)
                 uint16_t numUniverses = getUniverseCount(ch);
                 if (universe >= ch.start_universe && universe < ch.start_universe + numUniverses) {
                     uint16_t universeOffset = universe - ch.start_universe;
@@ -534,25 +538,43 @@ public:
         }
         JsonArray arr = doc["outputs"].as<JsonArray>();
         int layoutVersion = doc["version"] | 1;
-        bool needsMigration = (layoutVersion < 2);
         for (JsonObject item : arr) {
-            if (channels.size() >= 16) break; // Max 16 channels total
+            // No hard limit — enforced by scoring + hardware resource validation
             OutputChannel ch;
             uint8_t rawType = item["type"] | 0;
-            if (needsMigration) {
+            if (layoutVersion < 2) {
+                // v1→v2→v3 migration: skip deprecated WiZ (v1 type 4), map everything else to v3
                 if (rawType == 4) {
                     Serial.println("Skipping deprecated WiZ output channel from /outputs.json during migration");
                     continue;
-                } else if (rawType == 5) ch.type = 4;
-                else if (rawType == 6) ch.type = 5;
-                else if (rawType == 7) ch.type = 6;
-                else if (rawType == 8) ch.type = 7;
-                else if (rawType == 9) ch.type = 8;
-                else if (rawType == 10) ch.type = 9;
-                else if (rawType == 11) ch.type = 10;
-                else if (rawType == 12) ch.type = 11;
-                else if (rawType == 13) ch.type = 12;
-                else if (rawType == 15) ch.type = 13;
+                } else if (rawType == 5) ch.type = 6; // Motor → v3 6
+                else if (rawType == 6) ch.type = 7; // Stepper → v3 7
+                else if (rawType == 7) ch.type = 8; // Servo → v3 8
+                else if (rawType == 8) ch.type = 17; // Solenoid → v3 17
+                else if (rawType == 9) ch.type = 5; // Analog RGB → v3 5
+                else if (rawType == 10) ch.type = 9; // Buzzer → v3 9
+                else if (rawType == 11) ch.type = 18; // Smoke → v3 18
+                else if (rawType == 12) ch.type = 11; // 7-Seg → v3 11 (2-pin)
+                else if (rawType == 13) ch.type = 10; // DFPlayer → v3 10
+                else if (rawType == 15) ch.type = 15; // PWM DAC (stays 15)
+                else if (rawType == 14) ch.type = 14; // DAC
+                else if (rawType == 16) ch.type = 16; // Func Gen
+                else ch.type = rawType;
+            } else if (layoutVersion == 2) {
+                // v2→v3 migration
+                if (rawType == 4) ch.type = 4; // PWM Dimmer → Single Color LED (stays)
+                else if (rawType == 5) ch.type = 6; // Motor → v3
+                else if (rawType == 6) ch.type = 7; // Stepper → v3
+                else if (rawType == 7) ch.type = 8; // Servo → v3
+                else if (rawType == 8) ch.type = 17; // Solenoid → v3
+                else if (rawType == 9) ch.type = 5; // Analog RGB → v3
+                else if (rawType == 10) ch.type = 9; // Buzzer → v3
+                else if (rawType == 11) ch.type = 18; // Smoke → v3
+                else if (rawType == 12) ch.type = 11; // 7-Seg → v3 2-pin
+                else if (rawType == 13) ch.type = 10; // DFPlayer → v3
+                else if (rawType == 14) ch.type = 14; // DAC (stays)
+                else if (rawType == 15) ch.type = 15; // PWM DAC (stays)
+                else if (rawType == 16) ch.type = 16; // Func Gen (stays)
                 else ch.type = rawType;
             } else {
                 ch.type = rawType;
@@ -587,7 +609,7 @@ public:
             ch.pin3_addr = item["pin3_addr"] | 0x20;
             ch.pin3_channel = item["pin3_channel"] | 255;
             ch.mc_resolution = item["mc_resolution"] | 8;
-            if (ch.type != 6 && ch.mc_resolution > 16) ch.mc_resolution = 16;
+            if (ch.type != 7 && ch.mc_resolution > 16) ch.mc_resolution = 16; // Stepper v3 = 7
             if (ch.mc_resolution == 0) ch.mc_resolution = 8;
             ch.mc_freq = item["mc_freq"] | 1000;
             ch.mc_mode = item["mc_mode"] | 0;
@@ -626,7 +648,7 @@ public:
             ch.shoot_duration_ms = item["shoot_duration_ms"] | 1000;
             ch.smoke_lockout_ms = item["smoke_lockout_ms"] | 2000;
             
-            if (ch.type == 0) { // LED
+            if (ch.type == 3) { // RGB LED strip (v3)
                 uint16_t numUniverses = getUniverseCount(ch);
                 ch.bufferSize = numUniverses * 512;
             } else { // DMX and all other small types
@@ -640,9 +662,9 @@ public:
             
             channels.push_back(ch);
         }
-        if (needsMigration) {
+        if (layoutVersion < 3) {
             saveChannels();
-            Serial.println("Saved migrated output channels to /outputs.json with version 2");
+            Serial.println("Saved migrated output channels to /outputs.json with version 3");
         }
         Serial.printf("Loaded %d output channels from /outputs.json\n", channels.size());
     }
@@ -655,7 +677,7 @@ public:
          }
  
          JsonDocument doc;
-         doc["version"] = 2;
+         doc["version"] = 3;
          JsonArray arr = doc["outputs"].to<JsonArray>();
          for (const auto& ch : channels) {
              JsonObject item = arr.add<JsonObject>();
@@ -685,11 +707,11 @@ public:
              item["shoot_duration_ms"] = ch.shoot_duration_ms;
              item["smoke_lockout_ms"] = ch.smoke_lockout_ms;
 
-            if (ch.type >= 4 && ch.type <= 7) {
+            if ((ch.type >= 4 && ch.type <= 8) || ch.type == 17) { // v3 motion range: Single Color(4), Analog RGB(5), Motor(6), Stepper(7), Servo(8), Solenoid(17)
                 item["pin2"] = ch.pin2;
                 item["pin3"] = ch.pin3;
                 item["pin4"] = ch.pin4;
-                if (ch.type == 6) {
+                if (ch.type == 7) {  // Stepper (v3)
                     item["pin4_source"] = ch.pin4_source;
                     item["pin4_addr"] = ch.pin4_addr;
                     item["pin4_channel"] = ch.pin4_channel;
@@ -718,20 +740,23 @@ public:
                 item["mc_homing_timeout"] = ch.mc_homing_timeout;
                 item["mc_scale_factor"] = ch.mc_scale_factor;
                 item["mc_unit_type"] = ch.mc_unit_type;
-            } else if (ch.type == 12) {
+            } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) {  // 7-Segment (all variants)
                 item["pin2"] = ch.pin2;
                 item["pin2_source"] = ch.pin2_source;
                 item["pin2_addr"] = ch.pin2_addr;
                 item["pin2_channel"] = ch.pin2_channel;
                 item["mc_mode"] = ch.mc_mode;
-             } else if (ch.type == 8) {
+             } else if (ch.type == 17) {  // Solenoid (v3)
                 item["solenoid_mode"] = ch.solenoid_mode;
                 item["solenoid_threshold"] = ch.solenoid_threshold;
                 item["solenoid_pulse_ms"] = ch.solenoid_pulse_ms;
                 item["solenoid_pre_delay"] = ch.solenoid_pre_delay;
                 item["solenoid_post_delay"] = ch.solenoid_post_delay;
-            } else if (ch.type == 13) {
+             } else if (ch.type == 10) {  // DFPlayer (v3)
                 item["pin2"] = ch.pin2;
+             } else if (ch.type == 15 || ch.type == 16) {  // PWM DAC / FuncGen — stays same
+                item["mc_freq"] = ch.mc_freq;
+                item["mc_resolution"] = ch.mc_resolution;
             }
         }
 
@@ -761,6 +786,11 @@ public:
                 delete ch.dfPlayer;
                 ch.dfPlayer = nullptr;
             }
+            if (ch.funcGen != nullptr) {
+                ch.funcGen->stop();
+                delete ch.funcGen;
+                ch.funcGen = nullptr;
+            }
         }
         channels.clear();
     }
@@ -777,7 +807,7 @@ public:
 
         // DFPlayer gets priority because DMX can fall back to RMT
         for (const auto& ch : channels) {
-            if (ch.type == 13) {
+            if (ch.type == 10) { // DFPlayer (v3)
                 if (!uart2Used) {
                     uart2Used = true;
                 } else if (!uart1Used) {
@@ -798,17 +828,17 @@ public:
                 continue;
             } else if (ch.source >= 2 && ch.source <= 4) {
                 writeOutputPin(ch, 1, false);
-                if ((ch.type == 11 || ch.type == 5 || ch.type == 6) && ch.pca_channel2 != 255) {
+                if ((ch.type == 18 || ch.type == 6 || ch.type == 7) && ch.pca_channel2 != 255) { // v3: Smoke(18), Motor(6), Stepper(7)
                     writeOutputPin(ch, 2, false);
                 }
-                if ((ch.type == 5 || ch.type == 6) && ch.pca_channel3 != 255) {
+                if ((ch.type == 6 || ch.type == 7) && ch.pca_channel3 != 255) { // Motor(6), Stepper(7)
                     writeOutputPin(ch, 3, false);
                 }
                 Serial.printf("Digital expander initialized: source %d, addr 0x%02X, type %d\n",
                               ch.source, ch.pca_addr, ch.type);
                 continue;
             }
-            if (ch.type == 0) { // CHAN_TYPE_LED
+            if (ch.type == 3) { // RGB LED strip (v3)
                 if (ch.pixelStrip != nullptr) {
                     delete ch.pixelStrip;
                     ch.pixelStrip = nullptr;
@@ -835,7 +865,7 @@ public:
                 pinMode(ch.pin, OUTPUT);
                 digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
                 Serial.printf("Relay Channel initialized: GPIO %d, Start Universe %d\n", ch.pin, ch.start_universe);
-            } else if (ch.type == 8) { // CHAN_TYPE_SOLENOID
+            } else if (ch.type == 17) { // CHAN_TYPE_SOLENOID (v3)
                 pinMode(ch.pin, OUTPUT);
                 digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
                 // Set defaults if not configured
@@ -880,7 +910,7 @@ public:
                 } else {
                     Serial.println("Max 8 RMTs reached. Cannot initialize more DMX channels.");
                 }
-            } else if (ch.type == 11) { // Sequential Smoke Shooter
+            } else if (ch.type == 18) { // Sequential Smoke Shooter (v3)
                 if (ch.source == 0) { // ESP32 GPIO
                     pinMode(ch.pin, OUTPUT);
                     pinMode(ch.pin2, OUTPUT);
@@ -890,7 +920,7 @@ public:
                 ch.smoke_state = 0;
                 ch.smoke_prev_trigger = false;
                 Serial.printf("Smoke Shooter initialized: Smoke Pin %d, Shooter Pin %d\n", ch.pin, ch.pin2);
-            } else if (ch.type == 13) { // DFPlayer MP3
+            } else if (ch.type == 10) { // DFPlayer MP3 (v3)
                 ch.dfPlayer = new DFPlayerController();
                 if (dfPlayerCount == 0) {
                     ch.dfPlayer->begin(Serial2, ch.pin, ch.pin2);
@@ -925,7 +955,7 @@ public:
     void updateSmokeShooters() {
         unsigned long now = millis();
         for (auto& ch : channels) {
-            if (ch.type != 12) continue; // Sequential Smoke Shooter only
+            if (ch.type != 18) continue; // Sequential Smoke Shooter only (v3)
             if (ch.dmxBuffer == nullptr) continue;
             
             uint8_t dmx_val = ch.dmxBuffer[0];
@@ -997,7 +1027,7 @@ public:
     void updateSolenoids() {
         unsigned long now = millis();
         for (auto& ch : channels) {
-            if (ch.type != 9) continue; // Solenoid only
+            if (ch.type != 17) continue; // Solenoid only (v3)
             if (ch.dmxBuffer == nullptr) continue;
             
             uint8_t dmx_value = ch.dmxBuffer[0];
@@ -1045,7 +1075,7 @@ public:
         lastUpdate = now;
 
         for (auto& ch : channels) {
-            if (ch.type != 0) continue; // LED only
+            if (ch.type != 3) continue; // LED only (v3)
             if (ch.pixelStrip == nullptr || ch.dmxBuffer == nullptr) continue;
 
             const uint8_t colorOrder = ch.color_order;

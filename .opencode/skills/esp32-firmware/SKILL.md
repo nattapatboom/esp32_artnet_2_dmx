@@ -18,29 +18,34 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 
 ## Board: WT32-ETH01
 - **CPU:** ESP32 dual-core (Core 0 = network/display, Core 1 = application)
-- **Flash:** 4MB (partition: app 1.9MB, LittleFS 190KB) — ปัจจุบัน ~65.1%
+- **Flash:** 4MB (partition: app 1.9MB, LittleFS 190KB) — ปัจจุบัน ~66.6%
 - **RAM:** 320KB — ปัจจุบัน ~17.5%
 - **Usable GPIO:** 4, 12, 14, 15, 2, 17, 32, 33 (+ input-only 36, 39, 34, 35)
 - **Built-in:** Ethernet (LAN8720), no WiFi needed in Ethernet mode
 
-## Output Types (0-13)
+## Output Types (v3 — 0-18)
 
 | Type | Name | DMX Bytes | Source Support | Resource |
 |------|------|-----------|----------------|----------|
-| 0 | LED Strip (NeoPixel) | 3-4/led | GPIO only (RMT) | RMT 1ch |
+| 0 | AC Dimmer (TRIAC) | 1-2 | GPIO only | Timer + ZC |
 | 1 | DMX Serial Output | 512 | GPIO (UART1/2 or RMT) | UART 1-2 |
 | 2 | Relay (On/Off) | 1 | GPIO, PCA, Expander | GPIO 1 |
-| 3 | AC Dimmer (TRIAC) | 1-2 | GPIO only | Timer + ZC |
-| 4 | DC PWM Dimmer | 1-2 | GPIO, PCA | LEDC 1-2ch |
-| 5 | DC Motor (H-Bridge) | 1-2 | GPIO, PCA, Expander | LEDC 1-3ch |
-| 6 | Stepper Motor | 3-5 | GPIO+Expander hybrid | FastAccelStepper |
-| 7 | RC Servo | 1 | GPIO, PCA | LEDC 1ch |
-| 8 | Solenoid Trigger | 1 | GPIO, Expander | GPIO 1 |
-| 9 | Analog RGB/RGBW | 3-4 | GPIO, PCA | LEDC 3-4ch |
-| 10 | Passive Buzzer | 2 | GPIO only | LEDC 1ch |
-| 11 | Sequential Smoke Shooter | 1 | GPIO, Expander | GPIO 2 |
-| 12 | 7-Segment Display | 2-4 | GPIO, Expander | GPIO 2-8 |
-| 13 | DFPlayer MP3 Module | 3 | GPIO only (UART) | UART |
+| 3 | RGB LED (NeoPixel) | 3-4/led | GPIO only (RMT) | RMT 1ch |
+| 4 | Single Color LED (PWM) | 1-2 | GPIO, PCA | LEDC 1ch |
+| 5 | Analog RGB/RGBW | 3-4 | GPIO, PCA | LEDC 3-4ch |
+| 6 | DC Motor (H-Bridge) | 1-2 | GPIO, PCA, Expander | LEDC 1-3ch |
+| 7 | Stepper Motor | 3-5 | GPIO+Expander hybrid | FastAccelStepper |
+| 8 | RC Servo | 1 | GPIO, PCA | LEDC 1ch |
+| 9 | Passive Buzzer | 2 | GPIO only | LEDC 1ch |
+| 10 | DFPlayer MP3 Module | 3 | GPIO only (UART) | UART |
+| 11 | 7-Segment 2-Pin (TM1637) | 2-4 | GPIO, Expander | GPIO 2 |
+| 12 | 7-Segment DD 7-Pin PWM | 1 (Direct) | GPIO only (LEDC) | LEDC 1-7ch |
+| 13 | 7-Segment DD 8-Pin PWM | 1 (Direct) | GPIO only (LEDC) | LEDC 1-8ch |
+| 14 | DAC (Analog Out) | 1 | GPIO only (GPIO25/26) | DAC |
+| 15 | PWM DAC (RC Filter) | 1-2 | GPIO, PCA | LEDC 1ch |
+| 16 | Function Generator | 5 | GPIO only | LEDC 1ch + Timer |
+| 17 | Solenoid Trigger | 1 | GPIO, Expander | GPIO 1 |
+| 18 | Sequential Smoke Shooter | 1 | GPIO, Expander | GPIO 2 |
 
 ## Architecture
 
@@ -55,11 +60,11 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - `src/main.cpp` — Entry point, HTTP API routes, validation, network tasks
 
 ### OutputChannel Struct (output_control.h:98-189)
-- `type` (0-13), `source` (0=GPIO, 1=PCA9685, 2=MCP23017, 3=TCA9555, 4=PCF857x)
+- `type` (0-18 v3), `source` (0=GPIO, 1=PCA9685, 2=MCP23017, 3=TCA9555, 4=PCF857x)
 - `pin`-`pin4` with `_source`/`_addr`/`_channel` for expander hybrid
 - `dmxBuffer`, `bufferSize` (512 bytes for all non-LED types)
 - `pixelStrip` (LED), `dmxPort`/`rmtDmx` (DMX), `dfPlayer` (MP3)
-- Source compatibility: PCA (2,4,5,6,7,9,11), Digital (2,5,8,11)
+- Source compatibility (v3): PCA (2,4,6,8,5,18), Digital (2,6,17,18)
 
 ### Hardware Resource Limits
 - **UART:** 3 total. UART0=console. UART1 and UART2 are dynamically allocated. **DFPlayer has priority on UART** (assigns to UART2, then UART1) because DMX can dynamically fall back to RMT.
@@ -78,19 +83,21 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - **Atomic Flags:** Uses `std::atomic<bool>` for cross-core signaling flags (`networkFramePending`, `newRxData`) to prevent thread-safety buffer race conditions.
 - **I2C Hang Protection:** Replaces blocking `portMAX_DELAY` lockups with a 100ms timeout check (`xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE`) on `i2cMutex` takes, safeguarding task operations if hardware faults freeze the I2C bus SCL/SDA lines.
 - **Bootstrapping Pin warning:** Actively checks and warns the user in the Web UI if the critical bootstrapping pin GPIO 12 (MTDI) is configured, preventing bootloops.
-- **Configuration Layout Versioning:** Enforces layout version 2 on config file loading and saving, ensuring type layout translations are safely applied only once.
+- **Configuration Layout Versioning:** Enforces layout version 3 on config file loading and saving, with automated v1→v3 and v2→v3 migration paths during `loadChannels()`.
 
-## Resource Scoring System
+## Resource Scoring System (v3)
 
 ระบบตรวจวัดคะแนนการใช้งานทรัพยากร (Resource Scoring) จำกัดคะแนนรวมทุกแชนเนลไม่เกิน **100 คะแนน** เพื่อป้องกันภาระงานของไมโครคอนโทรลเลอร์ (CPU/LEDC/RMT) สูงเกินไปจนทำให้สัญญาณแกว่ง (Jitter) หรือระบบดับเนื่องจาก OOM โดยมีคะแนนแบ่งตามประเภทช่องสัญญาณดังนี้:
 
-- **LED Strip (Type 0):** `2.0` คะแนนพื้นฐาน + `1.0` คะแนนต่อทุก ๆ 100 เม็ดพิกเซล
+- **RGB LED (Type 3):** `2.0` คะแนนพื้นฐาน + `1.0` คะแนนต่อทุก ๆ 100 เม็ดพิกเซล
 - **DMX Output (Type 1):** `4.0` คะแนนต่อหนึ่งพอร์ตแชนเนล (เนื่องจากกินช่องสัญญาณ UART/RMT และบัฟเฟอร์ขนาด 512 ไบต์)
-- **AC Dimmer (Type 3) / RC Servo (Type 7) / 7-Segment (Type 12) / DFPlayer MP3 (Type 13):** `2.0` คะแนนต่อช่องสัญญาณ
-- **DC PWM Dimmer (Type 4) / DC Motor (Type 5) / Analog RGB (Type 9):** `3.0` คะแนนต่อช่องสัญญาณ (ใช้ทรัพยากร LEDC หลายแชนเนล)
-- **Stepper Motor (Type 6):** `8.0` คะแนนต่อแชนเนล (ใช้ FastAccelStepper ขัดจังหวะความถี่สูง)
-- **Passive Buzzer (Type 10) / Smoke Shooter (Type 11):** `1.5` คะแนนต่อช่องสัญญาณ
-- **Relay (Type 2) / Solenoid (Type 8):** `0.5` คะแนนต่อช่องสัญญาณ (เอาต์พุตเปิด/ปิดทั่วไป)
+- **AC Dimmer (Type 0) / RC Servo (Type 8) / 7-Segment (Type 11/12/13) / DFPlayer MP3 (Type 10):** `2.0` คะแนนต่อช่องสัญญาณ
+- **Single Color LED (Type 4) / DC Motor (Type 6) / Analog RGB (Type 5):** `3.0` คะแนนต่อช่องสัญญาณ (ใช้ทรัพยากร LEDC หลายแชนเนล)
+- **Stepper Motor (Type 7):** `8.0` คะแนนต่อแชนเนล (ใช้ FastAccelStepper ขัดจังหวะความถี่สูง)
+- **Passive Buzzer (Type 9) / Smoke Shooter (Type 18):** `1.5` คะแนนต่อช่องสัญญาณ
+- **Function Generator (Type 16):** `3.0` คะแนนต่อช่องสัญญาณ (ใช้ LEDC + Timer)
+- **PWM DAC (Type 15) / 7-Seg DD PWM (Type 12/13):** `3.0` คะแนนต่อช่องสัญญาณ (ใช้ LEDC หลายแชนเนล)
+- **DAC (Type 14) / Relay (Type 2) / Solenoid (Type 17):** `0.5` คะแนนต่อช่องสัญญาณ (เอาต์พุตเปิด/ปิดทั่วไป)
 
 ---
 
@@ -115,6 +122,44 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 ### 4. MCP23017 / TCA9555 / PCF857x (I2C GPIO Expander)
 - **Interface:** I2C (Address 0x20 - 0x27)
 - **Usage:** ขยายช่องสัญญาณดิจิทัลเอาต์พุต (Relay, Solenoid, Smoke Shooter) และอินพุต (Limit Switch ของมอเตอร์สเต็ป) พร้อมระบบป้องกันบัสล็อกค้างด้วย I2C Hang Protection 100ms
+
+### 5. PWM DAC (Type 15) — RC Low-Pass Filter
+- **Interface:** GPIO → LEDC PWM → RC Low-Pass Filter
+- **Usage:** แปลง PWM เป็นแรงดันแอนะล็อกเรียบสำหรับควบคุมไฟ DC, มอเตอร์ขนาดเล็ก, หรือเป็น CV (Control Voltage)
+- **DMX:** 1-2 bytes (ขึ้นอยู่กับ resolution 8-16 bit), GPIO-only
+- **PWM Carrier:** Configurable ผ่าน `mc_freq` (Hz) — ควรตั้งให้สูงกว่า fc ของ RC filter 3-5 เท่า
+- **Resolution:** 8-16 bit ผ่าน `mc_resolution` (ความสัมพันธ์: `max freq ≈ 80MHz / 2^resolution`)
+- **RC Filter Reference:** Web UI มีเครื่องคิดเลข fc ในหน้า channel config ให้ใส่ R/C → คำนวณ fc อัตโนมัติ
+
+### 6. Function Generator Output (Type 16) — RC Low-Pass Filter Circuit
+
+วงจร RC Low-Pass Filter สำหรับแปลง PWM จาก LEDC เป็นสัญญาณแอนะล็อกเรียบ:
+
+```
+GPIO (PWM Out) ──┬── R ──┬────── Analog Out
+                 │       │
+                GND     C │
+                         │
+                        GND
+```
+
+- **Single-pole (1st order):** rolloff 20dB/dec
+- **2-pole (2nd order):** rolloff 40dB/dec (ต่อ R/C อีก stage อนุกรม)
+- **Cutoff frequency:** `fc = 1 / (2π × R × C)`
+
+**ค่าที่แนะนำ:**
+
+| Freq Range | R | C | fc | Notes |
+|-----------|----|----|-----|-------|
+| 1-100 Hz | 10kΩ | 100nF | ~159 Hz | Sine wave smooth |
+| 100-1kHz | 1kΩ | 100nF | ~1.6 kHz | General purpose |
+| 1k-10kHz | 1kΩ | 10nF | ~15.9 kHz | Pass waveform, kill PWM carrier |
+| Square/PWM | 1kΩ | 1nF | ~159 kHz | Minimal filtering (keep edges) |
+
+**ข้อควรระวัง:**
+- PWM carrier ความถี่ LEDC ตั้งไว้ที่ 5000Hz (duty resolution 13-bit) — ต้องเลือก fc ให้ต่ำกว่า carrier อย่างน้อย 3-5 เท่า
+- DC Offset (DMX Byte 4): ถ้าต้องการ offset แบบ analog ให้ใช้ op-amp summing circuit หรือ AC-coupling ผ่าน capacitor + bias resistor
+- โหลดอิมพีแดนซ์สูง (>10kΩ) เพื่อไม่ให้ filter cutoff เปลี่ยน
 
 ---
 
@@ -150,7 +195,7 @@ curl.exe -F "update=@.pio\build\wt32-eth01\firmware.bin" http://192.168.1.93/upd
 
 ## Handover System
 - Docs in `handover/` folder, format `x.xx.xx.md`
-- Current: [1.20.00.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/handover/1.20.00.md)
+- Current: [1.23.00.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/handover/1.23.00.md)
 - Rules: no editing old files, max 1000 lines per file
 - SEE `handover/README.md` for full system rules
 

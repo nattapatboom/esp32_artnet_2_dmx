@@ -51,4 +51,7 @@ handover/
 | 1.18.00 | 2026-06-20 | JS Code Restructuring into 6 sections, case 14 dead code cleanup in scoring.h |
 | 1.19.00 | 2026-06-20 | Atomic flags for thread-safety, Web UI reboot overlay & countdown, auto-refresh Diagnostics |
 | 1.20.00 | 2026-06-20 | I2C lock protection, GPIO 12 bootstrapping pin warning, contiguous output type mapping and versioning |
+| 1.21.00 | 2026-06-20 | DAC (Type 14), Function Generator (Type 16), 7-segment DD GPIO, I2C/Display toggle, skill registration |
+| 1.22.00 | 2026-06-20 | Type 15 PWM DAC, RC Filter Calculator, Complete Test Mode, Func Gen PWM Carrier configurable |
+| 1.23.00 | 2026-06-20 | v3 Layout Migration — types renumbered 0-18 with grouped categories, type 12/13 PWM DD impl, PCA support for type 15 |
 
