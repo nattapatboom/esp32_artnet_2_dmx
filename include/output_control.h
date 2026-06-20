@@ -749,20 +749,22 @@ public:
         pcaManager.clear();
         digitalExpanderManager.clear();
 
-        // Detect DMX UART requirements beforehand to avoid conflicts with DFPlayer
-        bool dmxNeedsUart2 = false;
-        bool dmxNeedsUart1 = false;
-        uint8_t dmxUartCount = 0;
-        for (const auto& c : channels) {
-            if (c.type == 1 && c.source == 0) { // DMX on local GPIO
-                if (dmxUartCount == 0) {
-                    dmxNeedsUart2 = true;
-                } else if (dmxUartCount == 1) {
-                    dmxNeedsUart1 = true;
+        // Track UART allocations
+        bool uart2Used = false;
+        bool uart1Used = false;
+
+        // DFPlayer gets priority because DMX can fall back to RMT
+        for (const auto& ch : channels) {
+            if (ch.type == 15) {
+                if (!uart2Used) {
+                    uart2Used = true;
+                } else if (!uart1Used) {
+                    uart1Used = true;
                 }
-                dmxUartCount++;
             }
         }
+
+        uint8_t dfPlayerCount = 0;
 
         for (auto& ch : channels) {
             if (ch.source == 1) { // PCA9685 Expander
@@ -830,17 +832,22 @@ public:
                     ch.rmtDmx = nullptr;
                 }
                 
-                if (dmxIdx < 2) {
-                    dmx_port_t port = (dmxIdx == 0) ? DMX_NUM_2 : DMX_NUM_1;
-                    ch.dmxPort = (uint8_t)port;
-                    
+                if (!uart2Used) {
+                    ch.dmxPort = (uint8_t)DMX_NUM_2;
+                    uart2Used = true;
                     dmx_config_t dmxConfig = DMX_CONFIG_DEFAULT;
-                    dmx_driver_install(port, &dmxConfig, DMX_INTR_FLAGS_DEFAULT);
-                    dmx_set_pin(port, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
-                    
-                    Serial.printf("DMX Channel initialized: GPIO %d, Start Universe %d on UART%d\n", 
-                                  ch.pin, ch.start_universe, (port == DMX_NUM_2) ? 2 : 1);
-                    dmxIdx++;
+                    dmx_driver_install(DMX_NUM_2, &dmxConfig, DMX_INTR_FLAGS_DEFAULT);
+                    dmx_set_pin(DMX_NUM_2, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
+                    Serial.printf("DMX Channel initialized: GPIO %d, Start Universe %d on UART2\n", 
+                                  ch.pin, ch.start_universe);
+                } else if (!uart1Used) {
+                    ch.dmxPort = (uint8_t)DMX_NUM_1;
+                    uart1Used = true;
+                    dmx_config_t dmxConfig = DMX_CONFIG_DEFAULT;
+                    dmx_driver_install(DMX_NUM_1, &dmxConfig, DMX_INTR_FLAGS_DEFAULT);
+                    dmx_set_pin(DMX_NUM_1, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
+                    Serial.printf("DMX Channel initialized: GPIO %d, Start Universe %d on UART1\n", 
+                                  ch.pin, ch.start_universe);
                 } else if (rmtIdx < 8) {
                     // Fallback to RMT for extra DMX channels
                     ch.rmtDmx = new RmtDmxDriver(rmtIdx, ch.pin);
@@ -849,7 +856,7 @@ public:
                                   ch.pin, ch.start_universe, rmtIdx);
                     rmtIdx++;
                 } else {
-                    Serial.println("Max 2 DMX UARTs + 8 RMTs reached. Cannot initialize more DMX channels.");
+                    Serial.println("Max 8 RMTs reached. Cannot initialize more DMX channels.");
                 }
             } else if (ch.type == 12) { // Sequential Smoke Shooter
                 if (ch.source == 0) { // ESP32 GPIO
@@ -863,15 +870,16 @@ public:
                 Serial.printf("Smoke Shooter initialized: Smoke Pin %d, Shooter Pin %d\n", ch.pin, ch.pin2);
             } else if (ch.type == 15) { // DFPlayer MP3
                 ch.dfPlayer = new DFPlayerController();
-                // Dynamic UART assignment to prevent conflict
-                if (!dmxNeedsUart2) {
+                if (dfPlayerCount == 0) {
                     ch.dfPlayer->begin(Serial2, ch.pin, ch.pin2);
                     Serial.printf("DFPlayer MP3 initialized on Serial2: TX Pin %d, RX Pin %d\n", ch.pin, ch.pin2);
-                } else if (!dmxNeedsUart1) {
+                    dfPlayerCount++;
+                } else if (dfPlayerCount == 1) {
                     ch.dfPlayer->begin(Serial1, ch.pin, ch.pin2);
                     Serial.printf("DFPlayer MP3 initialized on Serial1: TX Pin %d, RX Pin %d\n", ch.pin, ch.pin2);
+                    dfPlayerCount++;
                 } else {
-                    Serial.println("Error: No available UART port for DFPlayer MP3! UART1 and UART2 are both used by DMX.");
+                    Serial.println("Error: No available UART port for DFPlayer MP3!");
                 }
             }
         }

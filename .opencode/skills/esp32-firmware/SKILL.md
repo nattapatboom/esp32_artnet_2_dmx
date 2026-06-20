@@ -62,20 +62,19 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - Source compatibility: PCA (2,5,6,7,8,10,12), Digital (2,6,9,12)
 
 ### Hardware Resource Limits
-- **UART:** 3 total. UART0=console, UART1=DMX_NUM_1, UART2=DMX_NUM_2/Serial2
+- **UART:** 3 total. UART0=console. UART1 and UART2 are dynamically allocated. **DFPlayer has priority on UART** (assigns to UART2, then UART1) because DMX can dynamically fall back to RMT.
 - **LEDC:** 8 channels max (PWM dimmer, motor, servo, RGB, buzzer)
-- **RMT:** 8 channels max (LED strips, extra DMX fallback)
+- **RMT:** 8 channels max (LED strips, extra DMX fallback). Total RMT channels (LEDs + extra DMX fallback) cannot exceed 8.
 - **Timer:** 4 total (AC dimmer uses 1)
 - **I2C:** 1 bus (Wire), shared by all expanders + display
-- **P0 Conflict:** DMX channel 1 + DFPlayer both use UART2 → crash
+- **Dynamic UART Allocation:** DFPlayer is allocated first. DMX uses any remaining UART. If none are free, DMX falls back to RMT driver automatically.
 
-### Known P0 Bugs (Must Fix)
-1. `digitalWrite()` in ISR context (dimmer_control.h) — use `gpio_set_level()`
-2. Static globals in header (dimmer_control.h) — ODR violation
-3. ESP-NOW ISR calling `mapDmxDataToChannels()` — blocking in ISR
-4. `calloc()` no NULL check (output_control.h:606) — crash on OOM
-5. Div-by-zero `1000 / output_fps` — crash when FPS=0
-6. HTTP body no Content-Length limit (main.cpp) — OOM attack vector
+### System Security & Stability
+- **HTTP DoS Protection:** Rejects any incoming HTTP requests with bodies exceeding 64KB to prevent OOM attacks.
+- **Settings Sanitization:** Validates `output_fps` to be between 1 and 100 on loading and saving, preventing division-by-zero crashes.
+- **Memory Allocation Safety:** Performs NULL checks on all `calloc()` calls allocating DMX buffers.
+- **Interrupt Storm Rate Limiting:** Enforces a 5ms rate limit on zero-cross interrupts to avoid lockups when the Zero-Cross pin floats.
+- **Core-Safe Deferral:** ESP-NOW callback pushes packets into a FreeRTOS queue, deferring the thread-unsafe `mapDmxDataToChannels()` processing to the Core 1 `outputTask` thread.
 
 ## Coding Conventions
 - **No comments** in code unless necessary

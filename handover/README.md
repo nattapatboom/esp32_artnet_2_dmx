@@ -47,3 +47,4 @@ handover/
 | 1.14.00 | — | Pin Mapping UI, I2C Mutex, Display, ZC Safety, Scoring |
 | 1.15.00 | 2026-06-18 | DFPlayer MP3 (Type 15), Hardware Conflict Matrix, Code Review, Dead Code Cleanup Policy |
 | 1.16.00 | 2026-06-20 | P0 & P1 Bug Fixes, Dimmer Globals/ISR safety, ESP-NOW Queuing, HTTP OOM fix, Dynamic UART Allocation |
+| 1.17.00 | 2026-06-20 | UART allocation priority to DFPlayer, RMT validation & fallback, SKILL.md update |

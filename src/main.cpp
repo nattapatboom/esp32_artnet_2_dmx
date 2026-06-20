@@ -539,20 +539,30 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         message = "Maximum 16 output channels";
         return false;
     }
-    // Check UART conflict between DMX and DFPlayer
-    uint8_t dmxUartCount = 0;
+    // Check UART and RMT hardware limits
+    uint8_t dmxCount = 0;
     uint8_t dfPlayerCount = 0;
+    uint8_t ledCount = 0;
     for (JsonObject output : outputs) {
         uint8_t type = output["type"] | 0;
         uint8_t source = output["source"] | 0;
-        if (type == 1 && source == 0) {
-            dmxUartCount++;
-        } else if (type == 15) {
+        if (type == 1 && source == 0) { // DMX on local GPIO
+            dmxCount++;
+        } else if (type == 15) { // DFPlayer
             dfPlayerCount++;
+        } else if (type == 0) { // LED Strip
+            ledCount++;
         }
     }
-    if (dmxUartCount + dfPlayerCount > 2) {
-        message = "Hardware limit exceeded: Maximum 2 channels can use UART (DMX on local GPIO and DFPlayer). Current configuration requires " + String(dmxUartCount + dfPlayerCount);
+    if (dfPlayerCount > 2) {
+        message = "Hardware limit exceeded: Maximum 2 DFPlayer channels (requires UART1/UART2)";
+        return false;
+    }
+    uint8_t freeUarts = 2 - dfPlayerCount;
+    uint8_t dmxUartUse = dmxCount < freeUarts ? dmxCount : freeUarts;
+    uint8_t dmxRmtUse = dmxCount - dmxUartUse;
+    if (ledCount + dmxRmtUse > 8) {
+        message = "Hardware limit exceeded: Total RMT channels (LED strips + extra DMX fallback) cannot exceed 8";
         return false;
     }
     uint8_t channelNumber = 1;
