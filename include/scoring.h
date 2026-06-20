@@ -219,7 +219,12 @@ inline float totalOutputScoreFromJson(JsonArrayConst outputs) {
         OutputChannel tmp;
         tmp.type = ch["type"] | 0;
         tmp.source = ch["source"] | 0;
+        tmp.pin2_source = ch["pin2_source"] | 0;
+        tmp.pin3_source = ch["pin3_source"] | 0;
+        tmp.pin4_source = ch["pin4_source"] | 0;
+        tmp.color_order = ch["color_order"] | 0;
         tmp.mc_mode = ch["mc_mode"] | 0;
+        tmp.mc_homing_mode = ch["mc_homing_mode"] | 0;
         tmp.pin = ch["pin"] | 255;
         tmp.pin2 = ch["pin2"] | 255;
         tmp.pin4 = ch["pin4"] | 255;

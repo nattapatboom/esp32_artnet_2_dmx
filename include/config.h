@@ -145,7 +145,7 @@ inline void loadConfig(SystemConfig& cfg) {
     cfg.i2c_scl = prefs.getUChar("i2c_scl", 15);
     cfg.i2c_speed = prefs.getUInt("i2c_speed", 400000);
     cfg.output_fps = prefs.getUChar("fps", 40);
-    if (cfg.output_fps == 0) cfg.output_fps = 40;
+    if (cfg.output_fps == 0 || cfg.output_fps > 44) cfg.output_fps = 40;
 
     String w_ssid = prefs.getString("wf_ssid", "");
     strncpy(cfg.wifi_ssid, w_ssid.c_str(), sizeof(cfg.wifi_ssid) - 1);

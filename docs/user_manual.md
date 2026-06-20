@@ -51,9 +51,9 @@ ESP-NOW Slave mode always keeps the setup AP active so the slave can be configur
 
 ## 4. Output Concepts
 
-The board supports up to 16 configured output channels. Each output has:
+Configured output channels are score-limited, not fixed-count limited. Practical capacity depends on resource score and hard peripheral limits. Each output has:
 - Type (0-18)
-- Source (GPIO, PCA9685, MCP23017, TCA9555, PCF857x)
+- Source (GPIO, PCA9685, MCP23017, TCA9555, PCF857x, MCP4725)
 - Start Universe
 - Start Address
 - Type-specific settings
@@ -142,8 +142,8 @@ Outputs DMX512 data from the selected universe.
 
 Notes:
 - Start Address is ignored; DMX Serial outputs a complete 512-channel universe.
-- First 2 DMX outputs use hardware UART.
-- Additional DMX outputs use RMT fallback.
+- DFPlayer outputs reserve UARTs first.
+- DMX outputs use remaining hardware UARTs, then RMT fallback.
 - Use an RS-485 transceiver such as MAX485/SN75176 between ESP32 GPIO and DMX wiring.
 
 ### Relay
@@ -271,7 +271,7 @@ State-machine controlled smoke machine. One DMX channel triggers a sequence: Smo
 
 ### 7-Segment Display
 
-Supports TM1637 (2-wire protocol) or direct-drive (7-8 pins via expander).
+Supports TM1637 (2-wire GPIO protocol) or direct-drive (7-8 pins, optionally via expander).
 
 Modes:
 - TM1637 Numeric (2 Ch): 4-digit numeric display.
@@ -381,9 +381,9 @@ GPIO12 is a boot strap pin. Use proper buffering/high-Z behavior during boot.
 Use `tools/load_calculator.py` to estimate node count and load.
 
 Practical limits:
-- Max configured output channels: 16
+- Configured output channels are score-limited, not fixed-count limited
 - LED strips: max 8 RMT channels
-- DMX: first 2 UART, extras use RMT fallback
+- UART: DFPlayer reserves UARTs first; DMX uses remaining UARTs, then RMT fallback
 - Flash should stay below roughly 75% to keep OTA comfortable
 - Very long LED strips can work, but FPS drops as LED count grows
 
@@ -447,7 +447,7 @@ Points are calculated based on the hardware source selected:
 CPU load depends on the output type and the global output FPS:
 - **High Load Types:** Function Generator, Steppers, and 7-Segment Direct Drive consume more CPU points.
 - **LED Strips:** Compute cost increases based on the number of pixels.
-- **FPS Factor:** Higher output FPS (e.g., 60 FPS vs 40 FPS) increases the overall compute score.
+- **FPS Factor:** Higher output FPS (e.g., 44 FPS vs 30 FPS) increases the overall compute score.
 
 ### 17.3 PCA9685 Frequency Interlock
 - Each PCA9685 chip (by I2C address) shares a single PWM frequency.
@@ -455,4 +455,3 @@ CPU load depends on the output type and the global output FPS:
 - Other PWM types on the same chip will use the frequency set by the first configured channel, provided it is compatible.
 
 The total score is displayed in the Web UI. If the score exceeds the limit, the system may warn you that stability cannot be guaranteed.
-

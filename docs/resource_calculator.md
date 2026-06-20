@@ -1,140 +1,161 @@
-# WT32-ETH01 / ESP32 Hardware Resource Calculator & Constraints Manual
+# WT32-ETH01 / ESP32 Hardware Resource Calculator
 
-This document details how hardware resources are allocated on the WT32-ETH01 controller across different output modes, mapping rules for I2C expanders, and guidelines to avoid hardware overloads.
+This document describes how the firmware estimates hardware load and applies hard safety constraints for WT32-ETH01 output configurations.
 
----
+The scoring contract is in `docs/domain_model.md`. Firmware implementation lives in `include/scoring.h`, with matching JavaScript expected in `web/index.html`.
 
-## 1. ESP32 Peripheral Limits
+## 1. Peripheral Limits
 
-The ESP32 microcontroller inside the WT32-ETH01 provides several specialized hardware peripherals. These are shared among all configured output types:
+The ESP32 peripherals are shared by all configured outputs.
 
 | Peripheral | Max Capacity | Usage Rules | Affected Output Types |
 | :--- | :--- | :--- | :--- |
-| **RMT Channels** | 8 channels | 1 RMT channel per LED strip. 1 RMT channel per software-based DMX serial output. | LED Strip (NeoPixel), DMX Serial (extra pins) |
-| **LEDC PWM** | 16 channels | Channels 0-15. Used to generate PWM signals for dimmers, servos, and H-Bridge motor speed. | DC PWM Dimmer, RC Servo, DC Motor (all modes) |
-| **UART Ports** | 2 DMX ports | UART0 is reserved for USB debug/serial. UART1 and UART2 are available as hardware DMX. | DMX Serial (first 2 instances) |
-| **Active Channels**| 8 Slots | Max 8 total rows in `/outputs.json` due to firmware capacity checks. | All Output Types |
-| **GPIO Outputs** | ~8 Pins | Physical header limitation of WT32-ETH01 (most pins reserved internally). | All direct-connected pins |
+| **RMT Channels** | 8 channels | 1 RMT channel per LED strip. 1 RMT channel per software-based DMX serial output. | LED Strip, DMX Serial fallback |
+| **LEDC PWM** | 16 channels | Channels 0-15. Used to generate PWM signals for dimmers, servos, motors, buzzers, 7-segment direct drive, PWM DAC, and function generator. | Types 4, 5, 6, 8, 9, 12, 13, 15, 16 |
+| **UART Ports** | 2 usable ports | UART0 is reserved for console/debug. UART1 and UART2 are shared by DFPlayer and hardware DMX. DFPlayer has priority; DMX falls back to RMT. | DFPlayer, DMX Serial |
+| **Configured Outputs** | Score-limited | The firmware uses resource score plus hard peripheral validation instead of the old fixed 8-channel capacity rule. | All output types |
+| **GPIO Outputs** | About 8 pins | Physical header limitation of WT32-ETH01. Many ESP32 pins are reserved by LAN8720 Ethernet. | Direct-connected outputs |
 
----
+## 2. Resource Footprint by Output Type
 
-## 2. Resource Footprint by Output Mode
+The current v3 output types are `0..18`. Actual resource use depends on selected source, mode, and per-pin routing.
 
-The resource footprint varies heavily depending on whether a mode uses ESP32 GPIO directly or routes through an expander:
+Resource scoring is intended to be routing-accurate: firmware and Web UI score calculations should account for selected sources, hybrid GPIO/PCA/expander pins, segment-level routing, and DMX UART-to-RMT fallback after DFPlayer UART allocation. Hard validation remains a separate gate for interlocks and absolute peripheral limits.
 
-| Output Type | ESP32 GPIO Count | RMT Count | LEDC Count | UART Count | Expander Compatible? |
-| :--- | :---: | :---: | :---: | :---: | :--- |
-| **LED Strip** | 1 pin | 1 channel | 0 | 0 | ❌ No (requires RMT precision) |
-| **DMX Serial** | 1 pin | 1 (if >2 outputs)| 0 | 1 (if <=2 outputs)| ❌ No (requires UART/RMT timing) |
-| **Relay** | 1 pin | 0 | 0 | 0 | **Yes** (PCA9685/MCP23017/TCA9555/PCF8574) |
-| **Solenoid Trigger** | 1 pin | 0 | 0 | 0 | **Yes** (PCA9685/MCP23017/TCA9555/TPIC6B595) |
-| **AC Dimmer** | 1 pin (+1 shared ZC) | 0 | 0 | 0 | ❌ No (requires Zero-Crossing ISR sync) |
-| **DC PWM Dimmer** | 1 pin | 0 | 1 | 0 | **Yes** (PCA9685/TLC5947) |
-| **RC Servo** | 1 pin | 0 | 1 | 0 | **Yes** (PCA9685) |
-| **DC Motor (Open-Loop PWM+PWM)**| 2 pins | 0 | 2 | 0 | **Yes** (PCA9685) |
-| **DC Motor (Open-Loop PWM+DIR)**| 2 pins | 0 | 1 | 0 | **Yes** (PCA9685) |
-| **DC Motor (Open-Loop IN1+IN2+EN)**| 3 pins| 0 | 1 | 0 | **Yes** (PCA9685) |
-| **~~DC Motor Closed-Loop (A/B Hall)~~** | ~~2 out + 2 in (A/B phase)~~ | ~~0~~ | ~~0-2~~ | ~~0~~ | ~~**Yes** (Outputs on PCA9685; inputs must be direct ESP32 GPIO for PCNT)~~ *(Canceled)* |
-| **~~DC Motor Closed-Loop (AS5600 I2C)~~** | ~~2 out + 0 extra in (I2C)~~ | ~~0~~ | ~~0-2~~ | ~~0~~ | ~~**Yes** (Outputs on PCA9685; inputs share I2C bus `0x36`, no extra pins)~~ *(Canceled)* |
-| **~~DC Motor Closed-Loop (PWM Enc.)~~** | ~~2 out + 1 in (PWM feedback)~~ | ~~0~~ | ~~0-2~~ | ~~0~~ | ~~**Yes** (Outputs on PCA9685; input must be direct ESP32 GPIO for capture)~~ *(Canceled)* |
-| **Stepper Motor** | 1 to 4 pins | 0 | 0 | 0 | **Partially** (STEP pin must be direct ESP32 GPIO; DIR/ENABLE can use expander) |
-| **WiZ Smart Bulb** | 0 | 0 | 0 | 0 | ❌ N/A (Deprecated/Removed -> Move to PC/host control instead) |
-| **Sequential Smoke Shooter** | 2 pins | 0 | 0 | 0 | **Yes** (PCA9685/MCP23017/TCA9555/PCF8574/TPIC6B595) |
-| **7-Segment (Driver Chip)** | 2 to 3 pins | 0 | 0 | 0 | **Yes** (TM1637 uses 2 pins; MAX7219 uses 3 pins) |
-| **7-Segment Direct Drive** | 7 to 8 pins | 0 | 0 | 0 | **Yes** (Converts DMX ASCII. Strongly recommended to map to I2C expander to save pins) |
-| **Analog RGB** | 3 pins | 0 | 3 | 0 | **Yes** (PCA9685/TLC5947) |
-| **Analog RGBW** | 4 pins | 0 | 4 | 0 | **Yes** (PCA9685/TLC5947) |
-| **Passive Buzzer** | 1 pin | 0 | 1 | 0 | ❌ No (Not recommended due to shared PCA9685 frequencies) |
-| **ToF Sensor (VL53L0X)** | 2 shared pins (I2C) | 0 | 0 | 0 | **Yes** (Runs on shared I2C bus at address `0x29`) |
-| **Ultrasonic (HC-SR04 / A02YYUW)** | 1 out + 1 in (HC-SR04) or 1 in UART RX (A02YYUW) | 0 | 0 | 0 | **Yes** (HC-SR04 Trig can use expander; A02YYUW uses direct ESP32 GPIO mapped as UART RX) |
-| **Analog Microphone** | 1 analog pin (in) | 0 | 0 | 0 | ❌ No (Requires direct ESP32 ADC pin) |
+Implementation status: this is the domain rule and target behavior. When changing scoring code, audit both `include/scoring.h` and `web/index.html`; the C++ JSON scoring path must copy every routing field it needs from saved/output JSON before estimating resources.
 
----
+| Type | Output Type | Typical ESP32 GPIO | RMT | LEDC | UART | Expander / PCA Notes |
+| :---: | :--- | :---: | :---: | :---: | :---: | :--- |
+| 0 | AC Dimmer | 1 | 0 | 0 | 0 | GPIO only; uses shared zero-crossing input |
+| 1 | DMX Serial Output | 1 | fallback | 0 | 1 preferred | GPIO only; uses UARTs left after DFPlayer, then RMT fallback |
+| 2 | Relay | 1 | 0 | 0 | 0 | GPIO, PCA9685, or digital expander |
+| 3 | RGB/RGBW LED Strip | 1 | 1 | 0 | 0 | GPIO only; requires RMT timing |
+| 4 | Single Color LED | 1 | 0 | 1 | 0 | GPIO+LEDC or PCA9685 |
+| 5 | Analog RGB/RGBW | 3-4 | 0 | 3-4 | 0 | Each color can route to GPIO or PCA9685 |
+| 6 | DC Motor | 2-3 | 0 | 1-2 | 0 | GPIO or PCA9685; EN pin cannot use digital expander |
+| 7 | Stepper Motor | 2-3 | 2 | 0 | 0 | STEP must be GPIO; DIR/ENABLE may be hybrid routed |
+| 8 | RC Servo | 1 | 0 | 1 | 0 | GPIO+LEDC or PCA9685; servo forces PCA chip to 50 Hz |
+| 9 | Passive Buzzer | 1 | 0 | 1 | 0 | GPIO only |
+| 10 | DFPlayer MP3 | 2 | 0 | 0 | 1 | GPIO only; max 2 channels |
+| 11 | 7-Segment TM1637 | 2 | 0 | 0 | 0 | GPIO only |
+| 12 | 7-Segment DD 7-Pin PWM | per segment | 0 | routing-dependent | 0 | Score each segment by its GPIO, PCA9685, or expander route |
+| 13 | 7-Segment DD 8-Pin PWM | per segment | 0 | routing-dependent | 0 | Score each segment by its GPIO, PCA9685, or expander route |
+| 14 | DAC | 1 | 0 | 0 | 0 | GPIO DAC is unavailable on WT32-ETH01; MCP4725 source recommended |
+| 15 | PWM DAC | 1 | 0 | 1 | 0 | GPIO+LEDC or PCA9685 |
+| 16 | Function Generator | 1 | 0 | 1 | 0 | GPIO only; uses timer/compute budget |
+| 17 | Solenoid Trigger | 1 | 0 | 0 | 0 | GPIO, PCA9685, or digital expander |
+| 18 | Sequential Smoke Shooter | 2 | 0 | 0 | 0 | GPIO, PCA9685, or digital expander |
 
-## 3. WT32-ETH01 Physical Pin Allocations & Safety
+## 3. Score Formula
 
-The WT32-ETH01 is highly integrated. Many ESP32 GPIOs are wired internally to the LAN8720 Ethernet PHY chip. Using these pins for outputs will crash the system.
+Resource score weights:
 
-### Internal Reserved Pins (DO NOT USE)
-* **Ethernet RMII Interface:** GPIO0, GPIO16, GPIO18, GPIO19, GPIO21, GPIO22, GPIO23, GPIO25, GPIO26, GPIO27
+| Resource | Weight |
+| --- | ---: |
+| GPIO | 0.5 |
+| LEDC | 2.5 |
+| RMT | 3.0 |
+| UART | 8.0 |
+| DAC | 2.0 |
+| PCA9685 channel | 0.25 |
+| Digital expander channel | 0.125 |
+
+Formula:
+
+```text
+resourceScore = GPIO*0.5 + LEDC*2.5 + RMT*3.0 + UART*8.0 + DAC*2.0 + PCA*0.25 + EXP*0.125
+computeScore  = sum(type compute cost) + (output_fps / 60) * 5
+totalScore    = resourceScore + computeScore
+```
+
+The firmware limit is `SCORE_LIMIT`, currently `resourceScoreLimit() + 25.0`.
+
+Compute score is intentionally separate from hard peripheral validation. A configuration must pass both total score and interlock checks.
+
+## 4. WT32-ETH01 Physical Pin Allocations & Safety
+
+The WT32-ETH01 is highly integrated. Many ESP32 GPIOs are wired internally to the LAN8720 Ethernet PHY chip. Using these pins for outputs can break networking or crash the system.
+
+### Internal Reserved Pins
+
+* **Ethernet RMII interface:** GPIO0, GPIO16, GPIO18, GPIO19, GPIO21, GPIO22, GPIO23, GPIO25, GPIO26, GPIO27
 * **Debug UART0:** GPIO1 (TX0), GPIO3 (RX0)
-* **Oscillator / XTAL:** GPIO32, GPIO33 (depending on board revision, often reserved for 50MHz PHY clock input)
+* **ESP32 DAC pins:** GPIO25/GPIO26 are occupied by Ethernet on WT32-ETH01, so MCP4725 is the practical DAC path.
 
 ### Exposed Header Pins
-* **Safe Outputs:** GPIO2, GPIO4 (default LED pin), GPIO12, GPIO14, GPIO15, GPIO17 (default DMX TX pin)
-* **Safe Inputs Only:** GPIO34, GPIO35, GPIO36, GPIO39 (no internal pull-ups, input-only). 
-  * *Tip:* These input-only pins are ideal for sensor inputs:
-    * **Ultrasonic Echo pin** (e.g. GPIO34)
-    * **Analog Microphone** (e.g. GPIO36 or GPIO39 which are ADC1 channels)
-    * **PIR/Laser gate inputs** (e.g. GPIO35)
-* **Status LED Pin:** GPIO5 (can be disabled or moved in SystemConfig)
-* **Zero-Crossing Pin:** User-configured (recommended to use GPIO35 or another input-only pin)
 
-> [!IMPORTANT]
-> Because only **6 to 8 pins** are available for general outputs on the WT32-ETH01 headers, using I2C expander chips is **strongly recommended** for any system requiring more than a couple of actuators or channels.
+* **Common safe outputs:** GPIO2, GPIO4, GPIO12, GPIO14, GPIO15, GPIO17, GPIO32, GPIO33
+* **Input-only pins:** GPIO34, GPIO35, GPIO36, GPIO39
+* **Default status LED pin:** GPIO5
+* **Default I2C pins:** GPIO14 SDA, GPIO15 SCL
+* **Zero-crossing pin:** User-configured; input-only GPIO is recommended.
 
----
+Because only a small number of general output pins are available, I2C expanders are strongly recommended for installations with many relays, solenoids, indicators, or 7-segment segments.
 
-## 4. I2C Expander Device Specifications
+## 5. I2C Expander Device Specifications
 
-I2C expanders communicate with the ESP32 using just 2 pins (SDA and SCL) but map to dozens of external channels.
+### 5.1 PCA9685 PWM/Servo Expander
 
-### 4.1 PCA9685 PWM/Servo Expander (16 Channels)
-* **Ideal for:** Servos, PWM dimmers, on-off relay drivers, DC motor signals.
-* **Resolution:** 12-bit (0-4095).
-* **Limitation:** All 16 channels on the same board **must share the same PWM frequency** (24 Hz to 1526 Hz).
-  * *Servo frequency:* 50 Hz.
-  * *DC Motor/LED frequency:* 200 Hz to 1000+ Hz.
-  * *Optimization rule:* Do not mix Servos (50Hz) and LED dimmers (1000Hz) on the same chip. Use address `0x40` for 50Hz servos and address `0x41` for 1000Hz PWM.
+* **Interface:** I2C.
+* **Address range:** `0x40..0x47`.
+* **Channels:** 16 PWM outputs per chip.
+* **Best for:** Servos, PWM dimmers, analog RGB/RGBW, PWM DAC, relay drivers, and motor signals.
+* **Key constraint:** All 16 channels on the same chip share one PWM frequency. If any servo uses a chip, the chip is forced to 50 Hz.
 
-### 4.2 MCP23017 / TCA9555 Digital GPIO Expander (16 Channels)
-* **Ideal for:** Relays, solenoids, smoke sequences, digital input sensors.
-* **Resolution:** On/Off only (no PWM).
-* **Optimization rule:** Highly efficient for multiple relays since they consume 0 LEDC/RMT resources on the main chip.
+### 5.2 MCP23017 / TCA9555 Digital GPIO Expander
 
-### 4.3 PCF8574 Low-Cost Expander (8 Channels)
-* **Ideal for:** Simple relay modules.
-* **Limitation:** Quasi-bidirectional pins have weak pull-ups. Active-low switching is recommended.
+* **Interface:** I2C.
+* **Address range:** usually `0x20..0x27`.
+* **Best for:** Relays, solenoids, smoke shooter valves, and digital segment routing.
+* **Key constraint:** Digital only; do not use for PWM-only pins such as motor EN.
 
-### 4.4 TPIC6B595 Power Sink Shift Register (8 Channels)
-* **Ideal for:** Heavy solenoid or inductive relay banks.
-* **Limitation:** Not I2C (uses SPI/shift register pins). Can be daisy-chained. Acts as a low-side driver.
+### 5.3 PCF857x Digital GPIO Expander
 
-### 4.5 TLC5947 Constant-Current LED Driver (24 Channels)
-* **Ideal for:** Driving multiple small, direct-wired LEDs (e.g. control panel indicators).
-* **Limitation:** Current sink only.
+* **Interface:** I2C.
+* **Best for:** Simple relay modules and low-speed digital outputs.
+* **Key constraint:** Quasi-bidirectional pins have weak pull-ups; active-low wiring is often easier.
 
----
+### 5.4 MCP4725 DAC
 
-## 5. Capacity & Network Load Guidelines
+* **Interface:** I2C.
+* **Address range:** `0x60..0x67`.
+* **Resolution:** 12-bit.
+* **Best for:** Analog output when ESP32 DAC pins are unavailable.
 
-1. **Total LED Limit (RAM/Watchdog):**
-   * Keep total NeoPixels under **4,000 pixels** to prevent memory starvation.
-   * Long individual strips (e.g. >1000 LEDs) will drop the refresh rate:
-     $$\text{Max FPS} \approx \frac{1000}{\text{LED count} \times 0.030\text{ ms}}$$
-     * 170 LEDs $\approx$ 196 FPS
-     * 500 LEDs $\approx$ 66 FPS
-     * 1000 LEDs $\approx$ 33 FPS
-     * 1500 LEDs $\approx$ 22 FPS (stuttering visible)
+## 6. Hard Validation Rules
 
-2. **WiZ Bulb (Deprecated/Removed):**
-   * WiZ bulb control is deprecated and marked for deletion. It is recommended to handle all smart bulb controls on a host computer (Node-RED, QLC+, Home Assistant) rather than on the micro-controller.
+The score calculator is not the only gate. Firmware and Web UI validation also enforce these rules:
 
-3. **Bluetooth/BLE (Excluded):**
-   * Bluetooth/BLE has been officially excluded from this project due to excessive flash/RAM consumption which interferes with OTA and Ethernet stability. Do not enable Bluetooth.
+* GPIO pins cannot duplicate another output pin.
+* Output pins cannot overlap Status LED, Zero-Crossing, I2C SDA, or I2C SCL.
+* I2C SDA and SCL cannot be the same pin.
+* DFPlayer channels cannot exceed 2.
+* DFPlayer allocates UART before DMX; DMX uses remaining UARTs and then RMT fallback.
+* RMT usage from LED strips plus DMX fallback cannot exceed 8.
+* Source must be compatible with output type.
+* Stepper STEP must be ESP32 GPIO.
+* Motor EN in `IN1+IN2+EN` mode must use ESP32 GPIO or PCA9685.
+* PCA9685 frequency conflicts must be handled per chip.
 
-3. **7-Segment Display limits:**
-   * **TM1637:** Pre-made modules are extremely light. Up to 4 displays can easily run on a single ESP32 without polling lag (takes 2 GPIOs each).
-   * **MAX7219:** Daisy-chained SPI modules. Up to 8 modules (64 digits total) can share 1 SPI bus (3 GPIO pins total).
+## 7. Capacity & Network Load Guidelines
 
-4. **Mixed-Mode Optimization (Pin Saving):**
-   * High-speed pulse pins (like **STEP** for Steppers or **CLK** for fast SPI) must stay on direct ESP32 GPIOs.
-   * Slow state-change pins (like **DIR** and **ENABLE** for Steppers, or **Latch/CS** for displays) can be offloaded to an I2C GPIO Expander (like MCP23017). This reduces physical ESP32 GPIO usage of a Stepper from 3 or 4 pins down to just **1 pin**.
+1. **Total LED Limit**
+    * Keep total NeoPixels under about 4,000 pixels to avoid memory starvation.
+    * Long individual strips reduce refresh rate because WS281x timing is serialized.
 
-5. **Power Budget Planning:**
-   * **Do not drive relays, servos, motors, or solenoids from the ESP32 5V/3.3V pins.**
-   * Separate logic power from load power. Connect all Ground pins together.
-   * Calculate total current:
-     * *Standard NeoPixel (White full brightness):* 60mA per pixel.
-     * *170 pixels (1 Universe) full white:* 10.2A @ 5V.
-     * *Servo motor (moving under load):* 500mA - 1.5A per servo.
+2. **Bluetooth/BLE Excluded**
+    * Bluetooth/BLE is intentionally excluded because it consumes flash/RAM needed for OTA and Ethernet stability.
+
+3. **7-Segment Display Limits**
+    * TM1637 modules are GPIO-only and consume two signal pins each.
+    * Direct-drive 7-segment displays should use expanders or PCA9685 when possible to preserve ESP32 GPIO.
+
+4. **Mixed-Mode Optimization**
+    * Fast timing pins such as Stepper STEP must stay on direct ESP32 GPIO.
+    * Slow state pins such as Stepper DIR/ENABLE can be moved to expanders.
+
+5. **Power Budget Planning**
+    * Do not drive relays, servos, motors, solenoids, or LED strips from ESP32 3.3V pins.
+    * Use separate load power and connect grounds together.
+    * Use flyback protection for relay, solenoid, and motor coils.
+    * All GPIO outputs should have pull-down resistors when connected to interface boards.

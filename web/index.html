@@ -390,7 +390,7 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
   <!-- ===== OUTPUTS ===== -->
   <div id="pane-out" class="pane">
     <h2>Output Drivers</h2>
-    <div class="ib ib-blue" style="font-size:0.72rem">No hard channel limit — constrained by resource scoring + hardware limits | LED Strip: max 8 (RMT limit) | DMX Serial: first 2 use UART, extra ports use RMT fallback | Reboot required after changes.</div>
+    <div class="ib ib-blue" style="font-size:0.72rem">No hard channel limit — constrained by resource scoring + hardware limits | LED Strip: max 8 (RMT limit) | DFPlayer reserves UARTs first; DMX uses remaining UARTs, then RMT fallback | Reboot required after changes.</div>
     <div id="out-test-state" class="ib ib-blue" style="font-size:0.78rem">Normal output mode. Test tools are idle.</div>
     <div id="zc-warning" class="ib ib-red" style="display:none;font-size:0.72rem">Warning: AC Dimmer output(s) configured but Zero-Crossing pin is set to Disabled. AC Dimmer will NOT function. Set ZC pin in Network tab.</div>
     <div id="strapping-warning" class="ib ib-yellow" style="display:none;font-size:0.72rem;border:2px solid #eab308"><strong>Warning:</strong> GPIO 12 is configured as an active pin. GPIO 12 is a Bootstrapping pin (MTDI). If pulled HIGH during controller startup, the board will fail to boot due to flash voltage selection conflict (VDD_SDIO 1.8V vs 3.3V). Ensure your connected device does not drive this pin HIGH on power-up.</div>
@@ -404,7 +404,7 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
         </div>
       </div>
       <div id="score-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem">
-        <span style="font-weight:600;white-space:nowrap">Resource Score:</span>
+        <span style="font-weight:600;white-space:nowrap">Capacity Score:</span>
         <div style="flex:1;height:16px;background:#e2e8f0;border-radius:8px;overflow:hidden;position:relative">
           <div id="score-fill" style="height:100%;width:0%;border-radius:8px;transition:width .3s"></div>
           <span id="score-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:600;color:#1e293b">0 / 100</span>
@@ -433,7 +433,7 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
           </div>
         </div>
         <div class="sc" style="padding:6px;border-color:#cbd5e1">
-          <small style="font-weight:600;color:#475569">Resource Score</small>
+          <small style="font-weight:600;color:#475569">Capacity Score</small>
           <strong id="hw-score-val" style="font-size:1.1rem;color:#1e3a8a">0 / 100</strong>
           <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:4px;overflow:hidden">
             <div id="hw-score-bar" style="height:100%;width:0%;background:#22c55e;transition:width .2s"></div>
@@ -1284,7 +1284,7 @@ function renderPinRows(){
   const isCommonDim=is7Seg&&(mcMode>=6&&mcMode<=9);
   const is7SegDD=is7Seg&&(mcMode>=2&&mcMode<=9);
   const canUsePca=(t===2||t===4||t===6||t===8||t===5||t===15||t===17||t===18||is7SegDD);
-  const canUseDig=(t===2||t===6||t===17||t===18||(is7SegDD&&!isCommonDim));
+  const canUseDig=(t===2||t===17||t===18||(is7SegDD&&!isCommonDim));
   const mainExpander=src!==0;
   const usePin2=isMotor||isAnalog||t===18||is7Seg||isDfPlayer||(isStepper&&(pin2Src===0||pin2Src!==0));
   const usePin3=isAnalog||(isMotor&&mcMode===2)||isStepper||(is7Seg&&mcMode===1);
@@ -2211,7 +2211,7 @@ function toggleOutFields(){
 
   // Expander source compatibility
   const canUsePca = (t===2 || t===4 || t===6 || t===8 || t===5 || t===15 || t===17 || t===18 || is7SegDD);
-  const canUseDigitalExpander = (t===2 || t===6 || t===17 || t===18 || (is7SegDD && !isCommonDim));
+  const canUseDigitalExpander = (t===2 || t===17 || t===18 || (is7SegDD && !isCommonDim));
   const isGpioOnly = t===16;
   
   if (srcSelect && srcSelect.tagName === 'SELECT') {
@@ -2589,6 +2589,34 @@ function addOrUpdateOutput(){
     if(ch.pin3_source!==0 && ch.pin3_channel===255){
       alert('Stepper ENABLE expander channel is required.');
       return;
+    }
+  }
+  if(type===18){
+    if(ch.pin2_source>4){
+      alert('Unsupported Smoke Shooter Shoot pin source.');
+      return;
+    }
+    if(ch.pin2_source!==0 && ch.pin2_channel===255){
+      alert('Smoke Shooter Shoot expander channel is required.');
+      return;
+    }
+  }
+  if(type===5){
+    if((ch.source===1 && ch.pca_channel===255) ||
+       (ch.pin2_source===1 && ch.pin2_channel===255) ||
+       (ch.pin3_source===1 && ch.pin3_channel===255) ||
+       ((ch.color_order||0)>=4 && ch.pin4_source===1 && ch.pin4_channel===255)){
+      alert('Analog RGB/RGBW PCA9685 channel is required for each PCA-routed color.');
+      return;
+    }
+  }
+  if((type===12||type===13) && ch.seg_sources){
+    const numSeg = type===13 ? 8 : 7;
+    for(let s=0; s<numSeg; s++){
+      if((ch.seg_sources[s]||0)!==0 && (ch.seg_channels[s]===undefined || ch.seg_channels[s]===255)){
+        alert('7-Segment segment '+(s+1)+' expander channel is required.');
+        return;
+      }
     }
   }
   if(type===6 && ch.mc_mode===2){

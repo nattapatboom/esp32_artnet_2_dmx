@@ -633,8 +633,8 @@ void applySettingsFromJson(JsonObjectConst doc) {
 bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, String& message) {
     if (settings.containsKey("output_fps")) {
         int fps = settings["output_fps"] | 0;
-        if (fps <= 0 || fps > 100) {
-            message = "Global Output FPS must be between 1 and 100";
+        if (fps <= 0 || fps > 44) {
+            message = "Global Output FPS must be between 1 and 44";
             return false;
         }
     }
@@ -706,7 +706,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         }
         uint8_t mcMode = output["mc_mode"] | 0;
         bool pcaOk = (type == 2 || type == 4 || type == 6 || type == 7 || type == 8 || type == CHAN_TYPE_ANALOG_RGB || type == 15 || type == 17 || type == 18 || type == 12 || type == 13);
-        bool digitalOk = (type == 2 || type == 6 || type == 17 || type == 18 || ((type == 12 || type == 13) && mcMode >= 2 && mcMode <= 5));
+        bool digitalOk = (type == 2 || type == 17 || type == 18 || ((type == 12 || type == 13) && mcMode >= 2 && mcMode <= 5));
         if (source == 1 && !pcaOk) {
             message = "PCA9685 source is not supported by output channel " + String(channelNumber);
             return false;
@@ -735,10 +735,16 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
             if (output.containsKey("seg_sources")) {
                 JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
+                JsonArrayConst segChannels = output["seg_channels"].as<JsonArrayConst>();
+                uint8_t numSeg = (type == 13) ? 8 : 7;
                 for (int s = 0; s < segSources.size(); s++) {
                     uint8_t sSrc = segSources[s] | 0;
                     if (sSrc != 0 && sSrc > 4) {
                         message = "Unsupported segment expander source on channel " + String(channelNumber);
+                        return false;
+                    }
+                    if (s < numSeg && sSrc != 0 && (s >= segChannels.size() || (int)(segChannels[s] | 255) == 255)) {
+                        message = "Segment expander channel is missing on channel " + String(channelNumber);
                         return false;
                     }
                 }
@@ -765,8 +771,27 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             uint8_t pin3Source = output["pin3_source"] | 0;
             uint8_t pin4Source = output["pin4_source"] | 0;
+            uint8_t colorOrder = output["color_order"] | 0;
             if (source > 1 || pin2Source > 1 || pin3Source > 1 || pin4Source > 1) {
                 message = "Analog RGB/RGBW channels only support ESP32 GPIO or PCA9685 sources on channel " + String(channelNumber);
+                return false;
+            }
+            if ((source == 1 && (int)(output["pca_channel"] | 255) == 255) ||
+                (pin2Source == 1 && (int)(output["pin2_channel"] | 255) == 255) ||
+                (pin3Source == 1 && (int)(output["pin3_channel"] | 255) == 255) ||
+                (colorOrder >= 4 && pin4Source == 1 && (int)(output["pin4_channel"] | 255) == 255)) {
+                message = "Analog RGB/RGBW PCA9685 channel is missing on channel " + String(channelNumber);
+                return false;
+            }
+        }
+        if (type == 18) {
+            uint8_t pin2Source = output["pin2_source"] | 0;
+            if (pin2Source > 4) {
+                message = "Unsupported smoke shooter hybrid pin source on channel " + String(channelNumber);
+                return false;
+            }
+            if (pin2Source != 0 && (int)(output["pin2_channel"] | 255) == 255) {
+                message = "Smoke Shooter shoot expander channel is missing on channel " + String(channelNumber);
                 return false;
             }
         }
@@ -1003,7 +1028,9 @@ void startRecoveryEthernetOnly() {
 void setupWebServer() {
     // Serve Setup UI Page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-        request->send(200, "text/html", (const uint8_t*)CONFIG_HTML, sizeof(CONFIG_HTML) - 1);
+        AsyncWebServerResponse* response = request->beginResponse_P(200, "text/html; charset=utf-8", CONFIG_HTML_GZ, CONFIG_HTML_GZ_LEN);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
     });
 
     // API Route: Get Config settings

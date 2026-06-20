@@ -783,6 +783,10 @@ public:
                 item["solenoid_pre_delay"] = ch.solenoid_pre_delay;
                 item["solenoid_post_delay"] = ch.solenoid_post_delay;
             } else if (ch.type == 18) {
+                item["pin2"] = ch.pin2;
+                item["pin2_source"] = ch.pin2_source;
+                item["pin2_addr"] = ch.pin2_addr;
+                item["pin2_channel"] = ch.pin2_channel;
                 item["solenoid_threshold"] = ch.solenoid_threshold;
             } else if (ch.type == 9) {
                 item["mc_freq"] = ch.mc_freq;
