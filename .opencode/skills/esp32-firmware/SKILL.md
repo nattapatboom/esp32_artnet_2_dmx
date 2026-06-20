@@ -18,9 +18,10 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 
 ### Current State
 - **Board:** 192.168.1.93 (WT32-ETH01) — ONLINE
-- **Build:** Flash ~65.7%, RAM ~17.5%
+- **Build:** Flash ~67.8%, RAM ~17.5%
 - **Layout:** v3 (0-18) — config version 3
 - **Protocols:** Art-Net, sACN E1.31, ESP-NOW bridge
+- **Last Version:** 1.30.00 (7-Segment Decode Mode toggle for 7/8 pin direct drive)
 
 ## Board: WT32-ETH01
 - **CPU:** ESP32 dual-core (Core 0 = network/display, Core 1 = application)
@@ -59,13 +60,13 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 | 9 | Passive Buzzer | 2 | GPIO only | LEDC 1ch |
 | 10 | DFPlayer MP3 Module | 3 | GPIO only (UART) | UART 1 |
 | 11 | 7-Segment 2-Pin (TM1637) | 2-4 | GPIO only | GPIO 2 |
-| 12 | 7-Segment DD 7-Pin PWM | 1-2 (Direct) | GPIO, Expander | LEDC 7ch or Expander GPIO |
-| 13 | 7-Segment DD 8-Pin PWM | 1-2 (Direct) | GPIO, Expander | LEDC 8ch or Expander GPIO |
-| 14 | DAC (Analog Out) | 1 | GPIO only (GPIO25/26) | DAC 1ch (blocked on WT32-ETH01) |
+| 12 | 7-Segment DD 7-Pin PWM | 1-2 (Direct) | GPIO, PCA*, Expander | GPIO 7ch / PCA (Dim COM) / Exp segment routing |
+| 13 | 7-Segment DD 8-Pin PWM | 1-2 (Direct) | GPIO, PCA*, Expander | GPIO 8ch / PCA (Dim COM) / Exp segment routing |
+| 14 | DAC (Analog Out) | 1 | GPIO, MCP4725 | DAC 1ch / I2C MCP4725 (Source 5) |
 | 15 | PWM DAC (RC Filter) | 1-2 | GPIO, PCA | LEDC 1ch |
 | 16 | Function Generator | 5 | GPIO only | LEDC 1ch + esp_timer |
-| 17 | Solenoid Trigger | 1 | GPIO, Expander | GPIO 1 |
-| 18 | Sequential Smoke Shooter | 1 | GPIO, PCA, Expander | GPIO 2 |
+| 17 | Solenoid Trigger | 1 | GPIO, PCA, Expander | GPIO 1 / PCA 1 / Exp 1 |
+| 18 | Sequential Smoke Shooter | 1 | GPIO, PCA, Expander | GPIO 2 / PCA 2 / Exp 2 |
 
 ## Architecture
 
@@ -82,12 +83,13 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - `web/index.html` — Edit this file, run `tools/build_web.py` to regenerate `web_pages.h`
 
 ### OutputChannel Struct (output_control.h:98-192)
-- `type` (0-18 v3), `source` (0=GPIO, 1=PCA9685, 2=MCP23017, 3=TCA9555, 4=PCF857x)
+- `type` (0-18 v3), `source` (0=GPIO, 1=PCA9685, 2=MCP23017, 3=TCA9555, 4=PCF857x, 5=MCP4725 DAC)
 - `pin`-`pin4` with `_source`/`_addr`/`_channel` for expander hybrid
 - `dmxBuffer`, `bufferSize` (512 bytes for DMX, smaller for others)
 - `pixelStrip` (LED), `dmxPort`/`rmtDmx` (DMX), `dfPlayer` (MP3)
 - `ledc_chan2`/`ledc_chan3`/`ledc_chan4` — extra LEDC channels for Motor/RGB
-- Source compatibility (v3): PCA (2,4,5,6,8,15,18), Digital (2,6,17,18)
+- `seg_pins`, `seg_sources`, `seg_addrs`, `seg_channels` — 8-element arrays for individual segment routing of 7-segment displays (Type 12 / 13) to GPIO or expanders
+- Source compatibility (v3): PCA (2,4,5,6,8,12,13,15,17,18), Digital (2,6,11,17,18), MCP4725 DAC (14)
 
 ### Hardware Resource Limits
 - **UART:** 3 total. UART0=console. UART1 and UART2 are dynamically allocated. **DFPlayer (Type 10) has priority on UART** (assigns to UART2, then UART1) because DMX can dynamically fall back to RMT.
@@ -142,15 +144,18 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 | 9 Buzzer | 1 | 1 | - | - | - | - | - |
 | 10 DFPlayer | 2 | - | - | 1 | - | - | - |
 | 11 7-Seg 2-Pin | 2 | - | - | - | - | - | 2 |
-| 12 7-Seg 7-Pin | 7 | 7 | - | - | - | - | - |
-| 13 7-Seg 8-Pin | 8 | 8 | - | - | - | - | - |
-| 14 DAC | 1 | - | - | - | 1 | - | - |
-| 15 PWM DAC | 1* | 1* | - | - | - | 1* | - |
-| 16 Func Gen | 1 | 1 | - | - | - | - | - |
-| 17 Solenoid | 1* | - | - | - | - | - | 1* |
-| 18 Smoke | 2* | - | - | - | - | 2* | 2* |
+| 12 | 7-Seg 7-Pin | 7* | 7* | - | - | - | - | 7* |
+| 13 | 7-Seg 8-Pin | 8* | 8* | - | - | - | - | 8* |
+| 14 | DAC | 1* | - | - | - | 1* | - | 1* |
+| 15 | PWM DAC | 1* | 1* | - | - | - | 1* | - |
+| 16 | Func Gen | 1 | 1 | - | - | - | - | - |
+| 17 | Solenoid | 1* | - | - | - | - | 1* | 1* |
+| 18 | Smoke | 2* | - | - | - | - | 2* | 2* |
+| **MCP4725 DAC** | - | - | - | - | - | - | - | 1 (Exp) |
 
-*ตัวเลขเปลี่ยนตาม source ที่เลือก (0=GPIO+LEDC, 1=PCA, 2-4=Expander)
+*ตัวเลขเปลี่ยนตาม source ที่เลือก (0=GPIO+LEDC, 1=PCA, 2-4=Expander, 5=MCP4725 DAC)
+- 7-Segment Type 12/13 ในโหมด direct drive สามารถ map ขาแยกแต่ละ Segment ไปยัง Expander (Exp) หรือ GPIO ได้อิสระ
+- DAC Type 14 เมื่อเลือก Source 5 (MCP4725) จะไม่กินขา GPIO/DAC ของ ESP32 แต่คิดเป็น I2C Expander 1 pin (weight 0.125) และ PCA address configuration
 
 ### สูตรคำนวณ
 ```
@@ -295,7 +300,8 @@ handover/
 tools/
   build_web.py          Minify web/index.html → web_pages.h (auto-run in build_firmware_bin.bat)
   extract_web.py        Extract web_pages.h → web/index.html
-  web_mock_server.py    Mock REST API for web UI dev (http://localhost:5000)
+  web_mock_server.py    Mock REST API for web UI dev (http://localhost:8000, auto-reload)
+  web_ui_smoke_test.mjs Headless Web UI smoke test (Node + Chrome/Edge, no npm deps)
   load_calculator.py    Python resource calculator (offline analysis)
 ```
 
@@ -314,15 +320,21 @@ tools/
 ### 3. TM1637 & Direct Drive 7-Segment Displays (Type 11, 12, 13)
 - **TM1637 (Type 11):** 2-wire serial CLK/DIO display (uses 2 or 4 DMX channels for Numeric or ASCII text mode).
 - **Direct Drive (Type 12 / 13):** Direct Pin Drive 7-Segment (7-pin or 8-pin with Decimal Point).
-  - **GPIO Mode:** Supports mapping each segment (A to DP) to individual, non-consecutive ESP32 GPIO pins or using consecutive pins from a base pin.
-  - **Expander Mode:** Supports driving segments from consecutive expander pins (MCP23017, TCA9555, PCF857x).
+  - **Segment Routing:** รองรับการตั้งค่าขาแยกอิสระของแต่ละ Segment (A ถึง DP) ไปยังขา GPIO ต่างๆ (`seg_pins`) หรือ Expander (PCA9685, MCP23017, TCA9555, PCF857x via `seg_sources`, `seg_addrs`, `seg_channels`) แบบผสมกันได้อย่างอิสระ หรือกำหนดแบบเรียงช่องผ่าน PCA9685 / digital expander base pin (`pin2_source`) ก็ได้
+  - **Segment Inversion:** มีปุ่ม `Invert` ให้เลือกสำหรับแต่ละ segment pin แยกจากกันอิสระ โดยค่าจะบันทึกในรูปแบบ bitmask 8 บิต `seg_inverts` และนำไปลอจิกอินเวอร์ตระดับสัญญาณก่อนสั่งขับออกขาทาง C++
+  - **Segment A Mapping (Direct Mode):** ในโหมดแยกขา Seg A (modes 2-5) ข้อมูล Seg A จะต้องเชื่อมโยงกับการตั้งค่าพินหลักของช่องสัญญาณ (`no_source`, `no_pca_addr` ฯลฯ) ทั้งขั้นตอนการจัดเก็บและการดึงข้อมูล เพื่อให้การส่งค่าไปยัง expander สำหรับ Seg A ทำงานได้ถูกต้อง
   - **Dimming Modes:**
     - **No Dimming (1 Ch):** 1 DMX channel controls segment char/state at full brightness.
     - **Dimmed Mode (2 Ch):** DMX Channel 1 controls character, DMX Channel 2 controls PWM duty cycle brightness level (0-255).
+    - **Common Dimming (6-9):** ใช้สาย Common Anode/Cathode ต่อกับ PWM (LEDC หรือ PCA9685) เพื่อควบคุมความสว่างแบบรวม ส่วน segment อื่นๆ ต่อเป็น digital GPIO/Expander/PCA9685 เพื่อส่งข้อมูลปกติ
+      - Mode 6: Common Anode (CA) 7-Pin Dim (2 Ch)
+      - Mode 7: Common Cathode (CC) 7-Pin Dim (2 Ch)
+      - Mode 8: Common Anode (CA) 8-Pin Dim (2 Ch)
+      - Mode 9: Common Cathode (CC) 8-Pin Dim (2 Ch)
 
 ### 4. MCP23017 / TCA9555 / PCF857x (I2C GPIO Expander)
 - **Interface:** I2C (Address 0x20 - 0x27)
-- **Usage:** Digital outputs (Relay, Solenoid, Smoke), Stepper limit switch input
+- **Usage:** Digital outputs (Relay, Solenoid, Smoke, 7-Segment display segment mapping), Stepper limit switch input
 - **Protection:** I2C Hang Protection 100ms timeout
 
 ### 5. PWM DAC (Type 15) — RC Low-Pass Filter
@@ -345,6 +357,23 @@ GPIO (PWM Out) ── R ──── Analog Out
                   GND
 ```
 
+### 7. MCP4725 (12-bit I2C DAC)
+- **Interface:** I2C (Address 0x60 - 0x67)
+- **Usage:** Analog Output (Type 14 DAC) ที่ใช้ I2C แทน DAC pin (GPIO25/26) ของ ESP32 เพื่อหลีกเลี่ยงการชนกับ LAN8720 RMII pins
+- **Resolution:** 12-bit I2C DAC (ส่งคำสั่ง I2C ด้วยค่า 0-4095 สเกลจาก DMX 0-255)
+
+### 8. DC Motor EN Pin (H-Bridge Mode 2)
+- **Motor Mode 2 (IN1+IN2+EN):** ขา EN ต้องใช้ PWM ในการคุมความเร็วรอบ ดังนั้นจะต้องต่อเข้ากับ ESP32 GPIO (ใช้ LEDC) หรือ PCA9685 เท่านั้น ห้ามเลือกต่อกับ Digital Expander (MCP23017/TCA9555/PCF857x) เป็นอันขาด และมี Validation ตรวจสอบเตือนใน Web UI และ C++ firmware
+
+### 9. Analog RGB / RGBW (Type 5) Independent Routing
+- **Routing:** แชนเนลสี Red, Green, Blue, และ White (สำหรับ RGBW) สามารถเลือก Source (ESP32 GPIO หรือ PCA9685), Address, และ Pin/Channel ของแต่ละขาแยกกันได้อย่างอิสระเต็มที่ ไม่จำเป็นต้องแชร์ source/address เดียวกันหรือเป็น channel ที่เรียงต่อกันเหมือนเวอร์ชันก่อนๆ
+- **Scoring:** Resource scoring คำนวณรายแชนเนลแบบละเอียดตาม source จริงที่เลือกใช้ในแต่ละขา
+
+### 10. Sequential Smoke Shooter (Type 18) & Solenoid Trigger (Type 17) Threshold Configuration
+- **Solenoid Trigger (Type 17):** รองรับเฉพาะ **Threshold Mode** เท่านั้น (Frame-Sync mode ถูกนำออกแล้ว) โดยจะยิงพัลส์เมื่อค่า DMX เกินค่า threshold ที่กำหนด (`solenoid_threshold`)
+- **Sequential Smoke Shooter (Type 18):** มีช่องให้ตั้งค่า **Threshold Value** (`smoke_threshold` ในหน้า UI บันทึกในรูปแบบ `solenoid_threshold` ใน JSON) โดยเงื่อนไขการทริกเกอร์ลำดับการทำงานจะเช็คจากค่า DMX ที่มากกว่า threshold ที่ผู้ใช้กำหนด แทนค่าคงที่ 127 เดิม
+- **Routing:** ขา Smoke Valve (Pin 1) และ Shoot Valve (Pin 2) สามารถเลือก Source (GPIO, PCA9685, หรือ digital expanders), Address, และ Pin/Channel แยกกันได้อย่างอิสระเต็มที่ ช่วยให้ยืดหยุ่นในการจัดสรรพินของวาล์วพ่นควันและวาล์วยิงลม
+
 ---
 
 ## Developer Tools
@@ -355,8 +384,15 @@ GPIO (PWM Out) ── R ──── Analog Out
 - **[extract_web.py](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/tools/extract_web.py)**
   - สกัด HTML กลับออกจาก `web_pages.h` (ใช้เมื่อต้องการ reverse)
 - **[web_mock_server.py](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/tools/web_mock_server.py)**
-  - จำลอง API REST บน `http://localhost:5000`
+  - จำลอง API REST บน `http://localhost:8000`
   - ใช้ทดสอบ Web UI โดยไม่ต้องอัปโหลดไปบอร์ดจริง
+  - Auto-reload: เมื่อ save `web/index.html` browser จะ refresh เองภายในประมาณ 1 วินาที
+  - คำสั่งเร็วสำหรับ UI dev: `c:\Users\natta\.platformio\penv\Scripts\python.exe tools/web_mock_server.py` แล้วเปิด `http://localhost:8000`
+- **[web_ui_smoke_test.mjs](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/tools/web_ui_smoke_test.mjs)**
+  - Automated Web UI smoke test จากโค้ด ไม่ต้องให้ user เปิดหน้าเว็บเอง
+  - ใช้ Node built-in + Chrome/Edge headless ผ่าน DevTools Protocol ไม่ต้อง `npm install`
+  - ตรวจว่า Web UI render output type ทั้ง 19 แบบได้ และ add Function Generator ได้
+  - คำสั่ง: `node tools/web_ui_smoke_test.mjs`
 - **[load_calculator.py](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/tools/load_calculator.py)**
   - คำนวณ resource/load แบบ offline จาก outputs.json
 
@@ -367,9 +403,16 @@ GPIO (PWM Out) ── R ──── Analog Out
 - JSON serialization with ArduinoJson 7.x
 - Web UI source: `web/index.html` → run `build_web.py` → `web_pages.h`
 - Thai language for communication
+- **Config Appropriateness:** แต่ละแชนเนลจะต้องซ่อนพารามิเตอร์ที่ไม่เกี่ยวข้องออกไปเสมอ เช่น Solenoid (Type 17) ต้องไม่มีตัวเลือก Resolution และถูกกำหนด DMX byte ขนาด 1 Ch เสมอ เพื่อลดความซ้ำซ้อนและป้องกันความสับสนของผู้ใช้
 
 ## Build & Deploy
 ```powershell
+# Fast Web UI test (no build/OTA, auto-reload on save)
+c:\Users\natta\.platformio\penv\Scripts\python.exe tools/web_mock_server.py
+
+# Automated Web UI smoke test (preferred before asking user to test)
+node tools/web_ui_smoke_test.mjs
+
 # Build
 pio run
 
@@ -383,16 +426,15 @@ c:\Users\natta\.platformio\penv\Scripts\python.exe tools/build_web.py
 build_firmware_bin.bat
 ```
 
-## Handover System
-- Docs in `handover/` folder, format `x.xx.xx.md`
-- Current: [1.23.00.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/handover/1.23.00.md)
-- Rules: no editing old files, max 1000 lines per file
-- SEE `handover/README.md` for full system rules
+## Git Commit Workflow
+- **MANDATE:** ต้องทำ Git Commit ทุกครั้งหลังการแก้ไขโค้ด สร้างฟีเจอร์ใหม่ หรือแก้ไขไฟล์ระบบสำเร็จ พร้อมอธิบายความเปลี่ยนแปลงอย่างละเอียดใน Commit Message แทนการอัปเดตไฟล์ handover (ลบโฟลเดอร์ handover ออกแล้วเพื่อประหยัดจำนวน token ของ AI)
+- Commit message format: แนะนำให้ใช้รูปแบบภาษาอังกฤษหรือภาษาไทยที่เข้าใจง่าย เช่น `feat(7seg): add numeric decoding mode` หรือ `fix(ui): fix Segment A PCA routing`
 
 ## When Modifying Code
-1. Read existing files to understand patterns
-2. Check resource limits (UART, LEDC, RMT, GPIO)
-3. Ensure expander source compatibility
-4. If editing Web UI: edit `web/index.html` → run `build_web.py` → build firmware
-5. Update handover if adding significant features
+1. **ทำ Git Commit ทุกครั้งหลังแก้ไขโค้ดหรือไฟล์ skill สำเร็จ (สำคัญที่สุด)**
+2. Read existing files to understand patterns
+3. Check resource limits (UART, LEDC, RMT, GPIO)
+4. Ensure expander source compatibility
+5. If editing Web UI: edit `web/index.html` → run `build_web.py` → build firmware
 6. Read this SKILL.md first for full project context
+

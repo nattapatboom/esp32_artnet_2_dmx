@@ -149,6 +149,58 @@ private:
         return ch.mc_resolution > 16 ? 16 : ch.mc_resolution;
     }
 
+    void writeMcp4725(uint8_t addr, uint8_t value) {
+        uint16_t dac = ((uint16_t)value << 4) | (value >> 4);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
+        Wire.beginTransmission(addr);
+        Wire.write(0x40);
+        Wire.write((dac >> 4) & 0xFF);
+        Wire.write((dac & 0x0F) << 4);
+        Wire.endTransmission();
+        if (i2cMutex) xSemaphoreGive(i2cMutex);
+    }
+
+    uint8_t segmentGpio(OutputChannel& ch, uint8_t idx) {
+        return (ch.seg_pins[idx] != 255) ? ch.seg_pins[idx] : (ch.pin + idx);
+    }
+
+    void setupSegmentOutput(OutputChannel& ch, uint8_t idx, bool offState) {
+        uint8_t src = ch.seg_sources[idx];
+        bool inv = (ch.seg_inverts >> idx) & 1;
+        bool active_off = offState ^ inv;
+        if (src == 1) { // PCA9685
+            pcaManager.getOrCreateDriver(ch.seg_addrs[idx]);
+            pcaManager.setFrequency(ch.seg_addrs[idx], ch.mc_freq ? ch.mc_freq : 1000);
+            if (ch.seg_channels[idx] != 255) pcaManager.write(ch.seg_addrs[idx], ch.seg_channels[idx], active_off ? 4095 : 0);
+            return;
+        }
+        if (src >= 2 && src <= 4) {
+            if (ch.seg_channels[idx] != 255) digitalExpanderManager.write(src, ch.seg_addrs[idx], ch.seg_channels[idx], active_off, true);
+            return;
+        }
+        uint8_t pin = segmentGpio(ch, idx);
+        if (pin != 255) {
+            pinMode(pin, OUTPUT);
+            digitalWrite(pin, active_off ? HIGH : LOW);
+        }
+    }
+
+    void writeSegmentOutput(OutputChannel& ch, uint8_t idx, bool state) {
+        uint8_t src = ch.seg_sources[idx];
+        bool inv = (ch.seg_inverts >> idx) & 1;
+        bool active_state = state ^ inv;
+        if (src == 1) { // PCA9685
+            if (ch.seg_channels[idx] != 255) pcaManager.write(ch.seg_addrs[idx], ch.seg_channels[idx], active_state ? 4095 : 0);
+            return;
+        }
+        if (src >= 2 && src <= 4) {
+            if (ch.seg_channels[idx] != 255) digitalExpanderManager.write(src, ch.seg_addrs[idx], ch.seg_channels[idx], active_state);
+            return;
+        }
+        uint8_t pin = segmentGpio(ch, idx);
+        if (pin != 255) digitalWrite(pin, active_state ? HIGH : LOW);
+    }
+
     void setStepperDirection(OutputChannel& ch, bool forward) {
         if (ch.pin2_source == 0) return;
         writeOutputPin(ch, 2, forward);
@@ -166,7 +218,7 @@ public:
         engine.init();
 
         for (auto& ch : outputCtrl.getChannels()) {
-            if (ch.source != 0 && ch.type != 7) continue; // Stepper STEP must remain ESP32 GPIO; DIR/EN may be hybrid.
+            if (ch.source != 0 && ch.type != 7 && ch.type != CHAN_TYPE_ANALOG_RGB) continue; // Stepper and Analog RGB may be hybrid/independent.
             if (ch.type == 4) { // CHAN_TYPE_PWM
                 uint8_t pwmChan = allocateLedc();
                 if (pwmChan != 255) {
@@ -231,59 +283,79 @@ public:
                     }
                 }
                 else if (ch.mc_mode == 2) { // IN1 + IN2 + EN (v3)
-                    uint8_t pwmChan = allocateLedc();
-                    if (pwmChan != 255) {
-                        ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
-                        ledcAttachPin(ch.pin3, pwmChan); // EN pin
-                        if (ch.pin2_source == 0) {
-                            pinMode(ch.pin, OUTPUT);  // IN1
-                            digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
+                    uint8_t pwmChan = ch.pin3_source == 1 ? 255 : allocateLedc();
+                    if (ch.pin3_source == 1 || pwmChan != 255) {
+                        if (ch.pin3_source == 1) {
+                            pcaManager.getOrCreateDriver(ch.pin3_addr);
+                            pcaManager.setFrequency(ch.pin3_addr, ch.mc_freq ? ch.mc_freq : 1000);
+                            if (ch.pin3_channel != 255) pcaManager.write(ch.pin3_addr, ch.pin3_channel, 0);
                         } else {
-                            writeOutputPin(ch, 2, false);
+                            ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
+                            ledcAttachPin(ch.pin3, pwmChan); // EN pin
+                            ledcWrite(pwmChan, 0);
+                            ch.dmxPort = pwmChan;
                         }
-                        if (ch.pin3_source == 0) {
+                        pinMode(ch.pin, OUTPUT);  // IN1
+                        digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
+                        if (ch.pin2_source == 0) {
                             pinMode(ch.pin2, OUTPUT); // IN2
                             digitalWrite(ch.pin2, ch.pin2_invert ? HIGH : LOW);
                         } else {
-                            writeOutputPin(ch, 3, false);
+                            writeOutputPin(ch, 2, false);
                         }
-                        ledcWrite(pwmChan, 0);
-                        ch.dmxPort = pwmChan;
-                        Serial.printf("Motor (IN1+IN2+EN) src=%d EN=GPIO%d IN1 src=%d IN2 src=%d\n", ch.source, ch.pin3, ch.pin2_source, ch.pin3_source);
+                        Serial.printf("Motor (IN1+IN2+EN) src=%d IN2 src=%d EN src=%d\n", ch.source, ch.pin2_source, ch.pin3_source);
                     }
                 }
             }
             else if (ch.type == CHAN_TYPE_ANALOG_RGB) {
-                uint8_t rChan = allocateLedc();
-                uint8_t gChan = allocateLedc();
-                uint8_t bChan = allocateLedc();
-                uint8_t wChan = (ch.color_order >= 4) ? allocateLedc() : 255;
-                if (rChan != 255 && gChan != 255 && bChan != 255) {
-                    ledcSetup(rChan, ch.mc_freq, 8);
-                    ledcAttachPin(ch.pin, rChan);
-                    ledcWrite(rChan, 0);
-                    ch.dmxPort = rChan;
+                ch.dmxPort = 255;
+                ch.ledc_chan2 = 255;
+                ch.ledc_chan3 = 255;
+                ch.ledc_chan4 = 255;
 
-                    ledcSetup(gChan, ch.mc_freq, 8);
-                    ledcAttachPin(ch.pin2, gChan);
-                    ledcWrite(gChan, 0);
-                    ch.ledc_chan2 = gChan;
-
-                    ledcSetup(bChan, ch.mc_freq, 8);
-                    ledcAttachPin(ch.pin3, bChan);
-                    ledcWrite(bChan, 0);
-                    ch.ledc_chan3 = bChan;
-
+                // Red
+                if (ch.source == 0 && ch.pin != 255) {
+                    uint8_t rChan = allocateLedc();
+                    if (rChan != 255) {
+                        ledcSetup(rChan, ch.mc_freq, 8);
+                        ledcAttachPin(ch.pin, rChan);
+                        ledcWrite(rChan, 0);
+                        ch.dmxPort = rChan;
+                        Serial.printf("Analog Red attached to GPIO %d (LEDC %d)\n", ch.pin, rChan);
+                    }
+                }
+                // Green
+                if (ch.pin2_source == 0 && ch.pin2 != 255) {
+                    uint8_t gChan = allocateLedc();
+                    if (gChan != 255) {
+                        ledcSetup(gChan, ch.mc_freq, 8);
+                        ledcAttachPin(ch.pin2, gChan);
+                        ledcWrite(gChan, 0);
+                        ch.ledc_chan2 = gChan;
+                        Serial.printf("Analog Green attached to GPIO %d (LEDC %d)\n", ch.pin2, gChan);
+                    }
+                }
+                // Blue
+                if (ch.pin3_source == 0 && ch.pin3 != 255) {
+                    uint8_t bChan = allocateLedc();
+                    if (bChan != 255) {
+                        ledcSetup(bChan, ch.mc_freq, 8);
+                        ledcAttachPin(ch.pin3, bChan);
+                        ledcWrite(bChan, 0);
+                        ch.ledc_chan3 = bChan;
+                        Serial.printf("Analog Blue attached to GPIO %d (LEDC %d)\n", ch.pin3, bChan);
+                    }
+                }
+                // White
+                if (ch.color_order >= 4 && ch.pin4_source == 0 && ch.pin4 != 255) {
+                    uint8_t wChan = allocateLedc();
                     if (wChan != 255) {
                         ledcSetup(wChan, ch.mc_freq, 8);
                         ledcAttachPin(ch.pin4, wChan);
                         ledcWrite(wChan, 0);
                         ch.ledc_chan4 = wChan;
+                        Serial.printf("Analog White attached to GPIO %d (LEDC %d)\n", ch.pin4, wChan);
                     }
-                    Serial.printf("Analog %s initialized: R:%d (LEDC %d), G:%d (LEDC %d), B:%d (LEDC %d)%s\n",
-                                  (ch.color_order >= 4) ? "RGBW" : "RGB",
-                                  ch.pin, rChan, ch.pin2, gChan, ch.pin3, bChan,
-                                  (wChan != 255) ? " (W attached)" : "");
                 }
             }
             else if (ch.type == 7) { // CHAN_TYPE_STEPPER (v3)
@@ -326,52 +398,101 @@ public:
                     Serial.printf("Passive Buzzer initialized: GPIO %d, LEDC %d\n", ch.pin, pwmChan);
                 }
         } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) { // 7-Segment Display (v3)
-            if (ch.mc_mode >= 2 && ch.pin2_source >= 2 && ch.pin2_source <= 4) { // Direct Drive via Expander
-                for (uint8_t s = 0; s < (ch.mc_mode == 3 ? 8 : 7); s++) {
-                    digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + s, false, true);
+            bool isCommonDim = (ch.mc_mode >= 6 && ch.mc_mode <= 9);
+            uint8_t numSeg = (ch.mc_mode == 3 || ch.mc_mode == 5 || ch.mc_mode == 8 || ch.mc_mode == 9) ? 8 : 7;
+
+            if (ch.mc_mode >= 2 && ch.pin2_source == 1) { // Direct Drive via PCA9685
+                pcaManager.getOrCreateDriver(ch.pin2_addr);
+                pcaManager.setFrequency(ch.pin2_addr, ch.mc_freq ? ch.mc_freq : 1000);
+                for (uint8_t s = 0; s < numSeg; s++) {
+                    pcaManager.write(ch.pin2_addr, ch.pin2_channel + s, 0);
+                }
+                // Also if Common Dim and COM pin is GPIO, allocate LEDC for COM pin
+                if (isCommonDim && ch.source == 0) {
+                    uint8_t pwmChan = allocateLedc();
+                    if (pwmChan != 255) {
+                        ledcSetup(pwmChan, ch.mc_freq ? ch.mc_freq : 1000, 8);
+                        ledcAttachPin(ch.pin, pwmChan);
+                        ledcWrite(pwmChan, (ch.mc_mode == 6 || ch.mc_mode == 8) ? 0 : 255); // CA=0, CC=255
+                        ch.dmxPort = pwmChan;
+                    }
                 }
                 ch.prev_7seg_val = 0;
                 ch.prev_7seg_valid = false;
-                Serial.printf("7-Segment Direct Drive: expander src=%d addr=0x%02X baseCh=%d pins=%d\n",
-                              ch.pin2_source, ch.pin2_addr, ch.pin2_channel, ch.mc_mode == 3 ? 8 : 7);
+                Serial.printf("7-Segment DD PCA9685: mc_mode=%d pin2_source=1 baseCh=%d\n",
+                              ch.mc_mode, ch.pin2_channel);
+            } else if (ch.mc_mode >= 2 && ch.pin2_source >= 2 && ch.pin2_source <= 4) { // Direct Drive via Expander
+                for (uint8_t s = 0; s < numSeg; s++) {
+                    digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + s, false, true);
+                }
+                // Also if Common Dim and COM pin is GPIO, allocate LEDC for COM pin
+                if (isCommonDim && ch.source == 0) {
+                    uint8_t pwmChan = allocateLedc();
+                    if (pwmChan != 255) {
+                        ledcSetup(pwmChan, ch.mc_freq ? ch.mc_freq : 1000, 8);
+                        ledcAttachPin(ch.pin, pwmChan);
+                        ledcWrite(pwmChan, (ch.mc_mode == 6 || ch.mc_mode == 8) ? 0 : 255); // CA=0, CC=255
+                        ch.dmxPort = pwmChan;
+                    }
+                }
+                ch.prev_7seg_val = 0;
+                ch.prev_7seg_valid = false;
+                Serial.printf("7-Segment DD Expander: mc_mode=%d pin2_source=%d baseCh=%d\n",
+                              ch.mc_mode, ch.pin2_source, ch.pin2_channel);
             } else if (ch.mc_mode >= 2 && ch.pin2_source == 0) { // Direct Drive via GPIO
-                if (ch.type == 12 || ch.type == 13) {
-                    uint8_t numSeg = (ch.mc_mode == 3) ? 8 : 7;
-                    uint8_t baseChan = allocateLedc();
-                    if (baseChan != 255) {
-                        for (uint8_t s = 0; s < numSeg; s++) {
-                            uint8_t segPin = (ch.seg_pins[s] != 255) ? ch.seg_pins[s] : (ch.pin + s);
-                            if (segPin != 255 && baseChan + s <= 15) {
-                                ledcSetup(baseChan + s, ch.mc_freq ? ch.mc_freq : 1000, 8);
-                                ledcAttachPin(segPin, baseChan + s);
-                                ledcWrite(baseChan + s, 0);
-                            }
+                if (isCommonDim) {
+                    // COM pin is PWM
+                    if (ch.source == 0) {
+                        uint8_t pwmChan = allocateLedc();
+                        if (pwmChan != 255) {
+                            ledcSetup(pwmChan, ch.mc_freq ? ch.mc_freq : 1000, 8);
+                            ledcAttachPin(ch.pin, pwmChan);
+                            ledcWrite(pwmChan, (ch.mc_mode == 6 || ch.mc_mode == 8) ? 0 : 255);
+                            ch.dmxPort = pwmChan;
                         }
-                        ch.dmxPort = baseChan;
-                        Serial.printf("7-Segment DD PWM: GPIO base=%d pins=%d baseLEDC=%d freq=%dHz\n",
-                                      ch.pin, numSeg, baseChan, ch.mc_freq ? ch.mc_freq : 1000);
                     }
+                    // Segments are digital GPIO
+                    for (uint8_t s = 0; s < numSeg; s++) {
+                        setupSegmentOutput(ch, s, (ch.mc_mode == 6 || ch.mc_mode == 8));
+                    }
+                    Serial.printf("7-Segment DD Common Dim: COM_GPIO=%d segs=%d dmxPort=%d\n",
+                                  ch.pin, numSeg, ch.dmxPort);
                 } else {
-                    for (uint8_t s = 0; s < (ch.mc_mode == 3 ? 8 : 7); s++) {
-                        uint8_t segPin = (ch.seg_pins[s] != 255) ? ch.seg_pins[s] : (ch.pin + s);
-                        if (segPin != 255) {
-                            pinMode(segPin, OUTPUT);
-                            digitalWrite(segPin, LOW);
+                    // Modes 2-5: individual segment PWM (or digital if type 11)
+                    if (ch.type == 12 || ch.type == 13) {
+                        uint8_t baseChan = allocateLedc();
+                        if (baseChan != 255) {
+                            for (uint8_t s = 0; s < numSeg; s++) {
+                                uint8_t segPin = segmentGpio(ch, s);
+                                if (ch.seg_sources[s] == 0 && segPin != 255 && baseChan + s <= 15) {
+                                    ledcSetup(baseChan + s, ch.mc_freq ? ch.mc_freq : 1000, 8);
+                                    ledcAttachPin(segPin, baseChan + s);
+                                    ledcWrite(baseChan + s, 0);
+                                } else if (ch.seg_sources[s] >= 1 && ch.seg_sources[s] <= 4) {
+                                    setupSegmentOutput(ch, s, false);
+                                }
+                            }
+                            ch.dmxPort = baseChan;
+                            Serial.printf("7-Segment DD PWM: GPIO base=%d pins=%d baseLEDC=%d freq=%dHz\n",
+                                          ch.pin, numSeg, baseChan, ch.mc_freq ? ch.mc_freq : 1000);
+                        }
+                    } else {
+                        // Type 11
+                        for (uint8_t s = 0; s < numSeg; s++) {
+                            setupSegmentOutput(ch, s, false);
                         }
                     }
-                    Serial.printf("7-Segment Direct Drive: GPIO base=%d pins=%d\n",
-                                  ch.pin, ch.mc_mode == 3 ? 8 : 7);
                 }
                 ch.prev_7seg_val = 0;
                 ch.prev_7seg_valid = false;
             } else { // TM1637
-                    TM1637Driver tm(ch.pin, ch.pin2);
-                    tm.begin();
-                    ch.prev_7seg_val = 0;
-                    ch.prev_7seg_valid = false;
-                    Serial.printf("7-Segment Display initialized: CLK %d, DIO %d\n", ch.pin, ch.pin2);
-                }
+                TM1637Driver tm(ch.pin, ch.pin2);
+                tm.begin();
+                ch.prev_7seg_val = 0;
+                ch.prev_7seg_valid = false;
+                Serial.printf("7-Segment Display initialized: CLK %d, DIO %d\n", ch.pin, ch.pin2);
             }
+        }
             else if (ch.type == 16) { // Function Generator
                 uint8_t pwmChan = allocateLedc();
                 if (pwmChan != 255) {
@@ -392,6 +513,44 @@ public:
 
             uint32_t val = getDmxValue(ch);
             uint32_t max_val = getMaxValue(ch.mc_resolution);
+
+            if (ch.type == CHAN_TYPE_ANALOG_RGB) {
+                uint16_t r = ch.dmxBuffer[0];
+                uint16_t g = ch.dmxBuffer[1];
+                uint16_t b = ch.dmxBuffer[2];
+                uint16_t w = (ch.color_order >= 4) ? ch.dmxBuffer[3] : 0;
+
+                // Red
+                if (ch.source == 0) {
+                    if (ch.dmxPort != 255) ledcWrite(ch.dmxPort, r);
+                } else if (ch.source == 1) {
+                    pcaManager.write(ch.pca_addr, ch.pca_channel, (r * 4095) / 255);
+                }
+
+                // Green
+                if (ch.pin2_source == 0) {
+                    if (ch.ledc_chan2 != 255) ledcWrite(ch.ledc_chan2, g);
+                } else if (ch.pin2_source == 1) {
+                    pcaManager.write(ch.pin2_addr, ch.pin2_channel, (g * 4095) / 255);
+                }
+
+                // Blue
+                if (ch.pin3_source == 0) {
+                    if (ch.ledc_chan3 != 255) ledcWrite(ch.ledc_chan3, b);
+                } else if (ch.pin3_source == 1) {
+                    pcaManager.write(ch.pin3_addr, ch.pin3_channel, (b * 4095) / 255);
+                }
+
+                // White
+                if (ch.color_order >= 4) {
+                    if (ch.pin4_source == 0) {
+                        if (ch.ledc_chan4 != 255) ledcWrite(ch.ledc_chan4, w);
+                    } else if (ch.pin4_source == 1) {
+                        pcaManager.write(ch.pin4_addr, ch.pin4_channel, (w * 4095) / 255);
+                    }
+                }
+                continue;
+            }
 
             if (ch.source == 1) { // PCA9685 Expander
                 if (ch.type == 4 || ch.type == 15) { // PWM Dimmer / PWM DAC
@@ -452,20 +611,11 @@ public:
                         }
                     }
                 }
-                else if (ch.type == CHAN_TYPE_ANALOG_RGB) {
-                    uint16_t r = ch.dmxBuffer[0];
-                    uint16_t g = ch.dmxBuffer[1];
-                    uint16_t b = ch.dmxBuffer[2];
-                    uint16_t w = (ch.color_order >= 4) ? ch.dmxBuffer[3] : 0;
 
-                    pcaManager.write(ch.pca_addr, ch.pca_channel, (r * 4095) / 255);
-                    if (ch.pca_channel2 != 255) pcaManager.write(ch.pca_addr, ch.pca_channel2, (g * 4095) / 255);
-                    if (ch.pca_channel3 != 255) pcaManager.write(ch.pca_addr, ch.pca_channel3, (b * 4095) / 255);
-                    if (ch.color_order >= 4 && ch.pca_channel4 != 255) {
-                        pcaManager.write(ch.pca_addr, ch.pca_channel4, (w * 4095) / 255);
-                    }
-                }
                 continue; // Skip ESP32 direct hardware update
+            } else if (ch.source == 5) { // MCP4725 I2C DAC
+                if (ch.type == 14) writeMcp4725(ch.pca_addr, ch.dmxBuffer[0]);
+                continue;
             } else if (ch.source != 0) {
                 continue; // Digital expanders are handled by OutputControl for on/off modes.
             }
@@ -506,9 +656,13 @@ public:
                     } else if (ch.mc_mode == 1) { // PWM+DIR
                         ledcWrite(ch.dmxPort, 0);
                     } else if (ch.mc_mode == 2) { // IN1+IN2+EN
+                        writeOutputPin(ch, 1, ch.mc_brake);
                         writeOutputPin(ch, 2, ch.mc_brake);
-                        writeOutputPin(ch, 3, ch.mc_brake);
-                        ledcWrite(ch.dmxPort, ch.mc_brake ? max_val : 0);
+                        if (ch.pin3_source == 1) {
+                            if (ch.pin3_channel != 255) pcaManager.write(ch.pin3_addr, ch.pin3_channel, ch.mc_brake ? 4095 : 0);
+                        } else {
+                            ledcWrite(ch.dmxPort, ch.mc_brake ? max_val : 0);
+                        }
                     }
                 } else {
                     // MOVE
@@ -524,20 +678,17 @@ public:
                         writeOutputPin(ch, 2, is_forward);
                         ledcWrite(ch.dmxPort, duty);
                     } else if (ch.mc_mode == 2) { // IN1+IN2+EN
-                        writeOutputPin(ch, 2, is_forward);
-                        writeOutputPin(ch, 3, !is_forward);
-                        ledcWrite(ch.dmxPort, duty);
+                        writeOutputPin(ch, 1, is_forward);
+                        writeOutputPin(ch, 2, !is_forward);
+                        if (ch.pin3_source == 1) {
+                            if (ch.pin3_channel != 255) pcaManager.write(ch.pin3_addr, ch.pin3_channel, (uint32_t)duty * 4095 / max_val);
+                        } else {
+                            ledcWrite(ch.dmxPort, duty);
+                        }
                     }
                 }
             }
-            else if (ch.type == CHAN_TYPE_ANALOG_RGB) {
-                ledcWrite(ch.dmxPort, ch.dmxBuffer[0]);
-                if (ch.ledc_chan2 != 255) ledcWrite(ch.ledc_chan2, ch.dmxBuffer[1]);
-                if (ch.ledc_chan3 != 255) ledcWrite(ch.ledc_chan3, ch.dmxBuffer[2]);
-                if (ch.color_order >= 4 && ch.ledc_chan4 != 255) {
-                    ledcWrite(ch.ledc_chan4, ch.dmxBuffer[3]);
-                }
-            }
+
             else if (ch.type == 7) { // STEPPER (v3)
                 if (ch.dmxPort < stepperCount) {
                     FastAccelStepper* stepper = steppers[ch.dmxPort];
@@ -671,7 +822,11 @@ public:
             } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) { // 7-Segment Display (v3)
                 uint8_t bytes = 0;
                 if (ch.type >= 12) {
-                    bytes = 1;
+                    if (ch.mc_mode == 4 || ch.mc_mode == 5 || ch.mc_mode >= 6) {
+                        bytes = 2;
+                    } else {
+                        bytes = 1;
+                    }
                 } else {
                     bytes = (ch.mc_mode == 1) ? 4 : 2;
                 }
@@ -682,34 +837,98 @@ public:
                 if (!ch.prev_7seg_valid || val != ch.prev_7seg_val) {
                     ch.prev_7seg_val = val;
                     ch.prev_7seg_valid = true;
-                    if (ch.mc_mode >= 2 && ch.pin2_source >= 2 && ch.pin2_source <= 4) {
-                        // Direct Drive via Expander (1 digit, 7 or 8 pins)
-                        uint8_t numSeg = (ch.mc_mode == 3 || ch.mc_mode == 5) ? 8 : 7;
-                        uint8_t segByte = asciiToSegment(ch.dmxBuffer[0]);
+
+                    bool isCommonDim = (ch.mc_mode >= 6 && ch.mc_mode <= 9);
+                    bool isCA = (ch.mc_mode == 6 || ch.mc_mode == 8);
+                    uint8_t numSeg = (ch.mc_mode == 3 || ch.mc_mode == 5 || ch.mc_mode == 8 || ch.mc_mode == 9) ? 8 : 7;
+                    uint8_t segByte = 0;
+                    if (ch.mc_resolution == 10) {
+                        uint8_t raw = ch.dmxBuffer[0];
+                        if (raw <= 9) {
+                            const uint8_t segDigits[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
+                            segByte = segDigits[raw];
+                        } else if (raw >= 10 && raw <= 19) {
+                            const uint8_t segDigits[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
+                            segByte = segDigits[raw - 10] | 0x80;
+                        }
+                    } else {
+                        segByte = asciiToSegment(ch.dmxBuffer[0]);
+                    }
+
+                    if (ch.mc_mode >= 2 && ch.pin2_source == 1) {
+                        // Direct Drive via PCA9685
                         for (uint8_t b = 0; b < numSeg; b++) {
-                            digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + b, (segByte >> b) & 1);
+                            bool bitVal = (segByte >> b) & 1;
+                            if (isCommonDim) {
+                                bitVal = isCA ? !bitVal : bitVal;
+                            }
+                            bool inv = (ch.seg_inverts >> b) & 1;
+                            pcaManager.write(ch.pin2_addr, ch.pin2_channel + b, (bitVal ^ inv) ? 4095 : 0);
+                        }
+                        if (isCommonDim) {
+                            uint8_t brightness = ch.dmxBuffer[1];
+                            uint8_t duty = isCA ? brightness : (255 - brightness);
+                            if (ch.source == 1) { // PCA9685 COM Pin
+                                pcaManager.write(ch.pca_addr, ch.pca_channel, (duty * 4095) / 255);
+                            } else if (ch.source == 0 && ch.dmxPort != 255) { // GPIO LEDC COM Pin
+                                ledcWrite(ch.dmxPort, duty);
+                            }
+                        }
+                    } else if (ch.mc_mode >= 2 && ch.pin2_source >= 2 && ch.pin2_source <= 4) {
+                        // Direct Drive via Expander (1 digit, 7 or 8 pins)
+                        for (uint8_t b = 0; b < numSeg; b++) {
+                            bool bitVal = (segByte >> b) & 1;
+                            if (isCommonDim) {
+                                bitVal = isCA ? !bitVal : bitVal;
+                            }
+                            bool inv = (ch.seg_inverts >> b) & 1;
+                            digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + b, bitVal ^ inv);
+                        }
+                        if (isCommonDim) {
+                            uint8_t brightness = ch.dmxBuffer[1];
+                            uint8_t duty = isCA ? brightness : (255 - brightness);
+                            if (ch.source == 1) { // PCA9685 COM Pin
+                                pcaManager.write(ch.pca_addr, ch.pca_channel, (duty * 4095) / 255);
+                            } else if (ch.source == 0 && ch.dmxPort != 255) { // GPIO LEDC COM Pin
+                                ledcWrite(ch.dmxPort, duty);
+                            }
                         }
                     } else if (ch.mc_mode >= 2 && ch.pin2_source == 0) {
                         // Direct Drive via GPIO
-                        uint8_t numSeg = (ch.mc_mode == 3 || ch.mc_mode == 5) ? 8 : 7;
-                        uint8_t segByte = asciiToSegment(ch.dmxBuffer[0]);
-                        if (ch.type == 12 || ch.type == 13) {
-                            // PWM Direct Drive via LEDC
-                            uint8_t brightness = 255;
-                            if (ch.mc_mode == 4 || ch.mc_mode == 5) {
-                                brightness = ch.dmxBuffer[1]; // DMX Channel 2
+                        if (isCommonDim) {
+                            // COM pin dimming
+                            uint8_t brightness = ch.dmxBuffer[1];
+                            uint8_t duty = isCA ? brightness : (255 - brightness);
+                            if (ch.source == 1) { // PCA9685 COM Pin
+                                pcaManager.write(ch.pca_addr, ch.pca_channel, (duty * 4095) / 255);
+                            } else if (ch.source == 0 && ch.dmxPort != 255) { // GPIO LEDC COM Pin
+                                ledcWrite(ch.dmxPort, duty);
                             }
+                            // Segments are digital GPIO
                             for (uint8_t b = 0; b < numSeg; b++) {
-                                uint32_t duty = ((segByte >> b) & 1) ? brightness : 0;
-                                if (ch.dmxPort + b <= 15) {
-                                    ledcWrite(ch.dmxPort + b, duty);
-                                }
+                                bool bitVal = (segByte >> b) & 1;
+                                writeSegmentOutput(ch, b, isCA ? !bitVal : bitVal);
                             }
                         } else {
-                            for (uint8_t b = 0; b < numSeg; b++) {
-                                uint8_t segPin = (ch.seg_pins[b] != 255) ? ch.seg_pins[b] : (ch.pin + b);
-                                if (segPin != 255) {
-                                    digitalWrite(segPin, (segByte >> b) & 1);
+                            if (ch.type == 12 || ch.type == 13) {
+                                // PWM Direct Drive via LEDC
+                                uint8_t brightness = 255;
+                                if (ch.mc_mode == 4 || ch.mc_mode == 5) {
+                                    brightness = ch.dmxBuffer[1]; // DMX Channel 2
+                                }
+                                for (uint8_t b = 0; b < numSeg; b++) {
+                                    uint32_t duty = ((segByte >> b) & 1) ? brightness : 0;
+                                    if (ch.seg_sources[b] >= 1 && ch.seg_sources[b] <= 4) {
+                                        writeSegmentOutput(ch, b, duty > 0);
+                                    } else if (ch.dmxPort + b <= 15) {
+                                        bool inv = (ch.seg_inverts >> b) & 1;
+                                        uint32_t active_duty = inv ? (brightness - duty) : duty;
+                                        ledcWrite(ch.dmxPort + b, active_duty);
+                                    }
+                                }
+                            } else {
+                                for (uint8_t b = 0; b < numSeg; b++) {
+                                    writeSegmentOutput(ch, b, (segByte >> b) & 1);
                                 }
                             }
                         }

@@ -475,25 +475,37 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
       <div class="f">
         <label for="no_type">Type</label>
         <select id="no_type" onchange="toggleOutFields()">
-          <option value="0">AC Dimmer (TRIAC)</option>
-          <option value="1">DMX Serial Output</option>
-          <option value="2">Relay (On/Off)</option>
-          <option value="3">RGB LED (NeoPixel)</option>
-          <option value="4">Single Color LED (PWM)</option>
-          <option value="5">Analog RGB / RGBW Strip</option>
-          <option value="6">DC Motor (H-Bridge)</option>
-          <option value="7">Stepper Motor</option>
-          <option value="8">RC Servo</option>
-          <option value="9">Passive Buzzer</option>
-          <option value="10">DFPlayer MP3 Module</option>
-          <option value="11">7-Segment 2-Pin (TM1637)</option>
-          <option value="12">7-Segment DD 7-Pin PWM</option>
-          <option value="13">7-Segment DD 8-Pin PWM</option>
-          <option value="14">DAC (0-3.3V)</option>
-          <option value="15">PWM DAC (RC Filter)</option>
-          <option value="16">Function Generator</option>
-          <option value="17">Solenoid Trigger (Pulse)</option>
-          <option value="18">Sequential Smoke Shooter</option>
+          <optgroup label="Lighting">
+            <option value="0">AC Dimmer (TRIAC)</option>
+            <option value="1">DMX Serial Output</option>
+            <option value="2">Relay (On/Off)</option>
+            <option value="3">RGB LED (NeoPixel)</option>
+            <option value="4">Single Color LED (PWM)</option>
+            <option value="5">Analog RGB / RGBW Strip</option>
+          </optgroup>
+          <optgroup label="Motion">
+            <option value="6">DC Motor (H-Bridge)</option>
+            <option value="7">Stepper Motor</option>
+            <option value="8">RC Servo</option>
+          </optgroup>
+          <optgroup label="Audio">
+            <option value="9">Passive Buzzer</option>
+            <option value="10">DFPlayer MP3 Module</option>
+          </optgroup>
+          <optgroup label="Display">
+            <option value="11">7-Segment 2-Pin (TM1637)</option>
+            <option value="12">7-Segment DD 7-Pin PWM</option>
+            <option value="13">7-Segment DD 8-Pin PWM</option>
+          </optgroup>
+          <optgroup label="Analog / Signal">
+            <option value="14">DAC (0-3.3V)</option>
+            <option value="15">PWM DAC (RC Filter)</option>
+            <option value="16">Function Generator</option>
+          </optgroup>
+          <optgroup label="Trigger">
+            <option value="17">Solenoid Trigger (Pulse)</option>
+            <option value="18">Sequential Smoke Shooter</option>
+          </optgroup>
         </select>
       </div>
       <!-- Source dropdown rendered inside #pin-mapping-container -->
@@ -550,7 +562,7 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
               <option value="2">IN1 + IN2 + EN (3 pins)</option>
             </select>
           </div>
-          <div class="f" id="mc_res_grp"><label for="mc_resolution">Resolution</label>
+          <div class="f" id="mc_res_grp"><label for="mc_resolution" id="mc_resolution_lbl">Resolution</label>
             <select id="mc_resolution">
               <option value="8">8-bit (1 DMX Ch)</option>
               <option value="10">10-bit (2 DMX Ch)</option>
@@ -591,12 +603,6 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
           <strong>Solenoid Trigger Parameters</strong>
         </div>
         <div class="fg">
-          <div class="f"><label for="sol_mode">Trigger Mode</label>
-            <select id="sol_mode">
-              <option value="0">Threshold (DMX > value)</option>
-              <option value="1">Frame-Sync (every frame if DMX > 127)</option>
-            </select>
-          </div>
           <div class="f"><label for="sol_threshold">Threshold Value (0-255)</label><input type="number" id="sol_threshold" value="127" min="0" max="255"></div>
           <div class="f"><label for="sol_pulse_ms">Pulse Width (ms)</label><input type="number" id="sol_pulse_ms" value="50" min="1" max="500"></div>
           <div class="f"><label for="sol_pre_delay">Pre-Delay (ms)</label><input type="number" id="sol_pre_delay" value="0" min="0" max="1000"></div>
@@ -609,11 +615,12 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
           <strong>Sequential Smoke Shooter Parameters</strong>
         </div>
         <div class="fg">
+          <div class="f"><label for="smoke_threshold">Threshold Value (0-255)</label><input type="number" id="smoke_threshold" value="127" min="0" max="255"></div>
           <div class="f"><label for="smoke_dur">Smoke Duration (ms)</label><input type="number" id="smoke_dur" value="1000" min="0" max="10000"></div>
           <div class="f"><label for="smoke_settle">Settle Delay (ms)</label><input type="number" id="smoke_settle" value="500" min="0" max="10000"></div>
           <div class="f"><label for="smoke_shoot">Shoot Duration (ms)</label><input type="number" id="smoke_shoot" value="1000" min="0" max="10000"></div>
           <div class="f"><label for="smoke_lockout">Cooldown Lockout (ms)</label><input type="number" id="smoke_lockout" value="2000" min="0" max="30000"></div>
-          <div class="hint">Sequence: Smoke ON -> delay (Settle) -> Shoot ON -> both OFF -> Cooldown. Pin 1 is Smoke, Pin 2 is Shoot. Triggered when DMX > 127.</div>
+          <div class="hint">Sequence: Smoke ON -> delay (Settle) -> Shoot ON -> both OFF -> Cooldown. Pin 1 is Smoke, Pin 2 is Shoot. Triggered when DMX > threshold.</div>
         </div>
       </div>
     </div>
@@ -1142,7 +1149,7 @@ function pickSsid(){
 // Output Channels
 const ORDERS=['GRB','RGB','BRG','RBG','RGBW','GRBW','BRGW','WRGB'];
 const TYPES={0:'AC Dimmer', 1:'DMX Output', 2:'Relay', 3:'RGB LED', 4:'Single Color LED', 5:'Analog RGB / RGBW', 6:'DC Motor', 7:'Stepper', 8:'RC Servo', 9:'Passive Buzzer', 10:'DFPlayer MP3', 11:'7-Segment 2-Pin', 12:'7-Segment DD 7-Pin PWM', 13:'7-Segment DD 8-Pin PWM', 14:'DAC', 15:'PWM DAC', 16:'Function Gen', 17:'Solenoid Trigger', 18:'Smoke Shooter'};
-const SOURCES={0:'ESP32',1:'PCA9685',2:'MCP23017',3:'TCA9555',4:'PCF857x'};
+const SOURCES={0:'ESP32',1:'PCA9685',2:'MCP23017',3:'TCA9555',4:'PCF857x',5:'MCP4725 DAC'};
 const OUTPUT_GPIOS=[4,12,14,15,2,17,32,33];
 const INPUT_GPIOS=[36,39,34,35,32,33];
 const INPUT_ONLY_GPIOS=[36,39,34,35];
@@ -1172,10 +1179,18 @@ function outputChannelCount(o){
     return `${posBytes+2} Ch (${posBytes} Pos + Speed + Cmd)`;
   }
   if(t===5) return (o.color_order||0)>=4 ? '4 Ch (RGBW)' : '3 Ch (RGB)';
-  if(t>=4&&t<=8||t===17||t===15) return `${valueByteCount(parseInt(o.mc_resolution||8))} Ch`;
+  if(t>=4&&t<=8||t===15) return `${valueByteCount(parseInt(o.mc_resolution||8))} Ch`;
   if(t===9) return '2 Ch';
   if(t===18) return '1 Ch';
-  if(t>=11&&t<=13){const m=parseInt(o.mc_mode||0);return m===1?'4 Ch (ASCII)':t>=12?'1 Ch (Direct)':'2 Ch (Numeric)';}
+  if(t>=11&&t<=13){
+    const m=parseInt(o.mc_mode||0);
+    if(m===1) return '4 Ch (ASCII)';
+    if(t>=12) {
+      if(m===4||m===5||m===6||m===7||m===8||m===9) return '2 Ch (Char+Dim)';
+      return '1 Ch (Direct)';
+    }
+    return '2 Ch (Numeric)';
+  }
   if(t===10) return '3 Ch';
   if(t===14) return '1 Ch';
   if(t===16) return '5 Ch (Freq+Type+Amp+Off)';
@@ -1186,10 +1201,18 @@ function outputByteCount(o){
   const t=typeId(o);
   if(t===6) return valueByteCount(parseInt(o.mc_resolution||8))+2;
   if(t===5) return (o.color_order||0)>=4 ? 4 : 3;
-  if(t>=4&&t<=8||t===17||t===15) return valueByteCount(parseInt(o.mc_resolution||8));
+  if(t>=4&&t<=8||t===15) return valueByteCount(parseInt(o.mc_resolution||8));
   if(t===9) return 2;
   if(t===18) return 1;
-  if(t>=11&&t<=13){const m=parseInt(o.mc_mode||0);return m===1?4:t>=12?1:2;}
+  if(t>=11&&t<=13){
+    const m=parseInt(o.mc_mode||0);
+    if(m===1) return 4;
+    if(t>=12) {
+      if(m===4||m===5||m===6||m===7||m===8||m===9) return 2;
+      return 1;
+    }
+    return 2;
+  }
   if(t===10) return 3;
   if(t===16) return 5;
   return 1;
@@ -1199,20 +1222,37 @@ function outputGpios(o){
   const t=typeId(o);
   const pins=[];
   const add=p=>{p=parseInt(p); if(!isNaN(p)&&p!==255&&!pins.includes(p)) pins.push(p);};
-  if(parseInt(o.source||0)!==0) return pins;
-  add(o.pin);
-  const is7SegDD = (t===12||t===13) && (parseInt(o.mc_mode||0)>=2 && parseInt(o.mc_mode||0)<=5);
+  if(parseInt(o.source||0)===0) add(o.pin);
+  const is7SegDD = (t===12||t===13) && (parseInt(o.mc_mode||0)>=2 && parseInt(o.mc_mode||0)<=9);
   if(is7SegDD && parseInt(o.pin2_source||0)===0){
     const numSeg = (t===13) ? 8 : 7;
+    const isCommonDim = (parseInt(o.mc_mode||0)>=6 && parseInt(o.mc_mode||0)<=9);
+    const startIdx = isCommonDim ? 0 : 1;
     const sps = o.seg_pins || [];
-    for(let s=0; s<numSeg; s++){
+    const ssrc = o.seg_sources || [];
+    for(let s=startIdx; s<numSeg; s++){
+      if(parseInt(ssrc[s]||0)!==0) continue;
       const sp = (sps[s] !== undefined && sps[s] !== 255) ? sps[s] : (parseInt(o.pin) + s);
       add(sp);
     }
   }
-  if(t===6||t===5||t===18||t===10||(t===11&&!is7SegDD)||(t===7&&parseInt(o.pin2_source||0)===0)) add(o.pin2);
-  if(t===5||(t===6&&parseInt(o.mc_mode||0)===2)||(t===7&&parseInt(o.pin3_source||0)===0)) add(o.pin3);
-  if((t===7&&parseInt(o.mc_homing_mode||0)===0)||(t===5&&parseInt(o.color_order||0)>=4)) add(o.pin4);
+  if(t===6||t===5||t===18||t===10||(t===11&&!is7SegDD)){
+    if(parseInt(o.source||0)===0) add(o.pin2);
+  } else if(t===7 && parseInt(o.pin2_source||0)===0){
+    add(o.pin2);
+  }
+  if(t===5){
+    if(parseInt(o.source||0)===0) add(o.pin3);
+  } else if(t===6 && parseInt(o.mc_mode||0)===2){
+    if(parseInt(o.source||0)===0) add(o.pin3);
+  } else if(t===7 && parseInt(o.pin3_source||0)===0){
+    add(o.pin3);
+  }
+  if(t===7 && parseInt(o.mc_homing_mode||0)===0){
+    if(parseInt(o.pin4_source||0)===0) add(o.pin4);
+  } else if(t===5 && parseInt(o.color_order||0)>=4){
+    if(parseInt(o.pin4_source||0)===0) add(o.pin4);
+  }
   return pins;
 }
 
@@ -1232,7 +1272,11 @@ function renderPinRows(){
   const saved={};
   ['no_source','no_pin','no_pca_addr','no_pca_channel','no_pin2','no_pin2_source','no_pin2_addr','no_pin2_channel','no_pin3','no_pin3_source','no_pin3_addr','no_pin3_channel','no_pin4','no_pin4_source','no_pin4_addr','no_pin4_channel'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.value;});
   ['no_pin_invert','no_pin2_invert','no_pin3_invert','no_pin4_invert'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.checked;});
-  for(let s=1; s<=7; s++){const el=document.getElementById('no_seg_pin_'+s);if(el)saved['no_seg_pin_'+s]=el.value;}
+  for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_pin_'+s);if(el)saved['no_seg_pin_'+s]=el.value;}
+  for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_source_'+s);if(el)saved['no_seg_source_'+s]=el.value;}
+  for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_addr_'+s);if(el)saved['no_seg_addr_'+s]=el.value;}
+  for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_channel_'+s);if(el)saved['no_seg_channel_'+s]=el.value;}
+  for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_pin_invert_'+s);if(el)saved['no_seg_pin_invert_'+s]=el.checked;}
   const t=parseInt(document.getElementById('no_type').value);
   const src=parseInt(saved.no_source||0);
   const mcMode=parseInt(document.getElementById('mc_mode')?.value||0);
@@ -1240,18 +1284,22 @@ function renderPinRows(){
   const pin2Src=parseInt(saved.no_pin2_source||0);
   const pin3Src=parseInt(saved.no_pin3_source||0);
   const pin4Src=parseInt(saved.no_pin4_source||0);
+  const colorOrder=parseInt(document.getElementById('no_ord')?.value||0);
   const isStepper=t===7, isMotor=t===6, is7Seg=t>=11&&t<=13, isAnalog=t===5, isSmoke=t===18, isDfPlayer=t===10, isDac=t===14, isFuncGen=t===16;
-  const is7SegDD=is7Seg&&(mcMode>=2&&mcMode<=5);
-  const canUsePca=(t===2||t===4||t===6||t===8||t===5||t===15||t===18);
-  const canUseDig=(t===2||t===6||t===17||t===18);
-  const usePin2=(isMotor||isAnalog||t===18||is7Seg||isDfPlayer||(isStepper&&(pin2Src===0||pin2Src!==0)));
-  const usePin3=(isAnalog||(isMotor&&mcMode===2)||isStepper||(is7Seg&&mcMode===1));
-  const showPin4=isStepper&&hMode===0;
+  const isCommonDim=is7Seg&&(mcMode>=6&&mcMode<=9);
+  const is7SegDD=is7Seg&&(mcMode>=2&&mcMode<=9);
+  const canUsePca=(t===2||t===4||t===6||t===8||t===5||t===15||t===17||t===18||is7SegDD);
+  const canUseDig=(t===2||t===6||t===17||t===18||(is7SegDD&&!isCommonDim));
+  const mainExpander=src!==0;
+  const usePin2=isMotor||isAnalog||t===18||is7Seg||isDfPlayer||(isStepper&&(pin2Src===0||pin2Src!==0));
+  const usePin3=isAnalog||(isMotor&&mcMode===2)||isStepper||(is7Seg&&mcMode===1);
+  const showPin4=(isStepper&&hMode===0)||(isAnalog&&colorOrder>=4);
   const pinDefs=[];
-  const srcOpts=(allowPca,allowDig)=>{
+  const srcOpts=(allowPca,allowDig,allowDac=false)=>{
     let h=`<option value="0">ESP32 GPIO</option>`;
     if(allowPca) h+=`<option value="1">PCA9685</option>`;
     if(allowDig) h+=`<option value="2">MCP23017</option><option value="3">TCA9555</option><option value="4">PCF857x</option>`;
+    if(allowDac) h+=`<option value="5">MCP4725 DAC</option>`;
     return h;
   };
   const mkSel=(id,opts)=>`<select id="${id}" onchange="toggleOutFields()" style="width:100%">${opts}</select>`;
@@ -1259,6 +1307,7 @@ function renderPinRows(){
     const gs=[
       {l:'GPIO Expanders 0x20-0x27 (MCP23017/TCA9555/PCF857x)', s:[2,3,4], r:[0x20,0x27]},
       {l:'PCA9685 PWM 0x40-0x47', s:[1], r:[0x40,0x47]},
+      {l:'MCP4725 DAC 0x60-0x67', s:[5], r:[0x60,0x67]},
       {l:'Other I2C 0x38-0x3F', s:[1,2,3,4], r:[0x38,0x3F]}
     ];
     return gs.filter(g=>f===undefined||g.s.includes(f)).map(g=>`<optgroup label="${g.l}">${Array.from({length:g.r[1]-g.r[0]+1},(_,i)=>`<option value="${g.r[0]+i}">0x${(g.r[0]+i).toString(16).toUpperCase()}</option>`).join('')}</optgroup>`).join('');
@@ -1266,60 +1315,56 @@ function renderPinRows(){
   const chOpts=PIN_CHANS.map(v=>`<option value="${v}">CH ${v}</option>`).join('');
 
   // Build pin descriptions based on type
-  const p1Desc = isDac ? 'DAC Output' : isFuncGen ? 'Wave Out' : isAnalog ? 'R' : isSmoke ? 'Smoke Valve' : is7Seg ? 'CLK / Segment' : isStepper ? 'Step' : isMotor ? 'PWM' : isDfPlayer ? 'TX' : 'Main';
-  const p2Desc = isAnalog ? 'G' : isSmoke ? 'Shoot Valve' : is7SegDD ? 'Seg Base Ch' : is7Seg ? 'DIO' : isStepper ? (pin2Src===0?'DIR Pin':'DIR Ch') : isMotor ? (mcMode===1?'DIR':'IN1') : t===18?'Shoot Val':isDfPlayer?'RX':'Pin 2';
-  const p3Desc = isAnalog ? 'B' : isStepper ? (pin3Src===0?'EN Pin':'EN Ch') : isMotor && mcMode===2?'IN2/EN':'Pin 3';
-  const p4Desc = isAnalog ? 'W' : isStepper ? 'Homing' : 'Pin 4';
+  const p1Desc = isDac ? 'DAC Output' : isFuncGen ? 'Wave Out' : isAnalog ? 'Red Channel' : isSmoke ? 'Smoke Valve' : is7Seg ? 'CLK / Segment' : isStepper ? 'Step' : isMotor ? (mcMode===2?'IN1':'PWM') : isDfPlayer ? 'TX' : 'Main';
+  const p2Desc = isAnalog ? 'Green Channel' : isSmoke ? 'Shoot Valve' : is7SegDD ? 'Seg Base Ch' : is7Seg ? 'DIO' : isStepper ? (pin2Src===0?'DIR Pin':'DIR Ch') : isMotor ? (mcMode===1?'DIR':'IN2') : t===18?'Shoot Val':isDfPlayer?'RX':'Pin 2';
+  const p3Desc = isAnalog ? 'Blue Channel' : isStepper ? (pin3Src===0?'EN Pin':'EN Ch') : isMotor && mcMode===2?'EN PWM':'Pin 3';
+  const p4Desc = isAnalog ? 'White Channel' : isStepper ? 'Homing' : 'Pin 4';
 
   const localBadge = (label) => `<span style="display:inline-block;width:100%;background:#f1f5f9;color:#64748b;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #e2e8f0">${label}</span>`;
 
   // Pin 1 (Main)
   const p1Src=src;
   const isSegADirect = is7SegDD && pin2Src === 0;
-  const p1Label = isSegADirect ? 'Seg A' : 'Pin 1';
-  const p1DescText = isSegADirect ? 'Segment A' : p1Desc;
+  const p1Label = isCommonDim ? 'COM Pin' : isSegADirect ? 'Seg A' : 'Pin 1';
+  const p1DescText = isCommonDim ? 'Common Anode/Cathode PWM Pin' : isSegADirect ? 'Segment A' : p1Desc;
   if (isDac) {
-    pinDefs.push({label:'Pin 1',desc:p1Desc,srcHtml:localBadge('ESP32 GPIO'),addrHtml:localBadge('DAC only'),pinHtml:mkSel('no_pin',['25','26'].map(v=>`<option value="${v}">GPIO ${v} (DAC${v===25?'1':'2'})</option>`).join('')),invId:'no_pin_invert'});
+    pinDefs.push({label:'DAC',desc:p1Src===5?'I2C Analog Out':p1Desc,srcHtml:mkSel('no_source',srcOpts(false,false,true)),addrHtml:p1Src===5?mkSel('no_pca_addr',addrOpts(5)):localBadge('DAC only'),pinHtml:p1Src===5?localBadge('12-bit I2C'):mkSel('no_pin',['25','26'].map(v=>`<option value="${v}">GPIO ${v} (DAC${v===25?'1':'2'})</option>`).join('')),invId:p1Src===5?'':'no_pin_invert'});
   } else if (t===15) { // PWM DAC
     pinDefs.push({label:'Pin 1',desc:'PWM Out',srcHtml:mkSel('no_source',srcOpts(true,false)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.concat(['25','26','27']).map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
   } else if (isFuncGen) {
-    pinDefs.push({label:'Pin 1',desc:p1Desc,srcHtml:localBadge('ESP32 GPIO'),addrHtml:localBadge('GPIO only'),pinHtml:mkSel('no_pin',PIN_GPIOS.concat(['25','26','27']).map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')),invId:'no_pin_invert'});
+    pinDefs.push({label:'Pin 1',desc:p1Desc,srcHtml:mkSel('no_source',srcOpts(false,false)),addrHtml:localBadge('GPIO only'),pinHtml:mkSel('no_pin',PIN_GPIOS.concat(['25','26','27']).map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')),invId:'no_pin_invert'});
   } else {
     pinDefs.push({label:p1Label,desc:p1DescText,srcHtml:mkSel('no_source',srcOpts(canUsePca,canUseDig)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
   }
 
   // Pin 2
   if(usePin2){
-    let p2Src=isStepper||isMotor?pin2Src:0;
+    let p2Src=pin2Src;
     let showAddr=p2Src!==0;
     if(is7Seg&&!is7SegDD) p2Src=0;
-    if(is7SegDD) p2Src=pin2Src;
     if(isSegADirect){
-      const srcSel=mkSel('no_pin2_source',srcOpts(false,is7SegDD));
-      const addrEl=localBadge('ESP32 GPIO');
-      const pinOpts=localBadge('See below');
-      pinDefs.push({label:'Segs Src',desc:'Segments B-DP',srcHtml:srcSel,addrHtml:addrEl,pinHtml:pinOpts,invId:''});
-      
       const numSeg = (t === 13) ? 8 : 7;
       const segLabels = ['Seg A', 'Seg B', 'Seg C', 'Seg D', 'Seg E', 'Seg F', 'Seg G', 'Seg DP'];
-      for (let s = 1; s < numSeg; s++) {
+      const startSeg = isCommonDim ? 0 : 1;
+      for (let s = startSeg; s < numSeg; s++) {
+        const segSrc = parseInt(saved['no_seg_source_'+s]||0);
         pinDefs.push({
           label: segLabels[s],
           desc: 'Segment ' + segLabels[s].split(' ')[1],
-          srcHtml: localBadge('ESP32 GPIO'),
-          addrHtml: localBadge('GPIO Only'),
-          pinHtml: mkSel('no_seg_pin_' + s, `<option value="255">None</option>` + PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')),
-          invId: ''
+          srcHtml: (s === startSeg ? '<input type="hidden" id="no_pin2_source" value="0">' : '') + mkSel('no_seg_source_' + s, srcOpts(true,true)),
+          addrHtml: segSrc===0 ? localBadge('GPIO Only') : mkSel('no_seg_addr_' + s, addrOpts(segSrc)),
+          pinHtml: segSrc===0 ? mkSel('no_seg_pin_' + s, `<option value="255">None</option>` + PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')) : mkSel('no_seg_channel_' + s, `<option value="255">None</option>${chOpts}`),
+          invId: 'no_seg_pin_invert_' + s
         });
       }
     } else {
-      const srcSel=mkSel('no_pin2_source',srcOpts(isStepper||isMotor,isStepper||isMotor||is7SegDD));
+      const srcSel=mkSel('no_pin2_source',srcOpts(isStepper||isMotor||isAnalog||t===18||is7SegDD,isStepper||isMotor||is7SegDD||t===18));
       const addrEl=showAddr?mkSel('no_pin2_addr',addrOpts(p2Src)):localBadge('ESP32 GPIO');
       let pinOpts;
       if(showAddr){
         pinOpts=mkSel('no_pin2_channel',`<option value="255">None</option>${chOpts}`);
       } else if(is7SegDD){
-        const pinCount = (mcMode===3||mcMode===5) ? 7 : 6;
+        const pinCount = (mcMode===3||mcMode===5||mcMode===8||mcMode===9) ? 7 : 6;
         pinOpts=`<span style="display:inline-block;width:100%;background:#fef9c3;color:#854d0e;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #fef08a">base+0..${pinCount}</span>`;
       } else {
         pinOpts=mkSel('no_pin2',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`);
@@ -1330,12 +1375,11 @@ function renderPinRows(){
 
   // Pin 3
   if(usePin3){
-    const showSrc=isStepper;
-    let p3Src=isStepper?pin3Src:0;
-    const srcSel=mkSel('no_pin3_source',srcOpts(showSrc,showSrc));
-    const addrEl=showSrc&&p3Src!==0?mkSel('no_pin3_addr',addrOpts(p3Src)):localBadge('ESP32 GPIO');
+    let p3Src=pin3Src;
+    const srcSel=mkSel('no_pin3_source',srcOpts((isMotor&&mcMode===2)||isAnalog,isStepper));
+    const addrEl=p3Src!==0?mkSel('no_pin3_addr',addrOpts(p3Src)):localBadge('ESP32 GPIO');
     let pinOpts;
-    if(showSrc&&p3Src!==0){
+    if(p3Src!==0){
       pinOpts=mkSel('no_pin3_channel',`<option value="255">None</option>${chOpts}`);
     } else {
       pinOpts=mkSel('no_pin3',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`);
@@ -1345,11 +1389,11 @@ function renderPinRows(){
 
   // Pin 4
   if(showPin4){
-    const showSrc=isStepper;
-    const srcSel=mkSel('no_pin4_source',srcOpts(false,true));
-    const addrEl=pin4Src!==0?mkSel('no_pin4_addr',addrOpts(pin4Src)):localBadge('ESP32 GPIO');
+    let p4Src=pin4Src;
+    const srcSel=isStepper ? mkSel('no_pin4_source',srcOpts(false,true)) : (isAnalog ? mkSel('no_pin4_source',srcOpts(true,false)) : mkSel('no_pin4_source',srcOpts(false,false)));
+    const addrEl=p4Src!==0?mkSel('no_pin4_addr',addrOpts(p4Src)):localBadge('ESP32 GPIO');
     let pinOpts;
-    if(pin4Src!==0){
+    if(p4Src!==0){
       pinOpts=mkSel('no_pin4_channel',`<option value="255">None</option>${chOpts}`);
     } else {
       pinOpts=mkSel('no_pin4',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}<option value="36">GPIO 36</option><option value="39">GPIO 39</option><option value="34">GPIO 34</option><option value="35">GPIO 35</option>`);
@@ -1463,7 +1507,7 @@ function autoAssignOutputPins(){
   const hMode=parseInt(document.getElementById('mc_homing_mode').value);
   const colorOrder = parseInt(document.getElementById('no_ord')?.value||0);
   ['no_pin','no_pin2','no_pin3','no_pin4'].forEach(id=>setSelectIfOption(id,255));
-  for(let s=1; s<=7; s++){setSelectIfOption('no_seg_pin_'+s,255);}
+  for(let s=0; s<=7; s++){setSelectIfOption('no_seg_pin_'+s,255);}
   const picked=[];
   const takeOutput=()=>{
     const used=reservedPins(picked);
@@ -1484,10 +1528,11 @@ function autoAssignOutputPins(){
   
   if((t===12||t===13) && pin2Source===0){
     const numSeg = t === 13 ? 8 : 7;
+    const startSeg = (mcMode>=6&&mcMode<=9) ? 0 : 1;
     const basePin = takeOutput();
     setSelectIfOption('no_pin', basePin);
     if(basePin !== 255){
-      for(let s = 1; s < numSeg; s++){
+      for(let s = startSeg; s < numSeg; s++){
         setSelectIfOption('no_seg_pin_' + s, takeOutput());
       }
     }
@@ -1508,27 +1553,62 @@ function outputAddressLabel(o){
 
 function gpioLabel(o){
   const t=typeId(o);
-  if(t===7&&parseInt(o.source||0)===0){
-    const parts=[];
-    parts.push('STEP GPIO '+o.pin);
-    if(parseInt(o.pin2_source||0)===0) parts.push('DIR GPIO '+o.pin2);
-    else parts.push('DIR '+expanderPinLabel(o.pin2_source,o.pin2_addr,o.pin2_channel));
-    if(parseInt(o.pin3_source||0)===0){
-      if(parseInt(o.pin3)!==255) parts.push('EN GPIO '+o.pin3);
-    } else {
-      parts.push('EN '+expanderPinLabel(o.pin3_source,o.pin3_addr,o.pin3_channel));
+  const formatAddr=addr=>'0x'+parseInt(addr).toString(16).toUpperCase();
+  const getLabel=(src, addr, pin, ch) => {
+    if(src === 0) return pin !== 255 ? 'GPIO ' + pin : '';
+    const srcName = SOURCES[src] || 'Exp';
+    return `${srcName} ${formatAddr(addr)}:CH${ch}`;
+  };
+
+  if(t===7) { // Stepper
+    const parts = [];
+    parts.push('STEP: ' + getLabel(o.source, o.pca_addr, o.pin, o.pca_channel));
+    if(o.pin2 !== 255 || o.pin2_channel !== 255) {
+      parts.push('DIR: ' + getLabel(o.pin2_source, o.pin2_addr, o.pin2, o.pin2_channel));
     }
-    return parts.filter(Boolean).join(' / ');
+    if(o.pin3 !== 255 || o.pin3_channel !== 255) {
+      parts.push('EN: ' + getLabel(o.pin3_source, o.pin3_addr, o.pin3, o.pin3_channel));
+    }
+    if(o.pin4 !== 255 || o.pin4_channel !== 255) {
+      parts.push('LIMIT: ' + getLabel(o.pin4_source, o.pin4_addr, o.pin4, o.pin4_channel));
+    }
+    return parts.filter(p => !p.endsWith(': ')).join(' / ');
   }
+
+  if(t===6) { // DC Motor
+    const parts = [];
+    parts.push('PWM/IN1: ' + getLabel(o.source, o.pca_addr, o.pin, o.pca_channel));
+    if(o.pin2 !== 255 || o.pin2_channel !== 255) {
+      parts.push('IN2/DIR: ' + getLabel(o.pin2_source, o.pin2_addr, o.pin2, o.pin2_channel));
+    }
+    if(o.pin3 !== 255 || o.pin3_channel !== 255) {
+      parts.push('EN: ' + getLabel(o.pin3_source, o.pin3_addr, o.pin3, o.pin3_channel));
+    }
+    return parts.filter(p => !p.endsWith(': ')).join(' / ');
+  }
+
+  if(t===5) { // Analog RGB/RGBW
+    const parts = [];
+    parts.push('R: ' + getLabel(o.source, o.pca_addr, o.pin, o.pca_channel));
+    parts.push('G: ' + getLabel(o.pin2_source, o.pin2_addr, o.pin2, o.pin2_channel));
+    parts.push('B: ' + getLabel(o.pin3_source, o.pin3_addr, o.pin3, o.pin3_channel));
+    if((o.color_order||0) >= 4) {
+      parts.push('W: ' + getLabel(o.pin4_source, o.pin4_addr, o.pin4, o.pin4_channel));
+    }
+    return parts.filter(p => !p.endsWith(': ')).join(' / ');
+  }
+
+  if(t===18) { // Smoke
+    const parts = [];
+    parts.push('VALVE: ' + getLabel(o.source, o.pca_addr, o.pin, o.pca_channel));
+    parts.push('SHOOT: ' + getLabel(o.pin2_source, o.pin2_addr, o.pin2, o.pin2_channel));
+    return parts.filter(p => !p.endsWith(': ')).join(' / ');
+  }
+
+  // Fallback for single-pin / 7-seg DD / etc.
   if(parseInt(o.source||0)!==0){
-    const formatAddr=addr=>'0x'+parseInt(addr).toString(16).toUpperCase();
     const srcName=SOURCES[parseInt(o.source||0)]||'Expander';
-    const addrs = formatAddr(o.pca_addr || 0x40);
-    const channels = [o.pca_channel];
-    if(t===6||t===7||t===5||t===18) { if(o.pca_channel2!==255) channels.push(o.pca_channel2); }
-    if(t===7||t===5||(t===6&&parseInt(o.mc_mode||0)===2)) { if(o.pca_channel3!==255) channels.push(o.pca_channel3); }
-    if(t===5&&parseInt(o.color_order||0)>=4) { if(o.pca_channel4!==255) channels.push(o.pca_channel4); }
-    return `${srcName} ${addrs}:CH` + channels.join('/');
+    return `${srcName} ${formatAddr(o.pca_addr || 0x40)}:CH${o.pca_channel}`;
   }
   const pins=outputGpios(o);
   return pins.length?pins.map(p=>'GPIO '+p).join(' / '):'--';
@@ -1611,7 +1691,18 @@ function channelScore(o){
     case 2: if(src===0) gpio=1; else if(src===1) pca=1; else exp=1; break;
     case 3: if(src===0) gpio=1; break;
     case 4: if(src===0){gpio=1;ledc=1;}else if(src===1) pca=1; else exp=1; break;
-    case 5: if(src===0){gpio=3;ledc=3;}else if(src===1) pca=3; break;
+    case 5:
+      const p2s = o.pin2_source || 0;
+      const p3s = o.pin3_source || 0;
+      const p4s = o.pin4_source || 0;
+      const rgbw = (o.color_order || 0) >= 4;
+      if(src === 0) { gpio++; ledc++; } else if(src === 1) { pca++; }
+      if(p2s === 0) { gpio++; ledc++; } else if(p2s === 1) { pca++; }
+      if(p3s === 0) { gpio++; ledc++; } else if(p3s === 1) { pca++; }
+      if(rgbw) {
+        if(p4s === 0) { gpio++; ledc++; } else if(p4s === 1) { pca++; }
+      }
+      break;
     case 6:
       if(src===0){gpio=mode===2?3:2; ledc=mode===0?2:1;}
       else if(src===1) pca=mode===2?3:2;
@@ -1626,7 +1717,7 @@ function channelScore(o){
     case 11: if(src===0) gpio=2; else exp=2; break;
     case 12: gpio=7; ledc=7; break;
     case 13: gpio=8; ledc=8; break;
-    case 14: gpio=1; dac=1; break;
+    case 14: if(src===5) exp=1; else { gpio=1; dac=1; } break;
     case 15: if(src===0){gpio=1;ledc=1;}else if(src===1) pca=1; break;
     case 16: gpio=1; ledc=1; break;
     case 17: if(src===0) gpio=1; else if(src===1) pca=1; else exp=1; break;
@@ -2064,12 +2155,14 @@ function testMp3(idx,action){
   }
 }
 
-function setResolutionOptions(isStepper){
+function setResolutionOptions(isStepper, is7Seg){
   const sel=document.getElementById('mc_resolution');
   const current=parseInt(sel.value||8);
-  const opts=isStepper
-    ? [[8,'8-bit (1 Pos Ch)'],[10,'10-bit (2 Pos Ch)'],[12,'12-bit (2 Pos Ch)'],[16,'16-bit (2 Pos Ch)'],[24,'24-bit (3 Pos Ch)'],[32,'32-bit (4 Pos Ch)']]
-    : [[8,'8-bit (1 DMX Ch)'],[10,'10-bit (2 DMX Ch)'],[12,'12-bit (2 DMX Ch)'],[16,'16-bit (2 DMX Ch)']];
+  const opts=is7Seg
+    ? [[8,'ASCII / Character'],[10,'Numeric (0-9, 10-19 for DP)']]
+    : isStepper
+      ? [[8,'8-bit (1 Pos Ch)'],[10,'10-bit (2 Pos Ch)'],[12,'12-bit (2 Pos Ch)'],[16,'16-bit (2 Pos Ch)'],[24,'24-bit (3 Pos Ch)'],[32,'32-bit (4 Pos Ch)']]
+      : [[8,'8-bit (1 DMX Ch)'],[10,'10-bit (2 DMX Ch)'],[12,'12-bit (2 DMX Ch)'],[16,'16-bit (2 DMX Ch)']];
   sel.innerHTML=opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
   const allowed=opts.some(([v])=>v===current);
   sel.value=allowed?current:8;
@@ -2081,11 +2174,13 @@ function setModeOptions(kind, type){
   const current=parseInt(sel.value||0);
   const opts=kind==='7seg'
     ? type===11?[[0,'TM1637 Numeric (2 Ch)'],[1,'TM1637 ASCII Text (4 Ch)']]
-      :type===12?[[2,'Direct 7-pin (1 Ch - No Dim)'],[4,'Direct 7-pin Dim (2 Ch - Char+Dim)']]
-      :type===13?[[3,'Direct 8-pin (1 Ch - No Dim)'],[5,'Direct 8-pin Dim (2 Ch - Char+Dim)']]
+      :type===12?[[2,'Direct 7-pin (1 Ch - No Dim)'],[4,'Direct 7-pin Dim (2 Ch - Char+Dim)'],[6,'CA 7-pin Dim (2 Ch - COM Anode)'],[7,'CC 7-pin Dim (2 Ch - COM Cathode)']]
+      :type===13?[[3,'Direct 8-pin (1 Ch - No Dim)'],[5,'Direct 8-pin Dim (2 Ch - Char+Dim)'],[8,'CA 8-pin Dim (2 Ch - COM Anode)'],[9,'CC 8-pin Dim (2 Ch - COM Cathode)']]
       :[[0,'TM1637 Numeric (2 Ch)'],[1,'TM1637 ASCII Text (4 Ch)'],
        [2,'Direct 7-pin (1 Ch - No Dim)'],[3,'Direct 8-pin (1 Ch - No Dim)'],
-       [4,'Direct 7-pin Dim (2 Ch - Char+Dim)'],[5,'Direct 8-pin Dim (2 Ch - Char+Dim)']]
+       [4,'Direct 7-pin Dim (2 Ch - Char+Dim)'],[5,'Direct 8-pin Dim (2 Ch - Char+Dim)'],
+       [6,'CA 7-pin Dim (2 Ch - COM Anode)'],[7,'CC 7-pin Dim (2 Ch - COM Cathode)'],
+       [8,'CA 8-pin Dim (2 Ch - COM Anode)'],[9,'CC 8-pin Dim (2 Ch - COM Cathode)']]
     : [[0,'PWM + PWM (2 pins)'],[1,'PWM + DIR (2 pins)'],[2,'IN1 + IN2 + EN (3 pins)']];
   if(lbl) lbl.textContent=kind==='7seg'?'Display Mode':'Motor Sub-Mode';
   sel.innerHTML=opts.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
@@ -2094,6 +2189,7 @@ function setModeOptions(kind, type){
 
 function toggleOutFields(){
   const t=parseInt(document.getElementById('no_type').value);
+  const mcMode = parseInt(document.getElementById('mc_mode')?.value||0);
   // Ensure pin rows exist before reading/writing pin field elements
   if(!document.getElementById('no_source')) renderPinRows();
   const srcSelect=document.getElementById('no_source');
@@ -2101,7 +2197,7 @@ function toggleOutFields(){
   const isDmx = t===1;
   const isRelay = t===2;
   const isDimmer = t===0; // AC Dimmer
-  const isMc = (t>=4 && t<=8) || t===17; // Motion Control v3
+  const isMc = (t>=4 && t<=8); // Motion Control v3 (Solenoid is Type 17, no longer in isMc)
   const isPwmDimmer = t===4; // Single Color LED
   const isMotor = t===6;
   const isStepper = t===7;
@@ -2114,24 +2210,30 @@ function toggleOutFields(){
   const isDfPlayer = t===10;
   const isPwmDac = t===15;
   const isFuncGen = t===16;
+  const isDac = t===14;
+  const isCommonDim = is7Seg && mcMode >= 6 && mcMode <= 9;
+  const is7SegDD = is7Seg && mcMode >= 2 && mcMode <= 9;
 
   // Expander source compatibility
-  const canUsePca = (t===2 || t===4 || t===6 || t===8 || t===5 || t===15 || t===18);
-  const canUseDigitalExpander = (t===2 || t===6 || t===17 || t===18);
-  const isGpioOnly = t===14 || t===16;
-  [...srcSelect.options].forEach(opt=>{
-    const v=parseInt(opt.value);
-    opt.disabled=(v===1&&!canUsePca)||(v>=2&&!canUseDigitalExpander);
-  });
-  if (srcSelect.options[srcSelect.selectedIndex]?.disabled) srcSelect.value = 0;
-  if (!canUsePca && !canUseDigitalExpander || isGpioOnly) {
-    srcSelect.value = 0; // ESP32 GPIO
-    srcSelect.disabled = true;
-  } else {
-    srcSelect.disabled = false;
+  const canUsePca = (t===2 || t===4 || t===6 || t===8 || t===5 || t===15 || t===17 || t===18 || is7SegDD);
+  const canUseDigitalExpander = (t===2 || t===6 || t===17 || t===18 || (is7SegDD && !isCommonDim));
+  const isGpioOnly = t===16;
+  
+  if (srcSelect && srcSelect.tagName === 'SELECT') {
+    [...srcSelect.options].forEach(opt=>{
+      const v=parseInt(opt.value);
+      opt.disabled=(v===1&&!canUsePca)||(v>=2&&v<=4&&!canUseDigitalExpander)||(v===5&&t!==14);
+    });
+    if (srcSelect.options[srcSelect.selectedIndex]?.disabled) srcSelect.value = 0;
+    if (((!canUsePca && !canUseDigitalExpander) && t!==14) || isGpioOnly) {
+      srcSelect.value = 0; // ESP32 GPIO
+      srcSelect.disabled = true;
+    } else {
+      srcSelect.disabled = false;
+    }
   }
   
-  const src = parseInt(srcSelect.value||0);
+  const src = srcSelect ? parseInt(srcSelect.value||0) : 0;
   const isEsp32 = src===0;
   const isPca = src===1;
   const isExpander = src!==0;
@@ -2139,12 +2241,13 @@ function toggleOutFields(){
   if(addrSel){
     populateExpanderAddresses(addrSel, isExpander ? src : undefined);
     if(isPca && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=64;
+    if(src===5 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=96;
     if(src>=2 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=32;
   }
   
   document.getElementById('no_addr_grp').style.display=(isDmx||t===3)?'none':'';
-  document.getElementById('no_cnt_grp').style.display=(isDmx||isRelay||isDimmer||isMc||isSolenoid||isAnalogRgb||isBuzzer||isSmoke||is7Seg||isDfPlayer||isPwmDac)?'none':'';
-  document.getElementById('no_ord_grp').style.display=(isDmx||isRelay||isDimmer||isMc||isSolenoid||isBuzzer||isSmoke||is7Seg||isDfPlayer||isPwmDac)?'none':'';
+  document.getElementById('no_cnt_grp').style.display=(isDmx||isRelay||isDimmer||isMc||isSolenoid||isAnalogRgb||isBuzzer||isSmoke||is7Seg||isDfPlayer||isPwmDac||isDac||isFuncGen)?'none':'';
+  document.getElementById('no_ord_grp').style.display=(t===3||t===5)?'':'none';
   document.getElementById('no_led_proto_grp').style.display=(t===3)?'':'none';
   
   setModeOptions(is7Seg?'7seg':'motor', t);
@@ -2152,32 +2255,24 @@ function toggleOutFields(){
   document.getElementById('no_sol_grp').style.display=isSolenoid?'':'none';
   document.getElementById('no_smoke_grp').style.display=isSmoke?'':'none';
   if(isDfPlayer) renderPinRows();
-  if(isMc) setResolutionOptions(isStepper);
+  if(isMc || is7Seg) setResolutionOptions(isStepper, is7Seg);
   
-  const mcMode = parseInt(document.getElementById('mc_mode').value);
   const hMode = parseInt(document.getElementById('mc_homing_mode').value);
   const colorOrder = parseInt(document.getElementById('no_ord').value||0);
-  
-  // Render clean pin mapping rows
-  renderPinRows();
-  
-  // Extra expander channels for multi-channel outputs (analog RGB R/G/B/W, stepper ch2-4, etc.)
-  document.getElementById('no_pca_channel2_grp').style.display=(isExpander && (isMotor||isStepper||isAnalogRgb||isSmoke))?'':'none';
-  document.getElementById('no_pca_channel3_grp').style.display=(isPca && (isStepper || isAnalogRgb || (isMotor && mcMode===2)))?'':'none';
-  document.getElementById('no_pca_channel4_grp').style.display=(isPca && (isAnalogRgb && colorOrder>=4))?'':'none';
-  autoAssignOutputPins();
+  document.getElementById('no_pca_channel2_grp').style.display='none';
+  document.getElementById('no_pca_channel3_grp').style.display='none';
+  document.getElementById('no_pca_channel4_grp').style.display='none';
 
-  // Toggle internal fields of Motion Control
   if (isMc || is7Seg || isFuncGen || isPwmDac) {
-    document.getElementById('mc_mode_grp').style.display = is7Seg ? '' : 'none';
-    document.getElementById('mc_res_grp').style.display = (isMc || isPwmDac) ? '' : 'none';
-    
-    // Freq field and label
+    document.getElementById('mc_mode_grp').style.display = (is7Seg || isMotor) ? '' : 'none';
+    document.getElementById('mc_res_grp').style.display = (isMc || isPwmDac || is7Seg) ? '' : 'none';
+    const resLbl = document.getElementById('mc_resolution_lbl');
+    if(resLbl) resLbl.textContent = is7Seg ? 'Decode Mode' : 'Resolution';
     const freqGrp = document.getElementById('mc_freq_grp');
     const freqLbl = document.getElementById('mc_freq_lbl');
     if (isFuncGen || isPwmDac) {
       freqGrp.style.display = '';
-      freqLbl.textContent = isPwmDac ? "PWM Carrier Frequency (Hz)" : "PWM Carrier Frequency (Hz)";
+      freqLbl.textContent = "PWM Carrier Frequency (Hz)";
       document.getElementById('rc_filter_grp').style.display = '';
       calcRcCutoff();
     } else if (is7Seg) {
@@ -2286,24 +2381,37 @@ function editOutput(idx){
   setVal('mc_homing_dir',o.mc_homing_dir??0);
   setVal('mc_homing_speed',o.mc_homing_speed??500);
   setVal('mc_homing_timeout',o.mc_homing_timeout??5);
-  setVal('sol_mode',o.solenoid_mode??0);
   setVal('sol_threshold',o.solenoid_threshold??127);
   setVal('sol_pulse_ms',o.solenoid_pulse_ms??50);
   setVal('sol_pre_delay',o.solenoid_pre_delay??0);
   setVal('sol_post_delay',o.solenoid_post_delay??100);
   
+  if(document.getElementById('smoke_threshold')) setVal('smoke_threshold',o.solenoid_threshold??127);
   if(document.getElementById('smoke_dur')) setVal('smoke_dur',o.smoke_duration_ms??1000);
   if(document.getElementById('smoke_settle')) setVal('smoke_settle',o.settle_delay_ms??500);
   if(document.getElementById('smoke_shoot')) setVal('smoke_shoot',o.shoot_duration_ms??1000);
   if(document.getElementById('smoke_lockout')) setVal('smoke_lockout',o.smoke_lockout_ms??2000);
 
+  // Set segment sources first so their inputs can be rendered
+  const ssrc = o.seg_sources || [];
+  for (let s = 0; s <= 7; s++) {
+    setVal('no_seg_source_' + s, ssrc[s] !== undefined ? ssrc[s] : 0);
+  }
+
   // Re-render to apply visibility with correct values
   toggleOutFields();
   
-  // Set segment pins if editing 7-seg DD channel
+  // Set segment pins, addresses, channels, inverts if editing 7-seg DD channel
   const sps = o.seg_pins || [];
-  for (let s = 1; s <= 7; s++) {
+  const saddrs = o.seg_addrs || [];
+  const sch = o.seg_channels || [];
+  const sinvs = o.seg_inverts || 0;
+  for (let s = 0; s <= 7; s++) {
+    setVal('no_seg_addr_' + s, saddrs[s] !== undefined ? saddrs[s] : 32);
+    setVal('no_seg_channel_' + s, sch[s] !== undefined ? sch[s] : 255);
     setVal('no_seg_pin_' + s, sps[s] !== undefined ? sps[s] : 255);
+    const invEl = document.getElementById('no_seg_pin_invert_' + s);
+    if(invEl) invEl.checked = !!((sinvs >> s) & 1);
   }
   
   document.getElementById('out-add-btn').textContent='Update Channel';
@@ -2326,10 +2434,20 @@ function cancelEditOutput(){
   document.getElementById('no_pin2_channel').value=255;
   document.getElementById('no_pin3_source').value=0;
   document.getElementById('no_pin3_channel').value=255;
-  for(let s=1; s<=7; s++){
-    const el=document.getElementById('no_seg_pin_'+s);
-    if(el) el.value=255;
+  for(let s=0; s<=7; s++){
+    const pinEl=document.getElementById('no_seg_pin_'+s);
+    const srcEl=document.getElementById('no_seg_source_'+s);
+    const addrEl=document.getElementById('no_seg_addr_'+s);
+    const chEl=document.getElementById('no_seg_channel_'+s);
+    const invEl=document.getElementById('no_seg_pin_invert_'+s);
+    if(pinEl) pinEl.value=255;
+    if(srcEl) srcEl.value=0;
+    if(addrEl) addrEl.value=32;
+    if(chEl) chEl.value=255;
+    if(invEl) invEl.checked=false;
   }
+  setVal('sol_threshold',127);
+  if(document.getElementById('smoke_threshold')) setVal('smoke_threshold',127);
   ['no_pin_invert','no_pin2_invert','no_pin3_invert','no_pin4_invert'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
   document.getElementById('out-add-btn').textContent='Add Channel';
   document.getElementById('out-cancel-btn').style.display='none';
@@ -2390,11 +2508,11 @@ function addOrUpdateOutput(){
     mc_homing_dir: parseInt(document.getElementById('mc_homing_dir').value),
     mc_homing_speed: parseInt(document.getElementById('mc_homing_speed').value),
     mc_homing_timeout: parseInt(document.getElementById('mc_homing_timeout').value),
-    solenoid_mode: parseInt(document.getElementById('sol_mode').value),
-    solenoid_threshold: parseInt(document.getElementById('sol_threshold').value),
-    solenoid_pulse_ms: parseInt(document.getElementById('sol_pulse_ms').value),
-    solenoid_pre_delay: parseInt(document.getElementById('sol_pre_delay').value),
-    solenoid_post_delay: parseInt(document.getElementById('sol_post_delay').value),
+    solenoid_mode: 0,
+    solenoid_threshold: (type===18) ? parseInt(document.getElementById('smoke_threshold')?.value || 127) : parseInt(document.getElementById('sol_threshold')?.value || 127),
+    solenoid_pulse_ms: parseInt(document.getElementById('sol_pulse_ms')?.value || 50),
+    solenoid_pre_delay: parseInt(document.getElementById('sol_pre_delay')?.value || 0),
+    solenoid_post_delay: parseInt(document.getElementById('sol_post_delay')?.value || 100),
     
     // v1.11.0 fields
     smoke_duration_ms: parseInt(document.getElementById('smoke_dur')?.value || 1000),
@@ -2402,7 +2520,7 @@ function addOrUpdateOutput(){
     shoot_duration_ms: parseInt(document.getElementById('smoke_shoot')?.value || 1000),
     smoke_lockout_ms: parseInt(document.getElementById('smoke_lockout')?.value || 2000),
     seg_pins: (type===12||type===13)? [
-      gv('no_pin', 255),
+      ((type===12||type===13) && (parseInt(document.getElementById('mc_mode').value)>=6 && parseInt(document.getElementById('mc_mode').value)<=9)) ? gv('no_seg_pin_0', 255) : gv('no_pin', 255),
       gv('no_seg_pin_1', 255),
       gv('no_seg_pin_2', 255),
       gv('no_seg_pin_3', 255),
@@ -2410,7 +2528,34 @@ function addOrUpdateOutput(){
       gv('no_seg_pin_5', 255),
       gv('no_seg_pin_6', 255),
       gv('no_seg_pin_7', 255)
-    ] : [255, 255, 255, 255, 255, 255, 255, 255]
+    ] : [255, 255, 255, 255, 255, 255, 255, 255],
+    seg_sources: (type===12||type===13)? [0,1,2,3,4,5,6,7].map(s=>{
+      if (s === 0 && !(parseInt(document.getElementById('mc_mode').value)>=6 && parseInt(document.getElementById('mc_mode').value)<=9)) {
+        return parseInt(document.getElementById('no_source').value);
+      }
+      return gv('no_seg_source_'+s,0);
+    }) : [0,0,0,0,0,0,0,0],
+    seg_addrs: (type===12||type===13)? [0,1,2,3,4,5,6,7].map(s=>{
+      if (s === 0 && !(parseInt(document.getElementById('mc_mode').value)>=6 && parseInt(document.getElementById('mc_mode').value)<=9)) {
+        return parseInt(document.getElementById('no_pca_addr')?.value||32);
+      }
+      return gv('no_seg_addr_'+s,32);
+    }) : [32,32,32,32,32,32,32,32],
+    seg_channels: (type===12||type===13)? [0,1,2,3,4,5,6,7].map(s=>{
+      if (s === 0 && !(parseInt(document.getElementById('mc_mode').value)>=6 && parseInt(document.getElementById('mc_mode').value)<=9)) {
+        const mainSrc = parseInt(document.getElementById('no_source').value);
+        return mainSrc !== 0 ? parseInt(document.getElementById('no_pca_channel')?.value||255) : 255;
+      }
+      return gv('no_seg_channel_'+s,255);
+    }) : [255,255,255,255,255,255,255,255],
+    seg_inverts: (type===12||type===13) ? [0,1,2,3,4,5,6,7].reduce((acc, s)=>{
+      if (s === 0 && !(parseInt(document.getElementById('mc_mode').value)>=6 && parseInt(document.getElementById('mc_mode').value)<=9)) {
+        const isInv = document.getElementById('no_pin_invert')?.checked || false;
+        return acc | (isInv ? (1 << s) : 0);
+      }
+      const isInv = document.getElementById('no_seg_pin_invert_'+s)?.checked || false;
+      return acc | (isInv ? (1 << s) : 0);
+    }, 0) : 0
   };
 
   const statusPin=parseInt(document.getElementById('status_led_pin').value);
@@ -2448,6 +2593,16 @@ function addOrUpdateOutput(){
     }
     if(ch.pin3_source!==0 && ch.pin3_channel===255){
       alert('Stepper ENABLE expander channel is required.');
+      return;
+    }
+  }
+  if(type===6 && ch.mc_mode===2){
+    if(ch.pin3_source>=2){
+      alert('Motor EN pin needs PWM. Use ESP32 GPIO or PCA9685 for EN, not a digital expander.');
+      return;
+    }
+    if(ch.pin3_source===1 && ch.pin3_channel===255){
+      alert('Motor EN PCA9685 channel is required.');
       return;
     }
   }
@@ -2509,6 +2664,21 @@ function addOrUpdateOutput(){
       if(o.type===7&&parseInt(o.source||0)===0){
         if(addUsedExpander(o.pin2_source,o.pin2_addr,o.pin2_channel,i)) return;
         if(addUsedExpander(o.pin3_source,o.pin3_addr,o.pin3_channel,i)) return;
+      }
+      const is7SegDD = (o.type===12||o.type===13) && (parseInt(o.mc_mode||0)>=2 && parseInt(o.mc_mode||0)<=9);
+      if (is7SegDD && parseInt(o.pin2_source||0)!==0) {
+        const numSeg = (o.type === 13) ? 8 : 7;
+        for (let s = 0; s < numSeg; s++) {
+          if(addUsedExpander(o.pin2_source, o.pin2_addr, parseInt(o.pin2_channel) + s, i)) return;
+        }
+      } else if (is7SegDD) {
+        const numSeg = (o.type === 13) ? 8 : 7;
+        const segSources = o.seg_sources || [];
+        const segAddrs = o.seg_addrs || [];
+        const segChannels = o.seg_channels || [];
+        for (let s = 0; s < numSeg; s++) {
+          if(addUsedExpander(segSources[s] || 0, segAddrs[s] || 32, segChannels[s], i)) return;
+        }
       }
     }
 
@@ -2789,6 +2959,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </body>
-</html>)rawliteral";
+</html>
+)rawliteral";
 
 #endif // WEB_PAGES_H

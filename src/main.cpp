@@ -273,46 +273,68 @@ bool jsonPinMatches(JsonVariantConst value, uint8_t reservedPin) {
 bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
     if (reservedPin == 255) return false;
     uint8_t source = output["source"] | 0;
-
     uint8_t type = output["type"] | 0;
     uint8_t mcMode = output["mc_mode"] | 0;
     uint8_t homingMode = output["mc_homing_mode"] | 0;
+    uint8_t pin2Source = output["pin2_source"] | 0;
+    uint8_t pin3Source = output["pin3_source"] | 0;
+    uint8_t pin4Source = output["pin4_source"] | 0;
+    uint8_t colorOrder = output["color_order"] | 0;
 
     if (source == 0 && jsonPinMatches(output["pin"], reservedPin)) return true;
-    if (source == 0) {
-        uint8_t pin2Source = output["pin2_source"] | 0;
-        uint8_t pin3Source = output["pin3_source"] | 0;
-        
-        if ((type == 12 || type == 13) && pin2Source == 0) {
+
+    if (type == 12 || type == 13) {
+        if (pin2Source == 0) {
             uint8_t numSeg = (type == 13) ? 8 : 7;
+            bool isCommonDim = (mcMode >= 6 && mcMode <= 9);
+            uint8_t startIdx = isCommonDim ? 0 : 1;
             if (output.containsKey("seg_pins")) {
                 JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
-                for (int s = 0; s < numSeg; s++) {
+                JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
+                for (int s = startIdx; s < numSeg; s++) {
+                    if (s < segSources.size() && (uint8_t)(segSources[s] | 0) != 0) continue;
                     if (s < segArr.size()) {
                         if (jsonPinMatches(segArr[s], reservedPin)) return true;
-                    } else {
+                    } else if (source == 0) {
                         int basePin = output["pin"] | 255;
-                        if (basePin != 255 && reservedPin != 255 && (basePin + s) == reservedPin) return true;
+                        if (basePin != 255 && (basePin + s) == reservedPin) return true;
                     }
                 }
-            } else {
+            } else if (source == 0) {
                 int basePin = output["pin"] | 255;
-                if (basePin != 255 && reservedPin != 255) {
-                    for (int s = 0; s < numSeg; s++) {
+                if (basePin != 255) {
+                    for (int s = startIdx; s < numSeg; s++) {
                         if ((basePin + s) == reservedPin) return true;
                     }
                 }
             }
         }
-        
-        if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10 ||
-             (type == 7 && pin2Source == 0)) &&
-            jsonPinMatches(output["pin2"], reservedPin)) return true;
-        if ((type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2) ||
-             (type == 7 && pin3Source == 0)) &&
-            jsonPinMatches(output["pin3"], reservedPin)) return true;
-        uint8_t colorOrder = output["color_order"] | 0;
-        if (((type == 7 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && jsonPinMatches(output["pin4"], reservedPin)) return true;
+    } else {
+        bool p2IsGpio = false;
+        if (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10) {
+            p2IsGpio = (pin2Source == 0);
+        } else if (type == 7 && pin2Source == 0) {
+            p2IsGpio = true;
+        }
+        if (p2IsGpio && jsonPinMatches(output["pin2"], reservedPin)) return true;
+
+        bool p3IsGpio = false;
+        if (type == CHAN_TYPE_ANALOG_RGB) {
+            p3IsGpio = (pin3Source == 0);
+        } else if (type == 6 && mcMode == 2) {
+            p3IsGpio = (pin3Source == 0);
+        } else if (type == 7 && pin3Source == 0) {
+            p3IsGpio = true;
+        }
+        if (p3IsGpio && jsonPinMatches(output["pin3"], reservedPin)) return true;
+
+        bool p4IsGpio = false;
+        if (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4) {
+            p4IsGpio = (pin4Source == 0);
+        } else if (type == 7 && homingMode == 0) {
+            p4IsGpio = (pin4Source == 0);
+        }
+        if (p4IsGpio && jsonPinMatches(output["pin4"], reservedPin)) return true;
     }
     return false;
 }
@@ -370,47 +392,73 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
     for (JsonObject output : outputs) {
         uint8_t source = output["source"] | 0;
         uint8_t type = output["type"] | 0;
-        if (source != 0) {
-            channel++;
-            continue; // Ignore duplicate check for expander outputs using channels
-        }
         uint8_t mcMode = output["mc_mode"] | 0;
         uint8_t homingMode = output["mc_homing_mode"] | 0;
         uint8_t colorOrder = output["color_order"] | 0;
         uint8_t pin2Source = output["pin2_source"] | 0;
         uint8_t pin3Source = output["pin3_source"] | 0;
-        
-        if ((type == 12 || type == 13) && pin2Source == 0) {
-            uint8_t numSeg = (type == 13) ? 8 : 7;
-            if (output.containsKey("seg_pins")) {
-                JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
-                for (int s = 0; s < numSeg; s++) {
-                    int pVal = 255;
-                    if (s < segArr.size()) {
-                        pVal = segArr[s] | 255;
+        uint8_t pin4Source = output["pin4_source"] | 0;
+
+        if (source == 0) {
+            if (addPin(output["pin"] | 255, channel)) return true;
+        }
+
+        if (type == 12 || type == 13) {
+            if (pin2Source == 0) {
+                uint8_t numSeg = (type == 13) ? 8 : 7;
+                bool isCommonDim = (mcMode >= 6 && mcMode <= 9);
+                uint8_t startIdx = isCommonDim ? 0 : 1;
+                if (output.containsKey("seg_pins")) {
+                    JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
+                    JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
+                    for (int s = startIdx; s < numSeg; s++) {
+                        if (s < segSources.size() && (uint8_t)(segSources[s] | 0) != 0) continue;
+                        int pVal = 255;
+                        if (s < segArr.size()) {
+                            pVal = segArr[s] | 255;
+                        }
+                        if (pVal == 255 && source == 0) {
+                            int basePin = output["pin"] | 255;
+                            pVal = (basePin != 255) ? (basePin + s) : 255;
+                        }
+                        if (addPin(pVal, channel)) return true;
                     }
-                    if (pVal == 255) {
+                } else {
+                    if (source == 0) {
                         int basePin = output["pin"] | 255;
-                        pVal = (basePin != 255) ? (basePin + s) : 255;
+                        for (int s = startIdx; s < numSeg; s++) {
+                            int pVal = (basePin != 255) ? (basePin + s) : 255;
+                            if (addPin(pVal, channel)) return true;
+                        }
                     }
-                    if (addPin(pVal, channel)) return true;
-                }
-            } else {
-                int basePin = output["pin"] | 255;
-                for (int s = 0; s < numSeg; s++) {
-                    int pVal = (basePin != 255) ? (basePin + s) : 255;
-                    if (addPin(pVal, channel)) return true;
                 }
             }
         } else {
-            if (addPin(output["pin"] | 255, channel)) return true;
-            if ((type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10 ||
-                 (type == 7 && pin2Source == 0)) &&
-                addPin(output["pin2"] | 255, channel)) return true;
-            if ((type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2) ||
-                 (type == 7 && pin3Source == 0)) &&
-                addPin(output["pin3"] | 255, channel)) return true;
-            if (((type == 7 && homingMode == 0) || (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)) && addPin(output["pin4"] | 255, channel)) return true;
+            bool p2IsGpio = false;
+            if (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10) {
+                p2IsGpio = (pin2Source == 0);
+            } else if (type == 7 && pin2Source == 0) {
+                p2IsGpio = true;
+            }
+            if (p2IsGpio && addPin(output["pin2"] | 255, channel)) return true;
+
+            bool p3IsGpio = false;
+            if (type == CHAN_TYPE_ANALOG_RGB) {
+                p3IsGpio = (pin3Source == 0);
+            } else if (type == 6 && mcMode == 2) {
+                p3IsGpio = (pin3Source == 0);
+            } else if (type == 7 && pin3Source == 0) {
+                p3IsGpio = true;
+            }
+            if (p3IsGpio && addPin(output["pin3"] | 255, channel)) return true;
+
+            bool p4IsGpio = false;
+            if (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4) {
+                p4IsGpio = (pin4Source == 0);
+            } else if (type == 7 && homingMode == 0) {
+                p4IsGpio = (pin4Source == 0);
+            }
+            if (p4IsGpio && addPin(output["pin4"] | 255, channel)) return true;
         }
         channel++;
     }
@@ -460,11 +508,48 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
             if ((type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4) &&
                 addChannel(source, address, output["pca_channel4"] | 255, outputIndex)) return true;
         }
-        if (type == 7 && source == 0) {
+
+        uint8_t pin2Source = output["pin2_source"] | 0;
+        uint8_t pin3Source = output["pin3_source"] | 0;
+        uint8_t pin4Source = output["pin4_source"] | 0;
+
+        bool is7SegDD = (type == 12 || type == 13) && (mcMode >= 2 && mcMode <= 9);
+        if (pin2Source != 0 && !is7SegDD) {
+            uint8_t pin2Addr = output["pin2_addr"] | (pin2Source == 1 ? 0x40 : 0x20);
+            if (addChannel(pin2Source, pin2Addr, output["pin2_channel"] | 255, outputIndex)) return true;
+        }
+        if (pin3Source != 0) {
+            uint8_t pin3Addr = output["pin3_addr"] | (pin3Source == 1 ? 0x40 : 0x20);
+            if (addChannel(pin3Source, pin3Addr, output["pin3_channel"] | 255, outputIndex)) return true;
+        }
+        if (pin4Source != 0) {
+            uint8_t pin4Addr = output["pin4_addr"] | (pin4Source == 1 ? 0x40 : 0x20);
+            if (addChannel(pin4Source, pin4Addr, output["pin4_channel"] | 255, outputIndex)) return true;
+        }
+        if (is7SegDD) {
             uint8_t pin2Source = output["pin2_source"] | 0;
-            uint8_t pin3Source = output["pin3_source"] | 0;
-            if (addChannel(pin2Source, output["pin2_addr"] | 0x20, output["pin2_channel"] | 255, outputIndex)) return true;
-            if (addChannel(pin3Source, output["pin3_addr"] | 0x20, output["pin3_channel"] | 255, outputIndex)) return true;
+            if (pin2Source != 0) {
+                uint8_t baseCh = output["pin2_channel"] | 255;
+                uint8_t pin2Addr = output["pin2_addr"] | (pin2Source == 1 ? 0x40 : 0x20);
+                uint8_t numSeg = (type == 13) ? 8 : 7;
+                for (uint8_t s = 0; s < numSeg; s++) {
+                    if (addChannel(pin2Source, pin2Addr, baseCh != 255 ? baseCh + s : 255, outputIndex)) return true;
+                }
+            } else if (output.containsKey("seg_sources")) {
+                JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
+                JsonArrayConst segAddrs = output["seg_addrs"].as<JsonArrayConst>();
+                JsonArrayConst segChannels = output["seg_channels"].as<JsonArrayConst>();
+                uint8_t numSeg = (type == 13) ? 8 : 7;
+                for (uint8_t s = 0; s < numSeg; s++) {
+                    if (s < segSources.size() && s < segAddrs.size() && s < segChannels.size()) {
+                        uint8_t sSrc = segSources[s] | 0;
+                        if (sSrc != 0) {
+                            uint8_t sAddr = segAddrs[s] | (sSrc == 1 ? 0x40 : 0x20);
+                            if (addChannel(sSrc, sAddr, segChannels[s] | 255, outputIndex)) return true;
+                        }
+                    }
+                }
+            }
         }
         outputIndex++;
     }
@@ -619,8 +704,9 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             message = "Invalid output type on channel " + String(channelNumber) + ".";
             return false;
         }
-        bool pcaOk = (type == 2 || type == 4 || type == 6 || type == 7 || type == 8 || type == CHAN_TYPE_ANALOG_RGB || type == 15 || type == 18);
-        bool digitalOk = (type == 2 || type == 6 || type == 17 || type == 18);
+        uint8_t mcMode = output["mc_mode"] | 0;
+        bool pcaOk = (type == 2 || type == 4 || type == 6 || type == 7 || type == 8 || type == CHAN_TYPE_ANALOG_RGB || type == 15 || type == 17 || type == 18 || type == 12 || type == 13);
+        bool digitalOk = (type == 2 || type == 6 || type == 17 || type == 18 || ((type == 12 || type == 13) && mcMode >= 2 && mcMode <= 5));
         if (source == 1 && !pcaOk) {
             message = "PCA9685 source is not supported by output channel " + String(channelNumber);
             return false;
@@ -629,9 +715,34 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             message = "Digital GPIO expander source is not supported by output channel " + String(channelNumber);
             return false;
         }
-        if (source > 4) {
+        if (source == 5 && type != 14) {
+            message = "MCP4725 DAC source is only supported by DAC output channel " + String(channelNumber);
+            return false;
+        }
+        if (source > 5) {
             message = "Unsupported output source on channel " + String(channelNumber);
             return false;
+        }
+        if (type == 12 || type == 13) {
+            uint8_t pin2Source = output["pin2_source"] | 0;
+            if (pin2Source != 0 && pin2Source > 4) {
+                message = "Unsupported segment expander source on channel " + String(channelNumber);
+                return false;
+            }
+            if (pin2Source != 0 && (int)(output["pin2_channel"] | 255) == 255) {
+                message = "Segment expander base channel is missing on channel " + String(channelNumber);
+                return false;
+            }
+            if (output.containsKey("seg_sources")) {
+                JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
+                for (int s = 0; s < segSources.size(); s++) {
+                    uint8_t sSrc = segSources[s] | 0;
+                    if (sSrc != 0 && sSrc > 4) {
+                        message = "Unsupported segment expander source on channel " + String(channelNumber);
+                        return false;
+                    }
+                }
+            }
         }
         if (type == 7) {
             uint8_t pin2Source = output["pin2_source"] | 0;
@@ -647,6 +758,26 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             if ((pin2Source != 0 && (int)(output["pin2_channel"] | 255) == 255) ||
                 (pin3Source != 0 && (int)(output["pin3_channel"] | 255) == 255)) {
                 message = "Stepper hybrid expander channel is missing on channel " + String(channelNumber);
+                return false;
+            }
+        }
+        if (type == CHAN_TYPE_ANALOG_RGB) {
+            uint8_t pin2Source = output["pin2_source"] | 0;
+            uint8_t pin3Source = output["pin3_source"] | 0;
+            uint8_t pin4Source = output["pin4_source"] | 0;
+            if (source > 1 || pin2Source > 1 || pin3Source > 1 || pin4Source > 1) {
+                message = "Analog RGB/RGBW channels only support ESP32 GPIO or PCA9685 sources on channel " + String(channelNumber);
+                return false;
+            }
+        }
+        if (type == 6 && (uint8_t)(output["mc_mode"] | 0) == 2) {
+            uint8_t enSource = output["pin3_source"] | 0;
+            if (enSource >= 2) {
+                message = "Motor EN pin needs PWM; use ESP32 GPIO or PCA9685 on channel " + String(channelNumber);
+                return false;
+            }
+            if (enSource == 1 && (int)(output["pin3_channel"] | 255) == 255) {
+                message = "Motor EN PCA9685 channel is missing on channel " + String(channelNumber);
                 return false;
             }
         }

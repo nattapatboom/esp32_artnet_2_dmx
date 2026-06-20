@@ -19,26 +19,21 @@
 extern PCA9685Manager pcaManager;
 extern DigitalExpanderManager digitalExpanderManager;
 
-// Max universes supported per channel
 #define DMX_BUFFER_SIZE 512
 #define CHAN_TYPE_ANALOG_RGB 5
 
-// Global active DMX channel buffer for current universe-0 frame state
 extern uint8_t activeDmxBuffer[DMX_BUFFER_SIZE];
 extern unsigned long lastDmxUpdateTime;
 extern bool systemActive;
 extern std::atomic<bool> networkFramePending;
 
-// Interface for virtualized NeoPixelBus
 class PixelStripWrapper {
 public:
     virtual ~PixelStripWrapper() {}
     virtual void Begin() = 0;
     virtual void Show() = 0;
     virtual void SetPixelColor(uint16_t index, RgbColor color) = 0;
-    virtual void SetPixelColorRgbw(uint16_t index, RgbwColor color) {
-        // Default: RGB wrappers ignore this
-    }
+    virtual void SetPixelColorRgbw(uint16_t index, RgbwColor color) {}
     virtual bool IsRgbw() const { return false; }
 };
 
@@ -67,7 +62,7 @@ public:
     bool IsRgbw() const override { return false; }
 };
 
-// RGBW (4-channel) LED Strip Wrapper
+
 template <typename T_Method>
 class PixelStripRmtRgbw : public PixelStripWrapper {
 private:
@@ -110,9 +105,9 @@ struct OutputChannel {
     uint16_t start_address = 1;
     uint16_t led_count = 0;
     uint8_t color_order = 0;
-    uint8_t led_protocol = 0; // 0 = WS2812x (800kHz), 1 = WS2811 (400kHz)
+    uint8_t led_protocol = 0;
     
-    // Unicast feedback & Smoke parameters
+
     char dest_ip[16] = "192.168.1.100";
     uint16_t dest_port = 9000;
     uint16_t smoke_duration_ms = 1000;
@@ -120,24 +115,22 @@ struct OutputChannel {
     uint16_t shoot_duration_ms = 1000;
     uint16_t smoke_lockout_ms = 2000;
 
-    // Runtime state
-    uint8_t smoke_state = 0; // 0=IDLE, 1=SMOKE, 2=SETTLE, 3=SHOOT, 4=COOLDOWN
+    uint8_t smoke_state = 0;
     unsigned long smoke_timer = 0;
     bool smoke_prev_trigger = false;
     uint32_t prev_7seg_val = 0;
     bool prev_7seg_valid = false;
     
-    // Motion Control (Phase 5.5) fields
     uint8_t pin2;
     uint8_t pin3;
-    uint8_t pin4 = 255; // Limit Switch / Homing Sensor pin (255 = unused)
-    uint8_t pin4_source = 0; // Homing sensor source: 0=ESP32 GPIO, 2=MCP23017, 3=TCA9555, 4=PCF857x
-    uint8_t pin4_addr = 0x20; // Homing sensor expander I2C address
-    uint8_t pin4_channel = 255; // Homing sensor expander channel (255 = unused)
-    uint8_t pin2_source = 0; // Stepper DIR source: 0=ESP32, 1=PCA9685, 2=MCP23017, 3=TCA9555, 4=PCF857x
+    uint8_t pin4 = 255;
+    uint8_t pin4_source = 0;
+    uint8_t pin4_addr = 0x20;
+    uint8_t pin4_channel = 255;
+    uint8_t pin2_source = 0;
     uint8_t pin2_addr = 0x20;
     uint8_t pin2_channel = 255;
-    uint8_t pin3_source = 0; // Stepper ENABLE source
+    uint8_t pin3_source = 0;
     uint8_t pin3_addr = 0x20;
     uint8_t pin3_channel = 255;
     uint8_t mc_resolution; // 8, 10, 12, 16 bit
@@ -163,37 +156,33 @@ struct OutputChannel {
     bool pin3_invert = false;
     bool pin4_invert = false;
     
-    // Runtime Homing/Command state trackers
-    uint8_t stepper_cmd_state = 0; // 0=normal, 1=stop_pending, 2=stop_active, 3=homing_pending, 4=homing_active, 5=homing_done
+    uint8_t stepper_cmd_state = 0;
     unsigned long stepper_cmd_start_time = 0;
     unsigned long stepper_homing_start_time = 0;
     
-    uint8_t ledc_chan2 = 255; // 2nd LEDC channel for DC Motor PWM+PWM mode (255 = unused)
-    uint8_t ledc_chan3 = 255; // 3rd LEDC channel for Analog RGB Blue (255 = unused)
-    uint8_t ledc_chan4 = 255; // 4th LEDC channel for Analog RGBW White (255 = unused)
-    uint8_t seg_pins[8] = {255,255,255,255,255,255,255,255}; // 7-Seg DD individual segment pins A-G+DP (255=use base pin+offset)
+    uint8_t ledc_chan2 = 255;
+    uint8_t ledc_chan3 = 255;
+    uint8_t ledc_chan4 = 255;
+    uint8_t seg_pins[8] = {255,255,255,255,255,255,255,255};
+    uint8_t seg_sources[8] = {0,0,0,0,0,0,0,0};
+    uint8_t seg_addrs[8] = {0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20};
+    uint8_t seg_channels[8] = {255,255,255,255,255,255,255,255};
+    uint8_t seg_inverts = 0;
     
     uint8_t* dmxBuffer = nullptr;
     uint16_t bufferSize = 0;
-    
     PixelStripWrapper* pixelStrip = nullptr;
-    uint8_t dmxPort = 255; // 255 = uninitialized, otherwise DMX_NUM_2 or DMX_NUM_1
+    uint8_t dmxPort = 255;
     RmtDmxDriver* rmtDmx = nullptr;
-    
-    // Solenoid state
-    uint16_t solenoid_pulse_ms = 50;    // Pulse width in milliseconds
-    uint8_t solenoid_mode = 0;          // 0=threshold, 1=frame-sync
-    uint8_t solenoid_threshold = 127;   // DMX value threshold
-    uint16_t solenoid_pre_delay = 0;    // Delay before pulse in milliseconds
-    uint16_t solenoid_post_delay = 100; // Delay after pulse before next allowed trigger
-    unsigned long solenoid_pulse_start = 0;  // Timestamp when pulse started
-    bool solenoid_pulse_active = false;      // True when pulse is currently driving GPIO
-    unsigned long solenoid_last_trigger = 0; // Timestamp of last trigger
-
-    // DFPlayer MP3 state
+    uint16_t solenoid_pulse_ms = 50;
+    uint8_t solenoid_mode = 0;
+    uint8_t solenoid_threshold = 127;
+    uint16_t solenoid_pre_delay = 0;
+    uint16_t solenoid_post_delay = 100;
+    unsigned long solenoid_pulse_start = 0;
+    bool solenoid_pulse_active = false;
+    unsigned long solenoid_last_trigger = 0;
     DFPlayerController* dfPlayer = nullptr;
-
-    // Function Generator state
     FuncGenController* funcGen = nullptr;
 };
 
@@ -216,18 +205,36 @@ inline void writeOutputPin(OutputChannel& ch, uint8_t pinNum, bool state) {
         channel = ch.pin2_channel;
         gpio = ch.pin2;
         inv = ch.pin2_invert;
+        if (source == 0 && ch.source != 0 && ch.pca_channel2 != 255) {
+            source = ch.source;
+            address = ch.pca_addr;
+            channel = ch.pca_channel2;
+            gpio = 255;
+        }
     } else if (pinNum == 3) {
         source = ch.pin3_source;
         address = ch.pin3_addr;
         channel = ch.pin3_channel;
         gpio = ch.pin3;
         inv = ch.pin3_invert;
+        if (source == 0 && ch.source != 0 && ch.pca_channel3 != 255) {
+            source = ch.source;
+            address = ch.pca_addr;
+            channel = ch.pca_channel3;
+            gpio = 255;
+        }
     } else if (pinNum == 4) {
         source = ch.pin4_source;
         address = ch.pin4_addr;
         channel = ch.pin4_channel;
         gpio = ch.pin4;
         inv = ch.pin4_invert;
+        if (source == 0 && ch.source != 0 && ch.pca_channel4 != 255) {
+            source = ch.source;
+            address = ch.pca_addr;
+            channel = ch.pca_channel4;
+            gpio = 255;
+        }
     }
     
     if (gpio == 255 && channel == 255) return;
@@ -289,7 +296,6 @@ inline bool readOutputPin(OutputChannel& ch, uint8_t pinNum) {
             val = digitalExpanderManager.digitalRead(source, address, channel);
         }
     }
-    // source == 1 (PCA9685) — cannot read back, return false
     return val ^ inv;
 }
 
@@ -612,7 +618,7 @@ public:
             ch.pin3_addr = item["pin3_addr"] | 0x20;
             ch.pin3_channel = item["pin3_channel"] | 255;
             ch.mc_resolution = item["mc_resolution"] | 8;
-            if (ch.type != 7 && ch.mc_resolution > 16) ch.mc_resolution = 16; // Stepper v3 = 7
+            if (ch.type != 7 && ch.mc_resolution > 16) ch.mc_resolution = 16;
             if (ch.mc_resolution == 0) ch.mc_resolution = 8;
             ch.mc_freq = item["mc_freq"] | 1000;
             ch.mc_mode = item["mc_mode"] | 0;
@@ -640,8 +646,6 @@ public:
             ch.solenoid_pulse_ms = item["solenoid_pulse_ms"] | 50;
             ch.solenoid_pre_delay = item["solenoid_pre_delay"] | 0;
             ch.solenoid_post_delay = item["solenoid_post_delay"] | 100;
-            
-            // New network/smoke properties
             String destIp = item["dest_ip"] | "192.168.1.100";
             strncpy(ch.dest_ip, destIp.c_str(), sizeof(ch.dest_ip) - 1);
             ch.dest_ip[sizeof(ch.dest_ip) - 1] = '\0';
@@ -650,7 +654,6 @@ public:
             ch.settle_delay_ms = item["settle_delay_ms"] | 500;
             ch.shoot_duration_ms = item["shoot_duration_ms"] | 1000;
             ch.smoke_lockout_ms = item["smoke_lockout_ms"] | 2000;
-            
             if (item.containsKey("seg_pins")) {
                 JsonArray segArr = item["seg_pins"].as<JsonArray>();
                 for (int s = 0; s < 8; s++) {
@@ -665,11 +668,28 @@ public:
                     ch.seg_pins[s] = 255;
                 }
             }
-            
-            if (ch.type == 3) { // RGB LED strip (v3)
+            for (int s = 0; s < 8; s++) {
+                ch.seg_sources[s] = 0;
+                ch.seg_addrs[s] = 0x20;
+                ch.seg_channels[s] = 255;
+            }
+            if (item.containsKey("seg_sources")) {
+                JsonArray arr = item["seg_sources"].as<JsonArray>();
+                for (int s = 0; s < 8 && s < arr.size(); s++) ch.seg_sources[s] = arr[s] | 0;
+            }
+            if (item.containsKey("seg_addrs")) {
+                JsonArray arr = item["seg_addrs"].as<JsonArray>();
+                for (int s = 0; s < 8 && s < arr.size(); s++) ch.seg_addrs[s] = arr[s] | 0x20;
+            }
+            if (item.containsKey("seg_channels")) {
+                JsonArray arr = item["seg_channels"].as<JsonArray>();
+                for (int s = 0; s < 8 && s < arr.size(); s++) ch.seg_channels[s] = arr[s] | 255;
+            }
+            ch.seg_inverts = item["seg_inverts"] | 0;
+            if (ch.type == 3) {
                 uint16_t numUniverses = getUniverseCount(ch);
                 ch.bufferSize = numUniverses * 512;
-            } else { // DMX and all other small types
+            } else {
                 ch.bufferSize = 512;
             }
             ch.dmxBuffer = (uint8_t*)calloc(ch.bufferSize, 1);
@@ -677,12 +697,10 @@ public:
                 Serial.printf("OOM error allocating DMX buffer for channel type %d!\n", ch.type);
                 continue;
             }
-            
             channels.push_back(ch);
         }
         if (layoutVersion < 3) {
             saveChannels();
-            Serial.println("Saved migrated output channels to /outputs.json with version 3");
         }
         Serial.printf("Loaded %d output channels from /outputs.json\n", channels.size());
     }
@@ -717,7 +735,7 @@ public:
              item["pin3_invert"] = ch.pin3_invert;
              item["pin4_invert"] = ch.pin4_invert;
              
-             // Serialize new v1.11.0 fields
+
              item["dest_ip"] = ch.dest_ip;
              item["dest_port"] = ch.dest_port;
              item["smoke_duration_ms"] = ch.smoke_duration_ms;
@@ -725,11 +743,11 @@ public:
              item["shoot_duration_ms"] = ch.shoot_duration_ms;
              item["smoke_lockout_ms"] = ch.smoke_lockout_ms;
 
-            if (ch.type >= 4 && ch.type <= 8) { // v3 motion range: Single Color(4), Analog RGB(5), Motor(6), Stepper(7), Servo(8)
+            if (ch.type >= 4 && ch.type <= 8) {
                 item["pin2"] = ch.pin2;
                 item["pin3"] = ch.pin3;
                 item["pin4"] = ch.pin4;
-                if (ch.type == 7) {  // Stepper (v3)
+                if (ch.type == 7) {
                     item["pin4_source"] = ch.pin4_source;
                     item["pin4_addr"] = ch.pin4_addr;
                     item["pin4_channel"] = ch.pin4_channel;
@@ -758,15 +776,17 @@ public:
                 item["mc_homing_timeout"] = ch.mc_homing_timeout;
                 item["mc_scale_factor"] = ch.mc_scale_factor;
                 item["mc_unit_type"] = ch.mc_unit_type;
-            } else if (ch.type == 17) {  // Solenoid (v3)
+            } else if (ch.type == 17) {
                 item["solenoid_mode"] = ch.solenoid_mode;
                 item["solenoid_threshold"] = ch.solenoid_threshold;
                 item["solenoid_pulse_ms"] = ch.solenoid_pulse_ms;
                 item["solenoid_pre_delay"] = ch.solenoid_pre_delay;
                 item["solenoid_post_delay"] = ch.solenoid_post_delay;
-            } else if (ch.type == 9) {  // Buzzer (v3) — save mc_freq for tone restore
+            } else if (ch.type == 18) {
+                item["solenoid_threshold"] = ch.solenoid_threshold;
+            } else if (ch.type == 9) {
                 item["mc_freq"] = ch.mc_freq;
-            } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) {  // 7-Segment (all variants)
+            } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) {
                 item["pin2"] = ch.pin2;
                 item["pin2_source"] = ch.pin2_source;
                 item["pin2_addr"] = ch.pin2_addr;
@@ -777,10 +797,19 @@ public:
                     for (int s = 0; s < 8; s++) {
                         segArr.add(ch.seg_pins[s]);
                     }
+                    JsonArray segSources = item["seg_sources"].to<JsonArray>();
+                    JsonArray segAddrs = item["seg_addrs"].to<JsonArray>();
+                    JsonArray segChannels = item["seg_channels"].to<JsonArray>();
+                    for (int s = 0; s < 8; s++) {
+                        segSources.add(ch.seg_sources[s]);
+                        segAddrs.add(ch.seg_addrs[s]);
+                        segChannels.add(ch.seg_channels[s]);
+                    }
+                    item["seg_inverts"] = ch.seg_inverts;
                 }
-            } else if (ch.type == 10) {  // DFPlayer (v3)
+            } else if (ch.type == 10) {
                 item["pin2"] = ch.pin2;
-            } else if (ch.type == 15 || ch.type == 16) {  // PWM DAC / FuncGen
+            } else if (ch.type == 15 || ch.type == 16) {
                 item["mc_freq"] = ch.mc_freq;
                 item["mc_resolution"] = ch.mc_resolution;
             }
@@ -826,14 +855,10 @@ public:
         uint8_t dmxIdx = 0;
         pcaManager.clear();
         digitalExpanderManager.clear();
-
-        // Track UART allocations
         bool uart2Used = false;
         bool uart1Used = false;
-
-        // DFPlayer gets priority because DMX can fall back to RMT
         for (const auto& ch : channels) {
-            if (ch.type == 10) { // DFPlayer (v3)
+            if (ch.type == 10) {
                 if (!uart2Used) {
                     uart2Used = true;
                 } else if (!uart1Used) {
@@ -845,32 +870,29 @@ public:
         uint8_t dfPlayerCount = 0;
 
         for (auto& ch : channels) {
-            if (ch.source == 1) { // PCA9685 Expander
+            if (ch.source == 1) {
                 uint16_t freq = getPcaSharedFrequency(ch.pca_addr);
                 pcaManager.getOrCreateDriver(ch.pca_addr);
                 pcaManager.setFrequency(ch.pca_addr, freq);
-                Serial.printf("PCA9685 initialized at 0x%02X: shared freq = %d Hz, type = %d\n",
-                              ch.pca_addr, freq, ch.type);
+                Serial.printf("PCA9685 initialized at 0x%02X: freq=%dHz type=%d\n", ch.pca_addr, freq, ch.type);
                 continue;
             } else if (ch.source >= 2 && ch.source <= 4) {
                 writeOutputPin(ch, 1, false);
-                if ((ch.type == 18 || ch.type == 6 || ch.type == 7) && ch.pca_channel2 != 255) { // v3: Smoke(18), Motor(6), Stepper(7)
+                if ((ch.type == 18 || ch.type == 6 || ch.type == 7) && ch.pca_channel2 != 255) {
                     writeOutputPin(ch, 2, false);
                 }
-                if ((ch.type == 6 || ch.type == 7) && ch.pca_channel3 != 255) { // Motor(6), Stepper(7)
+                if ((ch.type == 6 || ch.type == 7) && ch.pca_channel3 != 255) {
                     writeOutputPin(ch, 3, false);
                 }
-                Serial.printf("Digital expander initialized: source %d, addr 0x%02X, type %d\n",
-                              ch.source, ch.pca_addr, ch.type);
+                Serial.printf("Expander initialized: src=%d addr=0x%02X type=%d\n", ch.source, ch.pca_addr, ch.type);
                 continue;
             }
-            if (ch.type == 3) { // RGB LED strip (v3)
+            if (ch.type == 3) {
                 if (ch.pixelStrip != nullptr) {
                     delete ch.pixelStrip;
                     ch.pixelStrip = nullptr;
                 }
                 if (rmtIdx < 8) {
-                    // Detect RGBW vs RGB based on color_order (0-3=RGB, 4-7=RGBW)
                     if (ch.color_order >= 4) {
                         ch.pixelStrip = createPixelStripRgbw(rmtIdx, ch.led_count, ch.pin, ch.led_protocol);
                     } else {
@@ -879,28 +901,25 @@ public:
                     if (ch.pixelStrip != nullptr) {
                         ch.pixelStrip->Begin();
                         ch.pixelStrip->Show();
-                        const char* stripType = (ch.color_order >= 4) ? "RGBW" : "RGB";
-                        Serial.printf("LED Channel initialized: GPIO %d, Count %d, Start Universe %d, RMT %d, Type %s\n", 
-                                      ch.pin, ch.led_count, ch.start_universe, rmtIdx, stripType);
+                        Serial.printf("LED init: GPIO%d cnt=%d U%d RMT%d %s\n",
+                            ch.pin, ch.led_count, ch.start_universe, rmtIdx, ch.color_order >= 4 ? "RGBW" : "RGB");
                     }
                     rmtIdx++;
                 } else {
-                    Serial.println("Max 8 LED channels reached. Cannot initialize more.");
+                    Serial.println("Max 8 LED channels reached.");
                 }
-            } else if (ch.type == 2) { // CHAN_TYPE_RELAY
+            } else if (ch.type == 2) {
                 pinMode(ch.pin, OUTPUT);
                 digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
-                Serial.printf("Relay Channel initialized: GPIO %d, Start Universe %d\n", ch.pin, ch.start_universe);
-            } else if (ch.type == 17) { // CHAN_TYPE_SOLENOID (v3)
+                Serial.printf("Relay init: GPIO%d U%d\n", ch.pin, ch.start_universe);
+            } else if (ch.type == 17) {
                 pinMode(ch.pin, OUTPUT);
                 digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
-                // Set defaults if not configured
-                if (ch.solenoid_pulse_ms == 0) ch.solenoid_pulse_ms = 50;  // Default 50ms pulse
-                if (ch.solenoid_threshold == 0) ch.solenoid_threshold = 127; // Default 50% threshold
-                Serial.printf("Solenoid Channel initialized: GPIO %d, Start Universe %d, Pulse %dms, Mode %s\n", 
-                              ch.pin, ch.start_universe, ch.solenoid_pulse_ms, 
-                              (ch.solenoid_mode == 0) ? "Threshold" : "FrameSync");
-            } else if (ch.type == 1) { // CHAN_TYPE_DMX
+                if (ch.solenoid_pulse_ms == 0) ch.solenoid_pulse_ms = 50;
+                if (ch.solenoid_threshold == 0) ch.solenoid_threshold = 127;
+                Serial.printf("Solenoid init: GPIO%d U%d pulse=%dms thresh=%d\n",
+                    ch.pin, ch.start_universe, ch.solenoid_pulse_ms, ch.solenoid_threshold);
+            } else if (ch.type == 1) {
                 if (ch.dmxPort != 255) {
                     dmx_driver_delete((dmx_port_t)ch.dmxPort);
                     ch.dmxPort = 255;
@@ -927,113 +946,98 @@ public:
                     Serial.printf("DMX Channel initialized: GPIO %d, Start Universe %d on UART1\n", 
                                   ch.pin, ch.start_universe);
                 } else if (rmtIdx < 8) {
-                    // Fallback to RMT for extra DMX channels
                     ch.rmtDmx = new RmtDmxDriver(rmtIdx, ch.pin);
                     ch.rmtDmx->begin();
-                    Serial.printf("DMX Channel (Extra) initialized: GPIO %d, Start Universe %d on RMT %d\n", 
-                                  ch.pin, ch.start_universe, rmtIdx);
+                    Serial.printf("DMX (RMT%d): GPIO%d U%d\n", rmtIdx, ch.pin, ch.start_universe);
                     rmtIdx++;
                 } else {
-                    Serial.println("Max 8 RMTs reached. Cannot initialize more DMX channels.");
+                    Serial.println("Max 8 RMTs reached.");
                 }
-            } else if (ch.type == 18) { // Sequential Smoke Shooter (v3)
-                if (ch.source == 0) { // ESP32 GPIO
+            } else if (ch.type == 18) {
+                if (ch.source == 0) {
                     pinMode(ch.pin, OUTPUT);
                     pinMode(ch.pin2, OUTPUT);
                     digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
                     digitalWrite(ch.pin2, ch.pin2_invert ? HIGH : LOW);
                 }
+                if (ch.solenoid_threshold == 0) ch.solenoid_threshold = 127;
                 ch.smoke_state = 0;
                 ch.smoke_prev_trigger = false;
-                Serial.printf("Smoke Shooter initialized: Smoke Pin %d, Shooter Pin %d\n", ch.pin, ch.pin2);
-            } else if (ch.type == 10) { // DFPlayer MP3 (v3)
+                Serial.printf("Smoke Shooter init: pin=%d pin2=%d thresh=%d\n", ch.pin, ch.pin2, ch.solenoid_threshold);
+            } else if (ch.type == 10) {
                 ch.dfPlayer = new DFPlayerController();
                 if (dfPlayerCount == 0) {
                     ch.dfPlayer->begin(Serial2, ch.pin, ch.pin2);
-                    Serial.printf("DFPlayer MP3 initialized on Serial2: TX Pin %d, RX Pin %d\n", ch.pin, ch.pin2);
+                    Serial.printf("DFPlayer (UART2): TX=%d RX=%d\n", ch.pin, ch.pin2);
                     dfPlayerCount++;
                 } else if (dfPlayerCount == 1) {
                     ch.dfPlayer->begin(Serial1, ch.pin, ch.pin2);
-                    Serial.printf("DFPlayer MP3 initialized on Serial1: TX Pin %d, RX Pin %d\n", ch.pin, ch.pin2);
+                    Serial.printf("DFPlayer (UART1): TX=%d RX=%d\n", ch.pin, ch.pin2);
                     dfPlayerCount++;
                 } else {
-                    Serial.println("Error: No available UART port for DFPlayer MP3!");
+                    Serial.println("Error: No UART for DFPlayer!");
                 }
             }
         }
     }
 
     void loop() {
-        // Trigger DMX Serial Frame send periodically based on target FPS
         static unsigned long lastDmxSend = 0;
         unsigned long now = millis();
         uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
         unsigned long interval = 1000 / fps;
         if (now - lastDmxSend >= interval) {
-            lastDmxSend = now; // Update before send to avoid drift accumulation
+            lastDmxSend = now;
             sendDmxFrames();
             updateRelays();
-            updateSolenoids(); // Frame-rate update for solenoid pulse control
-            updateSmokeShooters(); // Frame-rate update for smoke shooter sequence
+            updateSolenoids();
+            updateSmokeShooters();
         }
     }
 
     void updateSmokeShooters() {
         unsigned long now = millis();
         for (auto& ch : channels) {
-            if (ch.type != 18) continue; // Sequential Smoke Shooter only (v3)
+            if (ch.type != 18) continue;
             if (ch.dmxBuffer == nullptr) continue;
-            
-            uint8_t dmx_val = ch.dmxBuffer[0];
-            bool trigger_active = (dmx_val > 127);
-            
-            if (ch.smoke_state == 0) { // IDLE
+            bool trigger_active = (ch.dmxBuffer[0] > ch.solenoid_threshold);
+            if (ch.smoke_state == 0) {
                 writeOutputPin(ch, 1, false);
                 writeOutputPin(ch, 2, false);
-                
                 if (trigger_active && !ch.smoke_prev_trigger) {
-                    ch.smoke_state = 1; // SMOKE_ON
+                    ch.smoke_state = 1;
                     ch.smoke_timer = now;
                     writeOutputPin(ch, 1, true);
-                    Serial.println("Smoke Shooter: SMOKE state active");
                 }
-            }
-            else if (ch.smoke_state == 1) { // SMOKE_ON
+            } else if (ch.smoke_state == 1) {
                 writeOutputPin(ch, 1, true);
                 writeOutputPin(ch, 2, false);
                 if (now - ch.smoke_timer >= ch.smoke_duration_ms) {
-                    ch.smoke_state = 2; // SETTLE
+                    ch.smoke_state = 2;
                     ch.smoke_timer = now;
                     writeOutputPin(ch, 1, false);
-                    Serial.println("Smoke Shooter: SETTLE state active");
                 }
-            }
-            else if (ch.smoke_state == 2) { // SETTLE
+            } else if (ch.smoke_state == 2) {
                 writeOutputPin(ch, 1, false);
                 writeOutputPin(ch, 2, false);
                 if (now - ch.smoke_timer >= ch.settle_delay_ms) {
-                    ch.smoke_state = 3; // SHOOT_ON
+                    ch.smoke_state = 3;
                     ch.smoke_timer = now;
                     writeOutputPin(ch, 2, true);
-                    Serial.println("Smoke Shooter: SHOOT state active");
                 }
-            }
-            else if (ch.smoke_state == 3) { // SHOOT_ON
+            } else if (ch.smoke_state == 3) {
                 writeOutputPin(ch, 1, false);
                 writeOutputPin(ch, 2, true);
                 if (now - ch.smoke_timer >= ch.shoot_duration_ms) {
-                    ch.smoke_state = 4; // COOLDOWN
+                    ch.smoke_state = 4;
                     ch.smoke_timer = now;
                     writeOutputPin(ch, 2, false);
-                    Serial.println("Smoke Shooter: COOLDOWN state active");
                 }
-            }
-            else if (ch.smoke_state == 4) { // COOLDOWN
+            } else if (ch.smoke_state == 4) {
                 writeOutputPin(ch, 1, false);
                 writeOutputPin(ch, 2, false);
                 if (now - ch.smoke_timer >= ch.smoke_lockout_ms) {
-                    ch.smoke_state = 0; // Back to IDLE
-                    Serial.println("Smoke Shooter: returned to IDLE");
+                    ch.smoke_state = 0;
                 }
             }
             ch.smoke_prev_trigger = trigger_active;
@@ -1053,29 +1057,11 @@ public:
     void updateSolenoids() {
         unsigned long now = millis();
         for (auto& ch : channels) {
-            if (ch.type != 17) continue; // Solenoid only (v3)
+            if (ch.type != 17) continue;
             if (ch.dmxBuffer == nullptr) continue;
-            
-            uint8_t dmx_value = ch.dmxBuffer[0];
-            
-            // Check if trigger condition is met
-            bool should_trigger = false;
-            if (ch.solenoid_mode == 0) {
-                // Threshold mode: trigger when DMX > threshold
-                should_trigger = dmx_value > ch.solenoid_threshold;
-            } else if (ch.solenoid_mode == 1) {
-                // Frame-sync mode: trigger every frame if DMX > 127
-                should_trigger = dmx_value > 127;
-            }
-            
-            // Check cooldown period (post_delay)
-            if (now - ch.solenoid_last_trigger < ch.solenoid_post_delay) {
-                should_trigger = false;
-            }
-            
-            // Trigger new pulse if condition met and not already pulsing
+            bool should_trigger = (ch.dmxBuffer[0] > ch.solenoid_threshold);
+            if (now - ch.solenoid_last_trigger < ch.solenoid_post_delay) should_trigger = false;
             if (should_trigger && !ch.solenoid_pulse_active) {
-                // Wait pre_delay before starting pulse
                 if (now >= ch.solenoid_last_trigger + ch.solenoid_post_delay + ch.solenoid_pre_delay) {
                     ch.solenoid_pulse_active = true;
                     ch.solenoid_pulse_start = now;
@@ -1083,8 +1069,6 @@ public:
                     ch.solenoid_last_trigger = now;
                 }
             }
-            
-            // End pulse if duration elapsed
             if (ch.solenoid_pulse_active && (now - ch.solenoid_pulse_start >= ch.solenoid_pulse_ms)) {
                 writeOutputPin(ch, 1, false);
                 ch.solenoid_pulse_active = false;

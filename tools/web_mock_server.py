@@ -2,10 +2,30 @@
 import os
 import json
 import random
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 PORT = 8000
 HTML_FILE = "web/index.html"
+
+DEV_RELOAD_SCRIPT = b"""
+<script>
+(function(){
+  var lastMtime = null;
+  function checkReload(){
+    fetch('/api/dev-reload', {cache: 'no-store'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(data){
+        if(!data) return;
+        if(lastMtime === null) lastMtime = data.mtime;
+        else if(lastMtime !== data.mtime) location.reload();
+      })
+      .catch(function(){});
+  }
+  setInterval(checkReload, 1000);
+  checkReload();
+})();
+</script>
+"""
 
 # Default files to save mock database state
 SETTINGS_FILE = "tools/mock_settings.json"
@@ -100,10 +120,16 @@ class MockRequestHandler(BaseHTTPRequestHandler):
             
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
             self.send_cors_headers()
             self.end_headers()
             with open(HTML_FILE, "rb") as f:
-                self.wfile.write(f.read())
+                html = f.read()
+            if b"</body>" in html:
+                html = html.replace(b"</body>", DEV_RELOAD_SCRIPT + b"</body>", 1)
+            else:
+                html += DEV_RELOAD_SCRIPT
+            self.wfile.write(html)
             return
 
         # Serve mockup API endpoints
@@ -148,6 +174,10 @@ class MockRequestHandler(BaseHTTPRequestHandler):
                 "board_mac": "30:AE:A4:07:0C:48"
             }
             self.send_json_response(200, mock_telemetry)
+
+        elif self.path == "/api/dev-reload":
+            mtime = os.path.getmtime(HTML_FILE) if os.path.exists(HTML_FILE) else 0
+            self.send_json_response(200, {"mtime": mtime})
 
         elif self.path == "/api/scoring":
             outputs = load_json(OUTPUTS_FILE, DEFAULT_OUTPUTS)
@@ -248,13 +278,14 @@ class MockRequestHandler(BaseHTTPRequestHandler):
 
 def run():
     print(f"Starting Mock Server on http://localhost:{PORT} ...")
+    print("Serving web/index.html with auto-reload enabled.")
     if not os.path.exists(HTML_FILE):
         print(f"WARNING: '{HTML_FILE}' was not found. Running extractor first...")
         from extract_web import main as extract_main
         extract_main()
         
     server_address = ('', PORT)
-    httpd = HTTPServer(server_address, MockRequestHandler)
+    httpd = ThreadingHTTPServer(server_address, MockRequestHandler)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

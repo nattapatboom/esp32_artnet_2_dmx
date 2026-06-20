@@ -52,8 +52,8 @@ ESP-NOW Slave mode always keeps the setup AP active so the slave can be configur
 ## 4. Output Concepts
 
 The board supports up to 16 configured output channels. Each output has:
-- Type
-- GPIO pin(s)
+- Type (0-18)
+- Source (GPIO, PCA9685, MCP23017, TCA9555, PCF857x)
 - Start Universe
 - Start Address
 - Type-specific settings
@@ -61,6 +61,7 @@ The board supports up to 16 configured output channels. Each output has:
 For protocol data:
 - `start_universe` is the Art-Net/sACN universe used by the output.
 - `start_address` is the 1-based DMX channel inside that universe.
+
 
 Small output devices do not need to reserve a whole universe. A relay can use only 1 byte, and a motor can use 1 to 4 bytes depending on mode. These outputs can share the same universe by using different Start Address values.
 
@@ -426,40 +427,32 @@ Brownout detector resets during boot:
 - Tie external power supply ground to the controller ground.
 - Test boot with output loads disconnected; if brownout disappears, reconnect loads one type at a time.
 
-## 16. Interactive Installation Devices Application Guide
+## 17. Resource & Compute Scoring System (v3)
 
-To build complex interactive installations without creating redundant device modes, you can map common interactive hardware directly to the existing output modes. This section provides wiring and configuration recommendations for these devices:
+To ensure system stability, the firmware uses a scoring system to prevent overloading the ESP32 CPU and hardware resources. Each output channel consumes "points" based on the hardware it uses and the CPU processing required.
 
-### 16.1 Linear Actuators (กระบอกสูบไฟฟ้า)
-* **Description:** Used to push/pull physical props, sliders, or panels.
-* **Configuration:**
-  * **Precision/Step-Dir Actuators:** Configure as **Stepper Motor**. This enables 32-bit position tracking, Software Scale Factors, and automated homing via a limit sensor.
-  * **Simple/Limit-Switch Actuators:** Configure as **DC Motor** (using an H-Bridge driver) or use **2 Relay channels** (one for Forward, one for Reverse).
-* **Wiring:** Connect STEP/DIR pins to driver inputs. Keep STEP on a direct ESP32 GPIO pin for high-speed pulse generation. DIR and ENABLE can be routed to an I2C Expander.
+**Total Score Limit: ≈ 109 points**
 
-### 16.2 Electromagnetic Locks & Drop Bolts (กลอนแม่เหล็กไฟฟ้า)
-* **Description:** Used in escape rooms, hidden compartments, or trigger-activated doors.
-* **Configuration:** Configure as **Solenoid Trigger** (for pulsed unlocking) or **Relay** (for continuous hold/release).
-* **Wiring:** Connect the control pin to a MOSFET power switch or Relay Module to drive the 12V/24V lock coil. **Never connect the coil directly to ESP32 pins.**
+### 17.1 Resource Score
+Points are calculated based on the hardware source selected:
+- **GPIO:** 0.5 pts per pin
+- **LEDC (PWM):** 2.5 pts per channel
+- **RMT:** 3.0 pts per channel
+- **UART:** 8.0 pts per port
+- **DAC:** 2.0 pts per channel
+- **PCA9685:** 0.25 pts per channel
+- **I2C Expander:** 0.125 pts per pin
 
-### 16.3 Vibration Motors & Haptic Transducers (มอเตอร์สั่น)
-* **Description:** Provides physical feedback in interactive booths, handrails, or flooring based on DMX/Art-Net values.
-* **Configuration:** Configure as **DC PWM Dimmer** (using LEDC PWM) to control vibration intensity from 0-255, or **Relay** for simple on/off rumble.
-* **Wiring:** Drive via a logic-level MOSFET module connected to the configured PWM pin.
+### 17.2 Compute Score
+CPU load depends on the output type and the global output FPS:
+- **High Load Types:** Function Generator, Steppers, and 7-Segment Direct Drive consume more CPU points.
+- **LED Strips:** Compute cost increases based on the number of pixels.
+- **FPS Factor:** Higher output FPS (e.g., 60 FPS vs 40 FPS) increases the overall compute score.
 
-### 16.4 Laser Diodes (เลเซอร์ไดโอด)
-* **Description:** Used for beam arrays, laser tripwires, or laser harps.
-* **Configuration:** Configure as **DC PWM Dimmer** to control brightness/intensity via DMX, or **Relay** for simple on/off beam control.
-* **Wiring:** Use a logic-level MOSFET or laser driver board connected to the configured GPIO pin.
+### 17.3 PCA9685 Frequency Interlock
+- Each PCA9685 chip (by I2C address) shares a single PWM frequency.
+- **Servo Priority:** If any channel on a PCA chip is set as an **RC Servo**, the entire chip is forced to **50 Hz**.
+- Other PWM types on the same chip will use the frequency set by the first configured channel, provided it is compatible.
 
-### 16.5 Addressable LED Neon Flex (ไฟนีออนพิกเซล)
-* **Description:** Flexible neon-like diffuse tubing with individually addressable RGB/RGBW pixels.
-* **Configuration:** Configure as **LED Strip**. Choose the appropriate color order (e.g. WS2811/WS2812B/WS2815).
-* **Wiring:** Connect the SPI data pin to a direct ESP32 GPIO. For WS2815 (12V) strips, connect the Backup Data pin (BI) to ground or to the main Data pin (DI) as specified by the manufacturer.
+The total score is displayed in the Web UI. If the score exceeds the limit, the system may warn you that stability cannot be guaranteed.
 
-### 16.6 Shared I2C Diagnostics Displays (OLED SSD1306 & Character LCD 16x2/20x4)
-* **Description:** Local displays installed on the device housing to show diagnostic details (IP address, active mode, universe mapping, frame rates, and sensor telemetry) in the field without consuming extra GPIO pins.
-* **Supported Devices:**
-  * **OLED SSD1306:** Small graphical display (using standard I2C address `0x3C` or `0x3D`). Great for highly compact text and simple graphic logos.
-  * **Character LCD (16x2 / 20x4):** Standard character LCD displays using a **PCF8574 I2C Backpack Adapter** (default I2C addresses are usually `0x27` or `0x3F`). Ideal for rugged enclosures and displaying large, high-readability text lines.
-* **Wiring:** Connect directly to the shared I2C bus (`SDA` and `SCL` pins) alongside PCA9685/MCP23017 expanders and sensors. Since their I2C addresses do not conflict with the expanders (`0x40`/`0x20` etc.), they can coexist seamlessly on the same I2C bus with zero additional ESP32 pins.
