@@ -15,6 +15,7 @@ public:
 
 private:
     esp_timer_handle_t timer = nullptr;
+    volatile bool timerRunning = false;
     uint8_t ledcChan = 255;
     uint8_t pin = 255;
 
@@ -55,7 +56,7 @@ void FuncGenController::computeTables() {
         sawTable[i] = i * 254 / 255 - 127;
     }
     for (int i = 0; i < 256; i++) {
-        sqTable[i] = i < 128 ? 127 : -127;
+        sqTable[i] = i < 128 ? 128 : -128;
     }
 }
 
@@ -90,6 +91,7 @@ void FuncGenController::update(uint8_t newType, uint16_t newFreq, uint8_t newAmp
 }
 
 void FuncGenController::stop() {
+    timerRunning = false;
     if (timer) {
         esp_timer_stop(timer);
         esp_timer_delete(timer);
@@ -100,6 +102,7 @@ void FuncGenController::stop() {
 }
 
 void FuncGenController::rebuild() {
+    timerRunning = false;
     if (timer) {
         esp_timer_stop(timer);
         esp_timer_delete(timer);
@@ -126,9 +129,11 @@ void FuncGenController::rebuild() {
     args.name = "funcGen";
     esp_timer_create(&args, &timer);
     esp_timer_start_periodic(timer, period_us);
+    timerRunning = true;
 }
 
 void FuncGenController::sampleISR() {
+    if (!timerRunning) return;
     int8_t* table;
     switch (type) {
         case 0: table = sineTable; break;

@@ -571,7 +571,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             message = "Invalid output type on channel " + String(channelNumber) + ".";
             return false;
         }
-        bool pcaOk = (type == 2 || type == 4 || type == 6 || type == 7 || type == 8 || type == CHAN_TYPE_ANALOG_RGB || type == 18);
+        bool pcaOk = (type == 2 || type == 4 || type == 6 || type == 7 || type == 8 || type == CHAN_TYPE_ANALOG_RGB || type == 15 || type == 18);
         bool digitalOk = (type == 2 || type == 6 || type == 17 || type == 18);
         if (source == 1 && !pcaOk) {
             message = "PCA9685 source is not supported by output channel " + String(channelNumber);
@@ -1133,7 +1133,7 @@ void setupWebServer() {
                 return;
             }
 
-            doc["version"] = 2;
+            doc["version"] = 3;
             File file = LittleFS.open("/outputs.json", "w");
             if (!file) {
                 request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to open file for writing\"}");
@@ -1703,10 +1703,9 @@ void outputTask(void* pvParameters) {
         }
 
         // If network DMX is active, copy and display data on Core 1 loop
-        if ((sysCfg.device_mode == MODE_ARTNET_ETHERNET || sysCfg.device_mode == MODE_ESPNOW_MASTER) && networkFramePending) {
+        if ((sysCfg.device_mode == MODE_ARTNET_ETHERNET || sysCfg.device_mode == MODE_ESPNOW_MASTER) && networkFramePending.exchange(false)) {
             // Render local LED strips
             outputCtrl.updateLeds();
-            networkFramePending = false;
             ArtNetControl::newRxData = false;
         }
 

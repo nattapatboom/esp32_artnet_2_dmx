@@ -115,15 +115,21 @@ public:
         if (_kind == DIG_EXP_MCP23017) {
             uint8_t iodirReg = (channel < 8) ? 0x00 : 0x01;
             uint8_t portBit = (uint8_t)1 << (channel & 7);
-            uint8_t iodir = regRead8(iodirReg) | portBit;
+            uint8_t iodir = regRead8(iodirReg);
+            if (iodir == 0xFF) return; // I2C read error, skip to avoid corruption
+            iodir |= portBit;
             writeReg8(iodirReg, iodir);
             if (pullUp) {
                 uint8_t gppuReg = (channel < 8) ? 0x06 : 0x07;
-                uint8_t gppu = regRead8(gppuReg) | portBit;
+                uint8_t gppu = regRead8(gppuReg);
+                if (gppu == 0xFF) return;
+                gppu |= portBit;
                 writeReg8(gppuReg, gppu);
             }
         } else if (_kind == DIG_EXP_TCA9555) {
-            uint16_t config = regRead16(0x06) | ((uint16_t)1 << channel);
+            uint16_t config = regRead16(0x06);
+            if (config == 0xFFFF) return; // I2C read error
+            config |= (uint16_t)1 << channel;
             writeReg16(0x06, config);
         } else if (_kind == DIG_EXP_PCF857X) {
             writeChannel(channel, true, true);

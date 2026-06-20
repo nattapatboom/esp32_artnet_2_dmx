@@ -228,6 +228,7 @@ inline void writeOutputPin(OutputChannel& ch, uint8_t pinNum, bool state) {
         inv = ch.pin4_invert;
     }
     
+    if (gpio == 255 && channel == 255) return;
     if (source == 0) { // ESP32 GPIO
         if (gpio != 255) {
             digitalWrite(gpio, (state ^ inv) ? HIGH : LOW);
@@ -276,7 +277,7 @@ inline bool readOutputPin(OutputChannel& ch, uint8_t pinNum) {
         inv = ch.pin4_invert;
     }
     
-    bool val = true;
+    bool val = false;
     if (source == 0) {
         if (gpio != 255) {
             val = digitalRead(gpio) == HIGH;
@@ -286,6 +287,7 @@ inline bool readOutputPin(OutputChannel& ch, uint8_t pinNum) {
             val = digitalExpanderManager.digitalRead(source, address, channel);
         }
     }
+    // source == 1 (PCA9685) — cannot read back, return false
     return val ^ inv;
 }
 

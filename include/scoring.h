@@ -14,11 +14,11 @@ inline float scoreForType(uint8_t type, uint16_t ledCount = 0) {
         case 3: return 2.0f + (ledCount / 100.0f) * 1.0f; // RGB LED
         case 4: return 3.0f; // Single Color LED
         case 5: return 3.0f; // Analog RGB
-        case 6: return 8.0f; // Motor
-        case 7: return 2.0f; // Stepper
+        case 6: return 3.0f; // Motor (1-2 LEDC channels)
+        case 7: return 8.0f; // Stepper (FastAccelStepper timer)
         case 8: return 2.0f; // Servo
-        case 9: return 3.0f; // Buzzer
-        case 10: return 1.5f; // DFPlayer
+        case 9: return 1.5f; // Buzzer
+        case 10: return 2.0f; // DFPlayer (UART port)
         case 11: return 2.0f; // 7-Seg 2-pin
         case 12: return 3.0f; // 7-Seg DD PWM 7-pin (NEW)
         case 13: return 3.0f; // 7-Seg DD PWM 8-pin (NEW)

@@ -1446,7 +1446,7 @@ function autoAssignOutputPins(){
     return p;
   };
 
-  setSelectIfOption('no_pin',takeOutput());
+  if (t !== 14) setSelectIfOption('no_pin',takeOutput()); // DAC requires manual pin selection (GPIO 25/26 only)
   const pin2Source=parseInt(document.getElementById('no_pin2_source')?.value||0);
   const pin3Source=parseInt(document.getElementById('no_pin3_source')?.value||0);
   if(t===6||t===5||t===18||(t>=11&&t<=13)||t===10||(t===7&&pin2Source===0)) setSelectIfOption('no_pin2',takeOutput());
@@ -2146,7 +2146,7 @@ function editOutput(idx){
   setVal('no_cnt',o.led_count||170);
   setVal('no_ord',o.color_order||0);
   setVal('no_led_proto',o.led_protocol??0);
-  if(o.type>=5&&o.type<=8) setResolutionOptions(o.type===7);
+  if(o.type===4||o.type===5||o.type===6||o.type===7||o.type===8||o.type===15) setResolutionOptions(o.type===7);
   
   setVal('no_pin2',o.pin2??255);
   setVal('no_pin3',o.pin3??255);
@@ -2423,9 +2423,9 @@ function addOrUpdateOutput(){
   newOutputs.forEach(o => {
     if(o.type===3){ ledChCount++; totalLedPixels+=o.led_count||170; rmtUsed++; }
     else if(o.type===1){ dmxUartCount<=1?dmxUartCount++:dmxRmtCount++; if(dmxUartCount>2)rmtUsed++; }
-    else if(o.type===6){ if(o.source===0) ledcUsed++; }
-    else if(o.type===7){ if(o.source===0) ledcUsed+=(o.mc_mode===0?2:1); }
-    else if(o.type===8){ if(o.source===0) stepperCount++; }
+    else if(o.type===6){ if(o.source===0) ledcUsed+=(parseInt(o.mc_mode||0)===0?2:1); }
+    else if(o.type===7){ stepperCount++; }
+    else if(o.type===8){ if(o.source===0) ledcUsed++; }
     else if(o.type===4){ if(o.source===0) ledcUsed++; }
     else if(o.type===5){ if(o.source===0) ledcUsed+=((o.color_order||0)>=4?4:3); }
     else if(o.type===9){ if(o.source===0) ledcUsed++; }
