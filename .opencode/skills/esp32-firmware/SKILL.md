@@ -1,6 +1,6 @@
 ---
 name: esp32-firmware
-description: Full-stack ESP32 Art-Net firmware project (WT32-ETH01) — PlatformIO, 16 output types, DMX/Art-Net control, Web UI, OTA deploy
+description: Full-stack ESP32 Art-Net firmware project (WT32-ETH01) — PlatformIO, 19 output types (v3 0-18), DMX/Art-Net control, Web UI, OTA deploy
 metadata:
   board: wt32-eth01
   framework: arduino
@@ -16,12 +16,32 @@ metadata:
 ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 รับ Art-Net ผ่าน Ethernet (LAN) → ควบคุม output หลายประเภทผ่าน GPIO, PCA9685, I2C expander
 
+### Current State
+- **Board:** 192.168.1.93 (WT32-ETH01) — ONLINE
+- **Build:** Flash ~66.6%, RAM ~17.5%
+- **Layout:** v3 (0-18) — migrated from v2, config version 3
+- **Protocols:** Art-Net, sACN E1.31, ESP-NOW bridge
+
 ## Board: WT32-ETH01
 - **CPU:** ESP32 dual-core (Core 0 = network/display, Core 1 = application)
 - **Flash:** 4MB (partition: app 1.9MB, LittleFS 190KB) — ปัจจุบัน ~66.6%
 - **RAM:** 320KB — ปัจจุบัน ~17.5%
 - **Usable GPIO:** 4, 12, 14, 15, 2, 17, 32, 33 (+ input-only 36, 39, 34, 35)
 - **Built-in:** Ethernet (LAN8720), no WiFi needed in Ethernet mode
+
+### Hardware Notes
+- Avoid GPIO16 (LAN8720A Ethernet power)
+- Default status LED: GPIO 5
+- Common output GPIOs: 4, 12, 14, 15, 2, 17, 32, 33
+- Input-only: 36, 39, 34, 35
+- GPIO12 is boot strap pin — careful with pull-up/down
+- **ALL GPIO outputs MUST have pull-down resistors** when connecting to interface boards
+- DAC (Type 14) GPIO25/26 are used by LAN8720 RMII on WT32-ETH01 — unavailable
+
+### Runtime Architecture
+- **Core 0 — networkTask:** Art-Net, sACN, ESP-NOW, AsyncWebServer, I2C Display update, I2C Scan (queue-based)
+- **Core 1 — outputTask:** DMX TX, LED output, motion control, output test
+- **Storage:** LittleFS (`/outputs.json`, `/espnow_peers.json`), NVS Preferences (settings)
 
 ## Output Types (v3 — 0-18)
 
@@ -100,6 +120,50 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - **DAC (Type 14) / Relay (Type 2) / Solenoid (Type 17):** `0.5` คะแนนต่อช่องสัญญาณ (เอาต์พุตเปิด/ปิดทั่วไป)
 
 ---
+
+## Critical Code Patterns — MUST KNOW
+
+1. **i2cMutex** — Every `Wire` operation must be wrapped with `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100))` (100ms timeout, no longer `portMAX_DELAY`)
+2. **Scoring duplication** — Some JS `channelScore()` values may differ from C++ `scoreForType()` — verify when adding new types
+3. **Layout versioning** — Config file `/outputs.json` has `version: 3` with v1→v3 and v2→v3 migration paths
+4. **Dead code cleanup** — v1.x deprecated types removed, no backward compat needed
+
+## P0 Bugs (all fixed in v1.16.00)
+
+All 8 P0 bugs resolved: dimmer ISR safety, static globals, ESP-NOW queuing, unaligned pointer, calloc NULL check, div-by-zero, HTTP OOM, UART2 conflict (DFPlayer priority + DMX RMT fallback).
+
+## File Map
+
+```
+include/
+  config.h              SystemConfig, NVS load/save
+  output_control.h      Output mapping, DMX/LED rendering, save/load JSON
+  scoring.h             Dynamic scoring system (100-point limit)
+  web_pages.h           Embedded web UI (HTML+CSS+JS)
+  dimmer_control.h      AC dimmer ZC + timer ISR
+  motion_control.h      Motor, stepper, servo, 7-seg (types 11/12/13), DAC, PWM DAC, Buzzer, FuncGen
+  dfplayer_control.h    DFPlayer MP3 protocol driver (Type 10)
+  funcgen_control.h     Function Generator (Type 16)
+  i2c_gpio_expander.h   MCP23017, TCA9555, PCF857x drivers
+  pca9685_control.h     PCA9685 PWM driver
+  artnet_control.h      Art-Net UDP listener
+  sacn_control.h        sACN E1.31 listener
+  espnow_control.h      ESP-NOW master/slave bridge
+  rmt_dmx.h             RMT-based DMX TX fallback
+  display_driver.h      SSD1306/SH1106 OLED + PCF8574 LCD driver
+src/
+  main.cpp              Setup, network, web APIs, RTOS tasks, OTA, validation
+docs/
+  user_manual.md        User-facing manual
+handover/
+  README.md             Handover system rules
+  1.23.00.md            Current — v3 layout migration
+  archive/              Drafts and backups
+tools/
+  build_web.py          Minify web/index.html → web_pages.h
+  extract_web.py        Extract web_pages.h → web/index.html
+  web_mock_server.py    Mock REST API for web UI dev
+```
 
 ## Hardware Module Integration & Reference Manuals
 
@@ -205,3 +269,4 @@ curl.exe -F "update=@.pio\build\wt32-eth01\firmware.bin" http://192.168.1.93/upd
 3. Ensure expander source compatibility
 4. Build before OTA
 5. Update handover if adding significant features
+6. Read this SKILL.md first for full project context (AI_CONTEXT.md has been merged into this file)
