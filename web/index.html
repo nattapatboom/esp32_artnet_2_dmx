@@ -2220,7 +2220,7 @@ function cancelEditOutput(){
 
 function addOrUpdateOutput(){
   const type=parseInt(document.getElementById('no_type').value);
-  if(outputs.length>=16&&editOutIdx===-1){alert('Max 16 channels');return;}
+  // No hard channel limit — constrained by resource scoring + hardware limits
   function gv(id,d){const el=document.getElementById(id);return el?parseInt(el.value):d;}
   const source=parseInt(document.getElementById('no_source').value||0);
   const ch={
