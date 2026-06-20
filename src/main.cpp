@@ -311,10 +311,10 @@ bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
         }
     } else {
         bool p2IsGpio = false;
-        if (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10) {
+        if (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || (type == 7 && pin2Source == 0)) {
             p2IsGpio = (pin2Source == 0);
-        } else if (type == 7 && pin2Source == 0) {
-            p2IsGpio = true;
+        } else if (type == 11 || type == 10) {
+            p2IsGpio = (source == 0);
         }
         if (p2IsGpio && jsonPinMatches(output["pin2"], reservedPin)) return true;
 
@@ -435,10 +435,10 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
             }
         } else {
             bool p2IsGpio = false;
-            if (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || type == 11 || type == 10) {
+            if (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || (type == 7 && pin2Source == 0)) {
                 p2IsGpio = (pin2Source == 0);
-            } else if (type == 7 && pin2Source == 0) {
-                p2IsGpio = true;
+            } else if (type == 11 || type == 10) {
+                p2IsGpio = (source == 0);
             }
             if (p2IsGpio && addPin(output["pin2"] | 255, channel)) return true;
 

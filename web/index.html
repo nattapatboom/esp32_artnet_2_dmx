@@ -1231,21 +1231,15 @@ function outputGpios(o){
       add(sp);
     }
   }
-  if(t===6||t===5||t===18||t===10||(t===11&&!is7SegDD)){
+  if(t===10||(t===11&&!is7SegDD)){
     if(parseInt(o.source||0)===0) add(o.pin2);
-  } else if(t===7 && parseInt(o.pin2_source||0)===0){
+  } else if((t===6||t===7||t===5||t===18) && parseInt(o.pin2_source||0)===0){
     add(o.pin2);
   }
-  if(t===5){
-    if(parseInt(o.source||0)===0) add(o.pin3);
-  } else if(t===6 && parseInt(o.mc_mode||0)===2){
-    if(parseInt(o.source||0)===0) add(o.pin3);
-  } else if(t===7 && parseInt(o.pin3_source||0)===0){
-    add(o.pin3);
+  if((t===6 && parseInt(o.mc_mode||0)===2) || t===7 || t===5){
+    if(parseInt(o.pin3_source||0)===0) add(o.pin3);
   }
-  if(t===7 && parseInt(o.mc_homing_mode||0)===0){
-    if(parseInt(o.pin4_source||0)===0) add(o.pin4);
-  } else if(t===5 && parseInt(o.color_order||0)>=4){
+  if((t===7 && parseInt(o.mc_homing_mode||0)===0) || (t===5 && parseInt(o.color_order||0)>=4)){
     if(parseInt(o.pin4_source||0)===0) add(o.pin4);
   }
   return pins;
@@ -1663,28 +1657,26 @@ async function loadOutputs(){
   }catch(e){}
 }
 
-function channelScore(o){
+function channelResources(o, arr=outputs){
   const t=typeId(o);
   const src=o.source||0;
   const mode=o.mc_mode||0;
   const pin4=o.pin4!==undefined?o.pin4:255;
-  const W={gpio:0.5,ledc:2.5,rmt:3.0,uart:8.0,dac:2.0,pca:0.25,exp:0.125};
   let gpio=0,ledc=0,rmt=0,uart=0,dac=0,pca=0,exp=0;
-  // Count used UARTs by DFPlayer channels to determine DMX UART availability
-  const dfCount=outputs.filter(x=>typeId(x)===10).length;
+  const dfCount=arr.filter(x=>typeId(x)===10).length;
   switch(t){
     case 0: if(src===0) gpio=1; break;
     case 1:
       if(src===0){
         gpio=1;
         // DFPlayer has priority on UART; DMX falls back to RMT when both UARTs are taken
-        const dmxBefore=outputs.slice(0,outputs.indexOf(o)).filter(x=>typeId(x)===1&&(x.source||0)===0).length;
+        const dmxBefore=arr.slice(0,arr.indexOf(o)).filter(x=>typeId(x)===1&&(x.source||0)===0).length;
         const freeUarts=Math.max(0,2-dfCount);
         if(dmxBefore<freeUarts) uart=1; else rmt=1;
       }
       break;
     case 2: if(src===0) gpio=1; else if(src===1) pca=1; else exp=1; break;
-    case 3: if(src===0) gpio=1; break;
+    case 3: if(src===0) gpio=1; rmt=1; break;
     case 4: if(src===0){gpio=1;ledc=1;}else if(src===1) pca=1; else exp=1; break;
     case 5:
       const p2s = o.pin2_source || 0;
@@ -1699,29 +1691,62 @@ function channelScore(o){
       }
       break;
     case 6:
-      if(src===0){gpio=mode===2?3:2; ledc=mode===0?2:1;}
-      else if(src===1) pca=mode===2?3:2;
+      const p2s6 = o.pin2_source || 0;
+      const p3s6 = o.pin3_source || 0;
+      if (src === 0) { gpio++; ledc++; } else if (src === 1) { pca++; }
+      if (p2s6 === 0) { gpio++; if (mode === 0) ledc++; } else if (p2s6 === 1) { pca++; }
+      if (mode === 2) {
+        if (p3s6 === 0) { gpio++; ledc++; } else if (p3s6 === 1) { pca++; }
+      }
       break;
     case 7:
-      if(src===0){gpio=2+(pin4!==255&&(o.mc_homing_mode||0)===0?1:0); rmt=2;}
-      else if(src===1) pca=2;
+      gpio++; rmt += 2;
+      const p2s7 = o.pin2_source || 0;
+      const p3s7 = o.pin3_source || 0;
+      const p4s7 = o.pin4_source || 0;
+      if ((o.pin2 !== undefined ? o.pin2 : 255) !== 255) {
+        if (p2s7 === 0) gpio++; else if (p2s7 === 1) pca++; else exp++;
+      }
+      if ((o.pin3 !== undefined ? o.pin3 : 255) !== 255) {
+        if (p3s7 === 0) gpio++; else if (p3s7 === 1) pca++; else exp++;
+      }
+      if (pin4 !== 255 && (o.mc_homing_mode || 0) === 0) {
+        if (p4s7 === 0) gpio++; else if (p4s7 === 1) pca++; else exp++;
+      }
       break;
     case 8: if(src===0){gpio=1;ledc=1;}else if(src===1) pca=1; break;
     case 9: if(src===0){gpio=1;ledc=1;} break;
     case 10: if(src===0) gpio=2; uart=1; break;
     case 11: if(src===0) gpio=2; else exp=2; break;
-    case 12: gpio=7; ledc=7; break;
-    case 13: gpio=8; ledc=8; break;
+    case 12:
+    case 13:
+      const numSeg = t === 13 ? 8 : 7;
+      for (let s = 0; s < numSeg; s++) {
+        const segSrc = parseInt(o.seg_sources ? o.seg_sources[s] : 0) || 0;
+        if (segSrc === 0) { gpio++; ledc++; }
+        else if (segSrc === 1) { pca++; }
+        else { exp++; }
+      }
+      break;
     case 14: if(src===5) exp=1; else { gpio=1; dac=1; } break;
     case 15: if(src===0){gpio=1;ledc=1;}else if(src===1) pca=1; break;
     case 16: gpio=1; ledc=1; break;
     case 17: if(src===0) gpio=1; else if(src===1) pca=1; else exp=1; break;
-    case 18: if(src===0) gpio=2; else if(src===1) pca=2; else exp=2; break;
+    case 18:
+      if(src===0) gpio++; else if(src===1) pca++; else exp++;
+      const p2s18 = o.pin2_source || 0;
+      if(p2s18===0) gpio++; else if(p2s18===1) pca++; else exp++;
+      break;
   }
-  return gpio*W.gpio+ledc*W.ledc+rmt*W.rmt+uart*W.uart+dac*W.dac+pca*W.pca+exp*W.exp;
+  return {gpio,ledc,rmt,uart,dac,pca,exp};
+}
+function channelScore(o, arr=outputs){
+  const r = channelResources(o, arr);
+  const W={gpio:0.5,ledc:2.5,rmt:3.0,uart:8.0,dac:2.0,pca:0.25,exp:0.125};
+  return r.gpio*W.gpio+r.ledc*W.ledc+r.rmt*W.rmt+r.uart*W.uart+r.dac*W.dac+r.pca*W.pca+r.exp*W.exp;
 }
 function totalScore(arr){
-  return arr.reduce((s,o)=>s+channelScore(o),0);
+  return arr.reduce((s,o)=>s+channelScore(o, arr),0);
 }
 function channelComputeScore(o){
   const t=typeId(o);
@@ -1770,51 +1795,14 @@ function updateScoreBar(){
   txt.textContent='R'+Math.round(rs)+'+C'+Math.round(cs)+'='+Math.round(s)+' / '+Math.round(limit);
 
   // Calculate hardware resource metrics
-  let ledCount = 0;
-  let dmxCount = 0;
-  let dfPlayerCount = 0;
-  let ledcUsed = 0;
+  let ledcUsed = 0, rmtUsed = 0, uartUsed = 0;
   
   outputs.forEach(o => {
-    const t = typeId(o);
-    if (t === 3) {
-      ledCount++;
-    } else if (t === 1) {
-      dmxCount++;
-    } else if (t === 10) {
-      dfPlayerCount++;
-    }
-    
-    // LEDC PWM usage on local ESP32 GPIO (source === 0)
-    if (parseInt(o.source || 0) === 0) {
-      if (t === 4) { // Single Color LED
-        ledcUsed++;
-      } else if (t === 6) { // Motor
-        ledcUsed += (parseInt(o.mc_mode || 0) === 0 ? 2 : 1);
-      } else if (t === 8) { // Servo
-        ledcUsed++;
-      } else if (t === 5) { // Analog RGB/RGBW
-        ledcUsed += ((o.color_order || 0) >= 4 ? 4 : 3);
-      } else if (t === 9) { // Buzzer
-        ledcUsed++;
-      } else if (t === 16) { // Function Generator
-        ledcUsed++;
-      } else if (t === 15) { // PWM DAC
-        ledcUsed++;
-      } else if (t === 12) { // 7-Seg DD 7-Pin PWM
-        ledcUsed += 7;
-      } else if (t === 13) { // 7-Seg DD 8-Pin PWM
-        ledcUsed += 8;
-      }
-    }
+    const r = channelResources(o, outputs);
+    ledcUsed += r.ledc;
+    rmtUsed += r.rmt;
+    uartUsed += r.uart;
   });
-
-  const freeUarts = Math.max(0, 2 - dfPlayerCount);
-  const dmxUartUse = Math.min(dmxCount, freeUarts);
-  const dmxRmtUse = Math.max(0, dmxCount - freeUarts);
-  
-  const uartUsed = dfPlayerCount + dmxUartUse;
-  const rmtUsed = ledCount + dmxRmtUse;
 
   const rmtLimit = 8;
   const uartLimit = 2;
@@ -2562,23 +2550,22 @@ function addOrUpdateOutput(){
     alert('Status LED GPIO and Zero-Crossing GPIO cannot use the same pin.');
     return;
   }
-  if(ch.source===0){
-    if(outputGpios(ch).includes(statusPin)){
-      alert('GPIO '+statusPin+' is reserved for Status LED. Disable Status LED or select another output GPIO.');
-      return;
-    }
-    if(outputGpios(ch).includes(zcPin)){
-      alert('GPIO '+zcPin+' is reserved for Zero-Crossing input. Disable Zero-Crossing or select another output GPIO.');
-      return;
-    }
-    if(sdaPin!==255&&outputGpios(ch).includes(sdaPin)){
-      alert('GPIO '+sdaPin+' is reserved for I2C SDA. Select another output GPIO.');
-      return;
-    }
-    if(sclPin!==255&&outputGpios(ch).includes(sclPin)){
-      alert('GPIO '+sclPin+' is reserved for I2C SCL. Select another output GPIO.');
-      return;
-    }
+  const gpios = outputGpios(ch);
+  if(gpios.includes(statusPin) && statusPin!==255){
+    alert('GPIO '+statusPin+' is reserved for Status LED. Disable Status LED or select another output GPIO.');
+    return;
+  }
+  if(gpios.includes(zcPin) && zcPin!==255){
+    alert('GPIO '+zcPin+' is reserved for Zero-Crossing input. Disable Zero-Crossing or select another output GPIO.');
+    return;
+  }
+  if(gpios.includes(sdaPin) && sdaPin!==255){
+    alert('GPIO '+sdaPin+' is reserved for I2C SDA. Select another output GPIO.');
+    return;
+  }
+  if(gpios.includes(sclPin) && sclPin!==255){
+    alert('GPIO '+sclPin+' is reserved for I2C SCL. Select another output GPIO.');
+    return;
   }
   if(type===7){
     ch.source=0;
@@ -2674,28 +2661,43 @@ function addOrUpdateOutput(){
     };
     for (let i = 0; i < newOutputs.length; i++) {
       const o = newOutputs[i];
-      const channels = [o.pca_channel];
-      if (o.type === 6 || o.type === 7 || o.type === 5 || o.type === 18) { if(o.pca_channel2!==255) channels.push(o.pca_channel2); }
-      if (o.type === 7 || o.type === 5 || (o.type === 6 && parseInt(o.mc_mode||0) === 2)) { if(o.pca_channel3!==255) channels.push(o.pca_channel3); }
-      if (o.type === 5 && parseInt(o.color_order||0)>=4) { if(o.pca_channel4!==255) channels.push(o.pca_channel4); }
+      const src = parseInt(o.source||0);
+      const type = o.type;
+      const mcMode = parseInt(o.mc_mode||0);
+      const colorOrder = parseInt(o.color_order||0);
 
-      if(parseInt(o.source||0)!==0){
-        for (const chn of channels) {
-          if(addUsedExpander(o.source,o.pca_addr,chn,i)) return;
-        }
+      // Primary source (pca_channel)
+      const is7SegDD = (type===12||type===13) && (mcMode>=2 && mcMode<=9);
+      if (src !== 0) {
+        if(addUsedExpander(src, o.pca_addr, o.pca_channel, i)) return;
+        if ((type===6||type===7||type===5||type===18) && o.pca_channel2!==255)
+          if(addUsedExpander(src, o.pca_addr, o.pca_channel2, i)) return;
+        if ((type===7||type===5||(type===6&&mcMode===2)) && o.pca_channel3!==255)
+          if(addUsedExpander(src, o.pca_addr, o.pca_channel3, i)) return;
+        if (type===5 && colorOrder>=4 && o.pca_channel4!==255)
+          if(addUsedExpander(src, o.pca_addr, o.pca_channel4, i)) return;
       }
-      if(o.type===7&&parseInt(o.source||0)===0){
-        if(addUsedExpander(o.pin2_source,o.pin2_addr,o.pin2_channel,i)) return;
-        if(addUsedExpander(o.pin3_source,o.pin3_addr,o.pin3_channel,i)) return;
-      }
-      const is7SegDD = (o.type===12||o.type===13) && (parseInt(o.mc_mode||0)>=2 && parseInt(o.mc_mode||0)<=9);
-      if (is7SegDD && parseInt(o.pin2_source||0)!==0) {
-        const numSeg = (o.type === 13) ? 8 : 7;
+
+      // Hybrid pin2/pin3/pin4 — independent source per pin
+      const p2s = parseInt(o.pin2_source||0);
+      const p3s = parseInt(o.pin3_source||0);
+      const p4s = parseInt(o.pin4_source||0);
+      if (p2s !== 0 && !is7SegDD)
+        if(addUsedExpander(p2s, o.pin2_addr, o.pin2_channel, i)) return;
+      if (p3s !== 0)
+        if(addUsedExpander(p3s, o.pin3_addr, o.pin3_channel, i)) return;
+      if (p4s !== 0)
+        if(addUsedExpander(p4s, o.pin4_addr, o.pin4_channel, i)) return;
+
+      // 7-Seg Direct Drive per-segment expander
+      if (is7SegDD && p2s !== 0) {
+        const numSeg = (type === 13) ? 8 : 7;
+        const baseCh = parseInt(o.pin2_channel);
         for (let s = 0; s < numSeg; s++) {
-          if(addUsedExpander(o.pin2_source, o.pin2_addr, parseInt(o.pin2_channel) + s, i)) return;
+          if(addUsedExpander(p2s, o.pin2_addr, isNaN(baseCh)||baseCh===255 ? 255 : baseCh + s, i)) return;
         }
       } else if (is7SegDD) {
-        const numSeg = (o.type === 13) ? 8 : 7;
+        const numSeg = (type === 13) ? 8 : 7;
         const segSources = o.seg_sources || [];
         const segAddrs = o.seg_addrs || [];
         const segChannels = o.seg_channels || [];
@@ -2705,24 +2707,30 @@ function addOrUpdateOutput(){
       }
     }
 
-    // PCA9685 shared frequency validation
+    // PCA9685 shared frequency validation — checks all per-pin PCA routes, not just primary source
     const pcaInfo = {};
+    const registerPca = (addr, freq, isServo, label) => {
+      addr = parseInt(addr);
+      if (!pcaInfo[addr]) pcaInfo[addr] = {hasServo: false, firstFreq: null, mixed: false, affected: []};
+      if (isServo) { pcaInfo[addr].hasServo = true; return; }
+      if (pcaInfo[addr].firstFreq === null) pcaInfo[addr].firstFreq = freq;
+      else if (pcaInfo[addr].firstFreq !== freq) pcaInfo[addr].mixed = true;
+      if (freq !== 50) pcaInfo[addr].affected.push(label);
+    };
     for (let i = 0; i < newOutputs.length; i++) {
       const o = newOutputs[i];
-      if (o.source !== 1) continue;
-
-      let freq = 1000;
-      if (o.type === 8) freq = 50;
-      else if (o.type === 4 || o.type === 6 || o.type === 5 || o.type === 18) freq = parseInt(o.mc_freq || 1000);
-
-      const key=o.pca_addr;
-      if(!pcaInfo[key]) pcaInfo[key]={hasServo:false,firstFreq:null,mixed:false,affected:[]};
-      if(o.type===8) pcaInfo[key].hasServo=true;
-      if(o.type===4||o.type===6||o.type===5||o.type===18){
-        if(pcaInfo[key].firstFreq===null) pcaInfo[key].firstFreq=freq;
-        else if(pcaInfo[key].firstFreq!==freq) pcaInfo[key].mixed=true;
-        if(freq!==50) pcaInfo[key].affected.push(`${deviceLabel(o)} ch ${i+1} (${freq} Hz)`);
-      }
+      const t = o.type;
+      const freq = (t === 8) ? 50 : parseInt(o.mc_freq || 1000);
+      const isServo = (t === 8);
+      const lbl = `${deviceLabel(o)} ch ${i+1} (${freq} Hz)`;
+      const src = parseInt(o.source||0);
+      if (src === 1) registerPca(o.pca_addr, freq, isServo, lbl);
+      if ((t===6||t===7||t===5||t===18) && parseInt(o.pin2_source||0)===1)
+        registerPca(o.pin2_addr, freq, isServo, lbl);
+      if ((t===7||t===5||(t===6&&parseInt(o.mc_mode||0)===2)) && parseInt(o.pin3_source||0)===1)
+        registerPca(o.pin3_addr, freq, isServo, lbl);
+      if (t===5 && parseInt(o.color_order||0)>=4 && parseInt(o.pin4_source||0)===1)
+        registerPca(o.pin4_addr, freq, isServo, lbl);
     }
     for(const addr in pcaInfo){
       const info=pcaInfo[addr];
@@ -2734,24 +2742,16 @@ function addOrUpdateOutput(){
     }
   }
   
-  // Count resources
-  let ledChCount = 0, dmxUartCount = 0, dmxRmtCount = 0, rmtUsed = 0;
-  let totalLedPixels = 0, ledcUsed = 0, stepperCount = 0;
+  let ledcUsed = 0, rmtUsed = 0, stepperCount = 0, totalLedPixels = 0;
   newOutputs.forEach(o => {
-    if(o.type===3){ ledChCount++; totalLedPixels+=o.led_count||170; rmtUsed++; }
-    else if(o.type===1){ dmxUartCount<=1?dmxUartCount++:dmxRmtCount++; if(dmxUartCount>2)rmtUsed++; }
-    else if(o.type===6){ if(o.source===0) ledcUsed+=(parseInt(o.mc_mode||0)===0?2:1); }
-    else if(o.type===7){ stepperCount++; }
-    else if(o.type===8){ if(o.source===0) ledcUsed++; }
-    else if(o.type===4){ if(o.source===0) ledcUsed++; }
-    else if(o.type===5){ if(o.source===0) ledcUsed+=((o.color_order||0)>=4?4:3); }
-    else if(o.type===9){ if(o.source===0) ledcUsed++; }
-    else if(o.type===15){ if(o.source===0) ledcUsed++; }
+    const r = channelResources(o, newOutputs);
+    ledcUsed += r.ledc;
+    rmtUsed += r.rmt;
+    if(o.type===3) totalLedPixels += o.led_count||170;
+    if(o.type===7) stepperCount++;
   });
   
   let warnings=[];
-  if(ledChCount>8) warnings.push('LED strips exceed RMT hardware limit (max 8).');
-  if(dmxUartCount>2) warnings.push('DMX UARTs exceed hardware limit (max 2, extra use RMT).');
   if(rmtUsed>8) warnings.push('Total RMT usage exceeds hardware limit (max 8). Some outputs may fail.');
   if(ledcUsed>16) warnings.push('LEDC PWM channels exceed hardware limit (max 16).');
   if(stepperCount>2) warnings.push('Multiple stepper motors may cause timing jitter at high speed.');

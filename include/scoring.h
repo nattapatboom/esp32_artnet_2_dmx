@@ -61,6 +61,7 @@ inline ResourceUsage estimateResources(const OutputChannel& ch) {
             break;
         case 3:
             if (ch.source == 0) u.gpio = 1;
+            u.rmt = 1;
             break;
         case 4:
             if (ch.source == 0) { u.gpio = 1; u.ledc = 1; }
@@ -87,19 +88,36 @@ inline ResourceUsage estimateResources(const OutputChannel& ch) {
             }
             break;
         case 6:
-            if (ch.source == 0) {
-                u.gpio = (ch.mc_mode == 2) ? 3 : 2;
-                u.ledc = (ch.mc_mode == 0) ? 2 : 1;
-            } else if (ch.source == 1) {
-                u.pca = (ch.mc_mode == 2) ? 3 : 2;
+            if (ch.source == 0) { u.gpio++; u.ledc++; }
+            else if (ch.source == 1) { u.pca++; }
+
+            if (ch.pin2_source == 0) {
+                u.gpio++;
+                if (ch.mc_mode == 0) u.ledc++;
+            }
+            else if (ch.pin2_source == 1) { u.pca++; }
+
+            if (ch.mc_mode == 2) {
+                if (ch.pin3_source == 0) { u.gpio++; u.ledc++; }
+                else if (ch.pin3_source == 1) { u.pca++; }
             }
             break;
         case 7:
-            if (ch.source == 0) {
-                u.gpio = 2 + (ch.pin4 != 255 && ch.mc_homing_mode == 0 ? 1 : 0);
-                u.rmt = 2;
-            } else if (ch.source == 1) {
-                u.pca = 2;
+            u.gpio++; u.rmt += 2;
+            if (ch.pin2 != 255) {
+                if (ch.pin2_source == 0) u.gpio++;
+                else if (ch.pin2_source == 1) u.pca++;
+                else u.expander++;
+            }
+            if (ch.pin3 != 255) {
+                if (ch.pin3_source == 0) u.gpio++;
+                else if (ch.pin3_source == 1) u.pca++;
+                else u.expander++;
+            }
+            if (ch.pin4 != 255 && ch.mc_homing_mode == 0) {
+                if (ch.pin4_source == 0) u.gpio++;
+                else if (ch.pin4_source == 1) u.pca++;
+                else u.expander++;
             }
             break;
         case 8:
@@ -118,11 +136,16 @@ inline ResourceUsage estimateResources(const OutputChannel& ch) {
             else u.expander = 2;
             break;
         case 12:
-            u.gpio = 7; u.ledc = 7;
+        case 13: {
+            uint8_t numSeg = (ch.type == 13) ? 8 : 7;
+            for (uint8_t i = 0; i < numSeg; i++) {
+                uint8_t segSrc = ch.seg_sources[i];
+                if (segSrc == 0) { u.gpio++; u.ledc++; }
+                else if (segSrc == 1) { u.pca++; }
+                else { u.expander++; }
+            }
             break;
-        case 13:
-            u.gpio = 8; u.ledc = 8;
-            break;
+        }
         case 14:
             if (ch.source == 5) u.expander = 1;
             else { u.gpio = 1; u.dac = 1; }
@@ -140,9 +163,13 @@ inline ResourceUsage estimateResources(const OutputChannel& ch) {
             else u.expander = 1;
             break;
         case 18:
-            if (ch.source == 0) u.gpio = 2;
-            else if (ch.source == 1) u.pca = 2;
-            else u.expander = 2;
+            if (ch.source == 0) u.gpio++;
+            else if (ch.source == 1) u.pca++;
+            else u.expander++;
+
+            if (ch.pin2_source == 0) u.gpio++;
+            else if (ch.pin2_source == 1) u.pca++;
+            else u.expander++;
             break;
     }
     return u;
@@ -227,8 +254,15 @@ inline float totalOutputScoreFromJson(JsonArrayConst outputs) {
         tmp.mc_homing_mode = ch["mc_homing_mode"] | 0;
         tmp.pin = ch["pin"] | 255;
         tmp.pin2 = ch["pin2"] | 255;
+        tmp.pin3 = ch["pin3"] | 255;
         tmp.pin4 = ch["pin4"] | 255;
         tmp.led_count = ch["led_count"] | 0;
+        JsonArrayConst segArr = ch["seg_sources"];
+        if (!segArr.isNull()) {
+            for (int i = 0; i < 8 && i < segArr.size(); i++) {
+                tmp.seg_sources[i] = segArr[i] | 0;
+            }
+        }
         total += outputChannelScore(tmp);
     }
     return total;
