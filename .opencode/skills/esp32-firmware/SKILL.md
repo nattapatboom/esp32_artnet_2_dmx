@@ -80,6 +80,44 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - **Bootstrapping Pin warning:** Actively checks and warns the user in the Web UI if the critical bootstrapping pin GPIO 12 (MTDI) is configured, preventing bootloops.
 - **Configuration Layout Versioning:** Enforces layout version 2 on config file loading and saving, ensuring type layout translations are safely applied only once.
 
+## Resource Scoring System
+
+ระบบตรวจวัดคะแนนการใช้งานทรัพยากร (Resource Scoring) จำกัดคะแนนรวมทุกแชนเนลไม่เกิน **100 คะแนน** เพื่อป้องกันภาระงานของไมโครคอนโทรลเลอร์ (CPU/LEDC/RMT) สูงเกินไปจนทำให้สัญญาณแกว่ง (Jitter) หรือระบบดับเนื่องจาก OOM โดยมีคะแนนแบ่งตามประเภทช่องสัญญาณดังนี้:
+
+- **LED Strip (Type 0):** `2.0` คะแนนพื้นฐาน + `1.0` คะแนนต่อทุก ๆ 100 เม็ดพิกเซล
+- **DMX Output (Type 1):** `4.0` คะแนนต่อหนึ่งพอร์ตแชนเนล (เนื่องจากกินช่องสัญญาณ UART/RMT และบัฟเฟอร์ขนาด 512 ไบต์)
+- **AC Dimmer (Type 3) / RC Servo (Type 7) / 7-Segment (Type 12) / DFPlayer MP3 (Type 13):** `2.0` คะแนนต่อช่องสัญญาณ
+- **DC PWM Dimmer (Type 4) / DC Motor (Type 5) / Analog RGB (Type 9):** `3.0` คะแนนต่อช่องสัญญาณ (ใช้ทรัพยากร LEDC หลายแชนเนล)
+- **Stepper Motor (Type 6):** `8.0` คะแนนต่อแชนเนล (ใช้ FastAccelStepper ขัดจังหวะความถี่สูง)
+- **Passive Buzzer (Type 10) / Smoke Shooter (Type 11):** `1.5` คะแนนต่อช่องสัญญาณ
+- **Relay (Type 2) / Solenoid (Type 8):** `0.5` คะแนนต่อช่องสัญญาณ (เอาต์พุตเปิด/ปิดทั่วไป)
+
+---
+
+## Hardware Module Integration & Reference Manuals
+
+คู่มือและข้อกำหนดทางเทคนิคสำหรับโมดูลฮาร์ดแวร์ที่เชื่อมต่อกับบอร์ด WT32-ETH01:
+
+### 1. PCA9685 (16-Channel PWM Expander)
+- **Interface:** I2C (Address 0x40 - 0x47, ตั้งค่าผ่านแถบ Dip-switch บนโมดูล)
+- **Usage:** เหมาะสำหรับ Relay, DC PWM Dimmer, DC Motor, Servo, Analog RGB
+- **Note:** ชิปนี้แชร์ความถี่ร่วมกันทั้งชิป (Shared Frequency) หากช่องสัญญาณใดตั้งค่าเป็น RC Servo (50Hz) ชิปตัวนั้นจะทำงานที่ความถี่ 50Hz ทันที ซึ่งส่งผลต่อความถี่ของแชนเนลอื่นบนที่อยู่เดียวกัน
+
+### 2. DFPlayer Mini (MP3 Module)
+- **Interface:** Serial UART (ใช้ Serial2 หรือ Serial1 บนความเร็ว 9600 bps)
+- **Pinout:** ขา TX ของบอร์ดเข้า RX ของโมดูล (ต้องมีตัวต้านทาน 1K โอห์มอนุกรมเพื่อลดเสียงรบกวน), ขา RX ของบอร์ดเข้า TX ของโมดูล
+- **Control Flow:** ควบคุมผ่านแชนเนล DMX 3 ไบต์ (Byte 1 = คำสั่ง Play/Pause/Stop, Byte 2 = หมายเลขโฟลเดอร์/แทร็ก, Byte 3 = ระดับเสียง 0-30)
+
+### 3. TM1637 (4-Digit 7-Segment Display)
+- **Interface:** 2-wire serial (CLK, DIO)
+- **Usage:** เหมาะสำหรับแสดงผลตัวเลขคะแนนหรือเวลานับถอยหลังของระบบ
+
+### 4. MCP23017 / TCA9555 / PCF857x (I2C GPIO Expander)
+- **Interface:** I2C (Address 0x20 - 0x27)
+- **Usage:** ขยายช่องสัญญาณดิจิทัลเอาต์พุต (Relay, Solenoid, Smoke Shooter) และอินพุต (Limit Switch ของมอเตอร์สเต็ป) พร้อมระบบป้องกันบัสล็อกค้างด้วย I2C Hang Protection 100ms
+
+---
+
 ## Developer Tools
 
 ระบบประกอบด้วยสคริปต์ Python ในโฟลเดอร์ `tools/` เพื่อช่วยพัฒนาและทดสอบ Web UI ได้อย่างรวดเร็ว:
