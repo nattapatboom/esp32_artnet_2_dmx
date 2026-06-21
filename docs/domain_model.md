@@ -561,7 +561,7 @@ Configuration must pass these gates before save/apply:
 - Every channel: 128 bytes for the `OutputChannel` struct itself.
 - DMX output: +512 bytes for DMX buffer, DFPlayer: +100 bytes for UART command buffer, RGB LED: `led_count × 3` bytes for pixel buffer.
 - ESP-NOW Master: `512 + peers×256` bytes.
-- Limit: 65535 bytes (64 KB).
+- Limit: 65535 bytes (64 KB cap), but dynamically `min(ESP.getFreeHeap() × 20%, 65535)` at runtime.
 
 Known implementation drift (scoring-specific):
 - C++ `totalHardwareFromJson()` may not copy every routing field needed for routing-accurate scoring.

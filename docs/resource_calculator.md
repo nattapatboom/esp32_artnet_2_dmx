@@ -127,7 +127,8 @@ ESP-NOW Master overhead (chunkSize = 200 by default):
 ramBytes = 512 + peerCount × (chunkSize + 44)
 ```
 
-**Limit:** `65535` bytes (64 KB).
+**Limit:** `min(ESP.getFreeHeap() × 20%, 65535)` bytes. At typical 260KB free heap ≈ 52KB.
+Web UI uses a conservative 48000 (≈ 47KB) as a local pre-check; the real limit comes from the C++ API.
 
 ### Validation
 

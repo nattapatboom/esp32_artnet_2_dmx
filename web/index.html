@@ -1839,7 +1839,8 @@ function channelCost(o){
   return {cpu,ram};
 }
 const HW_MAX={ledc:16,rmt:8,uart:2,dac:2};
-const RAM_LIMIT=65535;
+// RAM limit: ~20% of ESP32 free heap (~260KB) with safety cap; API returns the actual dynamic limit
+const RAM_LIMIT=48000;
 const BASE_CHANNEL_RAM=128;
 function cpuLimit(fps){ return 25*(40/(parseInt(fps)||40)); }
 function totalHardware(arr){

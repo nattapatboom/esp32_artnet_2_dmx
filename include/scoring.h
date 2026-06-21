@@ -70,7 +70,13 @@ struct RamBudget {
         return r;
     }
 
-    static constexpr uint16_t limit() { return 65535; }  // 64 KB soft ceiling for output buffers
+    static uint16_t limit() {
+        // Use at most 20% of free heap for output buffers, capped at 64KB
+        uint32_t freeHeap = ESP.getFreeHeap();
+        uint16_t computed = (freeHeap * 20) / 100;
+        if (computed > 65535) computed = 65535;
+        return computed;
+    }
 };
 
 // ═══════════════════════════════════════
