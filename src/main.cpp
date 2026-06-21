@@ -1139,13 +1139,12 @@ void onWiFiEvent(WiFiEvent_t event) {
 void startAP() {
     if (apActive) return;
 
-    if (strcmp(sysCfg.ap_ssid, "ESP32-ArtNet-Setup") == 0) {
+    String activeSsid = String(sysCfg.ap_ssid);
+    if (activeSsid == "ESP32-ArtNet-Setup") {
         String mac = WiFi.macAddress();
         mac.replace(":", "");
         String suffix = mac.substring(mac.length() - 4);
-        String newSsid = String("ESP32-ArtNet-Setup-") + suffix;
-        strncpy(sysCfg.ap_ssid, newSsid.c_str(), sizeof(sysCfg.ap_ssid) - 1);
-        sysCfg.ap_ssid[sizeof(sysCfg.ap_ssid) - 1] = '\0';
+        activeSsid = activeSsid + "-" + suffix;
     }
 
     bool keepSta = wifiClientConfigured() || WiFi.isConnected();
@@ -1157,12 +1156,12 @@ void startAP() {
     
     int apChannel = (sysCfg.espnow_channel > 0) ? sysCfg.espnow_channel : 1;
     if (strlen(sysCfg.ap_pass) >= 8) {
-        WiFi.softAP(sysCfg.ap_ssid, sysCfg.ap_pass, apChannel);
+        WiFi.softAP(activeSsid.c_str(), sysCfg.ap_pass, apChannel);
     } else {
-        WiFi.softAP(sysCfg.ap_ssid, NULL, apChannel);
+        WiFi.softAP(activeSsid.c_str(), NULL, apChannel);
     }
     
-    Serial.printf("Access Point started: SSID = %s, IP = %s\n", sysCfg.ap_ssid, WiFi.softAPIP().toString().c_str());
+    Serial.printf("Access Point started: SSID = %s, IP = %s\n", activeSsid.c_str(), WiFi.softAPIP().toString().c_str());
     apStartTime = millis();
     apActive = true;
 }
