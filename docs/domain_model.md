@@ -78,7 +78,7 @@ All `SystemConfig` fields are exposed via the Web UI settings page at `/settings
 Output channel layout (`/outputs.json`) is configurable via the Web UI outputs page at `/outputs`.
 
 **Not exposed in Web UI** (compile-time only):
-- ESP-NOW chunk size (`ESPNOW_DMX_CHUNK_SIZE`), FreeRTOS queue depth, score limits
+- `ESPNOW_DMX_CHUNK_SIZE` compile-time constant (230 bytes — the runtime `espnow_chunk_size` is configurable via Web UI), FreeRTOS queue depth, score limits
 - Hardware pin reservations (board-specific, wired to LAN8720 — non-configurable)
 
 #### Storage Strategy
@@ -220,7 +220,7 @@ Key rules:
 - Source must match the output type.
 - **GPIO12 (MTDI) Avoidance:** GPIO 12 is a Bootstrap Pin — strictly forbidden; Web UI must show a warning if the user enters GPIO 12
 - **AC Dimmer Zero-Crossing Interlock:** If `zc_pin == 255` (disabled), AC Dimmer output is locked to 0; Web UI must show a ZC Pin Missing Warning
-- **PCA9685 Shared Frequency Conflict:** If devices with different frequency requirements (servo 50Hz + LED >200Hz) are mixed on the same PCA chip, Web UI and API show a warning but do not block saving
+- **PCA9685 Shared Frequency Conflict (Planned):** If devices with different frequency requirements (servo 50Hz + LED >200Hz) are mixed on the same PCA chip, a future warning mechanism will surface the conflict without blocking saving
 - **DMX Frame Timeout:** Core 1 loop must not perform any blocking operation that causes DMX Frame Cycle to exceed 50ms; initial FPS is forced to 30-40 FPS
 
 ### Capacity Scoring Context (Refactored v2)
@@ -629,9 +629,9 @@ Known implementation drift (scoring-specific):
 - **Rationale:** JS calculates DMX Fallback → RMT (3.0) dynamically; C++ estimates worst-case UART (8.0)
 - **Decision:** (1) C++ uses worst-case static estimation (prevents over-allocation) (2) Runtime allocation is separate from scoring logic (3) Recorded as Known Drift for future improvement
 
-### ADR012: Planned Independent Art-Net Enablement Option
+### ADR012: Independent Art-Net Enablement Option
 - **Rationale:** In networks with heavy Art-Net traffic, users may want to disable Art-Net to prevent overlap
-- **Decision:** (Future) Add `artnet_enabled` (bool) to NVS `SystemConfig` and UI checkbox; Core 0 controls `artNetCtrl.loop()` based on this flag; if both Art-Net and sACN are disabled → validation error to prevent the board from losing all lighting data
+- **Decision:** Added `artnet_enabled` (bool, default `true`) to NVS `SystemConfig` and Web UI checkbox; Core 0 gates `artNetCtrl.begin()` and `artNetCtrl.loop()` based on this flag; if both Art-Net and sACN are disabled → validation error to prevent the board from losing all lighting data. Implemented in config.h, main.cpp, and web/index.html.
 
 ---
 
@@ -664,7 +664,6 @@ Questions used during the grilling session and answers inferred from the existin
 | 8 | PCF8574 LCD display type enum in `SystemConfig` | ✅ Completed (defined in `config.h:88`) |
 
 ### Future Features — planned but not started
-- `artnet_enabled` checkbox in Web UI + backend (ADR012)
 - Frame interpolation for mechanical outputs (ADR005, long-term)
 - PCA9685 frequency conflict detection (C++ + Web UI)
 

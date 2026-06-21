@@ -696,6 +696,7 @@ void addSettingsToJson(JsonObject target) {
     target["ap_ssid"] = sysCfg.ap_ssid;
     target["ap_pass"] = sysCfg.ap_pass;
     target["espnow_channel"] = sysCfg.espnow_channel;
+    target["espnow_chunk_size"] = sysCfg.espnow_chunk_size;
     target["artnet_enabled"] = sysCfg.artnet_enabled;
     target["artnet_port"] = sysCfg.artnet_port;
     target["sacn_enabled"] = sysCfg.sacn_enabled;
@@ -732,6 +733,10 @@ void applySettingsFromJson(JsonObjectConst doc) {
     if (doc["ap_ssid"].is<const char*>()) copyConfigString(sysCfg.ap_ssid, sizeof(sysCfg.ap_ssid), doc["ap_ssid"]);
     if (doc["ap_pass"].is<const char*>()) copyConfigString(sysCfg.ap_pass, sizeof(sysCfg.ap_pass), doc["ap_pass"]);
     if (doc["espnow_channel"].is<int>()) sysCfg.espnow_channel = doc["espnow_channel"];
+    if (doc["espnow_chunk_size"].is<int>()) {
+        sysCfg.espnow_chunk_size = doc["espnow_chunk_size"];
+        if (sysCfg.espnow_chunk_size < 16 || sysCfg.espnow_chunk_size > 230) sysCfg.espnow_chunk_size = 200;
+    }
     if (doc["artnet_enabled"].is<bool>()) sysCfg.artnet_enabled = doc["artnet_enabled"];
     if (doc["artnet_port"].is<int>()) {
         int port = doc["artnet_port"];
