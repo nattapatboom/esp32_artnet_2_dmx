@@ -103,13 +103,13 @@ Receives Art-Net via Ethernet (LAN) → controls multiple output types via GPIO,
 - `web/index.html` — Edit this file, run `tools/build_web.py` to regenerate `web_pages.h`
 
 ### OutputChannel Struct (output_control.h:98-192)
-- `type` (0-18 v3), `source` (0=GPIO, 1=PCA9685, 2=MCP23017, 3=TCA9555, 4=PCF857x, 5=I2C DAC family)
+- `type` (0-18 v3), `source` (0=GPIO, 1=PCA9685, 2=MCP23017, 3=TCA9555, 4=PCF857x, 5=MCP4725, 6=DAC7571, 7=DAC7573)
 - `pin`-`pin4` with `_source`/`_addr`/`_channel` for expander hybrid
 - `dmxBuffer`, `bufferSize` (512 bytes for DMX, smaller for others)
 - `pixelStrip` (LED), `dmxPort`/`rmtDmx` (DMX), `dfPlayer` (MP3)
 - `ledc_chan2`/`ledc_chan3`/`ledc_chan4` — extra LEDC channels for Motor/RGB
 - `seg_pins`, `seg_sources`, `seg_addrs`, `seg_channels` — 8-element arrays for individual segment routing of 7-segment displays (Type 12 / 13) to GPIO or expanders
-- Source compatibility (v3): PCA (2,4,5,6,8,12,13,15,17,18), Digital (2,6,17,18), I2C DAC family (14)
+- Source compatibility (v3): PCA (2,4,5,6,8,12,13,15,17,18), Digital (2,6,17,18), I2C DAC sources 5-7 (14)
 
 ### Hardware Resource Limits
 - **UART:** 3 total. UART0=console. UART1 and UART2 are dynamically allocated. **DFPlayer (Type 10) has priority on UART** (assigns to UART2, then UART1) because DMX can dynamically fall back to RMT.
@@ -175,11 +175,11 @@ Known drift to audit next: `include/scoring.h::totalOutputScoreFromJson()` must 
 | 16 Func Gen | 1 | 1 | - | - | - | - | - |
 | 17 Solenoid | 1* | - | - | - | - | 1* | 1* |
 | 18 Smoke | 2* | - | - | - | - | 2* | 2* |
-| **MCP4725 DAC** | - | - | - | - | - | - | 1 (Exp) |
+| **I2C DAC (src 5-7)** | - | - | - | - | - | - | 1 (I2C) |
 
-*Numbers change based on selected source (0=GPIO+LEDC, 1=PCA, 2-4=Expander, 5=MCP4725 DAC)
+*Numbers change based on selected source (0=GPIO+LEDC, 1=PCA, 2-4=Expander, 5=MCP4725, 6=DAC7571, 7=DAC7573)
 - 7-Segment Type 12/13 in direct drive mode must score based on actual route of each segment via `seg_sources`/`seg_pins` or base routing, not always counting full GPIO/LEDC
-- DAC Type 14 when selecting Source 5 (MCP4725) will not consume ESP32 GPIO/DAC pins, but counts as 1 I2C Expander pin (weight 0.125) and PCA address configuration
+- DAC Type 14 when selecting I2C DAC source (5-7) does not consume ESP32 GPIO/internal DAC pins; consumes only I2C bus time (reflected in CPU budget)
 
 ### Formula
 ```
@@ -386,9 +386,9 @@ GPIO (PWM Out) ── R ──── Analog Out
 ```
 
 ### 7. I2C DACs (12-bit)
-- **MCP4725:** `dac_model=0`, addresses 0x60 and 0x61, single channel
-- **DAC7571:** `dac_model=1`, addresses 0x4C and 0x4D, single channel
-- **DAC7573:** `dac_model=2`, addresses 0x4C - 0x5B, quad channel; `pca_channel` selects A-D
+- **MCP4725:** `source=5`, addresses 0x60 and 0x61, single channel
+- **DAC7571:** `source=6`, addresses 0x4C and 0x4D, single channel
+- **DAC7573:** `source=7`, addresses 0x4C - 0x5B, quad channel; `pca_channel` selects A-D
 - **Usage:** Analog Output (Type 14 DAC) that uses I2C instead of ESP32 DAC pins (GPIO25/26) to avoid conflict with LAN8720 RMII pins
 - **Resolution:** 12-bit I2C DAC (sends I2C command with value 0-4095 scaled from DMX 0-255)
 

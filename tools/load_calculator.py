@@ -142,7 +142,7 @@ def estimate_hardware(ch):
             s_src = seg_sources[i] if i < len(seg_sources) else source
             if s_src == 0: ledc += 1
     elif ch_type == 14:
-        if source != 5: dac = 1
+        if not (5 <= source <= 7): dac = 1
     elif ch_type == 15:
         if source == 0: ledc = 1
     elif ch_type == 16:
@@ -152,7 +152,7 @@ def estimate_hardware(ch):
     return {"ledc": ledc, "rmt": rmt, "uart": uart, "dac": dac, "timer": timer}
 
 def src_on_i2c(src):
-    return src >= 1 and src <= 5
+    return src >= 1 and src <= 7
 
 def i2c_writes_for_channel(ch):
     ch_type = ch.get("type", 0)

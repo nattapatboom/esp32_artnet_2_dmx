@@ -1525,8 +1525,8 @@ function populateExpanderAddresses(el, filterSource){
     {label:'PCF8574A 0x38-0x3F', sources:[4], range:[0x38,0x3F]},
     {label:'PCA9685 PWM 0x40-0x47', sources:[1], range:[0x40,0x47]},
     {label:'MCP4725 DAC 0x60-0x61', sources:[5], range:[0x60,0x61]},
-    {label:'DAC7571 0x4C-0x4D', sources:[5], range:[0x4C,0x4D]},
-    {label:'DAC7573 0x4C-0x5B', sources:[5], range:[0x4C,0x5B]}
+    {label:'DAC7571 0x4C-0x4D', sources:[6], range:[0x4C,0x4D]},
+    {label:'DAC7573 0x4C-0x5B', sources:[7], range:[0x4C,0x5B]}
   ];
   el.innerHTML='';
   groups.forEach(g=>{
@@ -3115,7 +3115,7 @@ function addOrUpdateOutput(){
       else altMsg=' This output type has no expander alternative.';
     } else if(hwTot.dac>HW_MAX.dac){
       what='DAC';
-      altMsg=' Use I2C DAC (source=5) instead.';
+      altMsg=' Use I2C DAC (source=5,6,7) instead.';
     } else if(hwTot.timer>HW_MAX.timer){
       what='TIMER';
       altMsg=' Reduce AC Dimmer/Function Generator channels.';
