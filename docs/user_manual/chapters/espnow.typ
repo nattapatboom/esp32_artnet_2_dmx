@@ -65,6 +65,47 @@ The custom firmware packet header consists of:
 4. `Total Length` (2 bytes): 16-bit unsigned integer (`1..512`)
 5. `Length` (2 bytes): 16-bit unsigned integer (`1..230`) — number of DMX data bytes in this chunk
 
+== Offset-Based Chunking Protocol
+
+Each chunk is a *self-contained packet* — the Slave does not reassemble the full universe before driving outputs. Instead, every incoming chunk is applied immediately by computing the overlap between the chunk's content range and each channel's DMX address range.
+
+=== Master: Partitioning
+
+For each peer's configured routing range, the Master walks the DMX universe buffer in steps of `chunkSize`:
+
+#align(center)[
+#table(
+  columns: (1fr, 0.5fr, 0.5fr, 0.5fr),
+  inset: 8pt,
+  align: (left, center, center, center),
+  stroke: 0.5pt + gray,
+  [*Chunk*], [*Offset*], [*Length*], [*DMX Channels*],
+  [1], [0], [200], [1--200],
+  [2], [200], [200], [201--400],
+  [3], [400], [112], [401--512],
+)
+]
+
+The loop produces packets where `offset` advances by `chunkSize` each iteration and `length` is clamped so the last chunk does not exceed the universe boundary.
+
+If a peer's address range is narrower than the full universe (e.g., `Ch 10--30`), the Master computes `firstOffset = 9` and `lastOffsetExclusive = 30`. Only overlapping bytes are sent — no RF airtime is wasted on channels outside the peer's range.
+
+=== Slave: Overlap Mapping
+
+Every received chunk is pushed to a FreeRTOS queue and processed on Core 1. For each active output channel, the Slave finds the intersection of:
+
+- The chunk's data window: `$[ "offset" , "offset" + "length" )$
+- The channel's DMX source window: `$[ "startAddress" - 1 , "startAddress" - 1 + "bufferSize" )$
+
+If the windows overlap, the intersecting bytes are copied into the channel's DMX value buffer. All other channels are left untouched by this packet. Because each chunk is processed independently, packets may arrive out of order or be lost — the latest received value for any given DMX slot always wins.
+
+#v(0.5em)
+*Example:* A Slave configured with two outputs — Relay at Ch 10 and Single LED at Ch 250 — receives three chunks from a peer with range `Ch 1--512`. Only the relay channel receives bytes from Chunk 1; only the LED channel receives bytes from Chunk 2. Chunk 3 is discarded by both. No per-channel airtime is wasted.
+
+=== Sequence & Loss Handling
+
+The protocol has no retransmission or sequence numbering. If a chunk is lost in the RF medium, the affected DMX slots simply hold their last received value (Hold Last State per ADR005). On the next frame cycle, the Master re-sends the same universe — lost slots recover within one frame period.
+
 == Network Stability \& Planning
 
 To maximize RF efficiency and reliability, design your layouts around these operational constraints:
