@@ -93,8 +93,8 @@ The single source of truth for resource scoring, hard peripheral limits, physica
 - **Source of Truth:** [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md)
 - **Scoring:** 3 independent budgets → **CPU or RAM full = blocked; hardware = source-aware block**
   - **HardwareResource:** counts only (LEDC ≤16, RMT ≤8, UART ≤2, DAC ≤2) – GPIO/PCA/EXP not counted
-  - **CpuBudget:** per-type µs/frame + 200 µs base overhead + I2C overhead + ESP-NOW Master; limit = `800,000 / fps` µs (80% of frame time)
-  - **RamBudget:** static byte estimate per type; limit = 65535 (64 KB)
+  - **CpuBudget:** per-type µs/frame + 500 µs base overhead + per-I2C-write overhead + ESP-NOW Master; limit = `(1,000,000 / fps) - 1,500` µs
+  - **RamBudget:** `224B` channel slot + actual DMX buffer estimate + runtime objects (NeoPixel/DFPlayer/Stepper/FuncGen/RMT fallback/I2C route); limit = 65535 (64 KB)
 - **Verification Parity:** Must match between:
   - C++ Firmware: `include/scoring.h` -> `estimateHardware()`, `estimateChannelCost()`, `checkScores()`
   - Web UI: `web/index.html` -> `channelHardware()`, `channelCost()`, `hwBlocked()/cpuBlocked()/ramBlocked()`

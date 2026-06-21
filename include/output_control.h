@@ -22,6 +22,13 @@ extern DigitalExpanderManager digitalExpanderManager;
 #define DMX_BUFFER_SIZE 512
 #define CHAN_TYPE_ANALOG_RGB 5
 
+inline uint8_t dmxValueByteCount(uint8_t resolution) {
+    if (resolution <= 8) return 1;
+    if (resolution <= 16) return 2;
+    if (resolution <= 24) return 3;
+    return 4;
+}
+
 extern uint8_t activeDmxBuffer[DMX_BUFFER_SIZE];
 extern unsigned long lastDmxUpdateTime;
 extern bool systemActive;
@@ -189,6 +196,41 @@ struct OutputChannel {
     DFPlayerController* dfPlayer = nullptr;
     FuncGenController* funcGen = nullptr;
 };
+
+inline uint16_t outputDmxByteCount(const OutputChannel& ch) {
+    switch (ch.type) {
+        case 1:
+            return DMX_BUFFER_SIZE;
+        case 3: {
+            uint8_t bytesPerPixel = ch.color_order >= 4 ? 4 : 3;
+            uint16_t pixelsPerUniverse = DMX_BUFFER_SIZE / bytesPerPixel;
+            uint16_t universes = (ch.led_count + pixelsPerUniverse - 1) / pixelsPerUniverse;
+            if (universes < 1) universes = 1;
+            return universes * DMX_BUFFER_SIZE;
+        }
+        case 5:
+            return ch.color_order >= 4 ? 4 : 3;
+        case 7:
+            return dmxValueByteCount(ch.mc_resolution) + 2;
+        case 9:
+        case 11:
+            return ch.mc_mode == 1 ? 4 : 2;
+        case 12:
+        case 13:
+            return (ch.mc_mode == 4 || ch.mc_mode == 5 || ch.mc_mode >= 6) ? 2 : 1;
+        case 10:
+            return 3;
+        case 16:
+            return 5;
+        case 4:
+        case 6:
+        case 8:
+        case 15:
+            return dmxValueByteCount(ch.mc_resolution);
+        default:
+            return 1;
+    }
+}
 
 inline void writeOutputPin(OutputChannel& ch, uint8_t pinNum, bool state) {
     uint8_t source = 0;
@@ -508,8 +550,7 @@ public:
             defCh.start_address = 1;
             defCh.led_count = 170;
             defCh.color_order = COLOR_GRB;
-            uint16_t numUniverses = getUniverseCount(defCh);
-            defCh.bufferSize = numUniverses * 512;
+            defCh.bufferSize = outputDmxByteCount(defCh);
             defCh.dmxBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);
             if (defCh.dmxBuffer == nullptr) {
                 Serial.println("OOM error allocating default channel DMX buffer!");
@@ -536,8 +577,7 @@ public:
             defCh.start_address = 1;
             defCh.led_count = 170;
             defCh.color_order = COLOR_GRB;
-            uint16_t numUniverses = getUniverseCount(defCh);
-            defCh.bufferSize = numUniverses * 512;
+            defCh.bufferSize = outputDmxByteCount(defCh);
             defCh.dmxBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);
             if (defCh.dmxBuffer == nullptr) {
                 Serial.println("OOM error allocating default fallback DMX buffer!");
@@ -694,12 +734,7 @@ public:
                 for (int s = 0; s < 8 && s < arr.size(); s++) ch.seg_channels[s] = arr[s] | 255;
             }
             ch.seg_inverts = item["seg_inverts"] | 0;
-            if (ch.type == 3) {
-                uint16_t numUniverses = getUniverseCount(ch);
-                ch.bufferSize = numUniverses * 512;
-            } else {
-                ch.bufferSize = 512;
-            }
+            ch.bufferSize = outputDmxByteCount(ch);
             ch.dmxBuffer = (uint8_t*)calloc(ch.bufferSize, 1);
             if (ch.dmxBuffer == nullptr) {
                 Serial.printf("OOM error allocating DMX buffer for channel type %d!\n", ch.type);

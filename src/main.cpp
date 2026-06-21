@@ -1904,7 +1904,7 @@ void setupWebServer() {
         CpuBudget cpu = totalCpu(chs);
         RamBudget ram = totalRam(chs);
         uint32_t cpuLimit = CpuBudget::limit(fps);
-        uint16_t ramLimit = RamBudget::limit();
+        uint32_t ramLimit = RamBudget::limit();
 
         doc["ledc"] = hw.ledc;   doc["ledc_max"] = MAX_LEDC_RESOURCE;
         doc["rmt"]  = hw.rmt;    doc["rmt_max"]  = MAX_RMT_RESOURCE;

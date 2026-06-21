@@ -1815,39 +1815,115 @@ function channelCost(o){
   const t=typeId(o);
   const ledCount=parseInt(o.led_count||0);
   let cpu=0, ram=BASE_CHANNEL_RAM;
+  const i2cWrites=i2cWriteCount(o);
+  ram+=dmxBufferRam(t,ledCount,parseInt(o.color_order||0),parseInt(o.mc_resolution||8),parseInt(o.mc_mode||0));
   switch(t){
-    case 0: cpu=1; break;
-    case 1: cpu=15; ram+=512; break;
-    case 2: cpu=1; break;
-    case 3: cpu=5+ledCount*1; ram+=ledCount*3; break;
-    case 4: cpu=1; break;
-    case 5: cpu=5; break;
-    case 6: cpu=5; break;
-    case 7: cpu=20; break;
-    case 8: cpu=2; break;
-    case 9: cpu=2; break;
-    case 10: cpu=10; ram+=100; break;
-    case 11: cpu=200; break;
-    case 12: cpu=10; break;
-    case 13: cpu=12; break;
-    case 14: cpu=15; break;
-    case 15: cpu=2; break;
-    case 16: cpu=80; break;
-    case 17: cpu=2; break;
-    case 18: cpu=5; break;
+    case 0: cpu=5; break;
+    case 1: cpu=22600; break;
+    case 2: cpu=5; break;
+    case 3: cpu=ledStripServiceUs(ledCount, parseInt(o.color_order||0)); ram+=pixelBufferRam(ledCount,parseInt(o.color_order||0))+PIXEL_STRIP_OBJECT_RAM; break;
+    case 4: cpu=6; break;
+    case 5: cpu=18; break;
+    case 6: cpu=35; break;
+    case 7: cpu=80; ram+=STEPPER_RUNTIME_RAM; break;
+    case 8: cpu=12; break;
+    case 9: cpu=35; break;
+    case 10: cpu=30; ram+=DFPLAYER_OBJECT_RAM+100; break;
+    case 11: cpu=900; break;
+    case 12: cpu=30; break;
+    case 13: cpu=35; break;
+    case 14: cpu=10; break;
+    case 15: cpu=6; break;
+    case 16: cpu=120; ram+=FUNCGEN_OBJECT_RAM; break;
+    case 17: cpu=10; break;
+    case 18: cpu=25; break;
   }
-  if(channelUsesI2C(o)) cpu+=15;
+  cpu+=i2cWrites*I2C_WRITE_US;
+  ram+=i2cWrites*I2C_ROUTE_RAM;
   return {cpu,ram};
 }
 const HW_MAX={ledc:16,rmt:8,uart:2,dac:2};
 // RAM limit: C++ keeps ~150KB free, the rest for buffers (capped 64KB). Local pre-check at 48KB.
 const RAM_LIMIT=48000;
-const BASE_CHANNEL_RAM=128;
-const BASE_OVERHEAD_US=200;
+const BASE_CHANNEL_RAM=224;
+const BASE_OVERHEAD_US=500;
+const SAFETY_RESERVE_US=1500;
+const I2C_WRITE_US=180;
+const DMX_BUFFER_RAM=512;
+const PIXEL_STRIP_OBJECT_RAM=256;
+const DFPLAYER_OBJECT_RAM=160;
+const STEPPER_RUNTIME_RAM=512;
+const FUNCGEN_OBJECT_RAM=1120;
+const RMT_DMX_DRIVER_RAM=5150*4+32;
+const I2C_ROUTE_RAM=32;
+
+function dmxBufferRam(type,ledCount,colorOrder,resolution=8,mode=0){
+  type=parseInt(type); mode=parseInt(mode||0);
+  if(type===1) return DMX_BUFFER_RAM;
+  if(type===3){
+    const bytesPerPixel=parseInt(colorOrder||0)>=4?4:3;
+    const pixelsPerUniverse=Math.floor(512/bytesPerPixel);
+    return Math.max(1,Math.ceil((parseInt(ledCount)||0)/pixelsPerUniverse))*512;
+  }
+  if(type===5) return parseInt(colorOrder||0)>=4?4:3;
+  if(type===7) return valueByteCount(resolution)+2;
+  if(type===9||type===11) return mode===1?4:2;
+  if(type===12||type===13) return (mode===4||mode===5||mode>=6)?2:1;
+  if(type===10) return 3;
+  if(type===16) return 5;
+  if([4,6,8,15].includes(type)) return valueByteCount(resolution);
+  return 1;
+}
+
+function pixelBufferRam(ledCount,colorOrder){ return (parseInt(ledCount)||0)*(parseInt(colorOrder||0)>=4?4:3); }
+
+function ledStripServiceUs(ledCount,colorOrder){
+  const bytesPerPixel=parseInt(colorOrder||0)>=4?4:3;
+  const wireUsPerPixel=bytesPerPixel===4?40:30;
+  return 80+ledCount*(wireUsPerPixel+2);
+}
+
+function sevenSegCount(o){ return typeId(o)===13?8:(typeId(o)===12?7:0); }
+
+function i2cWriteCount(o){
+  const t=typeId(o), src=parseInt(o.source||0), mode=parseInt(o.mc_mode||0);
+  let writes=0;
+  const si=s=>srcIsI2C(parseInt(s)||0);
+  if([2,17,4,8,15].includes(t)){ if(si(src)) writes++; }
+  else if(t===5){
+    if(si(src)) writes++;
+    if(si(o.pin2_source)) writes++;
+    if(si(o.pin3_source)) writes++;
+    if(parseInt(o.color_order||0)>=4&&si(o.pin4_source)) writes++;
+  } else if(t===6){
+    if(si(src)) writes+=mode===2?3:2;
+    else {
+      if(si(o.pin2_source)) writes++;
+      if(mode===2&&si(o.pin3_source)) writes++;
+    }
+  } else if(t===7){
+    if(si(o.pin2_source)) writes++;
+    if(si(o.pin3_source)) writes++;
+  } else if(t===12||t===13){
+    const n=sevenSegCount(o);
+    if(mode>=2&&si(o.pin2_source)) writes+=n;
+    else {
+      const seg=o.seg_sources||[];
+      for(let i=0;i<n;i++) if(si(seg[i]||0)) writes++;
+    }
+    if(mode>=6&&mode<=9&&si(src)) writes++;
+  } else if(t===14){
+    if(si(src)) writes++;
+  } else if(t===18){
+    if(si(src)) writes++;
+    if(si(o.pin2_source)) writes++;
+  }
+  return writes;
+}
 
 function cpuLimit(fps){
-  // 80% of frame time = 800,000 / fps µs
-  return Math.floor(800000/(parseInt(fps)||40));
+  const frameUs=Math.floor(1000000/(parseInt(fps)||40));
+  return frameUs>SAFETY_RESERVE_US?frameUs-SAFETY_RESERVE_US:Math.floor(frameUs/2);
 }
 function totalHardware(arr){
   const t={ledc:0,rmt:0,uart:0,dac:0};
@@ -1860,7 +1936,15 @@ function totalCpu(arr,fps){
   return us;
 }
 function totalRam(arr){
-  let b=0; arr.forEach(o=>b+=channelCost(o).ram); return b;
+  let b=0, dmxCount=0, dfPlayerCount=0;
+  arr.forEach(o=>{
+    b+=channelCost(o).ram;
+    if(typeId(o)===1&&parseInt(o.source||0)===0) dmxCount++;
+    else if(typeId(o)===10) dfPlayerCount++;
+  });
+  const freeUarts=Math.max(0,2-dfPlayerCount);
+  const dmxRmtUse=Math.max(0,dmxCount-freeUarts);
+  return b+dmxRmtUse*RMT_DMX_DRIVER_RAM;
 }
 function hwBlocked(hw){
   return hw.ledc>HW_MAX.ledc||hw.rmt>HW_MAX.rmt||hw.uart>HW_MAX.uart||hw.dac>HW_MAX.dac;

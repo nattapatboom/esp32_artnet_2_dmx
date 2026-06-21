@@ -230,7 +230,7 @@ The scoring system uses **three independent budgets**:
 | Budget | What it counts | Limit | Blocks save? |
 |--------|---------------|-------|:---:|
 | **HardwareResource** | Finite ESP32 peripherals: LEDC, RMT, UART, internal DAC | `ledc ≤ 16`, `rmt ≤ 8`, `uart ≤ 2`, `dac ≤ 2` | ✅ Source-aware block |
-| **CpuBudget** | Per-type µs/frame + 200 µs base overhead | `≤ 800,000/fps` µs (80% of frame time) | ✅ Yes |
+| **CpuBudget** | Output service time: serialized DMX/WS281x/TM1637, active I2C writes, and 500 µs base overhead | `≤ (1,000,000/fps) - 1,500` µs | ✅ Yes |
 | **RamBudget** | Static buffer estimates per type | `≤ 65535` (64 KB) | ✅ Yes |
 
 Key files:
@@ -239,35 +239,36 @@ Key files:
 - `docs/resource_calculator.md`
 
 Key rules:
-- **GPIO is NOT counted** — expanders (I2C) can substitute for GPIO pins. The I2C overhead is reflected in CPU weight instead.
-- **PCA9685 / digital expander channels are NOT counted as hardware** — they consume I2C bus time, added to CPU weight as +0.3 per I2C-routed channel.
-- **ESP-NOW Master overhead** is a separate CPU/RAM cost: `cpuWeight = 1.0 + peers×0.2 + universes×0.3`, `ramBytes = 512 + peers×256`.
+- **GPIO is NOT counted** — expanders (I2C) can substitute for GPIO pins. Active I2C transactions are reflected in CpuBudget.
+- **PCA9685 / digital expander channels are NOT counted as hardware** — they consume I2C bus time, added as `+180 µs` per active write transaction.
+- **ESP-NOW Master overhead** is a separate CPU/RAM cost: `cpuUs = 500 + peers×ceil(512/chunkSize)×170 + universes×100`, `ramBytes = 512 + peers×(chunkSize+44)`.
 - All three budgets are checked independently; CPU and RAM **block saving**, hardware is **source-aware block** (types using PCA9685 or expander bypass the count).
 
-Per-type CPU time estimates in µs per frame (at 40 FPS reference). Every channel also costs a base 128 bytes for the `OutputChannel` struct itself:
+Per-type active-frame service-time estimates in µs per frame. RAM includes `224 bytes` base `OutputChannel`/allocator estimate plus the firmware-allocated DMX value buffer. Simple outputs now allocate only the DMX bytes they actually read; DMX output still uses 512 bytes and LED strips use universe-rounded buffers.
 
 | Type | CPU µs | RAM bytes | Notes |
 |:---:|:---:|:---:|:---|
-| 0 AC Dimmer | 1 | 128 | 1 GPIO write |
-| 1 DMX | 15 | 640 | 512-byte copy per frame |
-| 2 Relay | 1 | 128 | Trivial |
-| 3 RGB LED | `5 + led_count×1` | `128 + led_count×3` | Per-pixel NeoPixel data prep |
-| 4 Single LED | 1 | 128 | 1 PWM write |
-| 5 Analog RGB | 5 | 128 | 3-4 PWM writes |
-| 6 Motor | 5 | 128 | PWM + direction |
-| 7 Stepper | 20 | 128 | Pulse-train state machine |
-| 8 Servo | 2 | 128 | 1 PWM write |
-| 9 Buzzer | 2 | 128 | Tone PWM |
-| 10 DFPlayer | 10 | 228 | UART command buffer |
-| 11 TM1637 | 200 | 128 | Bit-bang I2C-like (4 digits × ~50µs) |
-| 12 7-seg 7-pin | 10 | 128 | 7 PWM updates |
-| 13 7-seg 8-pin | 12 | 128 | 8 PWM updates |
-| 14 DAC | 15 | 128 | I2C DAC write |
-| 15 PWM DAC | 2 | 128 | 1 PWM |
-| 16 Func Gen | 80 | 128 | Waveform calculation |
-| 17 Solenoid | 2 | 128 | State machine |
-| 18 Smoke | 5 | 128 | Dual state machine |
-| I2C overhead | +15 | — | Per channel using I2C source |
+| 0 AC Dimmer | 5 | 225 | GPIO/state update; ZC ISR separate |
+| 1 DMX | 22600 | 736 UART path; +20632 if RMT fallback | Full DMX512 transmit frame |
+| 2 Relay | 5 | 225 | Digital state update |
+| 3 RGB LED | `80 + led_count×32` RGB, `80 + led_count×42` RGBW | `224 + universes×512 + led_count×3 + 256` RGB, `224 + universes×512 + led_count×4 + 256` RGBW | WS281x serialized line time + mapping; RAM includes DMX + pixel buffers |
+| 4 Single LED | 6 | `224 + valueBytes` | 1 PWM/PCA update setup |
+| 5 Analog RGB | 18 | 227 RGB / 228 RGBW | 3-4 PWM updates before I2C writes |
+| 6 Motor | 35 | `224 + valueBytes` | Deadband/direction/PWM calculation |
+| 7 Stepper | 80 | `224 + valueBytes + 2 + 512` | Command parser, homing checks, stepper library calls |
+| 8 Servo | 12 | `224 + valueBytes` | Pulse calculation + PWM/PCA setup |
+| 9 Buzzer | 35 | 226 | Frequency change + duty update |
+| 10 DFPlayer | 30 | 487 | UART command path + DFPlayer object |
+| 11 TM1637 | 900 | 226 numeric / 228 ASCII | Bit-bang transfer with explicit delays |
+| 12 7-seg 7-pin | 30 | 225 direct / 226 dimmed | Decode + segment updates before I2C writes |
+| 13 7-seg 8-pin | 35 | 225 direct / 226 dimmed | Decode + segment updates before I2C writes |
+| 14 DAC | 10 | 225 | Internal DAC path before I2C write |
+| 15 PWM DAC | 6 | `224 + valueBytes` | Calibration + PWM/PCA setup |
+| 16 Func Gen | 120 | 1349 | Parameter update + timer-side load reserve; RAM includes waveform tables |
+| 17 Solenoid | 10 | 225 | Pulse state machine |
+| 18 Smoke | 25 | 225 | Dual sequence state machine |
+| I2C write | +180 each | — | Per active PCA/DAC/expander transaction |
+| I2C route RAM | — | +32 each | Per active I2C write route bookkeeping estimate |
 
 #### ESP-NOW Master Overhead
 
@@ -551,17 +552,20 @@ Configuration must pass these gates before save/apply:
 
 **Note:** GPIO is NOT counted. PCA9685 / digital expander channels are NOT counted as hardware.
 
-**CPU Budget** estimates per-frame CPU time in microseconds:
-- Every channel has a baseline CPU cost in µs (e.g., AC Dimmer 1 µs, Stepper 20 µs, TM1637 200 µs).
-- The output loop itself adds `BASE_OVERHEAD_US = 200` µs per frame (flag checks, channel iteration, RTOS overhead).
-- Any channel using an I2C source adds +15 µs for the I2C bus transaction.
+**CPU Budget** estimates output service time in microseconds:
+- Every channel has an active-frame service cost in µs (e.g., DMX 22600 µs, RGB LED serialized WS281x time, TM1637 900 µs).
+- The output loop itself adds `BASE_OVERHEAD_US = 500` µs per frame (flag checks, channel iteration, RTOS overhead).
+- Each active I2C write adds +180 µs; multi-pin outputs add multiple transactions.
 - ESP-NOW Master adds `500 + peers×ceil(512/chunkSize)×170 + universes×100` µs overhead.
-- Limit scales with FPS: `800,000 / fps` µs (80% of frame time). Higher FPS = less time per frame = smaller budget.
+- Limit scales with FPS: `(1,000,000 / fps) - 1,500` µs. Higher FPS = less time per frame = smaller budget.
 
 **RAM Budget** estimates static/stack buffer bytes:
-- Every channel: 128 bytes for the `OutputChannel` struct itself.
-- DMX output: +512 bytes for DMX buffer, DFPlayer: +100 bytes for UART command buffer, RGB LED: `led_count × 3` bytes for pixel buffer.
-- ESP-NOW Master: `512 + peers×256` bytes.
+- Every channel: 224 bytes for the `OutputChannel` vector slot and allocator/header slack.
+- Every channel gets a firmware DMX value buffer sized to what the output reads; DMX output uses 512 bytes and LED strips use `ceil(pixel_bytes/512)×512`.
+- RGB/RGBW LED strips also allocate a NeoPixel pixel buffer (`led_count×3/4`) plus 256 bytes wrapper/object overhead.
+- DMX RMT fallback adds 20,632 bytes per fallback output after DFPlayer-first UART allocation.
+- DFPlayer adds 260 bytes; Stepper adds 512 bytes; Function Generator adds 1120 bytes.
+- Active I2C routes add 32 bytes per write route; ESP-NOW Master adds `512 + peers×(chunkSize+44)` bytes.
 - Limit: 65535 bytes (64 KB cap), but dynamically `max(0, ESP.getFreeHeap() - 150KB)` at runtime (keeps 150KB free for system/network).
 
 Known implementation drift (scoring-specific):

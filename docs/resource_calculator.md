@@ -62,40 +62,41 @@ The system uses **three independent budgets**. If any one is exceeded, saving is
 GPIO is NOT counted here because expanders can substitute for GPIO pins.
 PCA9685 and digital expanders are NOT counted as hardware; they use I2C bus, reflected in CPU budget.
 
-### 3B. CpuBudget — Per-Frame Processing Time (Microseconds)
+### 3B. CpuBudget — Output Service Time (Microseconds)
 
-CPU time is estimated in **microseconds per frame** (µs/frame) at ESP32 240 MHz.
-Each frame's time budget = `800,000 / fps` µs (80% of frame time; 20% reserved for RTOS/network/loops).
+CPU budget is now modeled as **output service time** in microseconds per frame (µs/frame), not just core compute cycles. It includes blocking/serialized output work such as DMX512 transmit, WS281x LED line time, TM1637 bit-bang time, and active I2C transactions.
 
-**Baseline overhead:** `200 µs` per frame for the output loop itself (flag checks, channel iteration, RTOS).
+Frame budget = `(1,000,000 / fps) - 1,500 µs`.
+
+**Baseline overhead:** `500 µs` per frame for output loop iteration, atomic flag checks, channel traversal, status update, and RTOS jitter.
 
 Higher FPS = less time per frame = smaller budget:
-- 30 FPS → 33.3ms/frame → budget = 26,667 µs
-- 40 FPS → 25.0ms/frame → budget = 20,000 µs
-- 44 FPS → 22.7ms/frame → budget = 18,182 µs
+- 30 FPS → 33.3ms/frame → budget = 31,833 µs
+- 40 FPS → 25.0ms/frame → budget = 23,500 µs
+- 44 FPS → 22.7ms/frame → budget = 21,227 µs
 
 | Type | µs/frame | Notes |
 | :--- | ---: | :--- |
-| AC Dimmer (0) | 1 | 1 GPIO write |
-| DMX (1) | 15 | 512-byte memcpy + UART DMA start |
-| Relay (2) | 1 | 1 GPIO write |
-| RGB LED (3) | `5 + count×1` | Pixel data prep per LED (µs per pixel × count) |
-| Single LED (4) | 1 | 1 LEDC duty write |
-| Analog RGB (5) | 5 | 3–4 LEDC writes |
-| Motor (6) | 5 | PWM + direction writes |
-| Stepper (7) | 20 | State machine + timing check |
-| Servo (8) | 2 | 1 PWM write (LEDC or PCA) |
-| Buzzer (9) | 2 | LEDC tone write |
-| DFPlayer (10) | 10 | UART command buffer |
-| TM1637 (11) | 200 | Bit-bang protocol (4 digits × ~50 µs each) |
-| 7-seg 7-pin (12) | 10 | 7 PWM writes |
-| 7-seg 8-pin (13) | 12 | 8 PWM writes |
-| DAC (14) | 15 | I2C DAC write (2-byte transfer at 400kHz) |
-| PWM DAC (15) | 2 | 1 LEDC duty write |
-| Func Gen (16) | 80 | Waveform calculation (sine/tri/saw) |
-| Solenoid (17) | 2 | State machine + GPIO write |
-| Smoke Shooter (18) | 5 | Dual state machine (smoke + shoot) |
-| **I2C overhead** | **+15** | Any channel using I2C source |
+| AC Dimmer (0) | 5 | GPIO/state update; ZC timing handled by ISR |
+| DMX (1) | 22,600 | Full DMX512 frame transmit (513 slots × 11 bits @250kbps) |
+| Relay (2) | 5 | Digital state update |
+| RGB LED (3) | `80 + count×32` RGB, `80 + count×42` RGBW | WS281x serialized line time + pixel mapping |
+| Single LED (4) | 6 | 1 LEDC or PCA write setup |
+| Analog RGB (5) | 18 | 3-4 PWM updates before I2C additions |
+| Motor (6) | 35 | Deadband/direction/PWM calculation |
+| Stepper (7) | 80 | Command parser, homing checks, FastAccelStepper calls |
+| Servo (8) | 12 | Pulse calculation + PWM/PCA write setup |
+| Buzzer (9) | 35 | Frequency change + duty update |
+| DFPlayer (10) | 30 | Command check + UART command path |
+| TM1637 (11) | 900 | 7-byte bit-bang transfer with explicit 5µs delays |
+| 7-seg 7-pin (12) | 30 | Decode + 7 segment updates before I2C additions |
+| 7-seg 8-pin (13) | 35 | Decode + 8 segment updates before I2C additions |
+| DAC (14) | 10 | Internal DAC path before I2C additions |
+| PWM DAC (15) | 6 | Calibration + 1 PWM/PCA update |
+| Func Gen (16) | 120 | Waveform parameter update + timer-side load reserve |
+| Solenoid (17) | 10 | Pulse state machine |
+| Smoke Shooter (18) | 25 | Dual sequence state machine |
+| **I2C write** | **+180 each** | Per active PCA/DAC/expander transaction at typical 400kHz bus speed |
 
 ESP-NOW Master overhead (independent of output channels):
 ```
@@ -103,31 +104,38 @@ cpuUs = 500 + peerCount × ceil(512/chunkSize) × 170 + universeCount × 100
 ramBytes = 512 + peerCount × (chunkSize + 44)
 ```
 
-### 3C. RamBudget — Static Buffer Estimate
+### 3C. RamBudget — Runtime Memory Estimate
 
-Every channel costs 128 bytes for the `OutputChannel` struct itself, plus type-specific buffers:
+RAM estimates now include the `OutputChannel` vector slot, allocator/header slack, the per-channel DMX buffer allocated by firmware, and known runtime driver objects.
+
+Base per channel:
+- `224 bytes` for `OutputChannel` + vector/allocator slack
+- DMX value buffer is now sized to the bytes each output actually reads
+- DMX output still uses 512 bytes; LED strip DMX buffer = `ceil(led_count / pixels_per_universe) × 512`
 
 | Type | RAM (bytes) | Notes |
 | :--- | ---: | :--- |
-| AC Dimmer (0) | 128 | struct only |
-| DMX (1) | 640 | 128 struct + 512 DMX buffer |
-| Relay (2) | 128 | struct only |
-| RGB LED (3) | `128 + count×3` | struct + NeoPixel pixel buffer |
-| Single LED (4) | 128 | struct only |
-| Analog RGB (5) | 128 | struct only |
-| Motor (6) | 128 | struct only |
-| Stepper (7) | 128 | struct only |
-| Servo (8) | 128 | struct only |
-| Buzzer (9) | 128 | struct only |
-| DFPlayer (10) | 228 | 128 struct + 100 UART command buffer |
-| TM1637 (11) | 128 | struct only |
-| 7-seg 7-pin (12) | 128 | struct only |
-| 7-seg 8-pin (13) | 128 | struct only |
-| DAC (14) | 128 | struct only |
-| PWM DAC (15) | 128 | struct only |
-| Func Gen (16) | 128 | struct only |
-| Solenoid (17) | 128 | struct only |
-| Smoke Shooter (18) | 128 | struct only |
+| AC Dimmer (0) | 225 | base + 1 DMX byte |
+| DMX (1) | 736 UART path; +20,632 if RMT fallback | base + DMX buffer; RMT fallback allocates encoded item buffer |
+| Relay (2) | 225 | base + 1 DMX byte |
+| RGB LED (3) | `224 + universes×512 + count×3 + 256` RGB, `224 + universes×512 + count×4 + 256` RGBW | output DMX buffer + NeoPixel pixel buffer + wrapper/object overhead |
+| Single LED (4) | `224 + valueBytes` | 1-2 DMX bytes by resolution |
+| Analog RGB (5) | 227 RGB / 228 RGBW | base + color DMX bytes |
+| Motor (6) | `224 + valueBytes` | 1-2 DMX bytes by resolution |
+| Stepper (7) | `224 + valueBytes + 2 + 512` | position bytes + speed + command + FastAccelStepper runtime estimate |
+| Servo (8) | `224 + valueBytes` | 1-2 DMX bytes by resolution |
+| Buzzer (9) | 226 | frequency + volume |
+| DFPlayer (10) | 487 | base + 3 DMX bytes + DFPlayer object + command buffer |
+| TM1637 (11) | 226 numeric / 228 ASCII | base + 2 or 4 DMX bytes |
+| 7-seg 7-pin (12) | 225 direct / 226 dimmed | base + 1 or 2 DMX bytes; I2C routes add overhead |
+| 7-seg 8-pin (13) | 225 direct / 226 dimmed | base + 1 or 2 DMX bytes; I2C routes add overhead |
+| DAC (14) | 225 | base + 1 DMX byte; I2C DAC route adds overhead |
+| PWM DAC (15) | `224 + valueBytes` | 1-2 DMX bytes by resolution |
+| Func Gen (16) | 1349 | base + 5 DMX bytes + waveform tables/timer object estimate |
+| Solenoid (17) | 225 | base + 1 DMX byte |
+| Smoke Shooter (18) | 225 | base + 1 DMX byte |
+| I2C route bookkeeping | +32 per active I2C write route | PCA/DAC/expander manager/device reference estimate |
+| DMX RMT fallback | +20,632 per fallback DMX output | `5150 × sizeof(rmt_item32_t) + slack` |
 
 ESP-NOW Master overhead (chunkSize = 200 by default):
 ```
@@ -148,8 +156,8 @@ ESP32-native peripherals.
 // Hardware — every count ≤ max (source-aware: expander/PCA channels don't count)
 bool hwOk = total.ledc ≤ 16 && total.rmt ≤ 8 && total.uart ≤ 2 && total.dac ≤ 2;
 
-// CPU — total µs ≤ 800,000 / fps (80% of frame time)
-// Includes BASE_OVERHEAD_US (200 µs) for loop overhead
+// CPU/service time — total µs ≤ (1,000,000 / fps) - 1,500
+// Includes BASE_OVERHEAD_US (500 µs) for loop overhead
 bool cpuOk = cpuUs ≤ CpuBudget::limit(fps);
 
 // RAM — total bytes ≤ 65535
