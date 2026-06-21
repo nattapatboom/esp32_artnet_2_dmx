@@ -170,9 +170,20 @@ private:
         if (i2cMutex) xSemaphoreGive(i2cMutex);
     }
 
-    void writeDac757x(uint8_t addr, uint8_t channel, uint8_t value) {
+    void writeDac7571(uint8_t addr, uint8_t value) {
         uint16_t dac = ((uint16_t)value << 4) | (value >> 4);
-        uint8_t cmd = 0x10 | ((channel & 0x03) << 1);
+        uint8_t ctrl = (dac >> 8) & 0x0F; // PD1=0, PD0=0, D11-D8
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
+        Wire.beginTransmission(addr);
+        Wire.write(ctrl);
+        Wire.write(dac & 0xFF);
+        Wire.endTransmission();
+        if (i2cMutex) xSemaphoreGive(i2cMutex);
+    }
+
+    void writeDac7573(uint8_t addr, uint8_t channel, uint8_t value) {
+        uint16_t dac = ((uint16_t)value << 4) | (value >> 4);
+        uint8_t cmd = (channel & 0x03) << 1; // ch bits at pos 1-2, A3=A2=0, PD0=0
         if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
         Wire.beginTransmission(addr);
         Wire.write(cmd);
@@ -639,10 +650,10 @@ public:
                 if (ch.type == 14) writeMcp4725(ch.pca_addr, ch.dmxBuffer[0]);
                 continue;
             } else if (ch.source == 6) { // DAC7571 I2C DAC (single-channel)
-                if (ch.type == 14) writeDac757x(ch.pca_addr, 0, ch.dmxBuffer[0]);
+                if (ch.type == 14) writeDac7571(ch.pca_addr, ch.dmxBuffer[0]);
                 continue;
             } else if (ch.source == 7) { // DAC7573 I2C DAC (quad-channel)
-                if (ch.type == 14) writeDac757x(ch.pca_addr, ch.pca_channel, ch.dmxBuffer[0]);
+                if (ch.type == 14) writeDac7573(ch.pca_addr, ch.pca_channel, ch.dmxBuffer[0]);
                 continue;
             } else if (ch.source != 0) {
                 continue; // Digital expanders are handled by OutputControl for on/off modes.

@@ -66,7 +66,10 @@ private:
 
     bool validatePacket(const uint8_t* buf, int len) {
         if (len < 126) return false;
-        if (buf[0] != 0x00 || buf[1] != 0x10) return false;
+        // E1.31: root Flags/Length — upper 2 bits must be 0 (PHT), lower 14 bits = PDU length
+        uint16_t rootLen = ((uint16_t)buf[0] << 8) | buf[1];
+        if ((rootLen & 0xC000) != 0) return false; // flags must be PHT (00)
+        if (rootLen > (uint16_t)len) return false; // claimed length exceeds received data
         if (readUint32BE(buf, SACN_ROOT_VECTOR) != SACN_ROOT_VECTOR_VAL) return false;
         if (readUint32BE(buf, SACN_FRAMING_VECTOR) != SACN_FRAMING_VECTOR_VAL) return false;
         if (buf[SACN_DMP_VECTOR] != SACN_DMP_VECTOR_VAL) return false;

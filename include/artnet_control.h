@@ -17,6 +17,7 @@ class ArtNetControl {
 private:
     WiFiUDP udp;
     bool initialized = false;
+    uint8_t lastSequence[4] = {0}; // track sequence per universe (up to 4)
 
     // Buffer for sending ArtPollReply
     struct ArtPollReplyPacket {
@@ -89,6 +90,11 @@ public:
 private:
     void parseArtDmx(const uint8_t* buf, int size) {
         if (size < ARTNET_HEADER_SIZE) return;
+
+        // Protocol version check (Art-Net 4 requires >= 14)
+        uint16_t protVer = buf[10] | (buf[11] << 8);
+        if (protVer < 14) return;
+        (void)protVer;
 
         // Universe (Little Endian, low-byte first)
         uint16_t universe = buf[14] | (buf[15] << 8);
