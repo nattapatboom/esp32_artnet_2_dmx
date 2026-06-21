@@ -64,7 +64,7 @@ PCA9685 and digital expanders are NOT counted as hardware; they use I2C bus, ref
 
 ### 3B. CpuBudget — Per-Frame Processing Weight
 
-Base limit at 40 FPS: `25.0`. Scales inversely with FPS: `limit(fps) = 25.0 × (40 / fps)`.
+Base limit at 40 FPS: `25.0`. Scales with FPS: `limit(fps) = 25.0 × (fps / 40)`. Higher FPS = more frames/sec = more total CPU.
 
 | Type | Weight | Notes |
 | :--- | ---: | :--- |

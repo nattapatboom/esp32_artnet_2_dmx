@@ -54,10 +54,10 @@ struct CpuBudget {
         return r;
     }
 
-    // Budget scales inversely with FPS (lower FPS = more time per frame)
+    // CPU weight is per-frame cost. Higher FPS = more frames/sec = more total CPU.
     static float limit(uint8_t outputFps) {
         if (outputFps < 1) outputFps = 40;
-        return 25.0f * (40.0f / outputFps);
+        return 25.0f * ((float)outputFps / 40.0f);
     }
 };
 

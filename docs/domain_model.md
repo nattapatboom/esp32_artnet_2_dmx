@@ -230,7 +230,7 @@ The scoring system uses **three independent budgets**:
 | Budget | What it counts | Limit | Blocks save? |
 |--------|---------------|-------|:---:|
 | **HardwareResource** | Finite ESP32 peripherals: LEDC, RMT, UART, internal DAC | `ledc ≤ 16`, `rmt ≤ 8`, `uart ≤ 2`, `dac ≤ 2` | ✅ Source-aware block |
-| **CpuBudget** | Per-type CPU weight per frame × FPS scaling | `≤ 25.0 × (40/fps)` at 40 FPS baseline | ✅ Yes |
+| **CpuBudget** | Per-type CPU weight per frame × FPS scaling | `≤ 25.0 × (fps/40)` at 40 FPS baseline | ✅ Yes |
 | **RamBudget** | Static buffer estimates per type | `≤ 65535` (64 KB) | ✅ Yes |
 
 Key files:
@@ -555,7 +555,7 @@ Configuration must pass these gates before save/apply:
 - Each output type has a baseline CPU weight (see Capacity Scoring table).
 - Any channel using an I2C source adds +0.3 for I2C bus overhead.
 - ESP-NOW Master adds `1.0 + peers×0.2 + universes×0.3`.
-- Limit scales with FPS: `25.0 × (40/fps)`. Higher FPS = less CPU budget per frame.
+- Limit scales with FPS: `25.0 × (fps/40)`. Higher FPS = more frames/sec = more total CPU.
 
 **RAM Budget** estimates static/stack buffer bytes:
 - Every channel: 128 bytes for the `OutputChannel` struct itself.

@@ -1842,7 +1842,7 @@ const HW_MAX={ledc:16,rmt:8,uart:2,dac:2};
 // RAM limit: C++ keeps ~150KB free, the rest for buffers (capped 64KB). Local pre-check at 48KB.
 const RAM_LIMIT=48000;
 const BASE_CHANNEL_RAM=128;
-function cpuLimit(fps){ return 25*(40/(parseInt(fps)||40)); }
+function cpuLimit(fps){ return 25*((parseInt(fps)||40)/40); }
 function totalHardware(arr){
   const t={ledc:0,rmt:0,uart:0,dac:0};
   arr.forEach(o=>{const h=channelHardware(o);t.ledc+=h.ledc;t.rmt+=h.rmt;t.uart+=h.uart;t.dac+=h.dac;});
