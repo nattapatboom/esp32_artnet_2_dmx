@@ -1,19 +1,19 @@
 # Domain Model: ESP32 Art-Net Firmware
 
-เอกสารนี้เป็นผลลัพธ์จาก `/grilling` แบบ domain-modeling โดยสกัดจากไฟล์เดิมของโปรเจคเป็นหลัก: `include/output_control.h`, `include/scoring.h`, `include/config.h`, `src/main.cpp`, `web/index.html`, `docs/user_manual/main.typ`, และ `docs/resource_calculator.md`.
+This document is the result of a `/grilling` domain-modeling session, extracted primarily from `include/output_control.h`, `include/scoring.h`, `include/config.h`, `src/main.cpp`, `web/index.html`, `docs/user_manual/main.typ`, and `docs/resource_calculator.md`.
 
 ## Core Domain
 
-โปรเจคนี้คือ firmware สำหรับ WT32-ETH01 ที่รับ DMX data จาก Art-Net, sACN หรือ ESP-NOW แล้วแปลงเป็น output ทางกายภาพหลายชนิด เช่น LED, DMX, relay, dimmer, motor, servo, audio trigger และ smoke shooter.
+This project is firmware for the WT32-ETH01 that receives DMX data from Art-Net, sACN, or ESP-NOW and converts it into physical outputs such as LED, DMX, relay, dimmer, motor, servo, audio trigger, and smoke shooter.
 
-แกนกลางของระบบคือ `OutputChannel` หนึ่งรายการ ซึ่งแทน output ทางกายภาพหนึ่งชุด พร้อมข้อมูล routing, DMX address, type-specific settings, runtime state และ peripheral handle ที่จำเป็น.
+The central entity is an `OutputChannel`, which represents one physical output with routing information, DMX address, type-specific settings, runtime state, and the necessary peripheral handles.
 
 ### Hardware Architecture
 
-บอร์ด **WT32-ETH01** ใช้ชิปคู่ ESP32 (Dual-Core 240MHz) ร่วมกับชิปควบคุมแลน **LAN8720A Ethernet PHY** โดยมีการแบ่งงานในระดับฮาร์ดแวร์และซอฟต์แวร์ดังนี้:
+The **WT32-ETH01** board uses a dual-core ESP32 (Dual-Core 240MHz) together with the **LAN8720A Ethernet PHY**. The workload is split as follows:
 
-- **Core 0 (Network & Control Core):** จัดการงานที่เกี่ยวข้องกับเครือข่ายทั้งหมด (Ethernet, Wi-Fi SoftAP/STA, UDP Listeners, Web Server, และหน้าจอแสดงผล I2C Display)
-- **Core 1 (Real-Time Output Core):** จัดการงานประมวลผลเอาต์พุต (DMX Serial, LED strips, PWM, Stepper/Motor control) เพื่อไม่ให้สลอตเวลาการปล่อยสัญญาณจริงถูกรบกวนโดยการจราจรทางเครือข่าย
+- **Core 0 (Network & Control Core):** Handles all networking tasks (Ethernet, Wi-Fi SoftAP/STA, UDP Listeners, Web Server, and I2C Display)
+- **Core 1 (Real-Time Output Core):** Handles output processing (DMX Serial, LED strips, PWM, Stepper/Motor control) so real-time signal timing is not disrupted by network traffic
 
 ```mermaid
 graph TD
@@ -35,78 +35,78 @@ graph TD
 
 | Term | Meaning | Source of Truth |
 | --- | --- | --- |
-| Output Channel | แถว config หนึ่งรายการที่ควบคุมอุปกรณ์หนึ่งชุด | `OutputChannel` in `include/output_control.h` |
-| Output Type | ชนิดอุปกรณ์ v3 type `0..18` | `outputTypeName()` in `include/scoring.h` |
-| Source | ที่มาของ pin/channel: ESP32 GPIO, PCA9685, digital expander, MCP4725 | `source` fields in `OutputChannel` |
-| DMX Start Universe | universe แรกที่ channel นี้อ่านข้อมูล | `start_universe` |
-| DMX Start Address | DMX address แบบ 1-based ภายใน universe | `start_address` |
-| Resource Score | คะแนนทรัพยากร hardware ที่ใช้ | Contract: Configuration Contract; implementation: `estimateResources()`, `resourceScore()` |
-| Compute Score | คะแนนภาระ CPU/runtime | `channelComputeScore()`, `fpsComputeFactor()` |
-| Interlock | กฎป้องกัน config ที่ชนกันหรือ hardware ใช้งานไม่ได้ | `validateOutputJson()`, `validateSettingsAndOutputs()` |
-| Runtime State | state ชั่วคราว เช่น smoke, solenoid, stepper command | fields in `OutputChannel` |
+| Output Channel | A single config entry controlling one device | `OutputChannel` in `include/output_control.h` |
+| Output Type | Device type ID v3 `0..18` | `outputTypeName()` in `include/scoring.h` |
+| Source | Origin of a pin/channel: ESP32 GPIO, PCA9685, digital expander, MCP4725 | `source` fields in `OutputChannel` |
+| DMX Start Universe | The first universe this channel reads from | `start_universe` |
+| DMX Start Address | 1-based DMX address within the universe | `start_address` |
+| Resource Score | Hardware resource usage score | Contract: Configuration Contract; implementation: `estimateResources()`, `resourceScore()` |
+| Compute Score | CPU/runtime load score | `channelComputeScore()`, `fpsComputeFactor()` |
+| Interlock | Rules preventing conflicting or invalid configs | `validateOutputJson()`, `validateSettingsAndOutputs()` |
+| Runtime State | Transient state such as smoke, solenoid, stepper commands | fields in `OutputChannel` |
 
 ## Bounded Contexts
 
 ### Configuration Context
 
-หน้าที่:
-- เก็บ system settings ใน NVS `Preferences`.
-- เก็บ outputs layout ใน LittleFS `/outputs.json`.
-- migration config layout เป็น version 3.
-- sanitize values เช่น `output_fps`.
+Responsibilities:
+- Store system settings in NVS `Preferences`.
+- Store output layout in LittleFS `/outputs.json`.
+- Migrate config layout to version 3.
+- Sanitize values such as `output_fps`.
 
-ไฟล์หลัก:
+Key files:
 - `include/config.h`
 - `include/output_control.h`
 - `src/main.cpp`
 
-กฎสำคัญ:
-- `output_fps` ต้องอยู่ในช่วง `1..44`.
-- layout version ปัจจุบันคือ `3`.
-- `web/index.html` เป็น source ของ UI, `include/web_pages.h` เป็นไฟล์ generated.
+Key rules:
+- `output_fps` must be in range `1..44`.
+- Current layout version is `3`.
+- `web/index.html` is the UI source; `include/web_pages.h` is a generated file.
 
-#### การจัดเก็บข้อมูล (Storage Strategy)
+#### Storage Strategy
 
-ระบบจัดเก็บการตั้งค่าออกเป็น 2 ส่วน:
+The system stores configuration in two parts:
 
 **A. NVS Preferences Storage (System Config)**
-- ขอบเขต: ใช้เก็บข้อมูลคอนฟิกระบบที่มีขนาดเล็ก จำเป็นต่อการเริ่มต้นเครือข่ายและการบูตเครื่องขั้นพื้นฐาน เช่น IP Address, Wi-Fi Credentials, Device Mode, I2C Speed, Display Type, Art-Net/sACN Ports
-- Namespace: `"system"` ใน ESP32 Preferences Library
-- วงจรชีวิต: โหลดผ่าน `loadConfig()` ทันทีเมื่อเปิดเครื่องก่อนเริ่มระบบเครือข่าย; บันทึกผ่าน `saveConfig()` เมื่อกดเซฟจาก System Settings ในหน้าเว็บ
+- Scope: Small system configs required for network startup and basic boot, such as IP Address, Wi-Fi Credentials, Device Mode, I2C Speed, Display Type, Art-Net/sACN Ports
+- Namespace: `"system"` in the ESP32 Preferences Library
+- Lifecycle: Loaded via `loadConfig()` immediately on boot before network init; saved via `saveConfig()` when System Settings are saved from the web UI
 
 **B. LittleFS File System (Output Layout & Routing Data)**
-- ขอบเขต: ใช้สำหรับโครงสร้างข้อมูลช่องเอาต์พุตที่มีความยืดหยุ่น มีฟิลด์พารามิเตอร์จำนวนมาก หรือมีลักษณะเป็นอาร์เรย์
-- ไฟล์หลัก: `/outputs.json` (output channels), `/espnow_peers.json` (ESP-NOW peer routing)
-- เวอร์ชัน migration: `loadChannels()` ตรวจสอบฟิลด์ `"version"`; v1/v2 → v3 แปลง type IDs อัตโนมัติ, ข้าม output ที่ Deprecated (WiZ Bulbs); หลัง migration สำเร็จจะเขียนทับกลับเป็น v3 เสมอ
+- Scope: Flexible output channel data structures with many parameter fields or array-like data
+- Key files: `/outputs.json` (output channels), `/espnow_peers.json` (ESP-NOW peer routing)
+- Version migration: `loadChannels()` checks the `"version"` field; v1/v2 → v3 converts type IDs automatically, skips deprecated outputs (WiZ Bulbs); after successful migration, it writes back as v3
 
-#### ระบบระบุตัวตนเครือข่าย (Network Identity & Naming)
+#### Network Identity & Naming
 
-- SSID ของ SoftAP และชื่อ mDNS Responder จะถูกต่อท้ายด้วย MAC Address 4 หลักสุดท้าย (เช่น `ESP32-ArtNet-Setup-XXXX` และ `[mdns_name]-[xxxx].local`)
-- ข้อมูลชื่ออุปกรณ์ทาง ArtPollReply (Short/Long Name) จะต่อท้ายด้วย MAC Suffix (เช่น Short Name: `CHAL Node-XXXX`)
-- ใน Recovery Mode mDNS จะลงทะเบียนเป็น `[mdns_name]-recovery.local` (ไม่มี MAC suffix)
+- SoftAP SSID and mDNS Responder name are suffixed with the last 4 characters of the MAC address (e.g., `ESP32-ArtNet-Setup-XXXX` and `[mdns_name]-[xxxx].local`)
+- ArtPollReply device names (Short/Long Name) are suffixed with the MAC suffix (e.g., Short Name: `CHAL Node-XXXX`)
+- In Recovery Mode, mDNS registers as `[mdns_name]-recovery.local` (no MAC suffix)
 
-#### โหมดกู้คืน (Recovery Mode)
+#### Recovery Mode
 
-- เข้าด้วยการบูตล้มเหลวซ้ำซ้อน 5 ครั้ง (5 consecutive resets) หรือกดปุ่ม BOOT (GPIO0) ค้างไว้ขณะเปิดเครื่อง
-- จะเปิดการเชื่อมต่อแบบคู่ (Dual Network): Ethernet และ Wi-Fi AP พร้อมกัน โดย AP SSID จะเป็น `ESP32-ArtNet-Recovery-XXXX` และเปิดเป็น open AP (ไม่มีรหัสผ่าน)
-- ปิดฟังก์ชันการแสดงผลเอาต์พุตและทาสก์ส่งสตรีมไฟทั้งหมดในโหมดนี้
-- Async Web Server ยังคงทำงานเพื่อให้เข้าหน้าเว็บตั้งค่าและหน้า `/update` สำหรับ OTA firmware recovery
-- **กลไก Consecutive Reset Counter:** ใช้ `bootCount` ใน RTC Fast Memory; เพิ่มทุกครั้งที่ boot; task `resetBootCountTask` หน่วง 15 วินาทีแล้วล้างค่า; ถ้าเกิน 5 ครั้งก่อนล้างจะเข้า Recovery Mode
-- **Physical GPIO0 Trigger:** หากตรวจพบ GPIO0 เป็น LOW ใน `setup()` จะเข้า Recovery Mode โดยตรง
+- Triggered by 5 consecutive resets (boot counter) or pressing the BOOT button (GPIO0) during power-on
+- Enables Dual Network: Ethernet and Wi-Fi AP simultaneously; AP SSID is `ESP32-ArtNet-Recovery-XXXX` as an open AP (no password)
+- Disables all output functions and lighting stream tasks
+- Async Web Server stays active for config and `/update` page for OTA firmware recovery
+- **Consecutive Reset Counter:** Uses `bootCount` in RTC Fast Memory; incremented on each boot; `resetBootCountTask` delays 15 seconds then clears the counter; if counter reaches 5 before clearing, the system enters Recovery Mode on the next boot
+- **Physical GPIO0 Trigger:** If GPIO0 is detected as LOW in `setup()`, the system enters Recovery Mode directly
 
-#### การเชื่อมต่อ Wi-Fi ใหม่แบบอัตโนมัติ (Wi-Fi Auto-Reconnection)
+#### Wi-Fi Auto-Reconnection
 
-- ระบบพยายาม Reconnect Wi-Fi ทุกๆ 10 วินาทีเป็นอย่างน้อย (Rate-limited 10s)
-- จะข้ามการพยายามเชื่อมต่อ Wi-Fi Client เสมอหากอุปกรณ์รันในโหมด Ethernet และมีสายแลนเชื่อมต่ออยู่ (`ethConnected || ETH.linkUp()`)
+- Retries Wi-Fi reconnect at most every 10 seconds (rate-limited)
+- Skips Wi-Fi Client connection attempt entirely when the device is in Ethernet mode and a LAN cable is connected (`ethConnected || ETH.linkUp()`)
 
 ### Output Routing Context
 
-หน้าที่:
-- แปลง DMX bytes เป็น signal ที่เหมาะกับอุปกรณ์.
-- จัดการ source หลายชนิด: GPIO, PCA9685, MCP23017, TCA9555, PCF857x, MCP4725.
-- รองรับ hybrid routing สำหรับอุปกรณ์หลายขา เช่น stepper, motor, RGB/RGBW, 7-segment, smoke shooter.
+Responsibilities:
+- Convert DMX bytes into signals appropriate for each device.
+- Handle multiple source types: GPIO, PCA9685, MCP23017, TCA9555, PCF857x, MCP4725.
+- Support hybrid routing for multi-pin outputs such as stepper, motor, RGB/RGBW, 7-segment, and smoke shooter.
 
-ไฟล์หลัก:
+Key files:
 - `include/output_control.h`
 - `include/motion_control.h`
 - `include/pca9685_control.h`
@@ -114,116 +114,116 @@ graph TD
 - `include/funcgen_control.h`
 - `include/dfplayer_control.h`
 
-กฎสำคัญ:
-- STEP pin ของ stepper ต้องเป็น ESP32 GPIO.
-- Motor EN ใน mode `IN1+IN2+EN` ต้องเป็น ESP32 GPIO หรือ PCA9685 เพราะต้องใช้ PWM.
-- PCA9685 แชร์ frequency ต่อ chip; servo บังคับ 50 Hz.
-- digital expander เหมาะกับ digital output ไม่ใช่ PWM timing.
-- ทุกคำสั่งที่คุยผ่าน `Wire` (I2C) ต้องถูกคลุมด้วย `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100))` — รวมถึง PCA9685, MCP23017, I2C DAC และการวาดหน้าจอ
-- ทาสก์หน้าจอ I2C Display (Core 0) ใช้ queue เพื่อเลี่ยงการยึด I2C บ่อยเกินไป
+Key rules:
+- Stepper STEP pin must be ESP32 GPIO.
+- Motor EN in `IN1+IN2+EN` mode must be ESP32 GPIO or PCA9685 (requires PWM).
+- PCA9685 shares frequency per chip; servo forces 50 Hz.
+- Digital expanders are suitable for digital output only, not PWM timing.
+- Every `Wire` (I2C) operation must be protected by `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100))` — including PCA9685, MCP23017, I2C DAC, and display drawing
+- I2C Display task (Core 0) uses a queue to avoid frequent I2C bus contention
 
 ### Protocol Input Context
 
-หน้าที่:
-- รับ DMX frame จาก Art-Net, sACN หรือ ESP-NOW.
-- ทำให้ output task เห็นข้อมูลใหม่แบบ core-safe.
+Responsibilities:
+- Receive DMX frames from Art-Net, sACN, or ESP-NOW.
+- Expose new data to the output task in a core-safe manner.
 
-ไฟล์หลัก:
+Key files:
 - `include/artnet_control.h`
 - `include/sacn_control.h`
 - `include/espnow_control.h`
 - `src/main.cpp`
 
-กฎสำคัญ:
-- Core 0 รับ network/display/web.
-- Core 1 ประมวลผล output.
-- atomic flags เช่น `networkFramePending` ต้องใช้แบบปลอดภัยกับ dual-core.
-- ESP-NOW callback ต้อง defer ผ่าน queue ไม่ทำงานหนักใน callback.
+Key rules:
+- Core 0 handles network/display/web.
+- Core 1 processes outputs.
+- Atomic flags like `networkFramePending` must be used safely across dual-core.
+- ESP-NOW callback must defer via queue, not do heavy work in the callback.
 
 #### Art-Net Protocol
 
-- รองรับ OpCodes: `0x5000` (OpDmx) สำหรับรับ DMX frames, `0x2000` (OpPoll) สำหรับค้นหาอุปกรณ์
-- **ArtPollReply:** เมื่อได้รับ OpPoll จะสร้าง `ArtPollReplyPacket` ส่งกลับไปยังผู้ส่งพร้อมข้อมูล:
+- Supported OpCodes: `0x5000` (OpDmx) for receiving DMX frames, `0x2000` (OpPoll) for device discovery
+- **ArtPollReply:** On receiving OpPoll, builds an `ArtPollReplyPacket` and sends it back to the requester with:
   - Short Name: `"CHAL Node-XXXX"`, Long Name: `"CHAL WT32-ETH01 Converter - XXXX"`
   - Node Report: `"#0001 [OK] System healthy and ready."`
-  - IP/MAC Address และรายการ Universe เอาต์พุตที่กำลังใช้งาน (จำกัดสูงสุด 4 Universe ต่อ ArtPollReply)
-- Universe เก็บในรูปแบบ Little-Endian; Length เก็บในรูปแบบ Big-Endian
+  - IP/MAC Address and list of active output universes (max 4 universes per ArtPollReply)
+- Universe is stored in Little-Endian format; Length in Big-Endian format
 
 #### sACN Protocol (ANSI E1.31)
 
-- รองรับทั้ง Unicast และ Multicast
-- **Multicast Group Registration:** คำนวณและลงทะเบียนเข้ากลุ่ม Multicast IP (`239.255.X.Y`) อัตโนมัติตาม Universe ของเอาต์พุต
-- **Priority-based Source Selection:** รองรับฟังข้อมูลพร้อมกันสูงสุด 4 แหล่ง; เปรียบเทียบ sACN Priority (0-200); เลือกประมวลผลเฉพาะแหล่งที่มี priority สูงที่สุด; หากแหล่งหลักหายไปเกิน 2500 ms จะสลับไปแหล่งสำรอง
+- Supports both Unicast and Multicast
+- **Multicast Group Registration:** Automatically calculates and joins the Multicast IP (`239.255.X.Y`) based on each output's universe
+- **Priority-based Source Selection:** Listens to up to 4 sources simultaneously; compares sACN Priority (0-200); processes only the highest-priority source; if the primary source is lost for over 2500 ms, falls back to the next source
 
 #### ESP-NOW Master
 
-- รับ Art-Net/sACN แล้วส่งต่อ DMX ไปยัง slave ตาม peer route ที่เก็บใน `/espnow_peers.json`
-- การจับคู่บอร์ด (Peering): เก็บ MAC Address และช่วง DMX Universe/Address ของปลายทาง; หาก peer list ว่างจะ Broadcast ไป `FF:FF:FF:FF:FF:FF`
-- DMX Chunking: แบ่งส่งข้อมูล 1 Universe (512 channels) ในขนาดสูงสุด `ESPNOW_DMX_CHUNK_SIZE` (200 bytes data + 12 bytes header)
-- ใช้ peer route ให้แคบที่สุดเพื่อลด airtime
-- ESP-NOW ต้องเปิด Wi-Fi radio (`WIFI_AP_STA` เมื่อจำเป็น)
-- Chunk size user-configurable (future): แยก `configured_chunk_size` สำหรับส่งออกจาก compile-time max receive buffer; slave ไม่จำเป็นต้องตั้งค่า chunk size ตรงกับ master แต่ต้อง reject packet ที่ `length` เกิน max buffer
+- Receives Art-Net/sACN and forwards DMX to slaves according to peer routes stored in `/espnow_peers.json`
+- Peering: Stores MAC Address and DMX Universe/Address range for each peer; if the peer list is empty, broadcasts to `FF:FF:FF:FF:FF:FF`
+- DMX Chunking: Splits 1 Universe (512 channels) into chunks up to `ESPNOW_DMX_CHUNK_SIZE` (200 bytes data + 12 bytes header)
+- Keep peer routes as narrow as possible to reduce airtime
+- ESP-NOW requires Wi-Fi radio enabled (`WIFI_AP_STA` when needed)
+- Future: Make DMX chunk size user-configurable; separate `configured_chunk_size` from compile-time max receive buffer; slaves reject packets with `length` exceeding max buffer
 
 #### ESP-NOW Slave
 
-- รับ packet ผ่าน callback, queue ไปประมวลผลใน `outputTask`, แล้ว map ตาม universe/offset เข้าช่อง output
-- Core-Safe Deferral: callback (Core 0) ดันข้อมูลเข้า FreeRTOS Queue (Queue Depth 16); Core 1 (`outputTask`) อ่านจาก queue และประมวลผล
-- Always-On Setup AP: ในโหมด Slave บอร์ดจะเปิด SoftAP (SSID `ESP32-ArtNet-Setup-XXXX`) ค้างไว้ตลอดเพื่อให้เข้าตั้งค่าผ่านเว็บได้แม้ไม่มีการต่อสายแลน
+- Receives packets via callback, queues them for processing in `outputTask`, then maps by universe/offset to output channels
+- Core-Safe Deferral: callback (Core 0) pushes data into FreeRTOS Queue (Queue Depth 16); Core 1 (`outputTask`) reads from the queue and processes
+- Always-On Setup AP: In Slave mode, the board keeps SoftAP (SSID `ESP32-ArtNet-Setup-XXXX`) active for web configuration even without a LAN cable
 
 #### ESP-NOW DMX Packet Structure
 
 | Byte Range | Field Name | Data Type | Description |
 | :---: | :--- | :---: | :--- |
-| 0..2 | Prefix Magic | `char[3]` | ค่าคงที่ `"DMX"` เพื่อคัดกรองแพ็กเกจ |
+| 0..2 | Prefix Magic | `char[3]` | Constant `"DMX"` for packet filtering |
 | 3..4 | Universe | `uint16_t` | DMX Universe (0..32767) |
-| 5..6 | Offset | `uint16_t` | จุดเริ่มต้นของข้อมูลใน Universe (0..511) |
-| 7..8 | Total Length | `uint16_t` | ขนาดเต็มของ Universe (ปกติ 512) |
-| 9..10 | Chunk Length | `uint16_t` | ขนาด DMX data ในแพ็กเกจนี้ (สูงสุด chunk_size) |
-| 11 | Sequence | `uint8_t` | ตัวนับลำดับเพื่อเช็คความเสถียร |
-| 12.. | DMX Payload | `uint8_t[]` | ค่า DMX แชนเนลจริง |
+| 5..6 | Offset | `uint16_t` | Start offset within the Universe (0..511) |
+| 7..8 | Total Length | `uint16_t` | Full universe size (typically 512) |
+| 9..10 | Chunk Length | `uint16_t` | DMX data size in this packet (max chunk_size) |
+| 11 | Sequence | `uint8_t` | Sequence counter for stability checking |
+| 12.. | DMX Payload | `uint8_t[]` | Actual DMX channel values |
 
-Peer route จำกัดช่วง universe `0..32767` และ DMX address `1..512`; slave map packet ทันทีตาม `universe`/`offset` โดยไม่ต้องรอ reassemble ยกเว้น buffer แสดงสถานะ universe 0; ถ้า peer route ยาวกว่า chunk size, master แบ่งส่งหลาย packet โดยเพิ่ม `offset` ทีละ chunk size
+Peer route limits universe to `0..32767` and DMX address to `1..512`; slave maps each packet immediately by `universe`/`offset` without waiting for full reassembly, except for the universe 0 status buffer; if the peer route exceeds chunk size, the master sends multiple packets incrementing `offset` by chunk_size
 
 ### Validation And Interlock Context
 
-หน้าที่:
-- ป้องกัน configuration ที่ทำให้ firmware crash, peripheral ชนกัน หรือ hardware ทำงานผิด.
-- ต้อง validate ทั้งฝั่ง C++ API และ Web UI.
+Responsibilities:
+- Prevent configurations that would crash the firmware, cause peripheral conflicts, or make hardware inoperable.
+- Validate on both the C++ API and Web UI sides.
 
-ไฟล์หลัก:
+Key files:
 - `src/main.cpp`
 - `web/index.html`
 
-กฎสำคัญ:
-- ห้าม GPIO duplicate.
-- ห้าม output ใช้ pin เดียวกับ Status LED, Zero-Crossing, I2C SDA/SCL.
-- จำกัด DFPlayer ได้สูงสุด 2 channel เพราะใช้ UART1/2.
-- DFPlayer มี priority ในการจอง UART; DMX GPIO ใช้ UART ที่เหลือก่อน แล้ว fallback เป็น RMT.
-- RMT รวม LED strip และ DMX fallback ต้องไม่เกิน 8.
-- source ต้อง match output type.
-- **GPIO12 (MTDI) Avoidance:** GPIO 12 เป็น Bootstrap Pin — ห้ามใช้งานโดยเด็ดขาด; Web UI ต้องแสดงคำเตือนหากผู้ใช้กรอก GPIO 12
-- **AC Dimmer Zero-Crossing Interlock:** หาก `zc_pin == 255` (ปิดใช้งาน) AC Dimmer จะถูกล็อกให้เอาต์พุตเป็น 0 เสมอ; Web UI ต้องแสดง ZC Pin Missing Warning
-- **PCA9685 Shared Frequency Conflict:** หากผสมอุปกรณ์ที่ต้องการความถี่ต่างกัน (servo 50Hz + LED >200Hz) บน PCA chip เดียวกัน → Web UI และ API แสดงคำเตือนแต่ไม่อล็อกการเซฟ
-- **DMX Frame Timeout:** Core 1 loop ต้องไม่มี blocking operation ที่ทำให้ DMX Frame Cycle เกิน 50ms; บังคับตั้งค่า FPS เริ่มต้นที่ 30-40 FPS
+Key rules:
+- No duplicate GPIOs allowed.
+- Output pins must not conflict with Status LED, Zero-Crossing, I2C SDA/SCL.
+- DFPlayer limited to 2 channels (uses UART1/2).
+- DFPlayer has priority on UART allocation; DMX GPIO uses remaining UARTs first, then falls back to RMT.
+- RMT usage (LED strips + DMX fallback) must not exceed 8 channels.
+- Source must match the output type.
+- **GPIO12 (MTDI) Avoidance:** GPIO 12 is a Bootstrap Pin — strictly forbidden; Web UI must show a warning if the user enters GPIO 12
+- **AC Dimmer Zero-Crossing Interlock:** If `zc_pin == 255` (disabled), AC Dimmer output is locked to 0; Web UI must show a ZC Pin Missing Warning
+- **PCA9685 Shared Frequency Conflict:** If devices with different frequency requirements (servo 50Hz + LED >200Hz) are mixed on the same PCA chip, Web UI and API show a warning but do not block saving
+- **DMX Frame Timeout:** Core 1 loop must not perform any blocking operation that causes DMX Frame Cycle to exceed 50ms; initial FPS is forced to 30-40 FPS
 
 ### Capacity Scoring Context
 
-หน้าที่:
-- ประเมินความหนักของ configuration ก่อน save.
-- รวม hardware resource score และ compute score.
+Responsibilities:
+- Evaluate the resource weight of a configuration before saving.
+- Combine hardware resource score and compute score.
 
-ไฟล์หลัก:
+Key files:
 - `include/scoring.h`
 - `web/index.html`
 - `docs/resource_calculator.md`
 
-กฎสำคัญ:
-- weight constants ต้องตรงกันระหว่าง C++ และ JS.
-- resource scoring ต้องสะท้อน routing ที่เลือกจริง เช่น hybrid pin source, segment-level routing, และ DMX UART/RMT fallback.
-- total score limit มาจาก resource max ของ WT32-ETH01 + compute budget.
-- resource score ไม่แทน hard interlock ทั้งหมด; validation ยังคงต้องเช็ค peripheral limit จริง.
+Key rules:
+- Weight constants must match between C++ and JS.
+- Resource scoring must reflect actual routing, including hybrid pin sources, segment-level routing, and DMX UART/RMT fallback.
+- Total score limit is derived from resource max of WT32-ETH01 plus compute budget.
+- Resource score does not replace hard interlock checks; validation must still enforce peripheral limits.
 
-#### สูตรการคำนวณคะแนน (Score Formula)
+#### Score Formula
 
 ```text
 resourceScore = GPIO*0.5 + LEDC*2.5 + RMT*3.0 + UART*8.0 + DAC*2.0 + PCA*0.25 + EXP*0.125
@@ -232,85 +232,85 @@ totalScore    = resourceScore + computeScore
 ```
 
 - **Resource Weights:** GPIO (0.5), LEDC (2.5), RMT (3.0), UART (8.0), EXP (0.125), PCA (0.25)
-- **Compute Score:** ประเมิน CPU overhead เช่น Stepper/Function Generator +2.0 ต่อช่อง, RGB LED Pixel +0.005 ต่อหลอด
-- **Score Limit:** `SCORE_LIMIT ≈ 109.0` — หากเกิน Web UI และ firmware จะปฏิเสธ
+- **Compute Score:** Estimates CPU overhead, e.g., Stepper/Function Generator +2.0 per channel, RGB LED Pixel +0.005 per pixel
+- **Score Limit:** `SCORE_LIMIT ≈ 109.0` — if exceeded, both Web UI and firmware reject the config
 
-#### การตรวจสอบนอกระบบ (Offline Load Calculator)
+#### Offline Load Calculator
 
-มีสคริปต์ `tools/load_calculator.py` สำหรับประเมินและตรวจสอบการทับซ้อนของพินบนคอมพิวเตอร์ก่อนนำไปใช้จริง:
-- จำลอง Routing-accurate estimation ถอดรหัสขา (pin, pin2, pin3, pin4, seg_pins)
-- ตรวจสอบการชนกับขาส่วนกลาง (Status LED, ZC, I2C Bus)
-- รองรับโหมด Interactive หรือระบุไฟล์คอนฟิกจำลอง
+The `tools/load_calculator.py` script evaluates and checks pin overlap on a computer before deploying:
+- Simulates routing-accurate estimation by decoding pin fields (pin, pin2, pin3, pin4, seg_pins)
+- Checks for conflicts with system pins (Status LED, ZC, I2C Bus)
+- Supports Interactive mode or config file input
 
 ---
 
 ## Device Modes
 
-เฟิร์มแวร์รองรับ 3 โหมดหลักตามการตั้งค่าตัวแปร `sysCfg.device_mode` ใน NVS:
+The firmware supports 3 main modes, set via `sysCfg.device_mode` in NVS:
 
 ### Mode 0: Art-Net Ethernet Mode (`MODE_ARTNET_ETHERNET`)
 
-ทำหน้าที่เป็น wired lighting node รับสัญญาณ DMX ผ่านสายแลน (หรือ Wi-Fi สำรอง) แล้วแปลงออกเป็นพอร์ตเอาต์พุตต่างๆ
+Operates as a wired lighting node receiving DMX over LAN (or Wi-Fi fallback) and converting to physical outputs.
 
-**พอร์ตโปรโตคอล:** Art-Net UDP `6454` (ปรับได้), sACN UDP `5568` (Unicast + Multicast)
-**mDNS Responder:** จดทะเบียนเป็น `[mdns_name]-[xxxx].local`
+**Protocol Ports:** Art-Net UDP `6454` (configurable), sACN UDP `5568` (Unicast + Multicast)
+**mDNS Responder:** Registers as `[mdns_name]-[xxxx].local`
 
-**ลำดับการเริ่มระบบ (Startup & Fallback Sequence):**
+**Startup & Fallback Sequence:**
 
 ```mermaid
 flowchart TD
-    Start([เริ่มเปิดเครื่อง]) --> IncBoot[เพิ่มค่า bootCount ใน RTC RAM]
+    Start([Power On]) --> IncBoot[Increment bootCount in RTC RAM]
     IncBoot --> CheckBootCount{bootCount >= 5?}
     
-    CheckBootCount -- ใช่ --> RunRecovery[เข้าสู่ Recovery Mode: Ethernet & Wi-Fi AP]
-    CheckBootCount -- ไม่ใช่ --> InitFS[เมานต์ LittleFS & โหลดคอนฟิก]
+    CheckBootCount -- Yes --> RunRecovery[Enter Recovery Mode: Ethernet & Wi-Fi AP]
+    CheckBootCount -- No --> InitFS[Mount LittleFS & Load Config]
     
-    InitFS --> CheckButton{กดปุ่ม BOOT GPIO0 ค้างไว้?}
-    CheckButton -- ใช่ --> RunRecovery
-    CheckButton -- ไม่ใช่ --> InitETH[เริ่มเปิดการเชื่อมต่อ Ethernet]
+    InitFS --> CheckButton{BOOT GPIO0 held low?}
+    CheckButton -- Yes --> RunRecovery
+    CheckButton -- No --> InitETH[Start Ethernet]
     
-    InitETH --> CheckLink{มีสายแลนเชื่อมต่ออยู่?}
+    InitETH --> CheckLink{LAN cable connected?}
     
-    CheckLink -- ใช่ --> DHCEPH{เปิดใช้งาน DHCP?}
-    DHCEPH -- ใช่ --> EthDHCP[รับ IP จาก DHCP]
-    DHCEPH -- ไม่ใช่ --> EthStatic[ใช้ Static IP ที่เซฟไว้]
-    EthDHCP --> SetLed3[LED กะพริบ 3 ครั้ง: Ethernet Connected]
+    CheckLink -- Yes --> DHCEPH{DHCP enabled?}
+    DHCEPH -- Yes --> EthDHCP[Get IP via DHCP]
+    DHCEPH -- No --> EthStatic[Use saved Static IP]
+    EthDHCP --> SetLed3[LED blinks 3x: Ethernet Connected]
     EthStatic --> SetLed3
-    SetLed3 --> ResetBootNormal[รีเซ็ต bootCount กลับเป็น 0 หลัง 15 วินาที]
-    ResetBootNormal --> ModeNormal[เข้าสู่โหมดทำงานปกติ]
+    SetLed3 --> ResetBootNormal[Reset bootCount to 0 after 15s]
+    ResetBootNormal --> ModeNormal[Enter normal operation]
     
-    CheckLink -- ไม่ใช่ --> CheckWifiEn{เปิดใช้งาน Wi-Fi STA Fallback?}
-    CheckWifiEn -- ใช่ --> ConnectSTA[พยายามต่อ Wi-Fi Client]
-    ConnectSTA --> CheckWifiConnected{ต่อสำเร็จ?}
+    CheckLink -- No --> CheckWifiEn{Wi-Fi STA fallback enabled?}
+    CheckWifiEn -- Yes --> ConnectSTA[Attempt Wi-Fi Client connection]
+    ConnectSTA --> CheckWifiConnected{Connected?}
     
-    CheckWifiConnected -- ใช่ --> SetLed4[LED กะพริบ 4 ครั้ง: Wi-Fi STA Connected]
+    CheckWifiConnected -- Yes --> SetLed4[LED blinks 4x: Wi-Fi STA Connected]
     SetLed4 --> ResetBootNormal
     
-    CheckWifiEn -- ไม่ใช่/ต่อไม่สำเร็จ --> CheckApEn{เปิดใช้งาน Setup AP Fallback?}
-    CheckWifiConnected -- ไม่ใช่ --> CheckApEn
+    CheckWifiEn -- No/fail --> CheckApEn{Setup AP fallback enabled?}
+    CheckWifiConnected -- No --> CheckApEn
     
-    CheckApEn -- ใช่ --> StartAP[เปิด SoftAP: ESP32-ArtNet-Setup-XXXX]
-    StartAP --> SetLed2[LED กะพริบ 2 ครั้ง: AP Setup Active]
-    SetLed2 --> WebConfig[เปิดหน้าเว็บ 192.168.4.1 เพื่อตั้งค่า]
+    CheckApEn -- Yes --> StartAP[Start SoftAP: ESP32-ArtNet-Setup-XXXX]
+    StartAP --> SetLed2[LED blinks 2x: AP Setup Active]
+    SetLed2 --> WebConfig[Open web at 192.168.4.1 for setup]
     WebConfig --> ResetBootNormal
     
-    CheckApEn -- ไม่ใช่ --> LockEthernet[ล็อกที่การทำงาน Ethernet เปล่า]
+    CheckApEn -- No --> LockEthernet[Lock to bare Ethernet operation]
     LockEthernet --> ResetBootNormal
 ```
 
 ### Mode 1: ESP-NOW Master Mode (`MODE_ESPNOW_MASTER`)
 
-ทำหน้าที่เป็นตัวรับข้อมูลไฟจากระบบเครือข่ายแลน/Wi-Fi (Art-Net หรือ sACN) แล้วแปลงส่งต่อออกไปในรูปแบบคลื่นวิทยุไร้สายความเร็วสูงด้วยโปรโตคอล ESP-NOW ไปยังบอร์ดบริวาร (Slaves)
+Receives lighting data from LAN/Wi-Fi (Art-Net or sACN) and forwards it via the ESP-NOW wireless protocol to slave boards.
 
-- Peering: เก็บ MAC Address และช่วง DMX ใน `/espnow_peers.json`; หาก peer list ว่างจะ Broadcast ไป `FF:FF:FF:FF:FF:FF`
-- DMX Chunking: แบ่ง 1 Universe (512 ch) สูงสุด `ESPNOW_DMX_CHUNK_SIZE` (200 bytes data + 12 bytes header)
+- Peering: Stores MAC Address and DMX range in `/espnow_peers.json`; if peer list is empty, broadcasts to `FF:FF:FF:FF:FF:FF`
+- DMX Chunking: Splits 1 Universe (512 ch) into chunks up to `ESPNOW_DMX_CHUNK_SIZE` (200 bytes data + 12 bytes header)
 
 ### Mode 2: ESP-NOW Slave Mode (`MODE_ESPNOW_SLAVE`)
 
-ทำหน้าที่รับสัญญาณแพ็กเกจ DMX ไร้สายที่ Master ส่งมาเพื่อนำมาขับเอาต์พุตทางกายภาพที่ต่ออยู่กับบอร์ด
+Receives wireless DMX packets from the Master and drives physical outputs on the board.
 
-- Core-Safe Deferral: callback (Core 0) → FreeRTOS Queue (Queue Depth 16) → Core 1 (`outputTask`) ประมวลผล
-- Always-On Setup AP: SoftAP (SSID `ESP32-ArtNet-Setup-XXXX`) เปิดค้างไว้ตลอดเพื่อให้ config ภาคสนามแม้ไม่มีการต่อสายแลน
+- Core-Safe Deferral: callback (Core 0) → FreeRTOS Queue (Queue Depth 16) → Core 1 (`outputTask`) processing
+- Always-On Setup AP: SoftAP (SSID `ESP32-ArtNet-Setup-XXXX`) stays active for field configuration even without LAN
 
 ---
 
@@ -318,40 +318,40 @@ flowchart TD
 
 ### Device Configuration
 
-ประกอบด้วย:
+Consists of:
 - `SystemConfig`: network, protocol, pins, display, output FPS.
-- `outputs[]`: รายการ `OutputChannel`.
+- `outputs[]`: list of `OutputChannel`.
 
-Invariant:
-- global pins ต้องไม่ชนกันเองและไม่ชนกับ output pins.
-- protocol/network settings ต้องมี fallback ที่ predictable.
-- settings ที่เปลี่ยน hardware/network อาจต้อง reboot.
+Invariants:
+- Global pins must not conflict with each other or with output pins.
+- Protocol/network settings must have a predictable fallback.
+- Settings that change hardware/network may require a reboot.
 
 ### Output Channel
 
-ประกอบด้วย:
-- identity โดยตำแหน่งใน outputs array.
-- type/source/routing fields.
+Consists of:
+- Identity by position in the outputs array.
+- Type/source/routing fields.
 - DMX location.
-- type-specific parameters.
-- runtime-only state และ peripheral handles.
+- Type-specific parameters.
+- Runtime-only state and peripheral handles.
 
-Invariant:
-- field ที่เกี่ยวกับ source ต้องสอดคล้องกับ type.
-- multi-pin output ต้องมี routing ครบตาม mode.
-- runtime-only pointer/state ไม่ใช่ persisted domain data.
+Invariants:
+- Source-related fields must be consistent with the type.
+- Multi-pin outputs must have complete routing for the given mode.
+- Runtime-only pointers/state are not persisted domain data.
 
 ### Hardware Resource Budget
 
-ประกอบด้วย:
+Consists of:
 - GPIO, LEDC, RMT, UART, DAC, PCA9685 channel, digital expander channel.
-- compute budget จาก output type และ `output_fps`.
+- Compute budget from output type and `output_fps`.
 
-Invariant:
+Invariants:
 - RMT <= 8.
 - UART usable for DMX/DFPlayer <= 2.
 - LEDC <= 16.
-- total combined score <= `SCORE_LIMIT`.
+- Total combined score <= `SCORE_LIMIT`.
 
 ---
 
@@ -359,61 +359,61 @@ Invariant:
 
 ### I2C Bus Synchronization (`i2cMutex`)
 
-บอร์ด WT32-ETH01 มีพอร์ต I2C ทางกายภาพเพียงช่องเดียวซึ่งเชื่อมอุปกรณ์ทุกชิ้นเข้าด้วยกัน (Expander, DAC, Display)
+The WT32-ETH01 has only one physical I2C port shared by all devices (Expander, DAC, Display).
 
-**กฎเหล็ก:** ทุกคำสั่งที่คุยผ่าน `Wire` ต้องถูกคลุมด้วยระบบกั้น `i2cMutex`:
+**Golden Rule:** Every `Wire` operation must be protected by `i2cMutex`:
 
 ```cpp
 if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-    // ทำการอ่านหรือเขียนค่าผ่านบัส I2C
+    // Perform I2C read or write
     xSemaphoreGive(i2cMutex);
 } else {
-    // แจ้งเตือนข้อผิดพลาด I2C Lockup
+    // Report I2C Lockup error
 }
 ```
 
-ทาสก์หน้าจอ OLED (Core 0) ใช้ queue เพื่อเลี่ยงการยึด I2C บ่อยเกินไป
+The OLED display task (Core 0) uses a queue to avoid holding the I2C bus too frequently.
 
 ### Dynamic Config Reload Safety
 
-เมื่อหน้าเว็บส่ง POST `/api/outputs`:
-1. Validate ข้อมูลเอาต์พุต
-2. เขียนเซฟลง LittleFS
-3. ปิดและดีดคืนทรัพยากรเอาต์พุตเดิม → เริ่มทาสก์ใหม่บน Core 1 อย่างนุ่มนวล
+When the web UI sends POST `/api/outputs`:
+1. Validate the output data
+2. Save to LittleFS
+3. Tear down and release old output resources → start new tasks on Core 1 gracefully
 
 ### Atomic Frame Notification & Sync
 
-ใช้ตัวแปรอะตอมิก `networkFramePending` เพื่อหลีกเลี่ยง Heavy Mutex Lock ในการซิงค์เฟรมแสง (30-40 FPS):
+Uses the atomic flag `networkFramePending` to avoid heavy mutex locks during frame sync (30-40 FPS):
 
-- **Core 0:** เมื่อ network packet ผ่าน validation และ map ลง buffer สำเร็จ → ตั้ง `networkFramePending = true`
-- **Core 1:** ใน `outputTask` ตรวจสอบแฟล็กผ่าน `networkFramePending.exchange(false)` — ถ้า true → สั่ง `outputCtrl.updateLeds()` ทันที
-- **ผลดี:** แยก Decoupled execution loops ระหว่าง network กับ output rendering; latency ต่ำ; Deadlock-free
+- **Core 0:** After a network packet passes validation and is mapped to the output buffer → sets `networkFramePending = true`
+- **Core 1:** In `outputTask`, checks the flag via `networkFramePending.exchange(false)` — if true → calls `outputCtrl.updateLeds()` immediately
+- **Benefit:** Decoupled execution loops between network packet processing and output rendering; low latency; deadlock-free
 
 ### Wi-Fi Auto-Reconnection Logic
 
-- Rate-limited ทุก 10 วินาที (ใช้ `millis()` + `lastWifiReconnectAttempt`)
-- หากอุปกรณ์อยู่ใน Ethernet mode และมีสายแลนเชื่อมต่อ (`ethConnected || ETH.linkUp()`) จะข้ามการเชื่อมต่อ Wi-Fi Client โดยเจตนา
+- Rate-limited to every 10 seconds (using `millis()` + `lastWifiReconnectAttempt`)
+- Skips Wi-Fi Client reconnection when in Ethernet mode with LAN connected (`ethConnected || ETH.linkUp()`)
 
 ### DMX Frame Timeout Constraint
 
-DMX Frame Cycle ต้องไม่นานเกิน 50ms (ขั้นต่ำ 20Hz) เพื่อป้องกันโคมไฟเข้าสู่ Safe-state; ระบบบังคับตั้งค่าเริ่มต้นที่ 30-40 FPS
+DMX Frame Cycle must not exceed 50ms (minimum 20Hz) to prevent lighting fixtures from entering safe-state; initial FPS is forced to 30-40 FPS
 
 ---
 
 ## Configuration Contract
 
-ส่วนนี้เป็น contract กลางสำหรับ `/outputs.json`, Web UI, C++ validation, runtime setup, และ scoring. ถ้า behavior จริงในโค้ดไม่ตรงกับตารางนี้ ให้ถือว่าเป็น implementation drift ที่ต้องแก้หรือบันทึกไว้ชัดเจน.
+This section is the central contract for `/outputs.json`, Web UI, C++ validation, runtime setup, and scoring. If actual behavior in code deviates from these tables, treat it as implementation drift that must be fixed or explicitly recorded.
 
 ### Source IDs
 
 | ID | Source | Contract |
 | ---: | --- | --- |
-| 0 | ESP32 GPIO | direct ESP32 pin; ต้องไม่ชน global pins หรือ output GPIO อื่น |
-| 1 | PCA9685 | PWM-capable I2C expander; 16 channel ต่อ address; shared frequency ต่อ chip |
-| 2 | MCP23017 | digital-only I2C GPIO expander |
-| 3 | TCA9555 | digital-only I2C GPIO expander |
-| 4 | PCF857x | digital-only I2C GPIO expander |
-| 5 | I2C DAC | I2C DAC source ใช้ได้เฉพาะ output type 14; model selected by `dac_model` |
+| 0 | ESP32 GPIO | Direct ESP32 pin; must not conflict with global pins or other output GPIOs |
+| 1 | PCA9685 | PWM-capable I2C expander; 16 channels per address; shared frequency per chip |
+| 2 | MCP23017 | Digital-only I2C GPIO expander |
+| 3 | TCA9555 | Digital-only I2C GPIO expander |
+| 4 | PCF857x | Digital-only I2C GPIO expander |
+| 5 | I2C DAC | I2C DAC source valid only for output type 14; model selected by `dac_model` |
 
 ### I2C Address Contract
 
@@ -517,83 +517,83 @@ Known implementation drift to fix later:
 ## Architectural Decisions (ADRs)
 
 ### ADR001: Function Generator Frequency & Resolution Limitation
-- **Rationale:** เฟรมเรต Art-Net/DMX (30-44 FPS) เพียงพอสำหรับสายตามนุษย์
-- **Decision:** Function Generator (Type 16) เช่น Sine, Triangle เป็นฟังก์ชันเสริมสำหรับ Educational/Simulation; ไม่แนะนำให้รันความถี่สูงในงานจริง; จำกัด timer interrupt ขั้นต่ำไว้ที่ 50µs
+- **Rationale:** Art-Net/DMX frame rate (30-44 FPS) is sufficient for human perception
+- **Decision:** Function Generator (Type 16) such as Sine, Triangle is an auxiliary feature for Educational/Simulation use; not recommended for high-frequency production use; minimum timer interrupt set at 50µs
 
 ### ADR002: Motor & Motion Control Separation
-- **Rationale:** อุปกรณ์มอเตอร์ที่ต้องการความละเอียดสูง (Micro-stepping, Camera rotation) เป็นภาระหนักและอาจสร้างสัญญาณรบกวนข้ามคอร์
-- **Decision:** แนะนำให้ใช้ ESP32 นี้ส่ง DMX ไปควบคุม Dedicated Motor Controller Board แทนการขับกำลังสูงโดยตรง
+- **Rationale:** High-resolution motion devices (Micro-stepping, Camera rotation) are CPU-intensive and may cause cross-core interference
+- **Decision:** Use this ESP32 to send DMX to a dedicated Motor Controller Board rather than driving high-power motors directly
 
 ### ADR003: DMX Frame Timeout Constraint
-- **Rationale:** DMX Decoders บางประเภทเข้าสู่ Safe-state หากเว้นว่างเกิน 50ms
-- **Decision:** Core 1 loop ต้องไม่มี blocking operation ที่ทำให้ DMX Frame Cycle เกิน 50ms; บังคับตั้งค่า FPS เริ่มต้นที่ 30-40 FPS
+- **Rationale:** Some DMX Decoders enter safe-state if idle for more than 50ms
+- **Decision:** Core 1 loop must not perform blocking operations that cause DMX Frame Cycle to exceed 50ms; initial FPS forced to 30-40 FPS
 
 ### ADR004: I2C Display Recovery & Non-blocking Strategy
-- **Rationale:** จอ I2C อาจหลุดชั่วคราว แต่การ Blocking I2C ACK จะดึงเวลาเอาต์พุตโปรโตคอล
-- **Decision:** (1) สแกนบัส I2C เป็นระยะเพื่อ Auto-reinit (2) Non-blocking/Minimum Wait I2C write (3) อนุญาตให้ Disable Display ผ่าน Web UI
+- **Rationale:** I2C display may temporarily disconnect, but blocking on I2C ACK wastes output protocol time
+- **Decision:** (1) Periodically scan I2C bus for auto-reinit (2) Non-blocking/Minimum Wait I2C writes (3) Allow disabling display via Web UI
 
 ### ADR005: Low Latency Direct Update & Hold Last State
-- **Rationale:** ความหน่วงในระบบไฟเวทีคือสำคัญที่สุด; Frame Interpolation เพิ่ม Buffer Lag
-- **Decision:** (1) Slave อัปเดตแบบ "รับแล้วแสดงทันที" (2) หากไร้สายขาด — Hold Last State (3) Frame Interpolation เป็นแผนระยะยาวสำหรับเอาต์พุตทางกลเท่านั้น
+- **Rationale:** Latency is critical in stage lighting; Frame Interpolation adds buffer lag
+- **Decision:** (1) Slave updates directly on receive (2) On wireless loss — Hold Last State (3) Frame Interpolation is a long-term plan for mechanical outputs only
 
 ### ADR006: WT32-ETH01 GPIO 12 (MTDI) Avoidance Policy
-- **Rationale:** GPIO 12 เป็น Bootstrap Pin; การดึง High ขณะบูตทำให้ Boot Loop ถาวร
-- **Decision:** (1) ห้ามใช้งาน GPIO 12 ทุกกรณี (2) Web UI ต้องแสดง Warning Banner หากผู้ใช้กรอก GPIO 12
+- **Rationale:** GPIO 12 is a Bootstrap Pin; pulling it high during boot causes permanent boot loop
+- **Decision:** (1) Never use GPIO 12 under any circumstances (2) Web UI must show a warning banner if the user enters GPIO 12
 
 ### ADR007: PCA9685 Shared Frequency Compromise Policy
-- **Rationale:** PCA9685 ใช้ความถี่ PWM ร่วมกัน 16 ช่อง; servo (50Hz) + LED (>200Hz) ต่างความถี่
-- **Decision:** (1) แต่ละ I2C Address ตั้งค่าความถี่แยกอิสระ (0x40-0x47) (2) หากผสมอุปกรณ์ต่างความถี่บนบอร์ดเดียวกัน → Warning (ไม่บล็อกการเซฟ)
+- **Rationale:** PCA9685 shares PWM frequency across all 16 channels; servo (50Hz) and LED (>200Hz) have different requirements
+- **Decision:** (1) Each I2C Address sets frequency independently (0x40-0x47) (2) If devices with different frequency requirements are mixed on the same board → Warning (does not block saving)
 
 ### ADR008: Internal GPIO DAC Blocking (WT32-ETH01)
-- **Rationale:** GPIO 25/26 (Internal DAC) ชนกับ LAN8720A Ethernet PHY
-- **Decision:** (1) ปิด/ซ่อน Source 0 (GPIO) สำหรับ DAC Type 14 บน WT32-ETH01; ผลักดันให้ใช้ I2C DAC เสมอ (2) เก็บโค้ด `dacWrite()` ไว้เพื่อความเข้ากันได้กับบอร์ดอื่น
+- **Rationale:** GPIO 25/26 (Internal DAC) conflict with LAN8720A Ethernet PHY
+- **Decision:** (1) Hide/disable Source 0 (GPIO) for DAC Type 14 on WT32-ETH01; force I2C DAC usage (2) Keep `dacWrite()` code for compatibility with other boards in the future
 
 ### ADR009: ESP-NOW Slave Wi-Fi Channel Selection Policy
-- **Rationale:** ESP-NOW ต้องการ Master และ Slave อยู่บนช่อง Wi-Fi เดียวกัน
-- **Decision:** (1) Fix Channel Mode: ผู้ใช้กำหนดเลขช่องใน Web UI Slave (2) Auto Channel Mode: Slave สแกนหาแพ็กเกจ DMX Signature จาก MAC Master แล้วล็อกช่องอัตโนมัติ
+- **Rationale:** ESP-NOW requires Master and Slave to be on the same Wi-Fi channel
+- **Decision:** (1) Fix Channel Mode: user sets channel number in Slave Web UI (2) Auto Channel Mode: Slave scans for DMX Signature packets from the Master MAC and locks onto that channel automatically
 
 ### ADR010: In-field Hardware Adaptability & Switch Inversion Policy
-- **Rationale:** Homing switches ในหน้างานเป็นได้ทั้ง NO และ NC
-- **Decision:** เปิดเผย `pin_invert`, `pin4_invert` ใน Web UI; ให้ผู้ใช้ปรับ `val ^ inv` ใน `readOutputPin()` ได้ตามประเภทสวิตช์
+- **Rationale:** Homing switches can be either NO or NC in the field
+- **Decision:** Expose `pin_invert`, `pin4_invert` in Web UI; allow users to configure `val ^ inv` in `readOutputPin()` based on switch type
 
 ### ADR011: DMX Resource Scoring Parity Drift (C++ vs JS) — Known
-- **Rationale:** JS คำนวณ DMX Fallback → RMT (3.0) แบบ Dynamic; C++ ประเมินแบบ Worst-case UART (8.0)
-- **Decision:** (1) C++ เป็น Worst-case static estimation (ป้องกันการจองเกิน) (2) Runtime allocation แยกจาก logic scoring (3) บันทึกเป็น Known Drift เพื่อปรับปรุงภายหลัง
+- **Rationale:** JS calculates DMX Fallback → RMT (3.0) dynamically; C++ estimates worst-case UART (8.0)
+- **Decision:** (1) C++ uses worst-case static estimation (prevents over-allocation) (2) Runtime allocation is separate from scoring logic (3) Recorded as Known Drift for future improvement
 
 ### ADR012: Planned Independent Art-Net Enablement Option
-- **Rationale:** ใน network ที่สตรีม Art-Net เยอะ ผู้ใช้อาจต้องการปิด Art-Net เพื่อป้องกันทับซ้อน
-- **Decision:** (อนาคต) เพิ่ม `artnet_enabled` (bool) ใน NVS `SystemConfig` และ UI checkbox; Core 0 ควบคุม `artNetCtrl.loop()` ตามค่านี้; หากปิดทั้ง Art-Net และ sACN → validation error ป้องกันบอร์ดตัดขาดจากแสงไฟ
+- **Rationale:** In networks with heavy Art-Net traffic, users may want to disable Art-Net to prevent overlap
+- **Decision:** (Future) Add `artnet_enabled` (bool) to NVS `SystemConfig` and UI checkbox; Core 0 controls `artNetCtrl.loop()` based on this flag; if both Art-Net and sACN are disabled → validation error to prevent the board from losing all lighting data
 
 ---
 
 ## Grilling Results
 
-คำถามที่ใช้ grill และคำตอบที่ infer จากโค้ดเดิม:
+Questions used during the grilling session and answers inferred from the existing code:
 
 | Question | Answer from existing files | Consequence |
 | --- | --- | --- |
-| อะไรคือ entity หลักของระบบ? | `OutputChannel` | เอกสาร/validation ควรอ้างอิง channel เป็นศูนย์กลาง |
-| ข้อมูลไหนเป็น persisted config และข้อมูลไหนเป็น runtime state? | `OutputChannel` รวมทั้งสองกลุ่มไว้ใน struct เดียว | ต้องระวังเวลาเพิ่ม field ใหม่ว่า save/load หรือ runtime-only |
-| capacity คุมด้วยจำนวน channel หรือ resource score? | user manual บอก up to 16, code comment บอก no hard channel limit และใช้ score/hardware validation | เอกสาร resource เดิมที่เขียน max 8 ต้องแก้ |
-| source compatibility อยู่ที่ไหน? | C++ validation และ Web UI validation | การเพิ่ม output/source ต้องแก้สองฝั่ง |
-| score เป็น hard safety ทั้งหมดไหม? | ไม่ใช่, ยังมี UART/RMT/GPIO/PCA/I2C interlock | ห้ามลด validation เหลือแค่ score |
-| Web UI source of truth อยู่ที่ไหน? | `web/index.html`; `include/web_pages.h` generated | แก้ UI ต้อง regenerate web pages |
-| ความเสี่ยงหลักในการ refactor คืออะไร? | struct ใหญ่, routing hybrid, validation duplicated JS/C++ | ควร refactor แบบเล็กและมี build/test ทุกครั้ง |
+| What is the main entity? | `OutputChannel` | Documentation/validation should reference the channel as the central concept |
+| Which data is persisted config vs runtime state? | `OutputChannel` includes both groups in a single struct | When adding new fields, be careful about save/load vs runtime-only |
+| Is capacity controlled by channel count or resource score? | User manual says up to 16, code comment says no hard channel limit and uses score/hardware validation | The old resource doc stating max 8 must be corrected |
+| Where is source compatibility defined? | C++ validation and Web UI validation | Adding an output/source requires changes on both sides |
+| Is score a complete hard safety measure? | No, there are also UART/RMT/GPIO/PCA/I2C interlock checks | Do not reduce validation to only score |
+| Where is the Web UI source of truth? | `web/index.html`; `include/web_pages.h` is generated | After editing UI, regenerate web pages |
+| What is the main risk in refactoring? | Large struct, hybrid routing, duplicated JS/C++ validation | Refactor in small steps with build/test every time |
 
 ## Current Tidy-Up Decisions
 
-1. เอกสาร domain model นี้เป็น reference กลางของคำศัพท์และ invariant.
-2. `docs/resource_calculator.md` ต้องสะท้อน v3 current firmware ไม่ใช่รายการ output ที่ถูกยกเลิกหรือยังไม่มีใน type `0..18`.
-3. ยังไม่แยก `OutputChannel` ในโค้ด เพราะมีความเสี่ยงสูงต่อ save/load, Web UI JSON และ runtime pointer ownership.
-4. การปรับปรุงโค้ดในอนาคตควรเริ่มจาก helper validation หรือ shared constants ที่ลด drift ระหว่าง C++/JS โดยไม่เปลี่ยน layout ก่อน.
+1. This domain model document is the central reference for vocabulary and invariants.
+2. `docs/resource_calculator.md` must reflect v3 current firmware, not deprecated or non-existent output types beyond `0..18`.
+3. Do not yet split `OutputChannel` in code; the risk to save/load, Web UI JSON, and runtime pointer ownership is too high.
+4. Future code improvements should start with helper validation or shared constants that reduce C++/JS drift without changing the layout.
 
 ## Open Risks
 
 | Risk | Why It Matters | Mitigation |
 | --- | --- | --- |
-| C++/JS validation drift | ผู้ใช้อาจ save ผ่าน UI ไม่ได้ หรือ API รับ config ที่ UI ไม่รับ | เพิ่ม checklist ทุกครั้งที่แก้ output type/source |
-| `OutputChannel` รวม persisted/runtime state | เพิ่ม field ผิดที่อาจทำให้ migration หรือ memory lifecycle พัง | document field group ก่อน refactor |
-| Generated web file stale | firmware อาจ embed UI เก่า | run `python tools/build_web.py` หลังแก้ `web/index.html` |
-| Hardware docs drift | ผู้ใช้ต่อวงจรผิดหรือเลือก pin ผิด | ใช้ `docs/domain_model.md` และ `docs/resource_calculator.md` เป็นคู่กัน |
-| Resource scoring drift | C++/JS score อาจรับ config หนักเกินจริงหรือ reject config ที่ควรผ่าน | เมื่อแก้ routing field ต้อง sync `include/scoring.h` และ `web/index.html` ให้ routing-accurate |
-| Current scoring implementation drift | domain rule ต้องการ routing-accurate score แต่บาง C++ JSON scoring path ยังอาจ copy routing fields ไม่ครบ | audit/fix `totalOutputScoreFromJson()` และเทียบกับ JS `channelScore()` |
+| C++/JS validation drift | Users may not be able to save via UI, or the API may accept configs the UI rejects | Add a checklist every time an output type/source is modified |
+| `OutputChannel` combines persisted/runtime state | Adding a field in the wrong group can break migration or memory lifecycle | Document field groups before refactoring |
+| Generated web file stale | Firmware may embed an outdated UI | Run `python tools/build_web.py` after editing `web/index.html` |
+| Hardware docs drift | Users may wire circuits incorrectly or choose wrong pins | Use `docs/domain_model.md` and `docs/resource_calculator.md` together |
+| Resource scoring drift | C++/JS scores may accept overly heavy configs or reject valid ones | When modifying routing fields, sync `include/scoring.h` and `web/index.html` for routing-accurate scoring |
+| Current scoring implementation drift | Domain rules require routing-accurate score but some C++ JSON scoring paths may not copy all routing fields | Audit/fix `totalOutputScoreFromJson()` and compare against JS `channelScore()` |

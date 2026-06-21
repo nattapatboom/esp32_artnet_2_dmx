@@ -1,17 +1,17 @@
 # Hardware Protection & Verification Guidelines: ESP32 Art-Net Firmware
 
-เอกสารนี้อธิบายแนวทางการออกแบบวงจรป้องกันฮาร์ดแวร์ (Hardware Protection) สำหรับพอร์ตเอาต์พุตของบอร์ด WT32-ETH01 รวมถึงแผนการตรวจสอบ Datasheet ของอุปกรณ์พ่วงภายนอกทั้งหมดที่ใช้ร่วมกับเฟิร์มแวร์นี้
+This document describes the hardware protection circuit design guidelines for output ports on the WT32-ETH01 board, including datasheet verification plans for all external devices used with this firmware.
 
 ---
 
-## 1. วงจรป้องกันพอร์ตเอาต์พุต (Output Port ESD & Overcurrent Protection)
+## 1. Output Port ESD & Overcurrent Protection
 
-ในการใช้งานหน้างานจริงที่บอร์ดต้องขับโหลดหลากหลายประเภทเพื่อควบคุมแสงสีและเอฟเฟกต์ มักเกิดปัญหาการกระชากของกระแสหรือมีสัญญาณรบกวนขยะไฟย้อนกลับเข้ามาทำให้บอร์ดดับ/รีเซ็ตตัว (Brownout Reset) หรือพอร์ตพังเสียหาย จึงควรต่อวงจรป้องกันตามโครงสร้างดังนี้:
+When the board drives various loads for lighting and effect control in the field, current surges or noise feedback can cause brownout resets or port damage. The following protection circuits are recommended:
 
-### 1.1 แผนผังวงจร (Schematic Options)
+### 1.1 Schematic Options
 
-**กรณีที่ 1: เชื่อมต่อตรงจากขา GPIO ของ ESP32 (ไม่มีไอซีบัฟเฟอร์)**
-ใช้ Zener Diode ขนาด 3.3V เพื่อไม่ให้แรงดันไฟฝั่งขาสัญญาณของ ESP32 เกินพิกัด 3.3V
+**Case 1: Direct Connection from ESP32 GPIO (No Buffer IC)**
+Use a 3.3V Zener Diode to prevent the ESP32 signal pin voltage from exceeding the 3.3V rating.
 
 ```text
 [ESP32 GPIO Pin] ────┬─── [ R: 220 Ohm ] ─── [ PPTC: < 100 mA ] ─── [ OUT TO DEVICE ]
@@ -21,8 +21,8 @@
                     [GND]
 ```
 
-**กรณีที่ 2: เชื่อมต่อผ่านไอซีบัฟเฟอร์ 5V (เช่น 74HCT245 หรือระดับไฟ 5V)**
-ใช้ Zener Diode ขนาด 5.1V (เช่นรุ่น `PDZVTR5.1B`) ที่ฝั่งเอาต์พุตของบัฟเฟอร์
+**Case 2: Connection via 5V Buffer IC (e.g., 74HCT245 or 5V-level)**
+Use a 5.1V Zener Diode (e.g., `PDZVTR5.1B`) on the buffer's output side.
 
 ```text
 [ESP32 GPIO] ──> [5V Buffer IC] ────┬─── [ R: 220 Ohm ] ─── [ PPTC: < 100 mA ] ─── [ OUT TO DEVICE ]
@@ -32,81 +32,82 @@
                                     [GND]
 ```
 
-### 1.2 รายละเอียดอุปกรณ์และการป้องกัน
+### 1.2 Component Details & Protection
 
-- **Zener Diode (ESD Clamp):** ต่อคร่อมก่อนผ่านตัวต้านทานจำกัดกระแส เพื่อทำหน้าที่ขลิบแรงดันส่วนเกิน (Voltage Clamping) ป้องกันความเสียหายจากไฟฟ้าสถิต (ESD) หรือแรงดันไฟย้อนกลับ
-  - ใช้ Zener ขนาด **5.1V** (เช่นรุ่น `PDZVTR5.1B`): ใช้เฉพาะกรณีที่มีไอซีบัฟเฟอร์แปลงระดับสัญญาณเป็น 5V คั่นกลางเท่านั้น
-  - ใช้ Zener ขนาด **3.3V**: ต้องใช้ในกรณีที่ต่อตรงเข้าหาขา GPIO ของ ESP32 เพื่อป้องกันไม่ให้แรงดันบนพินสูงเกิน 3.3V
-- **ตัวต้านทานอนุกรม (Series Resistor):** ต่ออนุกรมขาสัญญาณด้วยตัวต้านทานขนาดประมาณ `220 Ohm` เพื่อจำกัดกระแสไฟฟ้าสูงสุดและช่วยป้องกันขาสัญญาณ
-- **ฟิวส์รีเซ็ตอัตโนมัติ (PPTC Resettable Fuse):** ต่ออนุกรมสายเอาต์พุตด้วย PPTC ขนาดเล็กพิเศษ **จำกัดกระแสใช้งานจริงต่ำกว่า 100 mA** เพื่อความปลอดภัยระดับพินสัญญาณเอาต์พุต
+- **Zener Diode (ESD Clamp):** Connected before the current-limiting resistor to clamp excess voltage (Voltage Clamping), protecting against ESD or reverse voltage.
+  - Use **5.1V Zener** (e.g., `PDZVTR5.1B`): Only when a 5V buffer IC is present between ESP32 and the external device.
+  - Use **3.3V Zener**: Required when connecting directly to ESP32 GPIO to prevent pin voltage exceeding 3.3V.
+- **Series Resistor:** A `220 Ohm` resistor in series on the signal line limits maximum current and protects the pin.
+- **PPTC Resettable Fuse:** A resettable fuse in series on the output line, **limiting operating current to under 100 mA** for signal-level output safety.
 
-### 1.3 วงจรคุมโหลดประเภทเหนี่ยวนำขดลวด (Inductive Load Protection / Flyback Diode)
+### 1.3 Inductive Load Protection (Flyback Diode)
 
-**ปัญหาหลัก:** โหลดที่มีขดลวดเหนี่ยวนำสูง (Inductor) เช่น โซลินอยด์วาล์วยิงลม (Solenoid), รีเลย์ (Relay Coil), หรือมอเตอร์ไฟตรง (DC Motor) เมื่อถูกสั่งปิดการทำงานกระทันหัน สนามแม่เหล็กที่ยุบตัวจะสร้างแรงดันไฟฟ้าย้อนกลับที่สูงมาก (Flyback Voltage Spike) ย้อนเข้ามารบกวนระบบวิทยุหรือเผาทรานซิสเตอร์ขับ
+**Problem:** Inductive loads (Solenoid valves, Relay coils, DC Motors) generate a high reverse voltage spike (Flyback Voltage) when suddenly switched off, which can disrupt the radio system or damage the driving transistor.
 
-**แนวทางการป้องกัน:** **ต้องต่อไดโอดความเร็วสูงหรือทั่วไป (เช่น 1N4007) คร่อมขนานตัวโหลดเหนี่ยวนำในลักษณะย้อนทิศ (Reverse-biased)** เสมอ เพื่อช่วยระบายแรงดันย้อนกลับตัวนี้ลงกราวด์อย่างปลอดภัย และหยุดปัญหาบอร์ดดับกลางคันเนื่องจากไฟกระชาก
+**Mitigation:** **Always connect a fast or general-purpose diode (e.g., 1N4007) in reverse-biased parallel across the inductive load** to safely discharge the reverse voltage to ground and prevent brownout resets from voltage spikes.
 
 ---
 
-## 2. รายการอุปกรณ์เป้าหมาย (Target Device Specs)
+## 2. Target Device Specs
 
-อุปกรณ์พ่วงภายนอกทั้งหมดจะต้องมีไฟล์ Datasheet อ้างอิงเพื่อตรวจสอบการเขียนโค้ดไดรเวอร์:
+All external peripheral devices must have reference Datasheets for driver code verification:
 
 | # | Device | Bus | Purpose |
 | ---: | --- | --- | --- |
-| 1 | **PCA9685** | I2C | 16-channel PWM controller; ตรวจสอบรีจิสเตอร์และขีดจำกัดความถี่ |
-| 2 | **MCP23017 / TCA9555** | I2C | 16-bit I/O Expander; ตรวจสอบ IODIR และการเขียนบิตแมปเอาต์พุต |
-| 3 | **PCF8574** | I2C | 8-bit I/O Expander; ตรวจสอบ Quasi-bidirectional I/O และ Active-Low |
-| 4 | **MCP4725 / DAC7571 / DAC7573** | I2C | 12-bit DACs; ตรวจสอบคำสั่งส่งข้อมูลและการตั้งค่าแอดเดรส |
-| 5 | **TM1637** | GPIO bit-bang | 7-Segment LED Driver; ตรวจสอบ Timing constraints ของ CLK/DIO |
-| 6 | **DFPlayer Mini / YX5200** | UART | Audio Player; ตรวจสอบบอร์ดสเปคและรูปแบบแพ็กเกจคำสั่ง (9600 bps) |
-| 7 | **LAN8720A** | RMII | Ethernet PHY; ตรวจสอบพินบูตสแตรปและผลกระทบสัญญาณ 50MHz RMII Clock |
-| 8 | **SSD1306 / SH1106** | I2C | OLED Display; ตรวจสอบ I2C address และ initialization sequence |
+| 1 | **PCA9685** | I2C | 16-channel PWM controller; verify register map and frequency limits |
+| 2 | **MCP23017 / TCA9555** | I2C | 16-bit I/O Expander; verify IODIR and output bitmap writes |
+| 3 | **PCF8574** | I2C | 8-bit I/O Expander; verify quasi-bidirectional I/O and Active-Low behavior |
+| 4 | **MCP4725 / DAC7571 / DAC7573** | I2C | 12-bit DACs; verify byte-level commands and I2C address configuration |
+| 5 | **TM1637** | GPIO bit-bang | 7-Segment LED Driver; verify CLK/DIO timing constraints |
+| 6 | **DFPlayer Mini / YX5200** | UART | Audio Player; verify board specs and command packet format (9600 bps) |
+| 7 | **LAN8720A** | RMII | Ethernet PHY; verify bootstrap pins and 50MHz RMII Clock GPIO impact |
+| 8 | **SSD1306 / SH1106** | I2C | OLED Display; verify I2C address and initialization sequence |
 
-### 2.1 ขั้นตอนการจัดเก็บและแบ่งปันข้อมูล (Storage & Infrastructure)
+### 2.1 Storage & Infrastructure
 
-- สร้างโฟลเดอร์สำหรับเก็บไฟล์ PDF Datasheets ที่ `docs/datasheets/`
-- จัดหาคู่มือการใช้งาน (User Manual) สำหรับบอร์ดโมดูลสำเร็จรูปและเก็บในโฟลเดอร์เดียวกัน
-- จัดเก็บลิงก์ดาวน์โหลดสำรองไว้ในระบบข้อมูลอ้างอิง
+- Create a folder for official PDF Datasheets at `docs/datasheets/`
+- Place User Manuals for pre-built modules in the same folder
+- Maintain backup download links in the reference system
 
-### 2.2 หัวข้อการตรวจสอบระดับฮาร์ดแวร์และซอฟต์แวร์ (Verification Checklist)
+### 2.2 Verification Checklist
 
-#### 2.2.1 ความเข้ากันได้ของความเร็วบัส I2C (I2C Bus Speed Compatibility)
+#### 2.2.1 I2C Bus Speed Compatibility
 
-ตรวจสอบระดับความเร็วสัญญาณนาฬิกา (I2C Clock Speed) ของแต่ละชิป:
+Check the I2C Clock Speed tolerance for each chip:
 
 | Device | Max I2C Speed |
 | --- | --- |
 | PCA9685 | 1 MHz (Fast-mode Plus) |
 | MCP23017 | 400 kHz (Fast-mode) |
-| PCF8574 | 100 kHz (Standard-mode) — อุปกรณ์เทียบเคียงบางตัวรันได้ถึง 400 kHz |
+| PCF8574 | 100 kHz (Standard-mode) — some compatible devices can run at 400 kHz |
 
-**กฎการตั้งค่ารันไทม์:** ความเร็วบัสในภาพรวม (`sysCfg.i2c_speed`) ต้องสอดคล้องและไม่เกินความเร็วสูงสุดที่อุปกรณ์ตัวที่ช้าที่สุดบนบัสนั้นรองรับ เพื่อหลีกเลี่ยงสภาวะบัสค้างหรือข้อมูลสูญหาย (Bus Lockup)
+**Runtime Rule:** The overall bus speed (`sysCfg.i2c_speed`) must not exceed the maximum supported by the slowest device on the bus, to avoid bus lockup or data corruption.
 
-#### 2.2.2 ความต้านทานแรงดันและพิกัดตรรกะสัญญาณ (Logic Level Tolerances)
+#### 2.2.2 Logic Level Tolerances
 
-- ชิป ESP32 ทำงานที่ระดับแรงดันตรรกะ 3.3V; โมดูลรีเลย์หรือตัวขับเอาต์พุตหลายตัวทำงานที่ระดับ 5V
-- ต้องตรวจสอบ Datasheet เพื่อดูว่าอุปกรณ์รองรับแรงดันไฟฟ้าระดับตรรกะอินพุตขั้นต่ำของ 5V โดยที่สัญญาณ 3.3V จาก ESP32 ยังทริกเกอร์ผ่าน (เช่น $V_{IH} \le 2.0\text{V}$) หรือว่ามีความจำเป็นต้องออกแบบวงจรแปลงระดับสัญญาณ (Logic Level Shifter)
+- ESP32 operates at 3.3V logic levels; many relay modules and output drivers operate at 5V.
+- Verify from the datasheet whether the 5V device accepts a 3.3V input signal as logic HIGH (e.g., $V_{IH} \le 2.0\text{V}$), or whether a logic level shifter is required.
 
-#### 2.2.3 ช่วงเวลาหน่วงและการกู้คืนจังหวะสัญญาณ (Timing & Start-up Delays)
+#### 2.2.3 Timing & Start-up Delays
 
-ตรวจสอบระยะเวลาเตรียมพร้อมของไอซีหลังจากจ่ายไฟเลี้ยง (Power-on Reset / Boot Time) เช่น ชิปขยายขาพินบางตัวต้องการเวลาหน่วงก่อนเริ่มรับคำสั่งแรก เพื่อไม่ให้เฟิร์มแวร์บูตผ่านการตั้งค่าเร็วเกินไปจนเกิดข้อผิดพลาดในการตรวจสอบสถานะตอนเปิดเครื่อง
-
----
-
-## 3. แนวทางการทดสอบและคาลิเบรตระบบคะแนน (Calibration & Verification Guidelines)
-
-การตรวจสอบความถูกต้องของการให้คะแนนเทียบกับบอร์ดจริงสามารถดำเนินการได้ผ่าน 3 ขั้นตอน:
-
-1. **การทดสอบเสถียรภาพเฟรมเรต (Jitter & Latency Test):** การจัดสรรเอาต์พุตจนเกือบเต็มขีดจำกัดสูงสุด (คะแนน 100-109) แล้วส่งข้อมูล Art-Net 40 FPS พร้อมใช้ Oscilloscope หรือ Logic Analyzer วัดจังหวะเฟรมที่เอาต์พุตปลายทาง หากเฟรมตกหรือสัญญาณสะดุด แสดงว่าเพดานหรือค่าน้ำหนักประมวลผลตั้งไว้หลวมเกินไป
-2. **การวัดเวลาบัส I2C (I2C Bus Contention Test):** วัดรอบเวลาของการส่งสัญญาณไปหา Expander บนบัส I2C ร่วมกัน หากการเขียนข้อมูลกินเวลารอบทำงานรวมกันเกินกว่า 15-20 ms แสดงว่าน้ำหนักคะแนนของ PCA/Expander น้อยเกินไปจนทำให้บัส I2C Saturation
-3. **การตรวจสอบหน่วยความจำคงเหลือ (RAM Heap Monitoring):** ตรวจสอบว่า RAM คงเหลือไม่ลดต่ำกว่า 30-40 KB ภายใต้สถานการณ์การทำงานหนัก เพื่อให้บอร์ดมีเสถียรภาพมากพอในการทำ OTA หรือส่งผ่านข้อมูลเครือข่าย
+- Check the power-on reset / boot time for each IC.
+- Some expander chips require a settling delay before accepting the first command, to prevent startup configuration errors.
 
 ---
 
-## 4. นโยบายการจัดเก็บเอกสารอ้างอิง (Reference Document Storage Policy)
+## 3. Calibration & Verification Guidelines
 
-- **ที่อยู่:** `docs/datasheets/` — เก็บไฟล์ PDF Datasheets ทางการของอุปกรณ์ทั้งหมด
-- **การตั้งชื่อ:** `<device_name>_<revision>_<datasheet|manual>.pdf` (เช่น `PCA9685_v5_datasheet.pdf`)
-- **การอัปเดต:** ทุกครั้งที่มีการเพิ่ม device driver ใหม่ ต้องแนบ Datasheet หรือลิงก์อ้างอิง
-- **ลิงก์สำรอง:** เก็บ URL สำหรับดาวน์โหลด Datasheet จากเว็บไซต์ผู้ผลิตไว้ใน `docs/datasheets/LINKS.md`
+Score calibration against the real board can be performed via three tests:
+
+1. **Jitter & Latency Test:** Configure outputs near full capacity (score 100-109), send Art-Net at 40 FPS, and measure output frame timing with an oscilloscope or logic analyzer. If frames drop or jitter, the score ceiling or compute weights are too loose.
+2. **I2C Bus Contention Test:** Measure round-trip time for expander writes on the shared I2C bus. If cumulative write time exceeds 15-20 ms, the PCA/Expander weight is too low, causing I2C bus saturation.
+3. **RAM Heap Monitoring:** Ensure free RAM stays above 30-40 KB under heavy load, to maintain stability for OTA and network data transfer.
+
+---
+
+## 4. Reference Document Storage Policy
+
+- **Location:** `docs/datasheets/` — store official PDF Datasheets for all devices.
+- **Naming:** `<device_name>_<revision>_<datasheet|manual>.pdf` (e.g., `PCA9685_v5_datasheet.pdf`)
+- **Updates:** Every time a new device driver is added, attach the Datasheet or a reference link.
+- **Backup Links:** Store download URLs from manufacturer websites in `docs/datasheets/LINKS.md`.
