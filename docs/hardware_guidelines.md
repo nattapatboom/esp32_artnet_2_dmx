@@ -21,6 +21,17 @@ Use a 3.3V Zener Diode to prevent the ESP32 signal pin voltage from exceeding th
                     [GND]
 ```
 
+```mermaid
+graph LR
+    subgraph Direct [ESP32 Direct Connection]
+        GPIO[ESP32 GPIO] --> R1[220Ω]
+        R1 --> PPTC[PPTC <100mA]
+        PPTC --> OUT[To Device]
+        Z1[3.3V Zener] -- clamp --> Line1[Signal Line]
+        Z1 --- GND1[GND]
+    end
+```
+
 **Case 2: Connection via 5V Buffer IC (e.g., 74HCT245 or 5V-level)**
 Use a 5.1V Zener Diode (e.g., `PDZVTR5.1B`) on the buffer's output side.
 
@@ -30,6 +41,18 @@ Use a 5.1V Zener Diode (e.g., `PDZVTR5.1B`) on the buffer's output side.
                                 [ Zener: 5.1V ]
                                       │
                                     [GND]
+```
+
+```mermaid
+graph LR
+    subgraph Buffered [5V Buffer IC Connection]
+        GPIO2[ESP32 GPIO] --> BUF[5V Buffer<br/>74HCT245]
+        BUF --> R2[220Ω]
+        R2 --> PPTC2[PPTC <100mA]
+        PPTC2 --> OUT2[To Device]
+        Z2[5.1V Zener] -- clamp --> Line2[Signal Line]
+        Z2 --- GND2[GND]
+    end
 ```
 
 ### 1.2 Component Details & Protection
@@ -45,6 +68,15 @@ Use a 5.1V Zener Diode (e.g., `PDZVTR5.1B`) on the buffer's output side.
 **Problem:** Inductive loads (Solenoid valves, Relay coils, DC Motors) generate a high reverse voltage spike (Flyback Voltage) when suddenly switched off, which can disrupt the radio system or damage the driving transistor.
 
 **Mitigation:** **Always connect a fast or general-purpose diode (e.g., 1N4007) in reverse-biased parallel across the inductive load** to safely discharge the reverse voltage to ground and prevent brownout resets from voltage spikes.
+
+```mermaid
+graph LR
+    subgraph Flyback [Inductive Load Protection]
+        D[1N4007 Flyback Diode] -- reverse biased --> LOAD[Inductive Load<br/>Solenoid / Relay / Motor]
+        LOAD --- Driver[Switching Transistor]
+        Driver --- GND3[GND]
+    end
+```
 
 ---
 

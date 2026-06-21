@@ -111,8 +111,11 @@ The single source of truth for resource scoring, hard peripheral limits, physica
 
 ## Typst User Manual
 
+- **Purpose:** The user manual is an **end-user-facing document** explaining how to assemble, wire, configure, and operate the WT32-ETH01 board as a DMX lighting node. It is **not** an internal developer reference.
+- **Diagram Quality:** All technical concepts (wiring, pinouts, topology, startup sequence, protection circuits) **must** be illustrated with Typst-native vector diagrams using CeTZ and Fletcher. No ASCII art or bitmap images in the final PDF.
 - **Location:** Source files are under `docs/user_manual/`. The entry point is `main.typ`, which imports modular chapters from `docs/user_manual/chapters/`.
 - **Diagrams:** Use native Typst/CeTZ/Fletcher libraries for high-quality, scalable vector graphics. Avoid external image binaries. Use verified compatible package versions (e.g., `@preview/cetz:0.5.2` and `@preview/fletcher:0.5.8` for Typst 0.15.0).
+- **Hardware Guidelines Diagrams:** Schematics in `docs/hardware_guidelines.md` use Mermaid as an interim rendering aid; the **canonical** versions intended for end-user delivery should be migrated to Typst/CeTZ diagrams in the user manual.
 - **Language Roadmap:** Keep the manual in English first. Thai translation context is planned for the future.
 - **Compilation:** Compile using the python script or batch file:
   ```powershell
