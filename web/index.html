@@ -149,6 +149,10 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
         <div class="proto-box">
           <h4>Art-Net</h4>
           <div class="fg">
+            <div class="f" style="flex-basis:100%">
+              <div class="cb"><input type="checkbox" id="artnet_enabled" name="artnet_enabled"><label for="artnet_enabled">Enable Art-Net input</label></div>
+              <div class="hint">Allows receiving DMX data over Art-Net. Enable for Art-Net senders.</div>
+            </div>
             <div class="f">
               <label for="artnet_port">UDP Port</label>
               <input type="number" id="artnet_port" name="artnet_port" value="6454" min="1" max="65535">
@@ -980,6 +984,7 @@ async function loadSettings(){
     if(fw) fw.textContent=d.firmware_version||'Unknown';
     s('artnet_port',d.artnet_port);
     s('sacn_port',d.sacn_port);
+    c('artnet_enabled',d.artnet_enabled);
     c('sacn_enabled',d.sacn_enabled); c('sacn_multicast',d.sacn_multicast);
     c('eth_dhcp',d.eth_dhcp);
     s('eth_ip',d.eth_ip); s('eth_netmask',d.eth_netmask); s('eth_gateway',d.eth_gateway); s('eth_dns',d.eth_dns);
@@ -1020,7 +1025,7 @@ async function saveSettings(e){
   const fd=new FormData(e.target||document.getElementById('cfgForm'));
   const obj={};
   fd.forEach((v,k)=>{
-    if(['eth_dhcp','wifi_dhcp','sacn_enabled','sacn_multicast','wifi_enable_in_eth_mode','ap_enable_in_eth_mode'].includes(k)) obj[k]=true;
+    if(['eth_dhcp','wifi_dhcp','artnet_enabled','sacn_enabled','sacn_multicast','wifi_enable_in_eth_mode','ap_enable_in_eth_mode'].includes(k)) obj[k]=true;
     else if(['device_mode','status_led_pin','zc_pin','eth_dhcp','wifi_dhcp',
              'artnet_port','sacn_port',
              'output_fps','i2c_sda','i2c_scl','i2c_speed',
@@ -1030,11 +1035,15 @@ async function saveSettings(e){
   });
   if(!document.getElementById('i2c_enabled').checked){ obj.i2c_sda=255; obj.i2c_scl=255; }
   if(!document.getElementById('disp_enable_ck').checked) obj.display_enabled=0;
-  ['eth_dhcp','wifi_dhcp','sacn_enabled','sacn_multicast','wifi_enable_in_eth_mode','ap_enable_in_eth_mode'].forEach(k=>{
+  ['eth_dhcp','wifi_dhcp','artnet_enabled','sacn_enabled','sacn_multicast','wifi_enable_in_eth_mode','ap_enable_in_eth_mode'].forEach(k=>{
     if (e.target.querySelector('#' + k)) {
       if (!obj.hasOwnProperty(k)) obj[k] = false;
     }
   });
+  if(!obj.artnet_enabled && !obj.sacn_enabled){
+    alert('Cannot disable both Art-Net and sACN protocols.');
+    return;
+  }
   if(obj.status_led_pin!==255&&obj.zc_pin!==255&&obj.status_led_pin===obj.zc_pin){
     alert('Status LED GPIO and Zero-Crossing GPIO cannot use the same pin.');
     return;

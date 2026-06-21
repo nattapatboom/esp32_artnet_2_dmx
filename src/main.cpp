@@ -705,6 +705,7 @@ void addSettingsToJson(JsonObject target) {
     target["eth_dns"] = sysCfg.eth_dns;
     target["ap_ssid"] = sysCfg.ap_ssid;
     target["ap_pass"] = sysCfg.ap_pass;
+    target["artnet_enabled"] = sysCfg.artnet_enabled;
     target["artnet_port"] = sysCfg.artnet_port;
     target["sacn_enabled"] = sysCfg.sacn_enabled;
     target["sacn_multicast"] = sysCfg.sacn_multicast;
@@ -739,6 +740,7 @@ void applySettingsFromJson(JsonObjectConst doc) {
     if (doc["eth_dns"].is<const char*>()) copyConfigString(sysCfg.eth_dns, sizeof(sysCfg.eth_dns), doc["eth_dns"]);
     if (doc["ap_ssid"].is<const char*>()) copyConfigString(sysCfg.ap_ssid, sizeof(sysCfg.ap_ssid), doc["ap_ssid"]);
     if (doc["ap_pass"].is<const char*>()) copyConfigString(sysCfg.ap_pass, sizeof(sysCfg.ap_pass), doc["ap_pass"]);
+    if (doc["artnet_enabled"].is<bool>()) sysCfg.artnet_enabled = doc["artnet_enabled"];
     if (doc["artnet_port"].is<int>()) {
         int port = doc["artnet_port"];
         sysCfg.artnet_port = (port > 0 && port <= 65535) ? port : 6454;
@@ -1313,6 +1315,7 @@ void setupWebServer() {
         doc["eth_dns"] = sysCfg.eth_dns;
         doc["ap_ssid"] = sysCfg.ap_ssid;
         doc["ap_pass"] = sysCfg.ap_pass;
+        doc["artnet_enabled"] = sysCfg.artnet_enabled;
         doc["artnet_port"] = sysCfg.artnet_port;
         doc["sacn_enabled"] = sysCfg.sacn_enabled;
         doc["sacn_multicast"] = sysCfg.sacn_multicast;
@@ -1365,6 +1368,15 @@ void setupWebServer() {
             uint8_t requestedDisplayType = doc["display_enabled"].is<int>() ? (uint8_t)(int)doc["display_enabled"] : sysCfg.display_enabled;
             uint8_t requestedDisplayAddr = doc["display_i2c_addr"].is<int>() ? (uint8_t)(int)doc["display_i2c_addr"] : sysCfg.display_i2c_addr;
             String validationMessage;
+
+            bool nextArtnetEnabled = doc.containsKey("artnet_enabled") ? doc["artnet_enabled"].as<bool>() : sysCfg.artnet_enabled;
+            bool nextSacnEnabled = doc.containsKey("sacn_enabled") ? doc["sacn_enabled"].as<bool>() : sysCfg.sacn_enabled;
+            if (!nextArtnetEnabled && !nextSacnEnabled) {
+                validationMessage = "Cannot disable both Art-Net and sACN protocols";
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
+                return;
+            }
+
             if (requestedStatusPin != 255 && requestedZcPin != 255 && requestedStatusPin == requestedZcPin) {
                 validationMessage = "Status LED GPIO and Zero-Crossing GPIO cannot use the same pin";
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
@@ -1416,6 +1428,7 @@ void setupWebServer() {
             if (doc["eth_dns"].is<const char*>()) copyConfigString(sysCfg.eth_dns, sizeof(sysCfg.eth_dns), doc["eth_dns"]);
             if (doc["ap_ssid"].is<const char*>()) copyConfigString(sysCfg.ap_ssid, sizeof(sysCfg.ap_ssid), doc["ap_ssid"]);
             if (doc["ap_pass"].is<const char*>()) copyConfigString(sysCfg.ap_pass, sizeof(sysCfg.ap_pass), doc["ap_pass"]);
+            if (doc["artnet_enabled"].is<bool>()) sysCfg.artnet_enabled = doc["artnet_enabled"];
             if (doc["artnet_port"].is<int>()) {
                 int port = doc["artnet_port"];
                 sysCfg.artnet_port = (port > 0 && port <= 65535) ? port : 6454;
@@ -2028,7 +2041,9 @@ void networkTask(void* pvParameters) {
     
     // Initialize Networking Services
     if (sysCfg.device_mode == MODE_ARTNET_ETHERNET || sysCfg.device_mode == MODE_ESPNOW_MASTER) {
-        artNetCtrl.begin();
+        if (sysCfg.artnet_enabled) {
+            artNetCtrl.begin();
+        }
         
         // Initialize sACN if enabled
         if (sysCfg.sacn_enabled) {
@@ -2044,7 +2059,9 @@ void networkTask(void* pvParameters) {
         }
 
         // Run network stack loops
-        artNetCtrl.loop();
+        if (sysCfg.artnet_enabled) {
+            artNetCtrl.loop();
+        }
         reconnectWiFiClient();
         
         // Process sACN packets if enabled

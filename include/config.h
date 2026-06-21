@@ -48,6 +48,7 @@ struct SystemConfig {
     char ap_pass[64];
 
     // Art-Net Settings
+    bool artnet_enabled;       // Enable Art-Net listener
     uint16_t artnet_port;
 
     // sACN/E1.31 Protocol Settings
@@ -133,6 +134,7 @@ inline void loadConfig(SystemConfig& cfg) {
     strncpy(cfg.ap_pass, pass.c_str(), sizeof(cfg.ap_pass) - 1);
     cfg.ap_pass[sizeof(cfg.ap_pass) - 1] = '\0';
 
+    cfg.artnet_enabled = prefs.getBool("art_on", true); // Default to true
     cfg.artnet_port = prefs.getUShort("art_port", 6454);
     if (cfg.artnet_port == 0) cfg.artnet_port = 6454;
     cfg.sacn_enabled = prefs.getBool("sacn_on", false);
@@ -198,6 +200,7 @@ inline void saveConfig(const SystemConfig& cfg) {
     prefs.putString("dns", String(cfg.eth_dns));
     prefs.putString("ap_ssid", String(cfg.ap_ssid));
     prefs.putString("ap_pass", String(cfg.ap_pass));
+    prefs.putBool("art_on", cfg.artnet_enabled);
     prefs.putUShort("art_port", cfg.artnet_port);
     prefs.putBool("sacn_on", cfg.sacn_enabled);
     prefs.putBool("sacn_mcast", cfg.sacn_multicast);
