@@ -1954,6 +1954,13 @@ function totalCpu(arr,fps){
     else if(typeId(o)===16) funcGenCount++;
   });
   us+=acDimmerBackgroundUs(dimmerCount,fps)+funcGenBackgroundUs(funcGenCount,fps);
+
+  const modeVal = parseInt(document.getElementById('device_mode')?.value || 0);
+  if (modeVal === 1) {
+    const unis = new Set(arr.map(o => parseInt(o.start_universe || 0)));
+    const peerCount = Math.max(1, espPeers.length);
+    us += espnowMasterCost(peerCount, unis.size).cpu;
+  }
   return us;
 }
 function totalRam(arr){
@@ -1965,7 +1972,14 @@ function totalRam(arr){
   });
   const freeUarts=Math.max(0,2-dfPlayerCount);
   const dmxRmtUse=Math.max(0,dmxCount-freeUarts);
-  return b+dmxRmtUse*RMT_DMX_DRIVER_RAM;
+  let ramVal = b+dmxRmtUse*RMT_DMX_DRIVER_RAM;
+
+  const modeVal = parseInt(document.getElementById('device_mode')?.value || 0);
+  if (modeVal === 1) {
+    const peerCount = Math.max(1, espPeers.length);
+    ramVal += espnowMasterCost(peerCount, 0).ram;
+  }
+  return ramVal;
 }
 function hwBlocked(hw){
   return hw.ledc>HW_MAX.ledc||hw.rmt>HW_MAX.rmt||hw.uart>HW_MAX.uart||hw.dac>HW_MAX.dac||hw.timer>HW_MAX.timer;
@@ -3164,6 +3178,7 @@ async function loadPeers(){
 function renderPeers(){
   const tb=document.getElementById('peer-tbody');
   tb.innerHTML='';
+  updateScoreBar();
   if(!espPeers.length){tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:12px">No peers added (Fallback to Broadcast).</td></tr>';return;}
   espPeers.forEach((p,i)=>{
     p=normPeer(p);

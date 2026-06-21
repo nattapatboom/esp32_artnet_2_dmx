@@ -10,16 +10,25 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
-# Resource Weights matching include/scoring.h
-W_GPIO = 0.5
-W_LEDC = 2.5
-W_RMT = 3.0
-W_UART = 8.0
-W_DAC = 2.0
-W_PCA = 0.25
-W_EXP = 0.125
+# Hardware limits matching include/scoring.h
+MAX_LEDC = 16
+MAX_RMT = 8
+MAX_UART = 2
+MAX_DAC = 2
+MAX_TIMER = 4
+RAM_LIMIT = 65535 # 64 KB cap
 
-SCORE_LIMIT = 109.0
+BASE_CHANNEL_RAM = 224
+DMX_BUFFER_RAM = 512
+PIXEL_STRIP_OBJECT_RAM = 256
+DFPLAYER_OBJECT_RAM = 160
+STEPPER_RUNTIME_RAM = 512
+FUNCGEN_OBJECT_RAM = 1120
+RMT_DMX_DRIVER_RAM = 5150 * 4 + 32
+I2C_ROUTE_RAM = 32
+
+BASE_OVERHEAD_US = 500
+I2C_WRITE_US = 180
 
 def print_banner():
     print("=====================================================================")
@@ -67,7 +76,7 @@ def check_pin_safety(pin, status_led=5, zc_pin=255, role="Output", sda_pin=14, s
 
 def parse_json_outputs(filepath):
     """
-    Parses outputs.json and returns channels list and configuration details.
+    Parses outputs.json and returns channels list.
     """
     if not os.path.exists(filepath):
         return None
@@ -79,271 +88,312 @@ def parse_json_outputs(filepath):
         print(f"Error reading {filepath}: {e}")
         return None
 
-def estimate_resources(ch):
+def estimate_hardware(ch):
     """
-    Estimates resource footprint for a single channel matching scoring.h::estimateResources()
+    Estimates hardware peripheral counts matching scoring.h::estimateHardware()
     """
-    gpio = 0
+    ch_type = ch.get("type", 0)
+    source = ch.get("source", 0)
+    
     ledc = 0
     rmt = 0
     uart = 0
     dac = 0
-    pca = 0
-    expander = 0
+    timer = 0
+    
+    if ch_type == 0:
+        pass
+    elif ch_type == 1:
+        uart = 1
+    elif ch_type == 2:
+        pass
+    elif ch_type == 3:
+        rmt = 1
+    elif ch_type == 4:
+        if source == 0: ledc = 1
+    elif ch_type == 5:
+        if source == 0: ledc += 1
+        if ch.get("pin2_source", source) == 0: ledc += 1
+        if ch.get("pin3_source", source) == 0: ledc += 1
+        if ch.get("color_order", 0) >= 4 and ch.get("pin4_source", source) == 0: ledc += 1
+    elif ch_type == 6:
+        mc_mode = ch.get("mc_mode", 0)
+        if source == 0: ledc += 1
+        if ch.get("pin2_source", source) == 0 and mc_mode == 0: ledc += 1
+        if mc_mode == 2 and ch.get("pin3_source", source) == 0: ledc += 1
+    elif ch_type == 7:
+        rmt = 2
+    elif ch_type == 8:
+        if source == 0: ledc = 1
+    elif ch_type == 9:
+        if source == 0: ledc = 1
+    elif ch_type == 10:
+        uart = 1
+    elif ch_type == 11:
+        pass
+    elif ch_type in (12, 13):
+        seg_n = 8 if ch_type == 13 else 7
+        seg_sources = ch.get("seg_sources", [])
+        for i in range(seg_n):
+            s_src = seg_sources[i] if i < len(seg_sources) else source
+            if s_src == 0: ledc += 1
+    elif ch_type == 14:
+        if source != 5: dac = 1
+    elif ch_type == 15:
+        if source == 0: ledc = 1
+    elif ch_type == 16:
+        ledc = 1
+        timer = 1
+        
+    return {"ledc": ledc, "rmt": rmt, "uart": uart, "dac": dac, "timer": timer}
 
+def src_on_i2c(src):
+    return src >= 1 and src <= 5
+
+def i2c_writes_for_channel(ch):
     ch_type = ch.get("type", 0)
     source = ch.get("source", 0)
-    pin = ch.get("pin", 255)
-    pin2 = ch.get("pin2", 255)
-    pin3 = ch.get("pin3", 255)
-    pin4 = ch.get("pin4", 255)
-
-    pin2_source = ch.get("pin2_source", source)
-    pin3_source = ch.get("pin3_source", source)
-    pin4_source = ch.get("pin4_source", source)
-
-    def route_pin(pin_val, pin_src):
-        nonlocal gpio, pca, expander
-        if pin_val == 255:
-            return
-        if pin_src == 0:  # GPIO
-            gpio += 1
-        elif pin_src == 1:  # PCA9685
-            pca += 1
-        else:  # Expanders (2=MCP23017, 3=TCA9555, 4=PCF857x)
-            expander += 1
-
-    if ch_type == 0:  # AC Dimmer
-        if source == 0: gpio = 1
-    elif ch_type == 1:  # DMX
-        if source == 0: gpio = 1
-        uart = 1
-    elif ch_type == 2:  # Relay
-        route_pin(pin, source)
-    elif ch_type == 3:  # RGB LED (NeoPixel)
-        if source == 0: gpio = 1
-        rmt = 1
-    elif ch_type == 4:  # Single LED
-        route_pin(pin, source)
-        if source == 0 and pin != 255: ledc = 1
-    elif ch_type == 5:  # Analog RGB
-        # Red
-        route_pin(pin, source)
-        if source == 0 and pin != 255: ledc += 1
-        # Green
-        route_pin(pin2, pin2_source)
-        if pin2_source == 0 and pin2 != 255: ledc += 1
-        # Blue
-        route_pin(pin3, pin3_source)
-        if pin3_source == 0 and pin3 != 255: ledc += 1
-        # White
-        if ch.get("color_order", 0) >= 4:
-            route_pin(pin4, pin4_source)
-            if pin4_source == 0 and pin4 != 255: ledc += 1
-    elif ch_type == 6:  # Motor
-        mc_mode = ch.get("mc_mode", 0)
-        route_pin(pin, source)
-        if source == 0 and pin != 255: ledc += 1
-        
-        route_pin(pin2, pin2_source)
-        if pin2_source == 0 and pin2 != 255:
-            if mc_mode == 0: ledc += 1
-        
-        if mc_mode == 2:
-            route_pin(pin3, pin3_source)
-            if pin3_source == 0 and pin3 != 255: ledc += 1
-    elif ch_type == 7:  # Stepper
-        gpio += 1  # STEP pin is always direct ESP32 GPIO
-        rmt += 2
-        route_pin(pin2, pin2_source)
-        route_pin(pin3, pin3_source)
-        if pin4 != 255 and ch.get("mc_homing_mode", 0) == 0:
-            route_pin(pin4, pin4_source)
-    elif ch_type == 8:  # Servo
-        route_pin(pin, source)
-        if source == 0 and pin != 255: ledc = 1
-    elif ch_type == 9:  # Buzzer
-        if source == 0 and pin != 255:
-            gpio = 1
-            ledc = 1
-    elif ch_type == 10:  # DFPlayer
-        if source == 0: gpio = 2
-        uart = 1
-    elif ch_type == 11:  # 7-Seg TM1637
-        if source == 0: gpio = 2
-        else: expander = 2
-    elif ch_type in (12, 13):  # 7-Seg DD 7-Pin / 8-Pin PWM
-        num_seg = 8 if ch_type == 13 else 7
-        seg_sources = ch.get("seg_sources", [])
-        for i in range(num_seg):
-            seg_src = seg_sources[i] if i < len(seg_sources) else source
-            if seg_src == 0:
-                gpio += 1
-                ledc += 1
-            elif seg_src == 1:
-                pca += 1
-            else:
-                expander += 1
-    elif ch_type == 14:  # DAC
-        if source == 5:  # MCP4725
-            expander = 1
+    mode = ch.get("mc_mode", 0)
+    writes = 0
+    
+    if ch_type in (2, 17):
+        if src_on_i2c(source): writes += 1
+    elif ch_type in (4, 8, 15):
+        if src_on_i2c(source): writes += 1
+    elif ch_type == 5:
+        if src_on_i2c(source): writes += 1
+        if src_on_i2c(ch.get("pin2_source", source)): writes += 1
+        if src_on_i2c(ch.get("pin3_source", source)): writes += 1
+        if ch.get("color_order", 0) >= 4 and src_on_i2c(ch.get("pin4_source", source)): writes += 1
+    elif ch_type == 6:
+        if src_on_i2c(source):
+            writes += 3 if mode == 2 else 2
         else:
-            gpio = 1
-            dac = 1
-    elif ch_type == 15:  # PWM DAC
-        route_pin(pin, source)
-        if source == 0 and pin != 255: ledc = 1
-    elif ch_type == 16:  # Func Gen
-        gpio = 1
-        ledc = 1
-    elif ch_type == 17:  # Solenoid
-        route_pin(pin, source)
-    elif ch_type == 18:  # Smoke Shooter
-        route_pin(pin, source)
-        route_pin(pin2, pin2_source)
+            if src_on_i2c(ch.get("pin2_source", source)): writes += 1
+            if mode == 2 and src_on_i2c(ch.get("pin3_source", source)): writes += 1
+    elif ch_type == 7:
+        if src_on_i2c(ch.get("pin2_source", source)): writes += 1
+        if src_on_i2c(ch.get("pin3_source", source)): writes += 1
+    elif ch_type in (12, 13):
+        n = 8 if ch_type == 13 else 7
+        pin2_source = ch.get("pin2_source", source)
+        if mode >= 2 and src_on_i2c(pin2_source):
+            writes += n
+        else:
+            seg_sources = ch.get("seg_sources", [])
+            for i in range(n):
+                s_src = seg_sources[i] if i < len(seg_sources) else source
+                if src_on_i2c(s_src): writes += 1
+        if mode >= 6 and mode <= 9 and src_on_i2c(source): writes += 1
+    elif ch_type == 14:
+        if src_on_i2c(source): writes += 1
+    elif ch_type == 18:
+        if src_on_i2c(source): writes += 1
+        if src_on_i2c(ch.get("pin2_source", source)): writes += 1
+    return writes
 
-    return {
-        "gpio": gpio,
-        "ledc": ledc,
-        "rmt": rmt,
-        "uart": uart,
-        "dac": dac,
-        "pca": pca,
-        "expander": expander
-    }
+def value_byte_count(res):
+    if res == 16: return 2
+    if res == 12 or res == 10: return 2
+    return 1
 
-def channel_compute_score(ch):
-    """
-    Computes compute score for a single channel matching scoring.h::channelComputeScore()
-    """
+def dmx_buffer_ram_for_channel(ch_type, led_count, color_order, resolution, mode):
+    if ch_type == 1:
+        return DMX_BUFFER_RAM
+    elif ch_type == 3:
+        bytes_per_pixel = 4 if color_order >= 4 else 3
+        pixels_per_universe = 512 // bytes_per_pixel
+        universes = (led_count + pixels_per_universe - 1) // pixels_per_universe
+        if universes < 1: universes = 1
+        return universes * 512
+    elif ch_type == 5:
+        return 4 if color_order >= 4 else 3
+    elif ch_type == 7:
+        return value_byte_count(resolution) + 2
+    elif ch_type in (9, 11):
+        return 4 if mode == 1 else 2
+    elif ch_type in (12, 13):
+        return 2 if (mode == 4 or mode == 5 or mode >= 6) else 1
+    elif ch_type == 10:
+        return 3
+    elif ch_type == 16:
+        return 5
+    elif ch_type in (4, 6, 8, 15):
+        return value_byte_count(resolution)
+    return 1
+
+def pixel_buffer_ram(led_count, color_order):
+    return led_count * (4 if color_order >= 4 else 3)
+
+def led_strip_service_us(led_count, color_order):
+    bytes_per_pixel = 4 if color_order >= 4 else 3
+    return 80 + led_count * bytes_per_pixel
+
+def estimate_channel_cost(ch):
     ch_type = ch.get("type", 0)
-    if ch_type == 3:  # RGB LED
-        return ch.get("led_count", 0) * 0.005
-    elif ch_type == 6:  # Motor
-        return 0.5
-    elif ch_type == 7:  # Stepper
-        return 2.0
-    elif ch_type == 10:  # DFPlayer
-        return 0.5
-    elif ch_type == 11:  # 7-Seg TM1637
-        return 0.5
-    elif ch_type == 12:  # 7-Seg DD 7-Pin PWM
-        return 1.0
-    elif ch_type == 13:  # 7-Seg DD 8-Pin PWM
-        return 1.2
-    elif ch_type == 16:  # Func Gen
-        return 2.0
-    elif ch_type == 18:  # Smoke Shooter
-        return 0.3
-    return 0.0
+    led_count = ch.get("led_count", 0)
+    color_order = ch.get("color_order", 0)
+    resolution = ch.get("mc_resolution", 8)
+    mode = ch.get("mc_mode", 0)
+    
+    ram = BASE_CHANNEL_RAM + dmx_buffer_ram_for_channel(ch_type, led_count, color_order, resolution, mode)
+    cpu = 0
+    
+    if ch_type == 0: cpu = 5
+    elif ch_type == 1: cpu = 22600
+    elif ch_type == 2: cpu = 5
+    elif ch_type == 3:
+        cpu = led_strip_service_us(led_count, color_order)
+        ram += pixel_buffer_ram(led_count, color_order) + PIXEL_STRIP_OBJECT_RAM
+    elif ch_type == 4: cpu = 6
+    elif ch_type == 5: cpu = 18
+    elif ch_type == 6: cpu = 35
+    elif ch_type == 7:
+        cpu = 80
+        ram += STEPPER_RUNTIME_RAM
+    elif ch_type == 8: cpu = 12
+    elif ch_type == 9: cpu = 35
+    elif ch_type == 10:
+        cpu = 30
+        ram += DFPLAYER_OBJECT_RAM + 100
+    elif ch_type == 11: cpu = 900
+    elif ch_type == 12: cpu = 30
+    elif ch_type == 13: cpu = 35
+    elif ch_type == 14: cpu = 10
+    elif ch_type == 15: cpu = 6
+    elif ch_type == 16:
+        cpu = 120
+        ram += FUNCGEN_OBJECT_RAM
+    elif ch_type == 17: cpu = 10
+    elif ch_type == 18: cpu = 25
+    
+    writes = i2c_writes_for_channel(ch)
+    cpu += writes * I2C_WRITE_US
+    ram += writes * I2C_ROUTE_RAM
+    return {"cpu": cpu, "ram": ram}
 
-def run_calculation_on_channels(outputs, status_led=5, zc_pin=255, sda_pin=14, scl_pin=15, output_fps=40):
+def frame_time_us(fps):
+    return 1000000 // fps
+
+def ac_dimmer_background_us(dimmer_count, fps):
+    if dimmer_count == 0: return 0
+    ticks = frame_time_us(fps) // 39
+    return ticks * (1 + dimmer_count)
+
+def func_gen_background_us(func_gen_count, fps):
+    if func_gen_count == 0: return 0
+    samples = frame_time_us(fps) // 50
+    return samples * 4 * func_gen_count
+
+def espnow_master_cost(peer_count, universe_count, chunk_size=200):
+    chunks_per_uni = (511 + chunk_size) // chunk_size
+    cpu = 500 + peer_count * chunks_per_uni * 170 + universe_count * 100
+    ram = 512 + peer_count * (chunk_size + 44)
+    return {"cpu": cpu, "ram": ram}
+
+def get_espnow_peer_count():
+    locations = ["espnow_peers.json", "data/espnow_peers.json", "../data/espnow_peers.json", "c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/data/espnow_peers.json"]
+    for loc in locations:
+        if os.path.exists(loc):
+            try:
+                with open(loc, 'r') as f:
+                    d = json.load(f)
+                    peers = d.get("peers", [])
+                    return len(peers) if len(peers) > 0 else 1
+            except:
+                pass
+    return 0
+
+def run_calculation_on_channels(outputs, status_led=5, zc_pin=255, sda_pin=14, scl_pin=15, output_fps=40, is_master=False):
     """
-    Performs resource analysis on a list of channel configurations.
+    Performs resource analysis on a list of channel configurations using the 3 budgets model.
     """
-    print(f"\nAnalyzing {len(outputs)} configured channels (v3)...")
+    print(f"\nAnalyzing {len(outputs)} configured channels under 3 budgets model...")
     
-    # Standard ESP32 hardware capacity limits
-    max_rmt = 8
-    max_uart_dmx = 2
-    max_ledc = 16
-    max_channels_slots = 16
+    # Initialize accumulators
+    total_ledc = 0
+    total_rmt = 0
+    total_uart = 0
+    total_dac = 0
+    total_timer = 0
     
-    # Per-peripheral accumulators for resource limits check
-    used_rmt = 0
-    used_uart_dmx = 0
-    used_ledc = 0
-    total_leds = 0
+    total_cpu_us = BASE_OVERHEAD_US
+    total_ram_bytes = 0
+    
+    dimmer_count = 0
+    funcgen_count = 0
+    dmx_gpio_count = 0
     dfplayer_count = 0
-    stepper_count = 0
     
-    # Total scores
-    total_resource_score = 0.0
-    total_compute_score = (output_fps / 60.0) * 5.0  # Base FPS factor
+    gpio_usage = {}
+    pca9685_usage = {}
+    other_expanders = {}
     
-    # Hardware pin/channel trackers
-    gpio_usage = {}        # pin -> list of (channel_index, role)
-    pca9685_usage = {}     # addr -> {"channels": {ch_index: list of (ch_idx, role)}, "freqs": set()}
-    other_expanders = {}   # source_id -> {addr: {ch_index: list of (ch_idx, role)}}
-
-    # Source Name Mapping
     src_names = {
-        0: "ESP32 GPIO",
-        1: "PCA9685",
-        2: "MCP23017",
-        3: "TCA9555",
-        4: "PCF857x",
-        5: "MCP4725"
+        0: "ESP32 GPIO", 1: "PCA9685", 2: "MCP23017", 3: "TCA9555", 4: "PCF857x", 5: "MCP4725"
     }
     
     type_names = {
-        0: "AC Dimmer",
-        1: "DMX Output",
-        2: "Relay",
-        3: "RGB LED",
-        4: "Single LED",
-        5: "Analog RGB",
-        6: "Motor",
-        7: "Stepper",
-        8: "Servo",
-        9: "Buzzer",
-        10: "DFPlayer",
-        11: "7-Seg TM1637",
-        12: "7-Seg DD 7-Pin PWM",
-        13: "7-Seg DD 8-Pin PWM",
-        14: "DAC",
-        15: "PWM DAC",
-        16: "Func Gen",
-        17: "Solenoid",
-        18: "Smoke Shooter"
+        0: "AC Dimmer", 1: "DMX Output", 2: "Relay", 3: "RGB LED", 4: "Single LED",
+        5: "Analog RGB", 6: "Motor", 7: "Stepper", 8: "Servo", 9: "Buzzer",
+        10: "DFPlayer", 11: "7-Seg TM1637", 12: "7-Seg DD 7-Pin PWM", 13: "7-Seg DD 8-Pin PWM",
+        14: "DAC", 15: "PWM DAC", 16: "Func Gen", 17: "Solenoid", 18: "Smoke Shooter"
     }
     
     warnings = []
     errors = []
     
-    # Step 1: Analyze each channel's footprint
+    has_dimmer = False
+    unique_universes = set()
+    
+    # Process each channel
     for idx, ch in enumerate(outputs):
         ch_type = ch.get("type", 0)
         ch_name = type_names.get(ch_type, f"Unknown ({ch_type})")
+        source = ch.get("source", 0)
+        pin = ch.get("pin", 255)
+        pin2 = ch.get("pin2", 255)
+        pin3 = ch.get("pin3", 255)
+        pin4 = ch.get("pin4", 255)
         
-        # Estimate channel hardware resources
-        u = estimate_resources(ch)
+        pin2_source = ch.get("pin2_source", source)
+        pin3_source = ch.get("pin3_source", source)
+        pin4_source = ch.get("pin4_source", source)
         
-        # Accumulate peripheral limits
-        used_rmt += u["rmt"]
-        used_ledc += u["ledc"]
-        used_uart_dmx += u["uart"]
+        unique_universes.add(ch.get("start_universe", 0))
         
-        # Accumulate score
-        ch_resource_score = (
-            u["gpio"] * W_GPIO +
-            u["ledc"] * W_LEDC +
-            u["rmt"] * W_RMT +
-            u["uart"] * W_UART +
-            u["dac"] * W_DAC +
-            u["pca"] * W_PCA +
-            u["expander"] * W_EXP
-        )
-        ch_compute_score = channel_compute_score(ch)
-        total_resource_score += ch_resource_score
-        total_compute_score += ch_compute_score
+        # 1. Accumulate hardware peripherals
+        hw = estimate_hardware(ch)
+        total_ledc += hw["ledc"]
+        total_rmt += hw["rmt"]
+        total_uart += hw["uart"]
+        total_dac += hw["dac"]
+        total_timer += hw["timer"]
         
-        if ch_type == 3:  # RGB LED count
-            total_leds += ch.get("led_count", 0)
-        elif ch_type == 7:  # Stepper engines
-            stepper_count += 1
-        elif ch_type == 10:  # DFPlayer count
+        if ch_type == 0:
+            has_dimmer = True
+            dimmer_count += 1
+        elif ch_type == 16:
+            funcgen_count += 1
+            
+        if ch_type == 1 and source == 0:
+            dmx_gpio_count += 1
+        elif ch_type == 10:
             dfplayer_count += 1
-
-        # Track detailed pin/channel routing
+            
+        # 2. Accumulate active costs (CPU & RAM)
+        cost = estimate_channel_cost(ch)
+        total_cpu_us += cost["cpu"]
+        total_ram_bytes += cost["ram"]
+        
+        # 3. Track physical pins/channels for overlap check
         pins_to_check = [
-            ("pin", "Primary Pin", ch.get("pin", 255), ch.get("source", 0), ch.get("pca_addr", 0x40), ch.get("pca_channel", 0)),
-            ("pin2", "Secondary Pin", ch.get("pin2", 255), ch.get("pin2_source", ch.get("source", 0)), ch.get("pin2_addr", 0x20), ch.get("pca_channel2", 255)),
-            ("pin3", "Tertiary Pin", ch.get("pin3", 255), ch.get("pin3_source", ch.get("source", 0)), ch.get("pin3_addr", 0x20), ch.get("pca_channel3", 255)),
-            ("pin4", "Quaternary Pin", ch.get("pin4", 255), ch.get("pin4_source", ch.get("source", 0)), ch.get("pin4_addr", 0x20), ch.get("pca_channel4", 255)),
+            ("pin", "Primary Pin", pin, source, ch.get("pca_addr", 0x40), ch.get("pca_channel", 0)),
+            ("pin2", "Secondary Pin", pin2, pin2_source, ch.get("pin2_addr", 0x20), ch.get("pca_channel2", 255)),
+            ("pin3", "Tertiary Pin", pin3, pin3_source, ch.get("pin3_addr", 0x20), ch.get("pca_channel3", 255)),
+            ("pin4", "Quaternary Pin", pin4, pin4_source, ch.get("pin4_addr", 0x20), ch.get("pca_channel4", 255)),
         ]
         
-        # Add 7-segment segment pins if direct drive
         if ch_type in (12, 13):
             num_seg = 8 if ch_type == 13 else 7
             seg_pins = ch.get("seg_pins", [])
@@ -351,71 +401,107 @@ def run_calculation_on_channels(outputs, status_led=5, zc_pin=255, sda_pin=14, s
             seg_addrs = ch.get("seg_addrs", [])
             for s in range(num_seg):
                 s_pin = seg_pins[s] if s < len(seg_pins) else 255
-                s_src = seg_sources[s] if s < len(seg_sources) else ch.get("source", 0)
+                s_src = seg_sources[s] if s < len(seg_sources) else source
                 s_addr = seg_addrs[s] if s < len(seg_addrs) else 0x20
                 pins_to_check.append((f"seg_pins[{s}]", f"Segment {s} Pin", s_pin, s_src, s_addr, s))
-
+                
         i2c_bus_used = False
         for field, role_name, pin_val, pin_src, pin_addr, ch_idx in pins_to_check:
             if pin_val == 255:
                 continue
-                
             role_desc = f"{ch_name} (Ch{idx+1} {role_name})"
             
-            if pin_src == 0:  # Direct ESP32 GPIO
+            if pin_src == 0:
                 if pin_val not in gpio_usage:
                     gpio_usage[pin_val] = []
                 gpio_usage[pin_val].append((idx, role_desc))
-            else:  # I2C-based resource
+            else:
                 i2c_bus_used = True
-                if pin_src == 1:  # PCA9685
+                if pin_src == 1:
                     if pin_addr not in pca9685_usage:
                         pca9685_usage[pin_addr] = {"channels": {}, "freqs": set()}
-                    
-                    # Track PCA9685 frequency requirements
-                    # Servos force 50 Hz, Motors/Dimmers might require higher frequencies
-                    target_freq = ch.get("mc_freq", ch.get("pca_frequency", 50 if ch_type == 8 else 1000))
+                    target_freq = ch.get("mc_freq", 50 if ch_type == 8 else 1000)
                     pca9685_usage[pin_addr]["freqs"].add(target_freq)
-                    
-                    if ch_idx == 255:
-                        continue
-                    if ch_idx not in pca9685_usage[pin_addr]["channels"]:
-                        pca9685_usage[pin_addr]["channels"][ch_idx] = []
-                    pca9685_usage[pin_addr]["channels"][ch_idx].append((idx, role_desc))
-                    
-                else:  # Digital Expanders (2..4) or DAC (5)
+                    if ch_idx != 255:
+                        if ch_idx not in pca9685_usage[pin_addr]["channels"]:
+                            pca9685_usage[pin_addr]["channels"][ch_idx] = []
+                        pca9685_usage[pin_addr]["channels"][ch_idx].append((idx, role_desc))
+                else:
                     if pin_src not in other_expanders:
                         other_expanders[pin_src] = {}
                     if pin_addr not in other_expanders[pin_src]:
                         other_expanders[pin_src][pin_addr] = {}
-                    
                     if ch_idx == 255:
                         ch_idx = pin_val
                     if ch_idx not in other_expanders[pin_src][pin_addr]:
                         other_expanders[pin_src][pin_addr][ch_idx] = []
                     other_expanders[pin_src][pin_addr][ch_idx].append((idx, role_desc))
 
-        # Register shared Zero-Crossing pin if direct AC Dimmer is used
-        if ch_type == 0:
-            if zc_pin != 255:
-                if zc_pin not in gpio_usage:
-                    gpio_usage[zc_pin] = []
-                gpio_usage[zc_pin].append((idx, f"AC Dimmer Zero-Crossing Interrupt"))
-                
-        # Register shared I2C pins if I2C expanders are used
         if i2c_bus_used:
             for pin_val, pin_role in [(sda_pin, "I2C SDA"), (scl_pin, "I2C SCL")]:
                 if pin_val not in gpio_usage:
                     gpio_usage[pin_val] = []
                 gpio_usage[pin_val].append((idx, f"Shared {pin_role}"))
 
-    # Step 2: Validate GPIO Pin Overlaps & safety
+    # Extra shared dimmer timer
+    if has_dimmer:
+        total_timer += 1
+        
+    # Check background timer execution costs
+    total_cpu_us += ac_dimmer_background_us(dimmer_count, output_fps)
+    total_cpu_us += func_gen_background_us(funcgen_count, output_fps)
+    
+    # Calculate RMT DMX fallbacks
+    free_uarts = max(0, 2 - dfplayer_count)
+    dmx_rmt_use = max(0, dmx_gpio_count - free_uarts)
+    total_ram_bytes += dmx_rmt_use * RMT_DMX_DRIVER_RAM
+    
+    # ESP-NOW Master check
+    peer_count = get_espnow_peer_count()
+    if is_master or peer_count > 0:
+        actual_peers = peer_count if peer_count > 0 else 1
+        now_cost = espnow_master_cost(actual_peers, len(unique_universes))
+        total_cpu_us += now_cost["cpu"]
+        total_ram_bytes += now_cost["ram"]
+        print(f" 📡 ESP-NOW Master mode active. Added overhead for {actual_peers} peers.")
+
+    # 4. Check budgets and write results
+    cpu_limit_us = (1000000 // output_fps) - 1500
+    
+    print("\n--- BUDGET STATUS REPORT ---")
+    
+    print(f"1. HardwareResource Peripherals:")
+    print(f" - LEDC PWM : {total_ledc:2d} / {MAX_LEDC} {'❌ OVERLIMIT' if total_ledc > MAX_LEDC else '✅ OK'}")
+    print(f" - RMT      : {total_rmt:2d} / {MAX_RMT} {'❌ OVERLIMIT' if total_rmt > MAX_RMT else '✅ OK'}")
+    print(f" - UART     : {total_uart:2d} / {MAX_UART} {'❌ OVERLIMIT' if total_uart > MAX_UART else '✅ OK'}")
+    print(f" - DAC (Int): {total_dac:2d} / {MAX_DAC} {'❌ OVERLIMIT' if total_dac > MAX_DAC else '✅ OK'}")
+    print(f" - Timers   : {total_timer:2d} / {MAX_TIMER} {'❌ OVERLIMIT' if total_timer > MAX_TIMER else '✅ OK'}")
+    
+    print(f"2. CpuBudget (Output Service Time):")
+    print(f" - Estimate : {total_cpu_us} µs/frame")
+    print(f" - Limit    : {cpu_limit_us} µs/frame (at {output_fps} FPS)")
+    print(f" - Status   : {'❌ OVERLIMIT' if total_cpu_us > cpu_limit_us else '✅ OK'}")
+    
+    print(f"3. RamBudget (Static Allocation):")
+    print(f" - Estimate : {total_ram_bytes} bytes ({(total_ram_bytes/1024):.2f} KB)")
+    print(f" - Limit    : {RAM_LIMIT} bytes ({RAM_LIMIT/1024:.0f} KB)")
+    print(f" - Status   : {'❌ OVERLIMIT' if total_ram_bytes > RAM_LIMIT else '✅ OK'}")
+
+    # Safety checks
+    if total_ledc > MAX_LEDC: errors.append("❌ LEDC limit exceeded")
+    if total_rmt > MAX_RMT: errors.append("❌ RMT limit exceeded")
+    if total_uart > MAX_UART: errors.append("❌ UART limit exceeded")
+    if total_dac > MAX_DAC: errors.append("❌ DAC limit exceeded")
+    if total_timer > MAX_TIMER: errors.append("❌ Timer limit exceeded")
+    if total_cpu_us > cpu_limit_us: errors.append("❌ CPU compute budget exceeded")
+    if total_ram_bytes > RAM_LIMIT: errors.append("❌ RAM budget exceeded")
+
+    # Verify physical GPIOs
     print("\nChecking ESP32 physical GPIO allocations...")
     for pin, usages in sorted(gpio_usage.items()):
         role_desc = ", ".join([u[1] for u in usages])
         print(f" - GPIO {pin:2d}: Used by {role_desc}")
         
-        # Check safety
         is_input = any("LIMIT" in u[1] or "Zero-Crossing" in u[1] or "Sensor" in u[1] for u in usages)
         role_label = "Input" if is_input else "Output"
         safe, msg = check_pin_safety(pin, status_led, zc_pin, role_label, sda_pin, scl_pin)
@@ -425,38 +511,19 @@ def run_calculation_on_channels(outputs, status_led=5, zc_pin=255, sda_pin=14, s
             else:
                 warnings.append(f"⚠️ GPIO Pin Warning: Pin {pin} used as {role_label} for {role_desc}. Details: {msg}")
                 
-        # Duplicate direct GPIO check (except allowed shared pins: I2C or ZC)
         unique_channels = {u[0] for u in usages}
         is_shared_allowable = any("I2C" in u[1] or "Zero-Crossing" in u[1] for u in usages)
         if len(unique_channels) > 1 and not is_shared_allowable:
             errors.append(f"❌ GPIO Pin Collision: GPIO {pin} is shared across multiple outputs: {role_desc}")
 
-    # Check status LED, zero-crossing, and I2C safety specifically
-    if status_led != 255:
-        safe_led, led_msg = check_pin_safety(status_led, status_led, zc_pin, "Output", sda_pin, scl_pin)
-        if not safe_led and "CRITICAL" in led_msg:
-            errors.append(f"❌ Status LED Pin Error: GPIO {status_led} configured as Status LED. Details: {led_msg}")
-            
-    if zc_pin != 255:
-        safe_zc, zc_msg = check_pin_safety(zc_pin, status_led, zc_pin, "Input", sda_pin, scl_pin)
-        if not safe_zc and "CRITICAL" in zc_msg:
-            errors.append(f"❌ Zero-Crossing Pin Error: GPIO {zc_pin} configured as Zero-Crossing. Details: {zc_msg}")
-
-    # Step 3: Validate I2C Address Collisions and Expander Channel Overlaps
+    # Check PCA9685 address and frequency overlaps
     if pca9685_usage:
         print("\nChecking PCA9685 expander channels...")
         for addr, usage in pca9685_usage.items():
             freqs = list(usage["freqs"])
-            print(f" - PCA9685 @ 0x{addr:02X}: frequency requirements {freqs} Hz")
-            
-            # Frequency conflict check
+            print(f" - PCA9685 @ 0x{addr:02X}: frequencies {freqs} Hz")
             if len(freqs) > 1:
-                warnings.append(
-                    f"⚠️ PCA9685 Frequency Mismatch: PCA9685 at 0x{addr:02X} has channels sharing conflicting frequencies: {freqs} Hz. "
-                    f"All 16 channels share ONE physical frequency register. The hardware will run at the last configured frequency."
-                )
-            
-            # Channel overlap check
+                warnings.append(f"⚠️ PCA9685 Frequency Mismatch: PCA9685 at 0x{addr:02X} has channels sharing conflicting frequencies: {freqs} Hz.")
             for ch_idx, usages in usage["channels"].items():
                 if len(usages) > 1:
                     role_desc = ", ".join([u[1] for u in usages])
@@ -473,60 +540,6 @@ def run_calculation_on_channels(outputs, status_led=5, zc_pin=255, sda_pin=14, s
                         role_desc = ", ".join([u[1] for u in usages])
                         errors.append(f"❌ Expander Channel Collision: {src_name} @ 0x{addr:02X} channel {ch_idx} is shared multiple times: {role_desc}")
 
-    # Step 4: Validate global hardware capacity constraints & score limits
-    print("\nChecking hardware peripheral constraints...")
-    
-    # RMT limit
-    if used_rmt > max_rmt:
-        errors.append(f"❌ RMT Overload: Requested {used_rmt} RMT channels. ESP32 hardware limit is {max_rmt}.")
-    else:
-        print(f" ✅ RMT Channels: {used_rmt}/{max_rmt} used.")
-        
-    # LEDC limit
-    if used_ledc > max_ledc:
-        errors.append(f"❌ LEDC PWM Overload: Requested {used_ledc} LEDC channels. ESP32 hardware limit is {max_ledc}.")
-    else:
-        print(f" ✅ LEDC PWM Channels: {used_ledc}/{max_ledc} used.")
-        
-    # UART DMX/DFPlayer limit (shared)
-    # dfplayer has priority, UART count is checked
-    used_uart = dfplayer_count + used_uart_dmx
-    if used_uart > max_uart_dmx:
-        errors.append(f"❌ UART Overload: Requested {used_uart} UART channels (DFPlayers: {dfplayer_count}, DMXs: {used_uart_dmx}). ESP32 hardware limit is {max_uart_dmx}.")
-    else:
-        print(f" ✅ Hardware UARTs: {used_uart}/{max_uart_dmx} used.")
- 
-    # Stepper limit
-    if stepper_count > 8:
-        errors.append(f"❌ Stepper Limit Exceeded: Configured {stepper_count} steppers. Firmware restricts steppers to maximum 8.")
-    elif stepper_count > 0:
-        print(f" ✅ Stepper Engines: {stepper_count}/8 used.")
-
-    # Max channels slots
-    if len(outputs) > max_channels_slots:
-        errors.append(f"❌ Slot Count Exceeded: Configured {len(outputs)} output slots. The firmware restricts outputs.json to a maximum of {max_channels_slots} entries.")
-    else:
-        print(f" ✅ Output Channel Slots: {len(outputs)}/{max_channels_slots} used.")
-
-    # High load checks
-    if total_leds > 4000:
-        warnings.append(f"⚠️ High LED Count: {total_leds} total LEDs. Exceeding 4000 LEDs consumes critical RAM heap and can trigger brownouts or watchdog resets.")
-    elif total_leds > 0:
-        print(f" ✅ Total LED Strip Load: {total_leds} pixels.")
-
-    # Score limit validation
-    total_combined_score = total_resource_score + total_compute_score
-    print(f"\nScoring Breakdown:")
-    print(f" - Resource Score : {total_resource_score:.3f} / 84.0")
-    print(f" - Compute Score  : {total_compute_score:.3f} / 25.0")
-    print(f" - Total Score     : {total_combined_score:.3f} / {SCORE_LIMIT}")
-
-    if total_combined_score > SCORE_LIMIT:
-        errors.append(f"❌ SCORE LIMIT EXCEEDED: Configured score of {total_combined_score:.3f} exceeds the safe limit of {SCORE_LIMIT}!")
-    else:
-        print(f" ✅ Total Combined Score is safe.")
-
-    # Final summary display
     print("\n================== RESOURCE REPORT SUMMARY ==================")
     if errors:
         print(f"🔴 CONFIGURATION FAILED ({len(errors)} Errors, {len(warnings)} Warnings)")
@@ -536,14 +549,13 @@ def run_calculation_on_channels(outputs, status_led=5, zc_pin=255, sda_pin=14, s
         print(f"🟡 CONFIGURATION SAFE WITH WARNINGS ({len(warnings)} Warnings)")
     else:
         print("🟢 CONFIGURATION SAFE! (0 Errors, 0 Warnings)")
-        print("   All resource checks passed. Suitable for deployment.")
-        
+        print("   All budget checks passed successfully.")
     for warn in warnings:
         print(f"  {warn}")
     print("=============================================================")
 
 def run_interactive():
-    print("\n--- Running in Interactive Mode (v3) ---")
+    print("\n--- Running in Interactive Mode (3 Budgets) ---")
     total_leds = int(input("1. How many total LEDs (NeoPixels) do you plan to use? [0] ") or 0)
     led_strips = int(input("2. How many separate physical LED strips (Output Pins) will you use? [0] ") or 0)
     dmx_channels = int(input("3. How many DMX Serial outputs will you use? [0] ") or 0)
@@ -572,80 +584,74 @@ def run_interactive():
     
     dummy_outputs = []
     
-    # LED Strips (Type 3)
+    # LED Strips
     for _ in range(led_strips):
         dummy_outputs.append({"type": 3, "led_count": total_leds // led_strips if led_strips > 0 else 0, "pin": 4, "source": 0})
-    # DMX Serials (Type 1)
+    # DMX Serials
     for i in range(dmx_channels):
         dummy_outputs.append({"type": 1, "pin": 17 if i == 0 else (2 if i == 1 else 15), "source": 0})
-    # Relays (Type 2)
+    # Relays
     for _ in range(relays):
         dummy_outputs.append({"type": 2, "pin": 2, "source": 0})
-    # Single LED / Dimmers (Type 4)
+    # Single LED / Dimmers
     for _ in range(dimmers):
         dummy_outputs.append({"type": 4, "pin": 12, "source": 0})
-    # Analog RGB (Type 5)
+    # Analog RGB
     for _ in range(analog_rgb):
         dummy_outputs.append({"type": 5, "pin": 12, "pin2": 14, "pin3": 15, "source": 0, "color_order": 0})
-    # Analog RGBW (Type 5 RGBW)
+    # Analog RGBW
     for _ in range(analog_rgbw):
         dummy_outputs.append({"type": 5, "pin": 12, "pin2": 14, "pin3": 15, "pin4": 13, "source": 0, "color_order": 4})
-    # DC Motors (Type 6)
+    # DC Motors
     for _ in range(motors):
         dummy_outputs.append({"type": 6, "pin": 12, "pin2": 14, "pin3": 15, "source": 0, "mc_mode": motor_mode})
-    # Steppers (Type 7)
+    # Steppers
     for _ in range(steppers):
         if mixed_stepper.lower() == 'y':
             dummy_outputs.append({
-                "type": 7, 
-                "pin": 12,                  # STEP on ESP32 GPIO
-                "source": 0,
-                "pin2": 0,                  # DIR on expander address 0x20
-                "pin2_source": 2,
-                "pin2_addr": 32,
-                "pin3": 1,                  # EN on expander address 0x20
-                "pin3_source": 2,
-                "pin3_addr": 32
+                "type": 7, "pin": 12, "source": 0, "pin2": 0, "pin2_source": 2, "pin2_addr": 32, "pin3": 1, "pin3_source": 2, "pin3_addr": 32
             })
         else:
             dummy_outputs.append({"type": 7, "pin": 12, "pin2": 14, "source": 0})
-    # Servos (Type 8)
+    # Servos
     for _ in range(servos):
         dummy_outputs.append({"type": 8, "pin": 12, "source": 0})
-    # Passive Buzzers (Type 9)
+    # Passive Buzzers
     for _ in range(buzzers):
         dummy_outputs.append({"type": 9, "pin": 12, "source": 0})
-    # DFPlayer (Type 10)
+    # DFPlayer
     for _ in range(dfplayers):
         dummy_outputs.append({"type": 10, "pin": 17, "pin2": 16, "source": 0})
-    # TM1637 Display (Type 11)
+    # TM1637
     for _ in range(segment_displays_2pin):
         dummy_outputs.append({"type": 11, "pin": 12, "pin2": 14, "source": 0})
-    # 7-Seg DD 7-Pin (Type 12)
+    # 7-Seg 7-Pin
     for _ in range(segment_displays_pwm7):
         dummy_outputs.append({"type": 12, "seg_pins": [12, 14, 15, 13, 2, 4, 17], "source": 0})
-    # 7-Seg DD 8-Pin (Type 13)
+    # 7-Seg 8-Pin
     for _ in range(segment_displays_pwm8):
         dummy_outputs.append({"type": 13, "seg_pins": [12, 14, 15, 13, 2, 4, 17, 32], "source": 0})
-    # Function Generator (Type 16)
+    # Function Generator
     for _ in range(func_gens):
         dummy_outputs.append({"type": 16, "pin": 12, "source": 0})
-    # Solenoids (Type 17)
+    # Solenoids
     for _ in range(relays):
         dummy_outputs.append({"type": 17, "pin": 2, "source": 0})
-    # Smoke machines (Type 18)
+    # Smoke machines
     for _ in range(smoke_machines):
         dummy_outputs.append({"type": 18, "pin": 12, "pin2": 14, "source": 0})
-
-    status_pin = int(input("\nEnter Status LED GPIO pin number: [5] ") or 5)
-    zc_pin = int(input("Enter Zero-Crossing GPIO pin number (or 255 for none): [255] ") or 255)
+        
+    status_pin = int(input("\nEnter Status LED GPIO pin: [5] ") or 5)
+    zc_pin = int(input("Enter Zero-Crossing GPIO pin (255 for none): [255] ") or 255)
+    output_fps = int(input("Enter output FPS: [40] ") or 40)
+    is_master_input = input("Is ESP-NOW Master mode active? (y/n) [n] ") or "n"
+    is_master = is_master_input.lower() == 'y'
     
-    run_calculation_on_channels(dummy_outputs, status_led=status_pin, zc_pin=zc_pin)
+    run_calculation_on_channels(dummy_outputs, status_led=status_pin, zc_pin=zc_pin, output_fps=output_fps, is_master=is_master)
 
 def main():
     print_banner()
     
-    # 1. Check if config path is provided as argument
     if len(sys.argv) > 1:
         path = sys.argv[1]
         print(f"Loading configuration from command line path: {path}")
@@ -656,7 +662,6 @@ def main():
         else:
             print("Failed to load specified file. Falling back to search.")
             
-    # 2. Try default locations
     default_locations = [
         "outputs.json",
         "data/outputs.json",
@@ -678,7 +683,6 @@ def main():
             run_calculation_on_channels(outputs)
             return
  
-    # 3. If no file found, prompt user for interactive run
     print("Could not find any 'outputs.json' configuration file automatically.")
     choice = input("Would you like to run in interactive input mode? (y/n): [y] ") or "y"
     if choice.lower() == 'y':

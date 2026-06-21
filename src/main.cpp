@@ -2219,8 +2219,8 @@ void setup() {
     bootCount++;
     Serial.printf("Boot count: %d\n", bootCount);
 
-    if (bootCount >= 3) {
-        Serial.println("Recovery Mode Triggered! (3 consecutive resets)");
+    if (bootCount >= 5) {
+        Serial.println("Recovery Mode Triggered! (5 consecutive resets)");
         isRecoveryMode = true;
         bootCount = 0; // Reset so next boot is normal
     }

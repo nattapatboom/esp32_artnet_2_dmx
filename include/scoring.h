@@ -2,6 +2,8 @@
 #define SCORING_H
 
 #include <Arduino.h>
+#include <LittleFS.h>
+#include <ArduinoJson.h>
 #include "output_control.h"
 
 // ═══════════════════════════════════════
@@ -339,6 +341,57 @@ inline PerChannelCost espnowMasterCost(uint8_t peerCount, uint8_t universeCount,
     return c;
 }
 
+inline uint8_t getEspNowPeerCount() {
+    uint8_t count = 0;
+    if (LittleFS.exists("/espnow_peers.json")) {
+        File file = LittleFS.open("/espnow_peers.json", "r");
+        if (file) {
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc, file);
+            file.close();
+            if (!error && doc["peers"].is<JsonArray>()) {
+                count = doc["peers"].as<JsonArray>().size();
+            }
+        }
+    }
+    return count == 0 ? 1 : count; // Default to 1 (broadcast) if 0
+}
+
+inline uint8_t countUniqueUniverses(const std::vector<OutputChannel>& chs) {
+    std::vector<uint16_t> unis;
+    for (const auto& ch : chs) {
+        bool found = false;
+        for (uint16_t u : unis) {
+            if (u == ch.start_universe) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            unis.push_back(ch.start_universe);
+        }
+    }
+    return unis.size();
+}
+
+inline uint8_t countUniqueUniversesFromJson(JsonArrayConst arr) {
+    std::vector<uint16_t> unis;
+    for (JsonObjectConst j : arr) {
+        uint16_t u = j["start_universe"] | 0;
+        bool found = false;
+        for (uint16_t uni : unis) {
+            if (uni == u) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            unis.push_back(u);
+        }
+    }
+    return unis.size();
+}
+
 // ═══════════════════════════════════════
 //  AGGREGATE SUMS (vector version)
 // ═══════════════════════════════════════
@@ -365,6 +418,12 @@ inline CpuBudget totalCpu(const std::vector<OutputChannel>& chs, uint8_t fps = 4
     }
     t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
     t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
+    
+    if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
+        uint8_t peerCount = getEspNowPeerCount();
+        uint8_t universeCount = countUniqueUniverses(chs);
+        t.usPerFrame += espnowMasterCost(peerCount, universeCount).cpuUs;
+    }
     return t;
 }
 
@@ -380,6 +439,11 @@ inline RamBudget totalRam(const std::vector<OutputChannel>& chs) {
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
     uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
     t.bytes += (uint32_t)dmxRmtUse * RMT_DMX_DRIVER_RAM;
+
+    if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
+        uint8_t peerCount = getEspNowPeerCount();
+        t.bytes += espnowMasterCost(peerCount, 0).ramBytes;
+    }
     return t;
 }
 
@@ -557,6 +621,12 @@ inline CpuBudget totalCpuFromJson(JsonArrayConst arr, uint8_t fps = 40) {
     }
     t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
     t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
+
+    if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
+        uint8_t peerCount = getEspNowPeerCount();
+        uint8_t universeCount = countUniqueUniversesFromJson(arr);
+        t.usPerFrame += espnowMasterCost(peerCount, universeCount).cpuUs;
+    }
     return t;
 }
 
@@ -574,6 +644,11 @@ inline RamBudget totalRamFromJson(JsonArrayConst arr) {
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
     uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
     t.bytes += (uint32_t)dmxRmtUse * RMT_DMX_DRIVER_RAM;
+
+    if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
+        uint8_t peerCount = getEspNowPeerCount();
+        t.bytes += espnowMasterCost(peerCount, 0).ramBytes;
+    }
     return t;
 }
 
