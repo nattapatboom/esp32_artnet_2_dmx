@@ -591,7 +591,8 @@ Known implementation drift (scoring-specific):
 
 ### ADR002: Motor & Motion Control Separation
 - **Rationale:** High-resolution motion devices (Micro-stepping, Camera rotation) are CPU-intensive and may cause cross-core interference
-- **Decision:** Use this ESP32 to send DMX to a dedicated Motor Controller Board rather than driving high-power motors directly
+- **Decision:** (1) Direct GPIO/PCA/PWM drive is supported for low-power DC motors (Type 6) and steppers (Type 7) with full deadband, direction, and brake logic. (2) For high-power or high-resolution applications (e.g., micro-stepping, camera rotation), use this ESP32 to send DMX to a dedicated Motor Controller Board instead.
+- **Implementation:** Direct drive via `motion_control.h` — DC motors use LEDC/PCA9685 PWM with H-bridge control; steppers use FastAccelStepper library for STEP/DIR timing. High-power separation is a deployment guideline, not enforced in firmware.
 
 ### ADR003: DMX Frame Timeout Constraint
 - **Rationale:** Some DMX Decoders enter safe-state if idle for more than 50ms
