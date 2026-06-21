@@ -401,11 +401,20 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
           <span id="out-save-state" class="pill pill-ok">Saved</span>
         </div>
       </div>
-      <div id="score-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem">
-        <span style="font-weight:600;white-space:nowrap">Capacity Score:</span>
-        <div style="flex:1;height:16px;background:#e2e8f0;border-radius:8px;overflow:hidden;position:relative">
-          <div id="score-fill" style="height:100%;width:0%;border-radius:8px;transition:width .3s"></div>
-          <span id="score-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:600;color:#1e293b">0 / 100</span>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+        <div id="cpu-score-bar" style="display:flex;align-items:center;gap:8px;font-size:0.78rem">
+          <span style="font-weight:600;white-space:nowrap;width:95px">CPU Load:</span>
+          <div style="flex:1;height:16px;background:#e2e8f0;border-radius:8px;overflow:hidden;position:relative">
+            <div id="cpu-score-fill" style="height:100%;width:0%;border-radius:8px;transition:width .3s"></div>
+            <span id="cpu-score-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:600;color:#1e293b">0% (0 / 100 µs)</span>
+          </div>
+        </div>
+        <div id="ram-score-bar" style="display:flex;align-items:center;gap:8px;font-size:0.78rem">
+          <span style="font-weight:600;white-space:nowrap;width:95px">RAM Load:</span>
+          <div style="flex:1;height:16px;background:#e2e8f0;border-radius:8px;overflow:hidden;position:relative">
+            <div id="ram-score-fill" style="height:100%;width:0%;border-radius:8px;transition:width .3s"></div>
+            <span id="ram-score-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:600;color:#1e293b">0% (0 / 48000 KB)</span>
+          </div>
         </div>
       </div>
       <div id="hw-monitor" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;font-size:0.75rem">
@@ -1996,9 +2005,11 @@ function espnowMasterCost(peerCount, universeCount, chunkSize=200){
   return {cpu: 500 + peerCount*cpusPerUni*170 + universeCount*100, ram: 512 + peerCount*(chunkSize+44)};
 }
 function updateScoreBar(){
-  const bar=document.getElementById('score-fill');
-  const txt=document.getElementById('score-text');
-  if(!bar||!txt) return;
+  const cpuBar=document.getElementById('cpu-score-fill');
+  const cpuTxt=document.getElementById('cpu-score-text');
+  const ramBar=document.getElementById('ram-score-fill');
+  const ramTxt=document.getElementById('ram-score-text');
+  if(!cpuBar||!cpuTxt||!ramBar||!ramTxt) return;
   const fps=parseInt(document.getElementById('output_fps')?.value)||40;
   const hw=totalHardware(outputs);
   const cpu=totalCpu(outputs,fps);
@@ -2010,11 +2021,17 @@ function updateScoreBar(){
   const ramBad=ramBlocked(ram);
   const budgetBad=hwBad||cpuBad||ramBad;
 
-  // Combined bar (CPU % colored by worst blocker)
+  // CPU Bar
   const cpuPct=Math.min(cpu/cLim*100,100);
-  bar.style.width=cpuPct+'%';
-  bar.style.background=budgetBad?'#ef4444':cpuPct>80?'#eab308':'#22c55e';
-  txt.textContent='CPU '+cpu+'/'+cLim+'\u00B5s | RAM '+(ram/1024).toFixed(0)+'KB/'+(RAM_LIMIT/1024)+'KB';
+  cpuBar.style.width=cpuPct+'%';
+  cpuBar.style.background=cpuBad?'#ef4444':cpuPct>80?'#eab308':'#22c55e';
+  cpuTxt.textContent=cpuPct.toFixed(1)+'% ('+cpu+' / '+cLim+' \u00B5s)';
+
+  // RAM Bar
+  const ramPct=Math.min(ram/RAM_LIMIT*100,100);
+  ramBar.style.width=ramPct+'%';
+  ramBar.style.background=ramBad?'#ef4444':ramPct>80?'#eab308':'#22c55e';
+  ramTxt.textContent=ramPct.toFixed(1)+'% ('+(ram/1024).toFixed(3)+' KB / '+(RAM_LIMIT/1024).toFixed(3)+' KB)';
 
   // Per-resource hardware cards (show red when over, but warning only)
   const updateHwCard = (valId, barId, used, maxLimit) => {
