@@ -2,6 +2,7 @@
 #define MOTION_CONTROL_H
 
 #include <Arduino.h>
+#include <Wire.h>
 #include "output_control.h"
 #include <FastAccelStepper.h>
 
@@ -991,6 +992,7 @@ public:
                 }
             }
             else if (ch.type == 14) { // DAC
+                if (ch.source == 0) continue; // GPIO DAC blocked on WT32-ETH01 (ADR008)
                 dacWrite(ch.pin, ch.dmxBuffer[0]);
             }
             else if (ch.type == 16 && ch.funcGen != nullptr && ch.dmxBuffer != nullptr) { // Function Generator

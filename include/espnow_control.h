@@ -195,7 +195,6 @@ public:
 
         // Setup send/receive callbacks depending on mode
         if (sysCfg.device_mode == MODE_ESPNOW_MASTER) {
-            esp_now_register_send_cb(onDataSent);
             loadPeers();
             if (sysCfg.espnow_channel > 0) {
                 esp_wifi_set_channel(sysCfg.espnow_channel, WIFI_SECOND_CHAN_NONE);
@@ -261,10 +260,6 @@ public:
     }
 
 private:
-    static void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-        // Can be used for debugging / LED flash triggers
-    }
-
     static void onDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
         size_t minHeaderLen = 4 + 2 + 2 + 2 + 2; // header(4) + universe(2) + offset(2) + totalLength(2) + length(2)
         if (len < (int)minHeaderLen) {

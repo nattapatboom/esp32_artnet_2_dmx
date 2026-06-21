@@ -46,7 +46,6 @@ const char* getFirmwareVersion() {
 
 // Instantiate Global Control Instances
 SystemConfig sysCfg;
-uint8_t activeDmxBuffer[DMX_BUFFER_SIZE] = {0};
 unsigned long lastDmxUpdateTime = 0;
 bool systemActive = false;
 std::atomic<bool> networkFramePending(false);
@@ -2248,7 +2247,6 @@ void outputTask(void* pvParameters) {
         // If in ESP-NOW Slave mode, check for incoming wireless packages
         if (sysCfg.device_mode == MODE_ESPNOW_SLAVE) {
             if (EspNowControl::newRxData) {
-                memcpy(activeDmxBuffer, EspNowControl::rxDmxBuffer, EspNowControl::rxDmxLength);
                 EspNowControl::newRxData = false;
                 systemActive = true;
                 lastDmxUpdateTime = millis();
@@ -2274,7 +2272,7 @@ void outputTask(void* pvParameters) {
 // Recovery Mode tracking
 #define RECOVERY_BUTTON_PIN 0
 RTC_DATA_ATTR uint32_t bootCount = 0;
-bool isRecoveryMode = false;
+static bool isRecoveryMode = false;
 
 void resetBootCountTask(void *pvParameters) {
     vTaskDelay(15000 / portTICK_PERIOD_MS);

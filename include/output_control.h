@@ -29,7 +29,6 @@ inline uint8_t dmxValueByteCount(uint8_t resolution) {
     return 4;
 }
 
-extern uint8_t activeDmxBuffer[DMX_BUFFER_SIZE];
 extern unsigned long lastDmxUpdateTime;
 extern bool systemActive;
 extern std::atomic<bool> networkFramePending;
@@ -125,8 +124,6 @@ struct OutputChannel {
     uint16_t pwm_dac_max = 10000;
     
 
-    char dest_ip[16] = "192.168.1.100";
-    uint16_t dest_port = 9000;
     uint16_t smoke_duration_ms = 1000;
     uint16_t settle_delay_ms = 500;
     uint16_t shoot_duration_ms = 1000;
@@ -529,7 +526,6 @@ public:
         }
 
         if (updateActiveBuffer && universe == 0) {
-            memcpy(activeDmxBuffer + dataOffset, data, copyLen);
             matched = true;
         }
 
@@ -699,10 +695,6 @@ public:
             ch.solenoid_pulse_ms = item["solenoid_pulse_ms"] | 50;
             ch.solenoid_pre_delay = item["solenoid_pre_delay"] | 0;
             ch.solenoid_post_delay = item["solenoid_post_delay"] | 100;
-            String destIp = item["dest_ip"] | "192.168.1.100";
-            strncpy(ch.dest_ip, destIp.c_str(), sizeof(ch.dest_ip) - 1);
-            ch.dest_ip[sizeof(ch.dest_ip) - 1] = '\0';
-            ch.dest_port = item["dest_port"] | 9000;
             ch.smoke_duration_ms = item["smoke_duration_ms"] | 1000;
             ch.settle_delay_ms = item["settle_delay_ms"] | 500;
             ch.shoot_duration_ms = item["shoot_duration_ms"] | 1000;
@@ -785,10 +777,6 @@ public:
              item["pin2_invert"] = ch.pin2_invert;
              item["pin3_invert"] = ch.pin3_invert;
              item["pin4_invert"] = ch.pin4_invert;
-             
-
-             item["dest_ip"] = ch.dest_ip;
-             item["dest_port"] = ch.dest_port;
              item["smoke_duration_ms"] = ch.smoke_duration_ms;
              item["settle_delay_ms"] = ch.settle_delay_ms;
              item["shoot_duration_ms"] = ch.shoot_duration_ms;

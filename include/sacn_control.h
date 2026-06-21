@@ -218,10 +218,10 @@ public:
         }
     }
 
-    uint32_t getPacketCount() { return packetCount; }
-    uint32_t getErrorCount() { return errorCount; }
+    uint32_t getPacketCount() const { return packetCount; }
+    uint32_t getErrorCount() const { return errorCount; }
 
-    uint16_t getActiveUniverses() {
+    uint16_t getActiveUniverses() const {
         uint16_t count = 0;
         for (int i = 0; i < SACN_MAX_SOURCES; i++) {
             if (sources[i].active) count++;
