@@ -49,4 +49,5 @@
 #include "chapters/network.typ"
 #include "chapters/outputs.typ"
 #include "chapters/espnow.typ"
+#include "chapters/hardware.typ"
 #include "chapters/troubleshooting.typ"
