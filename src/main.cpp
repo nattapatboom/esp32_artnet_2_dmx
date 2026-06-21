@@ -276,7 +276,9 @@ bool sourceAddressValid(uint8_t source, uint8_t address) {
         case 2: return address >= 0x20 && address <= 0x27; // MCP23017
         case 3: return address >= 0x20 && address <= 0x27; // TCA9555
         case 4: return (address >= 0x20 && address <= 0x27) || (address >= 0x38 && address <= 0x3F); // PCF857x / PCF8574A
-        case 5: return (address >= 0x4C && address <= 0x5B) || address == 0x60 || address == 0x61; // I2C DAC family
+        case 5: return address == 0x60 || address == 0x61; // MCP4725
+        case 6: return address == 0x4C || address == 0x4D; // DAC7571
+        case 7: return address >= 0x4C && address <= 0x5B; // DAC7573
         default: return source == 0;
     }
 }
@@ -287,7 +289,9 @@ const char* sourceAddressRangeLabel(uint8_t source) {
         case 2: return "MCP23017 address must be 0x20-0x27";
         case 3: return "TCA9555 address must be 0x20-0x27";
         case 4: return "PCF857x address must be 0x20-0x27 or 0x38-0x3F";
-        case 5: return "I2C DAC address must match the selected DAC model";
+        case 5: return "MCP4725 address must be 0x60 or 0x61";
+        case 6: return "DAC7571 address must be 0x4C or 0x4D";
+        case 7: return "DAC7573 address must be 0x4C-0x5B";
         default: return "Unsupported I2C source";
     }
 }
@@ -304,20 +308,6 @@ bool displayAddressValid(uint8_t displayType, uint8_t address) {
     if (displayType == 1 || displayType == 2) return address == 0x3C || address == 0x3D;
     if (displayType == 3) return address == 0x27 || address == 0x3F;
     return false;
-}
-
-bool dacAddressValid(uint8_t model, uint8_t address) {
-    if (model == 0) return address == 0x60 || address == 0x61; // MCP4725
-    if (model == 1) return address == 0x4C || address == 0x4D; // DAC7571
-    if (model == 2) return address >= 0x4C && address <= 0x5B; // DAC7573
-    return false;
-}
-
-const char* dacAddressRangeLabel(uint8_t model) {
-    if (model == 0) return "MCP4725 address must be 0x60 or 0x61";
-    if (model == 1) return "DAC7571 address must be 0x4C or 0x4D";
-    if (model == 2) return "DAC7573 address must be 0x4C-0x5B";
-    return "Unsupported I2C DAC model";
 }
 
 bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
@@ -874,40 +864,36 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             message = "Digital GPIO expander source is not supported by output channel " + String(channelNumber);
             return false;
         }
-        if (source == 5 && type != 14) {
+        if (source >= 5 && source <= 7 && type != 14) {
             message = "I2C DAC source is only supported by DAC output channel " + String(channelNumber);
             return false;
         }
-        if (source > 5) {
+        if (source > 7) {
             message = "Unsupported output source on channel " + String(channelNumber);
             return false;
         }
         auto defaultAddrForSource = [](uint8_t s) -> uint8_t {
             if (s == 1) return 0x40;
             if (s == 5) return 0x60;
+            if (s == 6 || s == 7) return 0x4C;
             return 0x20;
         };
-        if (source != 0 && source != 5) {
+        if (source != 0 && !(source >= 5 && source <= 7)) {
             uint8_t addr = output["pca_addr"] | defaultAddrForSource(source);
             if (!validateSourceAddress(source, addr, "Primary I2C source on channel " + String(channelNumber), message)) return false;
         }
-        if (type == 14 && source == 5) {
-            uint8_t dacModel = output["dac_model"] | 0;
-            uint8_t addr = output["pca_addr"] | (dacModel == 0 ? 0x60 : 0x4C);
+        if (type == 14 && source >= 5 && source <= 7) {
+            uint8_t addr = output["pca_addr"] | defaultAddrForSource(source);
             uint8_t dacChannel = output["pca_channel"] | 0;
-            if (dacModel > 2) {
-                message = "Unsupported I2C DAC model on channel " + String(channelNumber);
+            if (!sourceAddressValid(source, addr)) {
+                message = "I2C DAC source on channel " + String(channelNumber) + " has invalid address 0x" + String(addr, HEX) + ". " + sourceAddressRangeLabel(source);
                 return false;
             }
-            if (!dacAddressValid(dacModel, addr)) {
-                message = "I2C DAC source on channel " + String(channelNumber) + " has invalid address 0x" + String(addr, HEX) + ". " + dacAddressRangeLabel(dacModel);
-                return false;
-            }
-            if (dacModel != 2 && dacChannel != 0) {
+            if (source != 7 && dacChannel != 0) {
                 message = "Only DAC7573 supports DAC channels B-D on channel " + String(channelNumber);
                 return false;
             }
-            if (dacModel == 2 && dacChannel > 3) {
+            if (source == 7 && dacChannel > 3) {
                 message = "DAC7573 channel must be 0-3 on channel " + String(channelNumber);
                 return false;
             }

@@ -134,7 +134,7 @@ inline HardwareResource estimateHardware(const OutputChannel& ch) {
             break;
         }
         case 14:
-            if (ch.source != 5) h.dac = 1;
+            if (!(ch.source >= 5 && ch.source <= 7)) h.dac = 1;
             break;
         case 15:
             if (ch.source == 0) h.ledc = 1;
@@ -148,7 +148,7 @@ inline HardwareResource estimateHardware(const OutputChannel& ch) {
 
 // True if a source ID uses the I2C bus (adds CPU overhead)
 inline bool srcOnI2C(uint8_t src) {
-    return src >= 1 && src <= 5;
+    return src >= 1 && src <= 7;
 }
 
 inline bool usesI2C(const OutputChannel& ch) {
@@ -487,7 +487,7 @@ inline HardwareResource estimateHardwareFromJson(JsonObjectConst j) {
             }
             break;
         }
-        case 14: if (src != 5) h.dac = 1; break;
+        case 14: if (!(src >= 5 && src <= 7)) h.dac = 1; break;
         case 15: if (src == 0) h.ledc = 1; break;
         case 16: h.ledc = 1; h.timer = 1; break;
         case 17: break;

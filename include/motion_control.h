@@ -635,11 +635,14 @@ public:
                 }
 
                 continue; // Skip ESP32 direct hardware update
-            } else if (ch.source == 5) { // I2C DAC family
-                if (ch.type == 14) {
-                    if (ch.dac_model == 0) writeMcp4725(ch.pca_addr, ch.dmxBuffer[0]);
-                    else writeDac757x(ch.pca_addr, ch.dac_model == 2 ? ch.pca_channel : 0, ch.dmxBuffer[0]);
-                }
+            } else if (ch.source == 5) { // MCP4725 I2C DAC
+                if (ch.type == 14) writeMcp4725(ch.pca_addr, ch.dmxBuffer[0]);
+                continue;
+            } else if (ch.source == 6) { // DAC7571 I2C DAC (single-channel)
+                if (ch.type == 14) writeDac757x(ch.pca_addr, 0, ch.dmxBuffer[0]);
+                continue;
+            } else if (ch.source == 7) { // DAC7573 I2C DAC (quad-channel)
+                if (ch.type == 14) writeDac757x(ch.pca_addr, ch.pca_channel, ch.dmxBuffer[0]);
                 continue;
             } else if (ch.source != 0) {
                 continue; // Digital expanders are handled by OutputControl for on/off modes.

@@ -461,7 +461,9 @@ This section is the central contract for `/outputs.json`, Web UI, C++ validation
 | 2 | MCP23017 | Digital-only I2C GPIO expander |
 | 3 | TCA9555 | Digital-only I2C GPIO expander |
 | 4 | PCF857x | Digital-only I2C GPIO expander |
-| 5 | I2C DAC | I2C DAC source valid only for output type 14; model selected by `dac_model` |
+| 5 | MCP4725 | I2C DAC; valid only for output type 14; single-channel, address 0x60/0x61 |
+| 6 | DAC7571 | I2C DAC; valid only for output type 14; single-channel, address 0x4C/0x4D |
+| 7 | DAC7573 | I2C DAC; valid only for output type 14; quad-channel, address 0x4C..0x5B, select via `pca_channel` (0-3) |
 
 ### I2C Address Contract
 
@@ -471,9 +473,9 @@ This section is the central contract for `/outputs.json`, Web UI, C++ validation
 | MCP23017 (`source=2`) | `0x20..0x27` | Digital GPIO expander |
 | TCA9555 (`source=3`) | `0x20..0x27` | Digital GPIO expander |
 | PCF857x (`source=4`) | `0x20..0x27`, `0x38..0x3F` | PCF8574 and PCF8574A address families |
-| MCP4725 (`source=5`, `dac_model=0`) | `0x60`, `0x61` | Single-channel 12-bit I2C DAC |
-| DAC7571 (`source=5`, `dac_model=1`) | `0x4C`, `0x4D` | Single-channel 12-bit I2C DAC; TI lists address support for up to two devices |
-| DAC7573 (`source=5`, `dac_model=2`) | `0x4C..0x5B` | Quad 12-bit I2C DAC; `pca_channel` selects channel A-D (`0..3`) |
+| MCP4725 (`source=5`) | `0x60`, `0x61` | Single-channel 12-bit I2C DAC |
+| DAC7571 (`source=6`) | `0x4C`, `0x4D` | Single-channel 12-bit I2C DAC; TI lists address support for up to two devices |
+| DAC7573 (`source=7`) | `0x4C..0x5B` | Quad 12-bit I2C DAC; `pca_channel` selects channel A-D (`0..3`) |
 | SSD1306/SH1106 display | `0x3C`, `0x3D` | System display setting, not an output source |
 | PCF8574 LCD display backpack | `0x27`, `0x3F` | System display setting, not an output source |
 
@@ -495,7 +497,7 @@ This section is the central contract for `/outputs.json`, Web UI, C++ validation
 | 11 | 7-Segment TM1637 | GPIO only | CLK/DIO GPIO pins | TM1637 is not expander-routed; direct-drive displays use type 12/13 |
 | 12 | 7-Segment DD 7-Pin PWM | GPIO or PCA9685 for Direct Dim; GPIO, PCA9685, or digital expander for No Dim/Common Dim segments | segment-level routing via `seg_*` or base routing | Direct Dim modes need PWM per segment, so MCP23017/TCA9555/PCF857x are invalid there |
 | 13 | 7-Segment DD 8-Pin PWM | GPIO or PCA9685 for Direct Dim; GPIO, PCA9685, or digital expander for No Dim/Common Dim segments | segment-level routing via `seg_*` or base routing | Direct Dim modes need PWM per segment, so MCP23017/TCA9555/PCF857x are invalid there |
-| 14 | DAC | I2C DAC preferred; ESP32 DAC GPIO path is legacy/unsafe on WT32-ETH01 | MCP4725/DAC7571 single-channel, DAC7573 channel A-D via `pca_channel` | GPIO25/26 are occupied by Ethernet; supported I2C DAC models are MCP4725, DAC7571, and DAC7573 |
+| 14 | DAC | I2C DAC (source 5-7) preferred; ESP32 DAC GPIO path is legacy/unsafe on WT32-ETH01 | MCP4725/DAC7571 single-channel, DAC7573 channel A-D via `pca_channel` | GPIO25/26 are occupied by Ethernet; supported I2C DAC models are MCP4725, DAC7571, and DAC7573 |
 | 15 | PWM DAC | GPIO or PCA9685 | none | GPIO path uses LEDC; supports duty calibration for external 0-10V or 4-20mA interface circuits |
 | 16 | Function Generator | GPIO only | none | uses LEDC/timer-like runtime load |
 | 17 | Solenoid | GPIO, PCA9685, digital expander | none | trigger/pulse state machine |
@@ -506,7 +508,7 @@ This section is the central contract for `/outputs.json`, Web UI, C++ validation
 Fields expected to be persisted in `/outputs.json`:
 - identity by array index, not by stable ID.
 - `type`, `source`, `start_universe`, `start_address`.
-- DAC model selection for I2C DAC outputs: `dac_model`; DAC7573 channel uses `pca_channel` (`0..3`).
+- DAC type selection via source ID: `source=5` (MCP4725), `source=6` (DAC7571), `source=7` (DAC7573); DAC7573 channel uses `pca_channel` (`0..3`).
 - primary routing: `pin`, `pca_addr`, `pca_channel`.
 - multi-pin routing: `pin2`, `pin3`, `pin4`, `pin2_source`, `pin3_source`, `pin4_source`, `pin2_addr`, `pin3_addr`, `pin4_addr`, `pin2_channel`, `pin3_channel`, `pin4_channel`.
 - PCA contiguous/legacy routing fields: `pca_channel2`, `pca_channel3`, `pca_channel4`.
@@ -528,6 +530,7 @@ Fields that must not be treated as persisted domain config:
 Configuration must pass these gates before save/apply:
 - type ID must be `0..18`.
 - source must match the output type source contract above.
+- source ID must be `0..7`.
 - global pins must not overlap each other: Status LED, Zero-Crossing, I2C SDA, I2C SCL.
 - any output GPIO, including hybrid GPIO pins and segment GPIO pins, must not overlap global pins.
 - Ethernet RMII pins (GPIO0, GPIO18, GPIO19, GPIO21, GPIO22, GPIO23, GPIO25, GPIO26, GPIO27) and PHY power (GPIO16) are system-reserved; must not be assigned as outputs.
@@ -549,7 +552,7 @@ Configuration must pass these gates before save/apply:
 - Count LEDC only for GPIO-routed PWM outputs that actually consume LEDC.
 - Count RMT for LED strips (1 per strip) and stepper (2 per stepper).
 - Count UART for DMX and DFPlayer (worst-case: 1 per DMX output).
-- Count DAC for internal DAC (source=0) only; I2C DAC (source=5) consumes no hardware resource.
+- Count DAC for internal DAC (source=0) only; I2C DAC (sources 5-7) consume no hardware resource.
 - Count timers: AC Dimmer = 1 shared timer if any dimmer exists; Function Generator = 1 timer-like runtime slot per channel.
 
 **Note:** GPIO is NOT counted. PCA9685 / digital expander channels are NOT counted as hardware.
@@ -652,7 +655,7 @@ Questions used during the grilling session and answers inferred from the existin
 | # | Item | Scope | Effort |
 |---|------|-------|--------|
 | 1 | Boot count threshold: code `>= 3` → spec `>= 5` (`main.cpp:2126`) | C++ | 1 line |
-| 2 | DAC (source=5) scored as EXP (0.125) instead of DAC (2.0) in `resourceScore()` | C++ scoring | 1 branch |
+| 2 | ~~DAC (source=5) scored as EXP (0.125) instead of DAC (2.0) in `resourceScore()`~~ **Fixed:** source IDs 5-7 are I2C DAC, counted correctly | docs + code | done |
 | 3 | GPIO12 rejection in `validateOutputJson()` | C++ API | 3 lines |
 | 4 | AC Dimmer ZC pin check in `validateOutputJson()` | C++ API | 5 lines |
 | 5 | GPIO34-39 input-only rejection in `validateOutputJson()` | C++ API | 3 lines |

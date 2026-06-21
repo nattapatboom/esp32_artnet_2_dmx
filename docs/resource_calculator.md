@@ -227,9 +227,9 @@ Because only a small number of general output pins are available, I2C expanders 
 * **Interface:** I2C.
 * **Resolution:** 12-bit.
 * **Best for:** Analog output when ESP32 DAC pins are unavailable.
-* **MCP4725 (`dac_model=0`) address range:** `0x60` or `0x61`.
-* **DAC7571 (`dac_model=1`) address range:** `0x4C` or `0x4D`.
-* **DAC7573 (`dac_model=2`) address range:** `0x4C..0x5B`; `pca_channel` selects channel A-D.
+* **MCP4725 (`source=5`) address range:** `0x60` or `0x61`.
+* **DAC7571 (`source=6`) address range:** `0x4C` or `0x4D`.
+* **DAC7573 (`source=7`) address range:** `0x4C..0x5B`; `pca_channel` selects channel A-D.
 
 ### 5.5 I2C Displays
 
