@@ -11,7 +11,7 @@ The ESP-NOW Wireless Bridge allows wireless forwarding of DMX universes from a n
 
 == Universe Chunking \& Custom Protocol
 
-ESP-NOW frames have a physical payload limit of 250 bytes. To transmit a full 512-channel DMX universe, the Master splits the universe data into chunks of up to 200 bytes. The custom packet structure uses a 12-byte header followed by DMX data bytes.
+ESP-NOW frames have a physical payload limit of 250 bytes. To transmit a full 512-channel DMX universe, the Master splits the universe data into chunks using a configurable chunk size (16--230 bytes, default 200). Each chunk is prefixed with a 12-byte custom header followed by DMX data bytes.
 
 #v(1em)
 #import "@preview/cetz:0.5.2": canvas, draw
@@ -59,12 +59,11 @@ ESP-NOW frames have a physical payload limit of 250 bytes. To transmit a full 51
 == Payload Layout
 
 The custom firmware packet header consists of:
-1. `Signature` (3 bytes): Ascii `"DMX"`
+1. `Header` (4 bytes): ASCII `"DMX\0"`
 2. `Universe` (2 bytes): 16-bit unsigned integer (`0..32767`)
 3. `Offset` (2 bytes): 16-bit unsigned integer (`0..511`)
 4. `Total Length` (2 bytes): 16-bit unsigned integer (`1..512`)
-5. `Chunk Length` (2 bytes): 16-bit unsigned integer (`1..200`)
-6. `Reserved` (1 byte): Alignment pad (`0x00`)
+5. `Length` (2 bytes): 16-bit unsigned integer (`1..230`) — number of DMX data bytes in this chunk
 
 == Network Stability \& Planning
 

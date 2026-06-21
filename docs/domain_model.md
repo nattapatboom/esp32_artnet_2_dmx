@@ -179,7 +179,8 @@ Key rules:
 - DMX Chunking: Splits 1 Universe (512 channels) into chunks up to `ESPNOW_DMX_CHUNK_SIZE` (200 bytes data + 12 bytes header)
 - Keep peer routes as narrow as possible to reduce airtime
 - ESP-NOW requires Wi-Fi radio enabled (`WIFI_AP_STA` when needed)
-- Future: Make DMX chunk size user-configurable; separate `configured_chunk_size` from compile-time max receive buffer; slaves reject packets with `length` exceeding max buffer
+- DMX chunk size is user-configurable (16-230 bytes) stored in NVS as `espnow_chunk_size` (default 200); Web UI slider at Settings → ESP-NOW Chunk Size
+- Slave rejects packets with `length` exceeding compile-time buffer `ESPNOW_DMX_CHUNK_SIZE` (230)
 
 #### ESP-NOW Slave
 
@@ -191,12 +192,11 @@ Key rules:
 
 | Byte Range | Field Name | Data Type | Description |
 | :---: | :--- | :---: | :--- |
-| 0..2 | Prefix Magic | `char[3]` | Constant `"DMX"` for packet filtering |
-| 3..4 | Universe | `uint16_t` | DMX Universe (0..32767) |
-| 5..6 | Offset | `uint16_t` | Start offset within the Universe (0..511) |
-| 7..8 | Total Length | `uint16_t` | Full universe size (typically 512) |
-| 9..10 | Chunk Length | `uint16_t` | DMX data size in this packet (max chunk_size) |
-| 11 | Sequence | `uint8_t` | Sequence counter for stability checking |
+| 0..3 | Header | `char[4]` | Constant `"DMX\0"` for packet filtering |
+| 4..5 | Universe | `uint16_t` | DMX Universe (0..32767) |
+| 6..7 | Offset | `uint16_t` | Start offset within the Universe (0..511) |
+| 8..9 | Total Length | `uint16_t` | Full universe size (typically 512) |
+| 10..11 | Length | `uint16_t` | DMX data size in this packet (max configured chunk_size) |
 | 12.. | DMX Payload | `uint8_t[]` | Actual DMX channel values |
 
 Peer route limits universe to `0..32767` and DMX address to `1..512`; slave maps each packet immediately by `universe`/`offset` without waiting for full reassembly, except for the universe 0 status buffer; if the peer route exceeds chunk size, the master sends multiple packets incrementing `offset` by chunk_size
@@ -665,7 +665,6 @@ Questions used during the grilling session and answers inferred from the existin
 
 ### Future Features — planned but not started
 - `artnet_enabled` checkbox in Web UI + backend (ADR012)
-- ESP-NOW chunk size user-configurable (currently compile-time)
 - Frame interpolation for mechanical outputs (ADR005, long-term)
 - PCA9685 frequency conflict detection (C++ + Web UI)
 
