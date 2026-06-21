@@ -80,7 +80,7 @@ struct SystemConfig {
     char mdns_name[32];
 
     // I2C Display Settings
-    uint8_t display_enabled;    // 0=off, 1=SSD1306 OLED, 2=SH1106 OLED
+    uint8_t display_enabled;    // 0=off, 1=SSD1306 OLED, 2=SH1106 OLED, 3=PCF8574 LCD
     uint8_t display_i2c_addr;   // I2C address (default 0x3C for SSD1306)
     uint8_t display_brightness; // 0-255
 };
