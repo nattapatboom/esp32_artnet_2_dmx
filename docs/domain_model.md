@@ -483,6 +483,7 @@ Configuration must pass these gates before save/apply:
 - global pins must not overlap each other: Status LED, Zero-Crossing, I2C SDA, I2C SCL.
 - any output GPIO, including hybrid GPIO pins and segment GPIO pins, must not overlap global pins.
 - output GPIO pins must not duplicate across outputs.
+- GPIO34, GPIO35, GPIO36, GPIO39 are input-only on ESP32; must not be assigned as output pins.
 - expander channels must not duplicate for the same source/address/channel.
 - every I2C-routed output address must be inside the valid range for that device/source/model.
 - display I2C address must match the selected display type: OLED `0x3C/0x3D`, PCF8574 LCD `0x27/0x3F`.
@@ -520,6 +521,7 @@ Known implementation drift to fix later:
 - **PCA9685 frequency conflict check not implemented:** Neither C++ nor Web UI detects mixed-frequency devices on the same PCA chip.
 - **`/api/outputs` POST skips `validateSettingsAndOutputs()`:** Only `/api/config/import` calls both validators; the outputs-only endpoint may miss global pin conflicts.
 - **No PCF8574 LCD display type in SystemConfig:** The `display_type` enum in `config.h` only maps SSD1306/SH1106, but the I2C Address Contract lists PCF8574 LCD backpack addresses (`0x27`, `0x3F`) for LCD support.
+- **GPIO34-39 not validated as input-only:** Neither C++ `validateOutputJson()` nor Web UI rejects output assignment on input-only pins.
 
 ---
 
