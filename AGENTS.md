@@ -22,8 +22,9 @@ You must design solutions that are hardware-safe, core-safe, and optimized for r
 WT32-ETH01 firmware for receiving Art-Net, sACN, or ESP-NOW DMX data and driving physical outputs: DMX, LED strips, relays, dimmers, motors, steppers, servos, buzzers, audio triggers, 7-segment displays, DAC/PWM DAC, function generator, solenoids, and smoke shooter.
 
 Read these first when working on the project:
-- `docs/domain_model.md` — domain vocabulary, bounded contexts, invariants, and Configuration Contract
+- `docs/domain_model.md` — domain vocabulary, bounded contexts, invariants, Configuration Contract, device modes, thread safety, and ADRs
 - `docs/resource_calculator.md` — current resource scoring and hard hardware limits
+- `docs/hardware_guidelines.md` — ESD protection, flyback diode, datasheet checklist, verification guidelines
 - `.agents/skills/esp32-firmware/SKILL.md` — full AI working context for this firmware
 
 ## Build & Deploy
@@ -55,8 +56,9 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - `src/main.cpp` — setup, HTTP API, validation, network/display tasks
 - `web/index.html` — Web UI source; edit this file, then run `tools/build_web.py`
 - `include/web_pages.h` — generated embedded Web UI; do not edit directly
-- `docs/domain_model.md` — project/domain context
+- `docs/domain_model.md` — project/domain context, device modes, thread safety, ADRs
 - `docs/resource_calculator.md` — hardware scoring and constraints
+- `docs/hardware_guidelines.md` — ESD protection, flyback diode, datasheet checklist
 - `docs/user_manual/` — Typst user manual source (English-first, modular chapters, CeTZ/Fletcher diagrams)
 - `tools/` — Web UI build/test/mock tools and offline load calculator
 - `.agents/skills/esp32-firmware/SKILL.md` — opencode skill for this project
