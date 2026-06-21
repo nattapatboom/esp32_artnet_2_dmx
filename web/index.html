@@ -1813,43 +1813,51 @@ function channelUsesI2C(o){
 }
 function channelCost(o){
   const t=typeId(o);
+  const ledCount=parseInt(o.led_count||0);
   let cpu=0, ram=BASE_CHANNEL_RAM;
   switch(t){
-    case 0: cpu=0.10; break;
-    case 1: cpu=0.50; ram+=512; break;
-    case 2: cpu=0.05; break;
-    case 3: cpu=(o.led_count||0)*0.005; ram+=(o.led_count||0)*3; break;
-    case 4: cpu=0.10; break;
-    case 5: cpu=0.20; break;
-    case 6: cpu=0.50; break;
-    case 7: cpu=2.00; break;
-    case 8: cpu=0.20; break;
-    case 9: cpu=0.10; break;
-    case 10: cpu=0.50; ram+=100; break;
-    case 11: cpu=0.50; break;
-    case 12: cpu=1.00; break;
-    case 13: cpu=1.20; break;
-    case 14: cpu=0.30; break;
-    case 15: cpu=0.10; break;
-    case 16: cpu=2.00; break;
-    case 17: cpu=0.10; break;
-    case 18: cpu=0.30; break;
+    case 0: cpu=1; break;
+    case 1: cpu=15; ram+=512; break;
+    case 2: cpu=1; break;
+    case 3: cpu=5+ledCount*1; ram+=ledCount*3; break;
+    case 4: cpu=1; break;
+    case 5: cpu=5; break;
+    case 6: cpu=5; break;
+    case 7: cpu=20; break;
+    case 8: cpu=2; break;
+    case 9: cpu=2; break;
+    case 10: cpu=10; ram+=100; break;
+    case 11: cpu=200; break;
+    case 12: cpu=10; break;
+    case 13: cpu=12; break;
+    case 14: cpu=15; break;
+    case 15: cpu=2; break;
+    case 16: cpu=80; break;
+    case 17: cpu=2; break;
+    case 18: cpu=5; break;
   }
-  if(channelUsesI2C(o)) cpu+=0.30;
+  if(channelUsesI2C(o)) cpu+=15;
   return {cpu,ram};
 }
 const HW_MAX={ledc:16,rmt:8,uart:2,dac:2};
 // RAM limit: C++ keeps ~150KB free, the rest for buffers (capped 64KB). Local pre-check at 48KB.
 const RAM_LIMIT=48000;
 const BASE_CHANNEL_RAM=128;
-function cpuLimit(fps){ return 25*((parseInt(fps)||40)/40); }
+const BASE_OVERHEAD_US=200;
+
+function cpuLimit(fps){
+  // 80% of frame time = 800,000 / fps µs
+  return Math.floor(800000/(parseInt(fps)||40));
+}
 function totalHardware(arr){
   const t={ledc:0,rmt:0,uart:0,dac:0};
   arr.forEach(o=>{const h=channelHardware(o);t.ledc+=h.ledc;t.rmt+=h.rmt;t.uart+=h.uart;t.dac+=h.dac;});
   return t;
 }
 function totalCpu(arr,fps){
-  let w=0; arr.forEach(o=>w+=channelCost(o).cpu); return w;
+  let us = BASE_OVERHEAD_US;
+  arr.forEach(o=>us+=channelCost(o).cpu);
+  return us;
 }
 function totalRam(arr){
   let b=0; arr.forEach(o=>b+=channelCost(o).ram); return b;
@@ -1865,7 +1873,8 @@ function ramBlocked(ram){
 }
 function espnowMasterCost(peerCount, universeCount, chunkSize=200){
   const cpusPerUni = Math.ceil(512/chunkSize);
-  return {cpu: 1 + peerCount*0.2*cpusPerUni + universeCount*0.3, ram: 512 + peerCount*(chunkSize+44)};
+  // µs per frame: packet build (20µs) + send (~150µs) per chunk per peer
+  return {cpu: 500 + peerCount*cpusPerUni*170 + universeCount*100, ram: 512 + peerCount*(chunkSize+44)};
 }
 function updateScoreBar(){
   const bar=document.getElementById('score-fill');
@@ -1886,7 +1895,7 @@ function updateScoreBar(){
   const cpuPct=Math.min(cpu/cLim*100,100);
   bar.style.width=cpuPct+'%';
   bar.style.background=budgetBad?'#ef4444':cpuPct>80?'#eab308':'#22c55e';
-  txt.textContent='CPU '+cpu.toFixed(1)+'/'+cLim.toFixed(0)+' | RAM '+(ram/1024).toFixed(0)+'KB/'+(RAM_LIMIT/1024)+'KB';
+  txt.textContent='CPU '+cpu+'/'+cLim+'\u00B5s | RAM '+(ram/1024).toFixed(0)+'KB/'+(RAM_LIMIT/1024)+'KB';
 
   // Per-resource hardware cards (show red when over, but warning only)
   const updateHwCard = (valId, barId, used, maxLimit) => {
@@ -1960,7 +1969,7 @@ function renderOutputs(){
     const cc=channelCost(o);
     const hwStr='L'+(h.ledc||'')+' R'+(h.rmt||'')+' U'+(h.uart||'')+(h.dac?' D':'');
     tr.innerHTML=`<td>${i+1}</td><td>${deviceLabel(o)}</td><td>${gpioLabel(o)}</td><td>${outputAddressLabel(o)}</td>
-      <td>${outputChannelCount(o)}</td><td><span class="pill pill-ok" style="font-size:0.65rem">${hwStr} ${cc.cpu.toFixed(1)}cpu</span></td>
+      <td>${outputChannelCount(o)}</td><td><span class="pill pill-ok" style="font-size:0.65rem">${hwStr} ${cc.cpu}\u00B5s</span></td>
       <td>${i===currentTestIdx?'<span class="pill pill-warn" style="margin-right:4px">TEST</span>':''}${removed?'<span class="pill pill-warn" style="margin-right:4px">DELETE</span>':`<button class="btn bg" style="padding:3px 8px;font-size:0.72rem;margin-right:4px" onclick="showOutputTest(${i})">Test</button>
           <button class="btn bs" style="padding:3px 8px;font-size:0.72rem;margin-right:4px" onclick="editOutput(${i})">Edit</button>`}
           <button class="btn bd" style="padding:3px 8px;font-size:0.72rem" onclick="delOutput(${i})">Delete</button></td>`;
@@ -2957,7 +2966,7 @@ function addOrUpdateOutput(){
     return;
   }
   if(cpuBlocked(cpuTot,fps)){
-    alert('CPU budget '+cpuTot.toFixed(1)+' exceeds limit of '+cLim.toFixed(0)+' at '+fps+' FPS. Reduce channels or FPS.');
+    alert('CPU budget '+cpuTot+'\u00B5s exceeds limit of '+cLim+'\u00B5s at '+fps+' FPS. Reduce channels or FPS.');
     return;
   }
   if(ramBlocked(ramTot)){

@@ -414,6 +414,87 @@ bool savedOutputsUseReservedPin(uint8_t reservedPin, const char* label, String& 
     return outputsUseReservedPin(doc["outputs"].as<JsonArray>(), reservedPin, label, message);
 }
 
+// Check for GPIO12 (MTDI bootstrap — strictly forbidden) and GPIO34-39 (input-only on ESP32).
+// GPIO34-39 are allowed only on pins used as inputs (e.g. stepper HOME switch on pin4).
+bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
+    auto isForbiddenOutput = [](int rawPin) -> int8_t {
+        if (rawPin == 255 || rawPin < 0) return -1;
+        uint8_t p = (uint8_t)rawPin;
+        if (p == 12) return 12;          // bootstrap — never allowed
+        if (p >= 34 && p <= 39) return (int8_t)p; // input-only on ESP32
+        return -1;
+    };
+    uint8_t channel = 1;
+    for (JsonObject output : outputs) {
+        uint8_t source = output["source"] | 0;
+        uint8_t type = output["type"] | 0;
+        uint8_t mcMode = output["mc_mode"] | 0;
+        uint8_t homingMode = output["mc_homing_mode"] | 0;
+        uint8_t colorOrder = output["color_order"] | 0;
+        uint8_t pin2Source = output["pin2_source"] | 0;
+        uint8_t pin3Source = output["pin3_source"] | 0;
+        uint8_t pin4Source = output["pin4_source"] | 0;
+
+        auto forbid = [&](int rawPin, const char* label) -> bool {
+            int8_t p = isForbiddenOutput(rawPin);
+            if (p < 0) return false;
+            if (p == 12) message = "GPIO 12 (MTDI bootstrap) is forbidden as an output on channel " + String(channel) + label;
+            else message = "GPIO " + String(p) + " is input-only and cannot be used as an output on channel " + String(channel) + label;
+            return true;
+        };
+
+        if (source == 0) {
+            if (forbid(output["pin"] | 255, "")) return true;
+        }
+
+        if (type == 12 || type == 13) {
+            if (pin2Source == 0) {
+                uint8_t numSeg = (type == 13) ? 8 : 7;
+                bool isCommonDim = (mcMode >= 6 && mcMode <= 9);
+                uint8_t startIdx = isCommonDim ? 0 : 1;
+                if (output.containsKey("seg_pins")) {
+                    JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
+                    JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
+                    for (int s = startIdx; s < numSeg; s++) {
+                        if (s < segSources.size() && (uint8_t)(segSources[s] | 0) != 0) continue;
+                        int pVal = 255;
+                        if (s < segArr.size()) pVal = segArr[s] | 255;
+                        if (pVal == 255 && source == 0) {
+                            int basePin = output["pin"] | 255;
+                            pVal = (basePin != 255) ? (basePin + s) : 255;
+                        }
+                        if (forbid(pVal, " segment")) return true;
+                    }
+                } else if (source == 0) {
+                    int basePin = output["pin"] | 255;
+                    for (int s = startIdx; s < numSeg; s++) {
+                        if (forbid((basePin != 255) ? (basePin + s) : 255, " segment")) return true;
+                    }
+                }
+            }
+        } else {
+            bool p2IsGpio = (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || (type == 7 && pin2Source == 0)) ? (pin2Source == 0) : ((type == 11 || type == 10) ? (source == 0) : false);
+            if (p2IsGpio && forbid(output["pin2"] | 255, " pin2")) return true;
+
+            bool p3IsGpio = (type == CHAN_TYPE_ANALOG_RGB) ? (pin3Source == 0) : ((type == 6 && mcMode == 2) ? (pin3Source == 0) : (type == 7 && pin3Source == 0));
+            if (p3IsGpio && forbid(output["pin3"] | 255, " pin3")) return true;
+
+            // pin4: stepper HOME is an input — GPIO34-39 allowed; GPIO12 still forbidden
+            bool p4IsInput = (type == 7 && homingMode == 0);
+            bool p4IsOutput = (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4);
+            int p4Pin = output["pin4"] | 255;
+            if (p4IsOutput && pin4Source == 0) {
+                if (forbid(p4Pin, " pin4")) return true;
+            } else if (p4IsInput && pin4Source == 0 && p4Pin == 12) {
+                message = "GPIO 12 (MTDI bootstrap) is forbidden on channel " + String(channel) + " pin4";
+                return true;
+            }
+        }
+        channel++;
+    }
+    return false;
+}
+
 bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
     struct UsedPin {
         uint8_t pin;
@@ -699,6 +780,10 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
         message = "Status LED GPIO and Zero-Crossing GPIO cannot use the same pin";
         return false;
     }
+    if (statusPin == 12 || sdaPin == 12 || sclPin == 12) {
+        message = "GPIO 12 (MTDI bootstrap) cannot be used as Status LED, I2C SDA, or I2C SCL";
+        return false;
+    }
     if (sdaPin != 255 && sclPin != 255 && sdaPin == sclPin) {
         message = "I2C SDA and SCL pins cannot be the same";
         return false;
@@ -719,6 +804,7 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
     if (outputsUseReservedPin(outputs, zcPin, "Zero-Crossing", message)) return false;
     if (outputsUseReservedPin(outputs, sdaPin, "I2C SDA", message)) return false;
     if (outputsUseReservedPin(outputs, sclPin, "I2C SCL", message)) return false;
+    if (outputsUseForbiddenGpio(outputs, message)) return false;
     if (outputsHaveDuplicateGpio(outputs, message)) return false;
     if (outputsHaveDuplicateExpanderChannel(outputs, message)) return false;
     return true;
@@ -752,10 +838,14 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         message = "Hardware limit exceeded: Total RMT channels (LED strips + extra DMX fallback) cannot exceed 8";
         return false;
     }
+    if (outputsUseForbiddenGpio(outputs, message)) return false;
+
+    bool hasAcDimmer = false;
     uint8_t channelNumber = 1;
     for (JsonObject output : outputs) {
         uint8_t type = output["type"] | 0;
         uint8_t source = output["source"] | 0;
+        if (type == 0) hasAcDimmer = true;
         if (type > 18) {
             message = "Invalid output type on channel " + String(channelNumber) + ".";
             return false;
@@ -973,6 +1063,10 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
         }
         channelNumber++;
+    }
+    if (hasAcDimmer && sysCfg.zc_pin == 255) {
+        message = "Zero-Crossing pin is not configured (GPIO 255). AC Dimmer outputs require a ZC pin to operate.";
+        return false;
     }
     return true;
 }
@@ -1474,33 +1568,21 @@ void setupWebServer() {
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
                 return;
             }
-            if (sysCfg.status_led_pin != 255 && sysCfg.zc_pin != 255 && sysCfg.status_led_pin == sysCfg.zc_pin) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Status LED GPIO and Zero-Crossing GPIO cannot use the same pin\"}");
-                return;
-            }
-            if (outputsUseReservedPin(outputs, sysCfg.status_led_pin, "Status LED", validationMessage)) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (outputsUseReservedPin(outputs, sysCfg.zc_pin, "Zero-Crossing", validationMessage)) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (outputsUseReservedPin(outputs, sysCfg.i2c_sda, "I2C SDA", validationMessage)) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (outputsUseReservedPin(outputs, sysCfg.i2c_scl, "I2C SCL", validationMessage)) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (outputsHaveDuplicateGpio(outputs, validationMessage)) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (outputsHaveDuplicateExpanderChannel(outputs, validationMessage)) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
+
+            {
+                // Run full pin-conflict validation against current settings
+                JsonDocument settingsDoc;
+                settingsDoc["output_fps"] = sysCfg.output_fps;
+                settingsDoc["status_led_pin"] = sysCfg.status_led_pin;
+                settingsDoc["zc_pin"] = sysCfg.zc_pin;
+                settingsDoc["i2c_sda"] = sysCfg.i2c_sda;
+                settingsDoc["i2c_scl"] = sysCfg.i2c_scl;
+                settingsDoc["display_enabled"] = sysCfg.display_enabled;
+                settingsDoc["display_i2c_addr"] = sysCfg.display_i2c_addr;
+                if (!validateSettingsAndOutputs(settingsDoc.as<JsonObjectConst>(), outputs, validationMessage)) {
+                    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
+                    return;
+                }
             }
 
             // Check hardware (source-aware), CPU, and RAM budgets
@@ -1821,14 +1903,14 @@ void setupWebServer() {
         HardwareResource hw = totalHardware(chs);
         CpuBudget cpu = totalCpu(chs);
         RamBudget ram = totalRam(chs);
-        float cpuLimit = CpuBudget::limit(fps);
+        uint32_t cpuLimit = CpuBudget::limit(fps);
         uint16_t ramLimit = RamBudget::limit();
 
         doc["ledc"] = hw.ledc;   doc["ledc_max"] = MAX_LEDC_RESOURCE;
         doc["rmt"]  = hw.rmt;    doc["rmt_max"]  = MAX_RMT_RESOURCE;
         doc["uart"] = hw.uart;   doc["uart_max"] = MAX_UART_RESOURCE;
         doc["dac"]  = hw.dac;    doc["dac_max"]  = MAX_DAC_RESOURCE;
-        doc["cpu_weight"] = cpu.weight;   doc["cpu_limit"] = cpuLimit;
+        doc["cpu_us"] = cpu.usPerFrame;   doc["cpu_limit"] = cpuLimit;
         doc["ram_bytes"]  = ram.bytes;    doc["ram_limit"]  = ramLimit;
         doc["fps"] = fps;
 
@@ -1843,7 +1925,7 @@ void setupWebServer() {
             item["type"] = chs[i].type;
             item["name"] = outputTypeName(chs[i].type);
             PerChannelCost cc = estimateChannelCost(chs[i]);
-            item["cpu_weight"] = cc.cpuWeight;
+            item["cpu_us"] = cc.cpuUs;
             item["ram_bytes"]  = cc.ramBytes;
             HardwareResource chHw = estimateHardware(chs[i]);
             item["ledc"] = chHw.ledc; item["rmt"] = chHw.rmt;

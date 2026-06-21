@@ -230,7 +230,7 @@ The scoring system uses **three independent budgets**:
 | Budget | What it counts | Limit | Blocks save? |
 |--------|---------------|-------|:---:|
 | **HardwareResource** | Finite ESP32 peripherals: LEDC, RMT, UART, internal DAC | `ledc ≤ 16`, `rmt ≤ 8`, `uart ≤ 2`, `dac ≤ 2` | ✅ Source-aware block |
-| **CpuBudget** | Per-type CPU weight per frame × FPS scaling | `≤ 25.0 × (fps/40)` at 40 FPS baseline | ✅ Yes |
+| **CpuBudget** | Per-type µs/frame + 200 µs base overhead | `≤ 800,000/fps` µs (80% of frame time) | ✅ Yes |
 | **RamBudget** | Static buffer estimates per type | `≤ 65535` (64 KB) | ✅ Yes |
 
 Key files:
@@ -244,41 +244,41 @@ Key rules:
 - **ESP-NOW Master overhead** is a separate CPU/RAM cost: `cpuWeight = 1.0 + peers×0.2 + universes×0.3`, `ramBytes = 512 + peers×256`.
 - All three budgets are checked independently; CPU and RAM **block saving**, hardware is **source-aware block** (types using PCA9685 or expander bypass the count).
 
-Per-type CPU weight estimates (at 40 FPS reference). Every channel also costs a base 128 bytes for the `OutputChannel` struct itself:
+Per-type CPU time estimates in µs per frame (at 40 FPS reference). Every channel also costs a base 128 bytes for the `OutputChannel` struct itself:
 
-| Type | CPU weight | RAM bytes | Notes |
+| Type | CPU µs | RAM bytes | Notes |
 |:---:|:---:|:---:|:---|
-| 0 AC Dimmer | 0.10 | 128 | ZC ISR + GPIO write |
-| 1 DMX | 0.50 | 640 | 512-byte copy per frame |
-| 2 Relay | 0.05 | 128 | Trivial |
-| 3 RGB LED | `led_count×0.005` | `128 + led_count×3` | Per-pixel NeoPixel update |
-| 4 Single LED | 0.10 | 128 | 1 PWM write |
-| 5 Analog RGB | 0.20 | 128 | 3-4 PWM writes |
-| 6 Motor | 0.50 | 128 | PWM + direction |
-| 7 Stepper | 2.00 | 128 | Pulse-train + state machine |
-| 8 Servo | 0.20 | 128 | 1 PWM write |
-| 9 Buzzer | 0.10 | 128 | Tone PWM |
-| 10 DFPlayer | 0.50 | 228 | UART command buffer |
-| 11 TM1637 | 0.50 | 128 | Bit-bang I2C-like |
-| 12 7-seg 7-pin | 1.00 | 128 | 7 PWM updates |
-| 13 7-seg 8-pin | 1.20 | 128 | 8 PWM updates |
-| 14 DAC | 0.30 | 128 | I2C or analog write |
-| 15 PWM DAC | 0.10 | 128 | 1 PWM |
-| 16 Func Gen | 2.00 | 128 | Timer + waveform calc |
-| 17 Solenoid | 0.10 | 128 | State machine |
-| 18 Smoke | 0.30 | 128 | Dual state machine |
-| I2C overhead | +0.30 | — | Per channel using I2C source |
+| 0 AC Dimmer | 1 | 128 | 1 GPIO write |
+| 1 DMX | 15 | 640 | 512-byte copy per frame |
+| 2 Relay | 1 | 128 | Trivial |
+| 3 RGB LED | `5 + led_count×1` | `128 + led_count×3` | Per-pixel NeoPixel data prep |
+| 4 Single LED | 1 | 128 | 1 PWM write |
+| 5 Analog RGB | 5 | 128 | 3-4 PWM writes |
+| 6 Motor | 5 | 128 | PWM + direction |
+| 7 Stepper | 20 | 128 | Pulse-train state machine |
+| 8 Servo | 2 | 128 | 1 PWM write |
+| 9 Buzzer | 2 | 128 | Tone PWM |
+| 10 DFPlayer | 10 | 228 | UART command buffer |
+| 11 TM1637 | 200 | 128 | Bit-bang I2C-like (4 digits × ~50µs) |
+| 12 7-seg 7-pin | 10 | 128 | 7 PWM updates |
+| 13 7-seg 8-pin | 12 | 128 | 8 PWM updates |
+| 14 DAC | 15 | 128 | I2C DAC write |
+| 15 PWM DAC | 2 | 128 | 1 PWM |
+| 16 Func Gen | 80 | 128 | Waveform calculation |
+| 17 Solenoid | 2 | 128 | State machine |
+| 18 Smoke | 5 | 128 | Dual state machine |
+| I2C overhead | +15 | — | Per channel using I2C source |
 
 #### ESP-NOW Master Overhead
 
 ESP-NOW Master mode has additional CPU and RAM independent of output channels.
 Costs depend on `chunkSize` (default 200 bytes data per packet, not including 12-byte header):
 
-| Source | CPU weight | RAM bytes |
+| Source | CPU µs | RAM bytes |
 |:---|:---:|---:|
-| ESP-NOW Master | `1.0 + peers×0.2 × ceil(512/chunkSize) + universes×0.3` | `512 + peers × (chunkSize + 44)` |
+| ESP-NOW Master | `500 + peers×ceil(512/chunkSize)×170 + universes×100` | `512 + peers × (chunkSize + 44)` |
 
-With default chunkSize=200: `cpu = 1.0 + peers×0.6 + universes×0.3`, `ram = 512 + peers×244`
+With default chunkSize=200: `cpu = 500 + peers×510 + universes×100`, `ram = 512 + peers×244`
 
 #### Offline Load Calculator
 
@@ -551,11 +551,12 @@ Configuration must pass these gates before save/apply:
 
 **Note:** GPIO is NOT counted. PCA9685 / digital expander channels are NOT counted as hardware.
 
-**CPU Budget** estimates per-type CPU weight per frame:
-- Each output type has a baseline CPU weight (see Capacity Scoring table).
-- Any channel using an I2C source adds +0.3 for I2C bus overhead.
-- ESP-NOW Master adds `1.0 + peers×0.2 + universes×0.3`.
-- Limit scales with FPS: `25.0 × (fps/40)`. Higher FPS = more frames/sec = more total CPU.
+**CPU Budget** estimates per-frame CPU time in microseconds:
+- Every channel has a baseline CPU cost in µs (e.g., AC Dimmer 1 µs, Stepper 20 µs, TM1637 200 µs).
+- The output loop itself adds `BASE_OVERHEAD_US = 200` µs per frame (flag checks, channel iteration, RTOS overhead).
+- Any channel using an I2C source adds +15 µs for the I2C bus transaction.
+- ESP-NOW Master adds `500 + peers×ceil(512/chunkSize)×170 + universes×100` µs overhead.
+- Limit scales with FPS: `800,000 / fps` µs (80% of frame time). Higher FPS = less time per frame = smaller budget.
 
 **RAM Budget** estimates static/stack buffer bytes:
 - Every channel: 128 bytes for the `OutputChannel` struct itself.

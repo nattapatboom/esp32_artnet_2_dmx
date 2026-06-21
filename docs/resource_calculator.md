@@ -62,38 +62,45 @@ The system uses **three independent budgets**. If any one is exceeded, saving is
 GPIO is NOT counted here because expanders can substitute for GPIO pins.
 PCA9685 and digital expanders are NOT counted as hardware; they use I2C bus, reflected in CPU budget.
 
-### 3B. CpuBudget — Per-Frame Processing Weight
+### 3B. CpuBudget — Per-Frame Processing Time (Microseconds)
 
-Base limit at 40 FPS: `25.0`. Scales with FPS: `limit(fps) = 25.0 × (fps / 40)`. Higher FPS = more frames/sec = more total CPU.
+CPU time is estimated in **microseconds per frame** (µs/frame) at ESP32 240 MHz.
+Each frame's time budget = `800,000 / fps` µs (80% of frame time; 20% reserved for RTOS/network/loops).
 
-| Type | Weight | Notes |
+**Baseline overhead:** `200 µs` per frame for the output loop itself (flag checks, channel iteration, RTOS).
+
+Higher FPS = less time per frame = smaller budget:
+- 30 FPS → 33.3ms/frame → budget = 26,667 µs
+- 40 FPS → 25.0ms/frame → budget = 20,000 µs
+- 44 FPS → 22.7ms/frame → budget = 18,182 µs
+
+| Type | µs/frame | Notes |
 | :--- | ---: | :--- |
-| AC Dimmer | 0.10 | ZC ISR + GPIO write |
-| DMX | 0.50 | 512-byte copy per frame |
-| Relay | 0.05 | Trivial |
-| RGB LED | `count×0.005` | Per-pixel NeoPixel update |
-| Single LED | 0.10 | 1 PWM write |
-| Analog RGB | 0.20 | 3–4 PWM writes |
-| Motor | 0.50 | PWM + direction |
-| Stepper | 2.00 | Pulse-train ISR + state machine |
-| Servo | 0.20 | 1 PWM write |
-| Buzzer | 0.10 | Tone PWM |
-| DFPlayer | 0.50 | UART command buffer |
-| TM1637 | 0.50 | Bit-bang I2C-like |
-| 7-seg 7-pin | 1.00 | 7 PWM updates |
-| 7-seg 8-pin | 1.20 | 8 PWM updates |
-| DAC | 0.30 | I2C or analog write |
-| PWM DAC | 0.10 | 1 PWM |
-| Func Gen | 2.00 | Timer + waveform calc |
-| Solenoid | 0.10 | State machine |
-| Smoke Shooter | 0.30 | Dual state machine |
-| **I2C overhead** | **+0.30** | Any channel using I2C source |
+| AC Dimmer (0) | 1 | 1 GPIO write |
+| DMX (1) | 15 | 512-byte memcpy + UART DMA start |
+| Relay (2) | 1 | 1 GPIO write |
+| RGB LED (3) | `5 + count×1` | Pixel data prep per LED (µs per pixel × count) |
+| Single LED (4) | 1 | 1 LEDC duty write |
+| Analog RGB (5) | 5 | 3–4 LEDC writes |
+| Motor (6) | 5 | PWM + direction writes |
+| Stepper (7) | 20 | State machine + timing check |
+| Servo (8) | 2 | 1 PWM write (LEDC or PCA) |
+| Buzzer (9) | 2 | LEDC tone write |
+| DFPlayer (10) | 10 | UART command buffer |
+| TM1637 (11) | 200 | Bit-bang protocol (4 digits × ~50 µs each) |
+| 7-seg 7-pin (12) | 10 | 7 PWM writes |
+| 7-seg 8-pin (13) | 12 | 8 PWM writes |
+| DAC (14) | 15 | I2C DAC write (2-byte transfer at 400kHz) |
+| PWM DAC (15) | 2 | 1 LEDC duty write |
+| Func Gen (16) | 80 | Waveform calculation (sine/tri/saw) |
+| Solenoid (17) | 2 | State machine + GPIO write |
+| Smoke Shooter (18) | 5 | Dual state machine (smoke + shoot) |
+| **I2C overhead** | **+15** | Any channel using I2C source |
 
 ESP-NOW Master overhead (independent of output channels):
-Costs depend on `chunkSize` (default 200 bytes data per packet):
 ```
-cpuWeight = 1.0 + peerCount×0.2 × ceil(512/chunkSize) + universeCount×0.3
-ramBytes  = 512 + peerCount × (chunkSize + 44)
+cpuUs = 500 + peerCount × ceil(512/chunkSize) × 170 + universeCount × 100
+ramBytes = 512 + peerCount × (chunkSize + 44)
 ```
 
 ### 3C. RamBudget — Static Buffer Estimate
@@ -141,8 +148,9 @@ ESP32-native peripherals.
 // Hardware — every count ≤ max (source-aware: expander/PCA channels don't count)
 bool hwOk = total.ledc ≤ 16 && total.rmt ≤ 8 && total.uart ≤ 2 && total.dac ≤ 2;
 
-// CPU — total weight ≤ 25.0 × (40 / fps)
-bool cpuOk = cpuWeight ≤ CpuBudget::limit(fps);
+// CPU — total µs ≤ 800,000 / fps (80% of frame time)
+// Includes BASE_OVERHEAD_US (200 µs) for loop overhead
+bool cpuOk = cpuUs ≤ CpuBudget::limit(fps);
 
 // RAM — total bytes ≤ 65535
 bool ramOk = ramBytes ≤ RamBudget::limit();
@@ -266,31 +274,18 @@ The score calculator is not the only gate. Firmware and Web UI validation also e
     * Configure per-peer universe/channel ranges instead of broadcasting all data to every slave.
     * Slave boards keep their setup AP available for field configuration; avoid unnecessary clients/AP traffic during show-critical wireless operation.
 
-## 8. Scoring System Verification & Calibration
+## 8. Verification & Calibration
 
-To ensure the scoring system aligns with the actual physical limits of the WT32-ETH01 / ESP32 hardware and does not cause task crashes or output stutter, follow these verification methodologies:
-
-### 8.1 Hardware Parity Verification (Mathematical Alignment)
-Compare weight constants to physical limitations to confirm that single-resource exhaustion triggers a score overload:
-- **GPIO limit (8 pins):** `8 * W_GPIO (0.5) = 4.0` points
-- **LEDC PWM limit (16 channels):** `16 * W_LEDC (2.5) = 40.0` points
-- **RMT channel limit (8 channels):** `8 * W_RMT (3.0) = 24.0` points
-- **UART port limit (2 usable):** `2 * W_UART (8.0) = 16.0` points
-- **DAC channel limit (unlimited via I2C, but address-limited):** `N * W_DAC (2.0)` — each MCP4725/DAC7571 uses 1 channel (address-limited to a few), DAC7573 uses up to 4 channels per chip.
-- **Resource limit sum (physical pins only):** `4.0 + 40.0 + 24.0 + 16.0 = 84.0` (matching `resourceScoreLimit()`, which excludes DAC/PCA/EXP because they use I2C bus, not ESP32 native peripherals).
-- This mathematically guarantees that if any single physical resource is exhausted, the score reflects it.
-- **Note:** I2C resources (DAC weight 2.0, PCA weight 0.25, EXP weight 0.125) are additive on top of the 84.0 base; their effective limit is governed by I2C bus bandwidth, not ESP32 pin count.
-
-### 8.2 Runtime Benchmarking (Performance & Latency Profiling)
-Measure real-time indicators on physical boards to calibrate compute score values (e.g. Stepper: `2.0`, Function Gen: `2.0`):
-1. **Output Jitter & Frame Latency:** Load a configuration close to `SCORE_LIMIT` (e.g., combined score of 100-109), send Art-Net packets at 40 FPS, and capture physical DMX/LED output lines using an oscilloscope or logic analyzer. If frame drops or jitter occur, the `SCORE_LIMIT` is too high or the compute weights are too low.
-2. **Heap Memory Audit:** Monitor free RAM (`ESP.getFreeHeap()`) under active DMX load. If heap falls below **30-40 KB**, lower the `SCORE_LIMIT` or increase the weights of memory-heavy channels (like WS2812B strips).
+### 8.1 Runtime Benchmarking
+Measure real-time indicators on physical boards to calibrate the µs estimates:
+1. **Output Jitter & Frame Latency:** Load a configuration near the CPU budget limit at 40 FPS, send Art-Net packets, and capture DMX/LED output using an oscilloscope. If frame drops or jitter occur, reduce the budget safety margin or increase the per-type µs estimates.
+2. **Heap Memory Audit:** Monitor free RAM (`ESP.getFreeHeap()`) under DMX load. If heap falls below 30-40 KB, reduce pixel counts or channel count.
 3. **Task Execution Time:** Check if the output loop task (Core 1) triggers the FreeRTOS watchdog or experiences scheduling delays.
 
-### 8.3 I2C Bus Contention Stress Testing
-Since all PCA9685 and digital expanders share a single I2C bus (`Wire`), high FPS updates can saturate the bus:
-- **Test:** Measure transaction duration for all expander updates inside the output loop.
-- **Calibration:** If I2C transactions take longer than **15-20 ms** (leaving too little time for the remaining 25 ms cycle at 40 FPS), increase the expander weights (`0.125` / `0.25`) to limit the count of allowed expander channels.
+### 8.2 I2C Bus Contention
+Since all PCA9685 and digital expanders share a single I2C bus, high FPS updates can saturate it:
+- Measure I2C transaction duration for all expander updates inside the output loop.
+- If I2C transactions take longer than 15ms (leaving <10ms for other processing at 40 FPS), increase per-channel I2C overhead µs.
 
-### 8.4 Simulation & Mock Validation
-Run the Python offline calculator `tools/load_calculator.py` against boundary/extreme mock configurations to check if the interlock validation matches the C++ firmware and JavaScript Web UI scoring engine logic.
+### 8.3 Simulation & Mock Validation
+Run the Python offline calculator `tools/load_calculator.py` against boundary configurations to verify interlock validation parity between C++ firmware and JavaScript Web UI.
