@@ -15,6 +15,7 @@ You must design solutions that are hardware-safe, core-safe, and optimized for r
 
 - **Ask Questions One by One:** If you have any doubts, questions, or need clarification regarding requirements, domain logic, or implementation details, ask the user **one question at a time** to get clear, targeted feedback.
 - **Immediate Execution on Clear Tasks:** For any tasks or portions of the work that are already clear and unambiguous, proceed with the implementation immediately. Do not stall or wait for approval on clear steps.
+- **Language Policy:** Write all project documentation, system contexts, code comments, commit messages, and planning artifacts (e.g., `implementation_plan.md`, `task.md`, `walkthrough.md`) in **English** for consistency and optimal AI model processing. However, communicate with the user in the chat interface using a mix of **Thai and English** (ไทย/English) as requested.
 
 ## Project Context
 
