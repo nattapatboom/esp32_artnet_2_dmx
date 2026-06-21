@@ -525,22 +525,12 @@ Resource Score must be routing-accurate:
 - Count Type 12/13 per segment using `seg_sources`, `seg_pins`, `seg_channels`, or base routing rules; Direct Dim modes can only score GPIO/LEDC or PCA segment routes because digital expanders are invalid.
 - Compute Score is separate from Resource Score and includes per-type runtime cost plus `output_fps` factor.
 
-Known implementation drift to fix later:
+Known implementation drift (scoring-specific):
 - C++ `totalOutputScoreFromJson()` may not copy every routing field needed for routing-accurate scoring.
 - Web UI `channelScore()` still has stale assumptions for some types and must be audited against this contract.
 - Web UI `channelScore()` uses global `outputs` for DMX/DFPlayer allocation even when scoring a candidate `newOutputs` array.
 - Web UI reserved-pin validation may miss hybrid GPIO pins when the primary source is not GPIO.
 - Web UI hardware warning counters are separate from score and may still use simplified counting.
-- **DAC mis-scored as expander:** I2C DAC (source=5) is counted with `EXP` weight (0.125) in C++ `resourceScore()` because there is no separate DAC branch; this also affects `estimateResources()` and `readOutputJson()`. The contract requires DAC weight 2.0.
-- **`resourceScoreLimit()` omits PCA and EXP:** The limit formula in C++ `resourceScoreLimit()` only sums GPIO * 0.5 + LEDC * 2.5 + RMT * 3.0 + UART * 8.0 + DAC * 2.0, omitting PCA * 0.25 and EXP * 0.125. In practice PCA/EXP are not accounted in the hard limit. The JS side does not call `resourceScoreLimit()` at all — it uses `isOverLimit` in the Web UI, which totals against the 109 SCORE_LIMIT directly. Web UI scoring has separate limits for PCA (max 16) and EXP (max 16/40 per chip).
-- **`artnet_enabled` flag not yet implemented:** ADR012 defines this as future work, but the contract lists it as if available.
-- **Boot count threshold mismatch:** Doc spec requires `bootCount >= 5` for Recovery Mode, but code (`main.cpp:2126`) uses `bootCount >= 3`. Spec is the correct target; code must be aligned.
-- **GPIO12 not blocked in C++ API:** Only Web UI warns on GPIO12 input; `validateOutputJson()` in `main.cpp` does not reject GPIO12.
-- **AC Dimmer ZC pin not validated in C++ API:** Web UI warns if ZC is disabled + AC dimmer exists, but `validateOutputJson()` does not check this.
-- **PCA9685 frequency conflict check not implemented:** Neither C++ nor Web UI detects mixed-frequency devices on the same PCA chip.
-- **`/api/outputs` POST skips `validateSettingsAndOutputs()`:** Only `/api/config/import` calls both validators; the outputs-only endpoint may miss global pin conflicts.
-- **No PCF8574 LCD display type in SystemConfig:** The `display_type` enum in `config.h` only maps SSD1306/SH1106, but the I2C Address Contract lists PCF8574 LCD backpack addresses (`0x27`, `0x3F`) for LCD support.
-- **GPIO34-39 not validated as input-only:** Neither C++ `validateOutputJson()` nor Web UI rejects output assignment on input-only pins.
 
 ---
 
@@ -610,22 +600,29 @@ Questions used during the grilling session and answers inferred from the existin
 | Where is the Web UI source of truth? | `web/index.html`; `include/web_pages.h` is generated | After editing UI, regenerate web pages |
 | What is the main risk in refactoring? | Large struct, hybrid routing, duplicated JS/C++ validation | Refactor in small steps with build/test every time |
 
-## Current Tidy-Up Decisions
+## Current Plan
 
-1. This domain model document is the central reference for vocabulary and invariants.
-2. `docs/resource_calculator.md` must reflect v3 current firmware, not deprecated or non-existent output types beyond `0..18`.
-3. Do not yet split `OutputChannel` in code; the risk to save/load, Web UI JSON, and runtime pointer ownership is too high.
-4. Future code improvements should start with helper validation or shared constants that reduce C++/JS drift without changing the layout.
+### Backlog — priority items to fix in code
+| # | Item | Scope | Effort |
+|---|------|-------|--------|
+| 1 | Boot count threshold: code `>= 3` → spec `>= 5` (`main.cpp:2126`) | C++ | 1 line |
+| 2 | DAC (source=5) scored as EXP (0.125) instead of DAC (2.0) in `resourceScore()` | C++ scoring | 1 branch |
+| 3 | GPIO12 rejection in `validateOutputJson()` | C++ API | 3 lines |
+| 4 | AC Dimmer ZC pin check in `validateOutputJson()` | C++ API | 5 lines |
+| 5 | GPIO34-39 input-only rejection in `validateOutputJson()` | C++ API | 3 lines |
+| 6 | Call `validateSettingsAndOutputs()` in `/api/outputs` POST | C++ API | 1 line |
+| 7 | `resourceScoreLimit()` include PCA and EXP terms | C++ scoring | add 2 terms |
+| 8 | PCF8574 LCD display type enum in `SystemConfig` | C++ + Web UI | small |
 
-## Open Risks
+### Future Features — planned but not started
+- `artnet_enabled` checkbox in Web UI + backend (ADR012)
+- ESP-NOW chunk size user-configurable (currently compile-time)
+- Frame interpolation for mechanical outputs (ADR005, long-term)
+- PCA9685 frequency conflict detection (C++ + Web UI)
 
-| Risk | Why It Matters | Mitigation |
-| --- | --- | --- |
-| C++/JS validation drift | Users may not be able to save via UI, or the API may accept configs the UI rejects | Add a checklist every time an output type/source is modified |
-| `OutputChannel` combines persisted/runtime state | Adding a field in the wrong group can break migration or memory lifecycle | Document field groups before refactoring |
-| Generated web file stale | Firmware may embed an outdated UI | Run `python tools/build_web.py` after editing `web/index.html` |
-| Hardware docs drift | Users may wire circuits incorrectly or choose wrong pins | Use `docs/domain_model.md` and `docs/resource_calculator.md` together |
-| Resource scoring drift | C++/JS scores may accept overly heavy configs or reject valid ones | When modifying routing fields, sync `include/scoring.h` and `web/index.html` for routing-accurate scoring |
-| Current scoring implementation drift | Domain rules require routing-accurate score but some C++ JSON scoring paths may not copy all routing fields | Audit/fix `totalOutputScoreFromJson()` and compare against JS `channelScore()` |
-| C++ validation gaps (GPIO12, ZC, PCA freq) | API may accept configs that create hardware conflicts or undefined behavior | Add GPIO12 avoidance, ZC interlock, and PCA freq conflict checks to C++ `validateOutputJson()` |
-| `validateSettingsAndOutputs()` not called on `/api/outputs` | Combined system + output config may violate global constraints that only the combined validator catches | Call `validateSettingsAndOutputs()` in the `/api/outputs` POST handler |
+### Known Limitations (accepted, not on roadmap)
+- C++/JS scoring parity drift: `totalOutputScoreFromJson()` copies fewer fields than JS `channelScore()`; C++ uses worst-case UART (8.0) while JS estimates dynamic RMT fallback (3.0) — see ADR011
+- `OutputChannel` struct combines persisted + runtime fields; splitting risks save/load/pointer lifecycle — postponed
+- Web UI `channelScore()` uses global `outputs` array when scoring candidate `newOutputs` — stale if page unsaved
+- Web UI reserved-pin validation may miss hybrid GPIO pins when primary source is not GPIO
+- Web UI hardware warning counters use simplified counting instead of full routing-accurate approach
