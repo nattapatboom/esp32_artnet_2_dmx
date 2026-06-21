@@ -20,7 +20,7 @@ ESP32-based Art-Net to DMX/Pixel/Relay/Motion controller for stage lighting.
 - `AGENTS.md` — concise project instructions loaded for agents
 - `docs/domain_model.md` — domain vocabulary, bounded contexts, invariants, and grilling results
 - `docs/resource_calculator.md` — current scoring formula, hardware limits, and validation rules
-- `docs/user_manual.md` — user-facing behavior and setup flow
+- `docs/user_manual/` — Typst user manual source (English-first, modular chapters, CeTZ/Fletcher diagrams)
 - `web/index.html` — Web UI source of truth; regenerate `include/web_pages.h` after edits
 - `docs/domain_model.md` -> `Configuration Contract` — source/routing/scoring contract for validation and implementation work
 
@@ -315,7 +315,7 @@ src/
 web/
   index.html            Web UI source — EDIT THIS, then run build_web.py
 docs/
-  user_manual.md        User-facing manual
+  user_manual/          Typst user manual source (main.typ + chapters)
 handover/
   README.md             Handover system rules
   1.23.00.md            Latest — v3 layout migration (0-18)

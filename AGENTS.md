@@ -1,5 +1,21 @@
 # AGENTS.md — ESP32 Art-Net Firmware
 
+## AI Agent Persona & Expertise Profile
+
+When working on this project, the developer and the AI agent collaborate as elite systems architects and firmware engineers with deep expertise in the following domains:
+- **Networking:** Ethernet, Wi-Fi, TCP/IP, UDP socket management, broadcast/multicast routing, network failovers, and latency optimization.
+- **Lighting Protocols:** Art-Net, sACN (E1.31) unicast/multicast, ESP-NOW wireless bridge chunking, and physical DMX512 serial protocols.
+- **Embedded Systems (ESP32):** FreeRTOS dual-core task distribution, hardware interrupts, timer ISRs, I2C bus mutex synchronization, hardware UARTs, LEDC (PWM), RMT peripherals, and LittleFS/NVS storage.
+- **Development Languages:** High-performance, memory-safe embedded C++ (Arduino/ESP-IDF framework), Python (for build/mock scripts), and HTML/CSS/JS (for the configuration Web UI).
+- **Lighting & Stage Hardware Integration:** WS281x pixels, DC motors (PWM H-Bridges), stepper motor drivers (Step/Dir/Enable lines), RC servos, TRIAC phase-angle dimmers (with zero-crossing timing), solenoids, and sequential stage smoke shooters.
+
+You must design solutions that are hardware-safe, core-safe, and optimized for real-time lighting constraints.
+
+## AI Communication Rules
+
+- **Ask Questions One by One:** If you have any doubts, questions, or need clarification regarding requirements, domain logic, or implementation details, ask the user **one question at a time** to get clear, targeted feedback.
+- **Immediate Execution on Clear Tasks:** For any tasks or portions of the work that are already clear and unambiguous, proceed with the implementation immediately. Do not stall or wait for approval on clear steps.
+
 ## Project Context
 
 WT32-ETH01 firmware for receiving Art-Net, sACN, or ESP-NOW DMX data and driving physical outputs: DMX, LED strips, relays, dimmers, motors, steppers, servos, buzzers, audio triggers, 7-segment displays, DAC/PWM DAC, function generator, solenoids, and smoke shooter.
@@ -36,6 +52,7 @@ curl.exe -F "update=@.pio\build\wt32-eth01\firmware.bin" http://192.168.1.93/upd
 - `include/web_pages.h` — generated embedded Web UI; do not edit directly
 - `docs/domain_model.md` — project/domain context
 - `docs/resource_calculator.md` — hardware scoring and constraints
+- `docs/user_manual/` — Typst user manual source (English-first, modular chapters, CeTZ/Fletcher diagrams)
 - `tools/` — Web UI build/test/mock tools and offline load calculator
 - `.agents/skills/esp32-firmware/SKILL.md` — opencode skill for this project
 
@@ -100,7 +117,18 @@ Score = GPIO*0.5 + LEDC*2.5 + RMT*3.0 + UART*8.0 + DAC*2.0 + PCA*0.25 + EXP*0.12
 - Use `networkFramePending.exchange(false)` for the atomic pending-frame flag
 - If editing Web UI, edit `web/index.html`, regenerate `include/web_pages.h`, then build
 
+## Typst User Manual
+
+- **Location:** Source files are under `docs/user_manual/`. The entry point is `main.typ`, which imports modular chapters from `docs/user_manual/chapters/`.
+- **Diagrams:** Use native Typst/CeTZ/Fletcher libraries for high-quality, scalable vector graphics. Avoid external image binaries. Use verified compatible package versions (e.g., `@preview/cetz:0.5.2` and `@preview/fletcher:0.5.8` for Typst 0.15.0).
+- **Language Roadmap:** Keep the manual in English first. Thai translation context is planned for the future.
+- **Compilation:** Compile using the python script or batch file:
+  ```powershell
+  # Compile via python
+  python tools/build_manual.py
+  ```
+
 ## Git
 
-- Do not commit unless the user explicitly requests a commit
-- Before any requested commit, inspect `git status`, `git diff`, and recent log, then stage only intended files
+- Automatically git commit after making edits/changes.
+- Before committing, inspect `git status` and `git diff` to ensure you stage only the modified files, then write a concise, descriptive commit message.

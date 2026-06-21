@@ -1,6 +1,6 @@
 # Domain Model: ESP32 Art-Net Firmware
 
-เอกสารนี้เป็นผลลัพธ์จาก `/grilling` แบบ domain-modeling โดยสกัดจากไฟล์เดิมของโปรเจคเป็นหลัก: `include/output_control.h`, `include/scoring.h`, `include/config.h`, `src/main.cpp`, `web/index.html`, `docs/user_manual.md`, และ `docs/resource_calculator.md`.
+เอกสารนี้เป็นผลลัพธ์จาก `/grilling` แบบ domain-modeling โดยสกัดจากไฟล์เดิมของโปรเจคเป็นหลัก: `include/output_control.h`, `include/scoring.h`, `include/config.h`, `src/main.cpp`, `web/index.html`, `docs/user_manual/main.typ`, และ `docs/resource_calculator.md`.
 
 ## Core Domain
 
@@ -41,6 +41,17 @@
 - `output_fps` ต้องอยู่ในช่วง `1..44`.
 - layout version ปัจจุบันคือ `3`.
 - `web/index.html` เป็น source ของ UI, `include/web_pages.h` เป็นไฟล์ generated.
+- **ระบบระบุตัวตนเครือข่าย (Network Identity & Naming):**
+  - ในโหมดปกติ SSID ของ SoftAP และชื่อ mDNS Responder จะถูกต่อท้ายด้วยตัวอักษร MAC Address 4 หลักสุดท้าย (เช่น `ESP32-ArtNet-Setup-XXXX` และ `[mdns_name]-[xxxx].local` เป็นตัวเล็ก)
+  - ข้อมูลชื่ออุปกรณ์ส่งทางโปรโตคอล ArtPollReply (Short/Long Name) จะต่อท้ายด้วย MAC Suffix เช่นกัน (เช่น Short Name: `CHAL Node-XXXX`)
+- **โหมดกู้คืน (Recovery Mode):**
+  - เข้าด้วยการบูตล้มเหลวซ้ำซ้อน 5 ครั้ง (5 consecutive resets) หรือกดปุ่ม BOOT (GPIO0) ค้างไว้ขณะเปิดเครื่อง
+  - จะเปิดการเชื่อมต่อแบบคู่ (Dual Network): Ethernet และ Wi-Fi AP พร้อมกัน โดย AP SSID จะเป็น `ESP32-ArtNet-Recovery-XXXX` และเปิดเป็น open AP (ไม่มีรหัสผ่าน)
+  - mDNS ในโหมดกู้คืนจะลงทะเบียนเป็น `[mdns_name]-recovery.local` (ไม่มี MAC suffix) เพื่อความสะดวกในการจดจำ
+  - ปิดฟังก์ชันการแสดงผลเอาต์พุตและทาสก์ส่งสตรีมไฟทั้งหมดในโหมดนี้เพื่อประหยัดพลังงาน
+- **การเชื่อมต่อ Wi-Fi ใหม่แบบอัตโนมัติ (Wi-Fi Auto-Reconnection):**
+  - ระบบพยายาม Reconnect Wi-Fi ทุกๆ 10 วินาทีเป็นอย่างน้อย (Rate-limited 10s) เพื่อไม่ให้ลูปเครือข่ายบล็อกการทำงานหลัก
+  - จะข้ามการพยายามเชื่อมต่อ Wi-Fi Client เสมอหากอุปกรณ์รันในโหมด Ethernet และมีสายแลนเชื่อมต่ออยู่ (`ethConnected || ETH.linkUp()`) เพื่อลดสัญญาณขยะในเน็ตเวิร์กไร้สาย
 
 ### Output Routing Context
 
