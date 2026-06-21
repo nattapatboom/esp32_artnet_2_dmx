@@ -1901,7 +1901,7 @@ void setupWebServer() {
         uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
 
         HardwareResource hw = totalHardware(chs);
-        CpuBudget cpu = totalCpu(chs);
+        CpuBudget cpu = totalCpu(chs, fps);
         RamBudget ram = totalRam(chs);
         uint32_t cpuLimit = CpuBudget::limit(fps);
         uint32_t ramLimit = RamBudget::limit();
@@ -1910,6 +1910,7 @@ void setupWebServer() {
         doc["rmt"]  = hw.rmt;    doc["rmt_max"]  = MAX_RMT_RESOURCE;
         doc["uart"] = hw.uart;   doc["uart_max"] = MAX_UART_RESOURCE;
         doc["dac"]  = hw.dac;    doc["dac_max"]  = MAX_DAC_RESOURCE;
+        doc["timer"] = hw.timer; doc["timer_max"] = MAX_TIMER_RESOURCE;
         doc["cpu_us"] = cpu.usPerFrame;   doc["cpu_limit"] = cpuLimit;
         doc["ram_bytes"]  = ram.bytes;    doc["ram_limit"]  = ramLimit;
         doc["fps"] = fps;
@@ -1929,7 +1930,7 @@ void setupWebServer() {
             item["ram_bytes"]  = cc.ramBytes;
             HardwareResource chHw = estimateHardware(chs[i]);
             item["ledc"] = chHw.ledc; item["rmt"] = chHw.rmt;
-            item["uart"] = chHw.uart; item["dac"] = chHw.dac;
+            item["uart"] = chHw.uart; item["dac"] = chHw.dac; item["timer"] = chHw.timer;
         }
         String response;
         serializeJson(doc, response);

@@ -408,7 +408,7 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
           <span id="score-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:600;color:#1e293b">0 / 100</span>
         </div>
       </div>
-      <div id="hw-monitor" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;font-size:0.75rem">
+      <div id="hw-monitor" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;font-size:0.75rem">
         <div class="sc" style="padding:6px;border-color:#cbd5e1">
           <small style="font-weight:600;color:#475569">RMT Channels</small>
           <strong id="hw-rmt-val" style="font-size:1.1rem;color:#1e3a8a">0 / 8</strong>
@@ -435,6 +435,13 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
           <strong id="hw-dac-val" style="font-size:1.1rem;color:#1e3a8a">0 / 2</strong>
           <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:4px;overflow:hidden">
             <div id="hw-dac-bar" style="height:100%;width:0%;background:#22c55e;transition:width .2s"></div>
+          </div>
+        </div>
+        <div class="sc" style="padding:6px;border-color:#cbd5e1">
+          <small style="font-weight:600;color:#475569">Timers</small>
+          <strong id="hw-timer-val" style="font-size:1.1rem;color:#1e3a8a">0 / 4</strong>
+          <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:4px;overflow:hidden">
+            <div id="hw-timer-bar" style="height:100%;width:0%;background:#22c55e;transition:width .2s"></div>
           </div>
         </div>
       </div>
@@ -1762,7 +1769,7 @@ async function loadOutputs(){
 function channelHardware(o){
   const t=typeId(o);
   const src=o.source||0;
-  let ledc=0,rmt=0,uart=0,dac=0;
+  let ledc=0,rmt=0,uart=0,dac=0,timer=0;
   switch(t){
     case 0: break;
     case 1: uart=1; break;
@@ -1795,11 +1802,11 @@ function channelHardware(o){
       break;
     case 14: if(src!==5) dac=1; break;
     case 15: if(src===0) ledc=1; break;
-    case 16: ledc=1; break;
+    case 16: ledc=1; timer=1; break;
     case 17: break;
     case 18: break;
   }
-  return {ledc,rmt,uart,dac};
+  return {ledc,rmt,uart,dac,timer};
 }
 function srcIsI2C(src){ return src>=1&&src<=5; }
 function channelUsesI2C(o){
@@ -1842,7 +1849,7 @@ function channelCost(o){
   ram+=i2cWrites*I2C_ROUTE_RAM;
   return {cpu,ram};
 }
-const HW_MAX={ledc:16,rmt:8,uart:2,dac:2};
+const HW_MAX={ledc:16,rmt:8,uart:2,dac:2,timer:4};
 // RAM limit: C++ keeps ~150KB free, the rest for buffers (capped 64KB). Local pre-check at 48KB.
 const RAM_LIMIT=48000;
 const BASE_CHANNEL_RAM=224;
@@ -1925,13 +1932,28 @@ function cpuLimit(fps){
   return frameUs>SAFETY_RESERVE_US?frameUs-SAFETY_RESERVE_US:Math.floor(frameUs/2);
 }
 function totalHardware(arr){
-  const t={ledc:0,rmt:0,uart:0,dac:0};
-  arr.forEach(o=>{const h=channelHardware(o);t.ledc+=h.ledc;t.rmt+=h.rmt;t.uart+=h.uart;t.dac+=h.dac;});
+  const t={ledc:0,rmt:0,uart:0,dac:0,timer:0};
+  let hasDimmer=false;
+  arr.forEach(o=>{
+    const h=channelHardware(o);
+    t.ledc+=h.ledc;t.rmt+=h.rmt;t.uart+=h.uart;t.dac+=h.dac;t.timer+=h.timer;
+    if(typeId(o)===0) hasDimmer=true;
+  });
+  if(hasDimmer) t.timer+=1;
   return t;
 }
+function frameTimeUs(fps){ return Math.floor(1000000/(parseInt(fps)||40)); }
+function acDimmerBackgroundUs(count,fps){ return count>0?Math.floor(frameTimeUs(fps)/39)*(1+count):0; }
+function funcGenBackgroundUs(count,fps){ return count>0?Math.floor(frameTimeUs(fps)/50)*4*count:0; }
 function totalCpu(arr,fps){
   let us = BASE_OVERHEAD_US;
-  arr.forEach(o=>us+=channelCost(o).cpu);
+  let dimmerCount=0, funcGenCount=0;
+  arr.forEach(o=>{
+    us+=channelCost(o).cpu;
+    if(typeId(o)===0) dimmerCount++;
+    else if(typeId(o)===16) funcGenCount++;
+  });
+  us+=acDimmerBackgroundUs(dimmerCount,fps)+funcGenBackgroundUs(funcGenCount,fps);
   return us;
 }
 function totalRam(arr){
@@ -1946,7 +1968,7 @@ function totalRam(arr){
   return b+dmxRmtUse*RMT_DMX_DRIVER_RAM;
 }
 function hwBlocked(hw){
-  return hw.ledc>HW_MAX.ledc||hw.rmt>HW_MAX.rmt||hw.uart>HW_MAX.uart||hw.dac>HW_MAX.dac;
+  return hw.ledc>HW_MAX.ledc||hw.rmt>HW_MAX.rmt||hw.uart>HW_MAX.uart||hw.dac>HW_MAX.dac||hw.timer>HW_MAX.timer;
 }
 function cpuBlocked(cpu,fps){
   return cpu>cpuLimit(fps);
@@ -1972,7 +1994,7 @@ function updateScoreBar(){
   const hwBad=hwBlocked(hw);
   const cpuBad=cpuBlocked(cpu,fps);
   const ramBad=ramBlocked(ram);
-  const budgetBad=cpuBad||ramBad;  // hardware is warning-only
+  const budgetBad=hwBad||cpuBad||ramBad;
 
   // Combined bar (CPU % colored by worst blocker)
   const cpuPct=Math.min(cpu/cLim*100,100);
@@ -2003,17 +2025,15 @@ function updateScoreBar(){
   updateHwCard('hw-rmt-val','hw-rmt-bar',hw.rmt,HW_MAX.rmt);
   updateHwCard('hw-uart-val','hw-uart-bar',hw.uart,HW_MAX.uart);
   updateHwCard('hw-dac-val','hw-dac-bar',hw.dac,HW_MAX.dac);
+  updateHwCard('hw-timer-val','hw-timer-bar',hw.timer,HW_MAX.timer);
 
-  // Save button lock (CPU/RAM only; hardware is warning-only)
+  // Save button lock (hardware/CPU/RAM blockers)
   const saveBtn = document.getElementById('out-save-btn');
   if (saveBtn) saveBtn.disabled = budgetBad;
 
   if (budgetBad) {
-    let errMsg = cpuBad ? 'CPU Budget Exceeded' : 'RAM Budget Exceeded';
+    let errMsg = hwBad ? 'Hardware Resource Exceeded' : (cpuBad ? 'CPU Budget Exceeded' : 'RAM Budget Exceeded');
     setSaveState(errMsg, 'err');
-  } else if (hwBad) {
-    // Hardware over — warning only, still savable
-    setSaveState('Hardware resource over — warning only', 'warn');
   } else {
     setSaveState(outputsDirty ? 'Unsaved changes' : 'Saved', outputsDirty ? 'warn' : 'ok');
   }
@@ -2050,7 +2070,7 @@ function renderOutputs(){
     const removed=typeId(o)<0||typeId(o)>18;
     const h=channelHardware(o);
     const cc=channelCost(o);
-    const hwStr='L'+(h.ledc||'')+' R'+(h.rmt||'')+' U'+(h.uart||'')+(h.dac?' D':'');
+    const hwStr='L'+(h.ledc||'')+' R'+(h.rmt||'')+' U'+(h.uart||'')+(h.dac?' D':'')+(h.timer?' T'+h.timer:'');
     tr.innerHTML=`<td>${i+1}</td><td>${deviceLabel(o)}</td><td>${gpioLabel(o)}</td><td>${outputAddressLabel(o)}</td>
       <td>${outputChannelCount(o)}</td><td><span class="pill pill-ok" style="font-size:0.65rem">${hwStr} ${cc.cpu}\u00B5s</span></td>
       <td>${i===currentTestIdx?'<span class="pill pill-warn" style="margin-right:4px">TEST</span>':''}${removed?'<span class="pill pill-warn" style="margin-right:4px">DELETE</span>':`<button class="btn bg" style="padding:3px 8px;font-size:0.72rem;margin-right:4px" onclick="showOutputTest(${i})">Test</button>
@@ -3004,11 +3024,12 @@ function addOrUpdateOutput(){
     }
   }
   
-  let ledcUsed = 0, rmtUsed = 0, stepperCount = 0, totalLedPixels = 0;
+  let ledcUsed = 0, rmtUsed = 0, timerUsed = 0, stepperCount = 0, totalLedPixels = 0;
   newOutputs.forEach(o => {
     const h = channelHardware(o);
     ledcUsed += h.ledc;
     rmtUsed += h.rmt;
+    timerUsed += h.timer;
     if(o.type===3) totalLedPixels += o.led_count||170;
     if(o.type===7) stepperCount++;
   });
@@ -3016,6 +3037,7 @@ function addOrUpdateOutput(){
   let warnings=[];
   if(rmtUsed>8) warnings.push('Total RMT usage exceeds hardware limit (max 8). Some outputs may fail.');
   if(ledcUsed>16) warnings.push('LEDC PWM channels exceed hardware limit (max 16).');
+  if(totalHardware(newOutputs).timer>HW_MAX.timer) warnings.push('Timer usage exceeds hardware/runtime limit (max 4).');
   if(stepperCount>2) warnings.push('Multiple stepper motors may cause timing jitter at high speed.');
   if(totalLedPixels>4000) warnings.push('Total LED pixels ('+totalLedPixels+') may cause RAM exhaustion.');
   newOutputs.forEach(o => { if(o.type===3&&o.led_count>1111) warnings.push('Single GPIO LED count >1111 drops refresh rate below 30 FPS.'); });
@@ -3044,6 +3066,9 @@ function addOrUpdateOutput(){
     } else if(hwTot.dac>HW_MAX.dac){
       what='DAC';
       altMsg=' Use I2C DAC (source=5) instead.';
+    } else if(hwTot.timer>HW_MAX.timer){
+      what='TIMER';
+      altMsg=' Reduce AC Dimmer/Function Generator channels.';
     }
     alert(what+' limit exceeded ('+hwTot[what.toLowerCase()]+'/'+HW_MAX[what.toLowerCase()]+').'+altMsg);
     return;

@@ -58,13 +58,16 @@ The system uses **three independent budgets**. If any one is exceeded, saving is
 | RMT | 8 | WS281x / DMX fallback |
 | UART | 2 | DFPlayer or DMX |
 | DAC | 2 | Internal DAC (GPIO 25/26, both occupied by Ethernet on WT32-ETH01) |
+| Timer | 4 | AC Dimmer shared hardware timer; Function Generator timer-like runtime slots |
 
 GPIO is NOT counted here because expanders can substitute for GPIO pins.
 PCA9685 and digital expanders are NOT counted as hardware; they use I2C bus, reflected in CPU budget.
 
 ### 3B. CpuBudget — Output Service Time (Microseconds)
 
-CPU budget is now modeled as **output service time** in microseconds per frame (µs/frame), not just core compute cycles. It includes blocking/serialized output work such as DMX512 transmit, WS281x LED line time, TM1637 bit-bang time, and active I2C transactions.
+CPU budget is now modeled as **output service time** in microseconds per frame (µs/frame), not just core compute cycles. It includes blocking/serialized output work such as DMX512 transmit, LED strip pixel mapping/RMT enqueue, TM1637 bit-bang time, and active I2C transactions.
+
+Timer-driven outputs have two costs: foreground set/update cost in the table below, plus background per-frame equivalent ISR/timer cost. AC Dimmer adds a shared hardware timer cost if any dimmer exists. Function Generator adds per-channel esp_timer ISR cost even when DMX values are unchanged.
 
 Frame budget = `(1,000,000 / fps) - 1,500 µs`.
 
@@ -77,7 +80,7 @@ Higher FPS = less time per frame = smaller budget:
 
 | Type | µs/frame | Notes |
 | :--- | ---: | :--- |
-| AC Dimmer (0) | 5 | GPIO/state update; ZC timing handled by ISR |
+| AC Dimmer (0) | 5 + background timer cost | GPIO/state update; ZC timing handled by ISR; consumes 1 shared timer |
 | DMX (1) | 22,600 | Full DMX512 frame transmit (513 slots × 11 bits @250kbps) |
 | Relay (2) | 5 | Digital state update |
 | RGB LED (3) | `80 + count×3` RGB, `80 + count×4` RGBW | CPU pixel mapping + RMT `Show()` enqueue only |
@@ -93,7 +96,7 @@ Higher FPS = less time per frame = smaller budget:
 | 7-seg 8-pin (13) | 35 | Decode + 8 segment updates before I2C additions |
 | DAC (14) | 10 | Internal DAC path before I2C additions |
 | PWM DAC (15) | 6 | Calibration + 1 PWM/PCA update |
-| Func Gen (16) | 120 | Waveform parameter update + timer-side load reserve |
+| Func Gen (16) | 120 + background timer cost | Waveform parameter update + esp_timer ISR reserve; consumes 1 timer-like slot |
 | Solenoid (17) | 10 | Pulse state machine |
 | Smoke Shooter (18) | 25 | Dual sequence state machine |
 | **I2C write** | **+180 each** | Per active PCA/DAC/expander transaction at typical 400kHz bus speed |
@@ -156,7 +159,7 @@ ESP32-native peripherals.
 
 ```cpp
 // Hardware — every count ≤ max (source-aware: expander/PCA channels don't count)
-bool hwOk = total.ledc ≤ 16 && total.rmt ≤ 8 && total.uart ≤ 2 && total.dac ≤ 2;
+bool hwOk = total.ledc ≤ 16 && total.rmt ≤ 8 && total.uart ≤ 2 && total.dac ≤ 2 && total.timer ≤ 4;
 
 // CPU/service time — total µs ≤ (1,000,000 / fps) - 1,500
 // Includes BASE_OVERHEAD_US (500 µs) for loop overhead

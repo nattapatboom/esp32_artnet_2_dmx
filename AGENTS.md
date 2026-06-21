@@ -92,14 +92,14 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 The single source of truth for resource scoring, hard peripheral limits, physical pin allocations, safety guidelines, and validation/interlock rules is:
 - **Source of Truth:** [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md)
 - **Scoring:** 3 independent budgets → **CPU or RAM full = blocked; hardware = source-aware block**
-  - **HardwareResource:** counts only (LEDC ≤16, RMT ≤8, UART ≤2, DAC ≤2) – GPIO/PCA/EXP not counted
-  - **CpuBudget:** per-type µs/frame + 500 µs base overhead + per-I2C-write overhead + ESP-NOW Master; limit = `(1,000,000 / fps) - 1,500` µs
+  - **HardwareResource:** counts only (LEDC ≤16, RMT ≤8, UART ≤2, DAC ≤2, timer ≤4) – GPIO/PCA/EXP not counted
+  - **CpuBudget:** per-type µs/frame + 500 µs base overhead + per-I2C-write overhead + AC Dimmer/Function Generator background timer cost + ESP-NOW Master; limit = `(1,000,000 / fps) - 1,500` µs
   - **RamBudget:** `224B` channel slot + actual DMX buffer estimate + runtime objects (NeoPixel/DFPlayer/Stepper/FuncGen/RMT fallback/I2C route); limit = 65535 (64 KB)
 - **Verification Parity:** Must match between:
   - C++ Firmware: `include/scoring.h` -> `estimateHardware()`, `estimateChannelCost()`, `checkScores()`
   - Web UI: `web/index.html` -> `channelHardware()`, `channelCost()`, `hwBlocked()/cpuBlocked()/ramBlocked()`
 - **LED strip runtime:** `OutputControl::updateLeds()` must call NeoPixelBus/RMT `CanShow()` before pixel mapping and `Show()`; if busy, skip that strip for the current tick and send the newest DMX buffer on a later frame.
-- **Hard Resource Limits:** Refer to [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#1-peripheral-limits) for LEDC (16 max), RMT (8 max), UART (2 usable), and shared I2C bus constraints.
+- **Hard Resource Limits:** Refer to [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#1-peripheral-limits) for LEDC (16 max), RMT (8 max), UART (2 usable), timer (4 max), and shared I2C bus constraints.
 - **Interlocks To Preserve:** Validate every config rule in both the C++ API and Web UI. You must prevent duplicate GPIOs, pin overlaps (Status LED, I2C, ZC), PCA9685 frequency conflicts, and incorrect expander usage. See [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#6-hard-validation-rules) for details.
 
 ## Coding Rules

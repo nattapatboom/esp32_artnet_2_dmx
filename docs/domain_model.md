@@ -229,7 +229,7 @@ The scoring system uses **three independent budgets**:
 
 | Budget | What it counts | Limit | Blocks save? |
 |--------|---------------|-------|:---:|
-| **HardwareResource** | Finite ESP32 peripherals: LEDC, RMT, UART, internal DAC | `ledc ≤ 16`, `rmt ≤ 8`, `uart ≤ 2`, `dac ≤ 2` | ✅ Source-aware block |
+| **HardwareResource** | Finite ESP32 peripherals: LEDC, RMT, UART, internal DAC, timers | `ledc ≤ 16`, `rmt ≤ 8`, `uart ≤ 2`, `dac ≤ 2`, `timer ≤ 4` | ✅ Source-aware block |
 | **CpuBudget** | Output service time: serialized DMX/WS281x/TM1637, active I2C writes, and 500 µs base overhead | `≤ (1,000,000/fps) - 1,500` µs | ✅ Yes |
 | **RamBudget** | Static buffer estimates per type | `≤ 65535` (64 KB) | ✅ Yes |
 
@@ -248,7 +248,7 @@ Per-type active-frame service-time estimates in µs per frame. RAM includes `224
 
 | Type | CPU µs | RAM bytes | Notes |
 |:---:|:---:|:---:|:---|
-| 0 AC Dimmer | 5 | 225 | GPIO/state update; ZC ISR separate |
+| 0 AC Dimmer | 5 + shared background timer cost | 225 | GPIO/state update; uses 1 shared hardware timer if any dimmer exists |
 | 1 DMX | 22600 | 736 UART path; +20632 if RMT fallback | Full DMX512 transmit frame |
 | 2 Relay | 5 | 225 | Digital state update |
 | 3 RGB LED | `80 + led_count×3` RGB, `80 + led_count×4` RGBW | `224 + universes×512 + led_count×3 + 256` RGB, `224 + universes×512 + led_count×4 + 256` RGBW | CPU pixel mapping + RMT enqueue; RAM includes DMX + pixel buffers |
@@ -264,7 +264,7 @@ Per-type active-frame service-time estimates in µs per frame. RAM includes `224
 | 13 7-seg 8-pin | 35 | 225 direct / 226 dimmed | Decode + segment updates before I2C writes |
 | 14 DAC | 10 | 225 | Internal DAC path before I2C write |
 | 15 PWM DAC | 6 | `224 + valueBytes` | Calibration + PWM/PCA setup |
-| 16 Func Gen | 120 | 1349 | Parameter update + timer-side load reserve; RAM includes waveform tables |
+| 16 Func Gen | 120 + background timer cost | 1349 | Parameter update + esp_timer ISR reserve; RAM includes waveform tables |
 | 17 Solenoid | 10 | 225 | Pulse state machine |
 | 18 Smoke | 25 | 225 | Dual sequence state machine |
 | I2C write | +180 each | — | Per active PCA/DAC/expander transaction |
@@ -390,13 +390,14 @@ Invariants:
 ### Hardware Resource Budget
 
 Consists of:
-- GPIO, LEDC, RMT, UART, DAC, PCA9685 channel, digital expander channel.
+- GPIO, LEDC, RMT, UART, DAC, hardware/runtime timer, PCA9685 channel, digital expander channel.
 - Compute budget from output type and `output_fps`.
 
 Invariants:
 - RMT <= 8.
 - UART usable for DMX/DFPlayer <= 2.
 - LEDC <= 16.
+- Timer <= 4. AC Dimmer consumes one shared hardware timer; Function Generator consumes one timer-like runtime slot per channel.
 - Total combined score <= `SCORE_LIMIT`.
 
 ---
@@ -549,12 +550,14 @@ Configuration must pass these gates before save/apply:
 - Count RMT for LED strips (1 per strip) and stepper (2 per stepper).
 - Count UART for DMX and DFPlayer (worst-case: 1 per DMX output).
 - Count DAC for internal DAC (source=0) only; I2C DAC (source=5) consumes no hardware resource.
+- Count timers: AC Dimmer = 1 shared timer if any dimmer exists; Function Generator = 1 timer-like runtime slot per channel.
 
 **Note:** GPIO is NOT counted. PCA9685 / digital expander channels are NOT counted as hardware.
 
 **CPU Budget** estimates output service time in microseconds:
 - Every channel has an active-frame service cost in µs (e.g., DMX 22600 µs, RGB LED CPU mapping/enqueue time, TM1637 900 µs).
 - The output loop itself adds `BASE_OVERHEAD_US = 500` µs per frame (flag checks, channel iteration, RTOS overhead).
+- AC Dimmer and Function Generator add per-frame equivalent background timer/ISR cost even when DMX values do not change.
 - Each active I2C write adds +180 µs; multi-pin outputs add multiple transactions.
 - ESP-NOW Master adds `500 + peers×ceil(512/chunkSize)×170 + universes×100` µs overhead.
 - Limit scales with FPS: `(1,000,000 / fps) - 1,500` µs. Higher FPS = less time per frame = smaller budget.

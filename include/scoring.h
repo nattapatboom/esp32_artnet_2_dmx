@@ -12,6 +12,7 @@ constexpr uint8_t MAX_LEDC_RESOURCE = 16;
 constexpr uint8_t MAX_RMT_RESOURCE = 8;
 constexpr uint8_t MAX_UART_RESOURCE = 2;
 constexpr uint8_t MAX_DAC_RESOURCE = 2;  // internal DAC (GPIO 25/26; both are Ethernet on WT32-ETH01)
+constexpr uint8_t MAX_TIMER_RESOURCE = 4;
 
 // GPIO is NOT counted — expanders can substitute.
 // PCA9685, digital expander channels are NOT counted as hardware — they use I2C
@@ -21,6 +22,7 @@ struct HardwareResource {
     uint8_t rmt = 0;
     uint8_t uart = 0;
     uint8_t dac = 0;
+    uint8_t timer = 0;
 
     HardwareResource operator+(const HardwareResource& o) const {
         HardwareResource r;
@@ -28,6 +30,7 @@ struct HardwareResource {
         r.rmt  = rmt  + o.rmt;
         r.uart = uart + o.uart;
         r.dac  = dac  + o.dac;
+        r.timer = timer + o.timer;
         return r;
     }
 };
@@ -36,7 +39,8 @@ inline bool hardwareWithinLimit(const HardwareResource& h) {
     return h.ledc <= MAX_LEDC_RESOURCE &&
            h.rmt <= MAX_RMT_RESOURCE &&
            h.uart <= MAX_UART_RESOURCE &&
-           h.dac <= MAX_DAC_RESOURCE;
+           h.dac <= MAX_DAC_RESOURCE &&
+           h.timer <= MAX_TIMER_RESOURCE;
 }
 
 // ═══════════════════════════════════════
@@ -133,7 +137,7 @@ inline HardwareResource estimateHardware(const OutputChannel& ch) {
         case 15:
             if (ch.source == 0) h.ledc = 1;
             break;
-        case 16: h.ledc = 1; break;
+        case 16: h.ledc = 1; h.timer = 1; break;
         case 17: break;
         case 18: break;
     }
@@ -233,6 +237,23 @@ constexpr uint32_t FUNCGEN_OBJECT_RAM = 1120;  // 4 waveform tables + esp_timer 
 constexpr uint32_t RMT_DMX_DRIVER_RAM = 5150UL * sizeof(rmt_item32_t) + 32;
 constexpr uint32_t I2C_ROUTE_RAM = 32;
 
+inline uint32_t frameTimeUs(uint8_t outputFps) {
+    if (outputFps < 1) outputFps = 40;
+    return 1000000U / (uint32_t)outputFps;
+}
+
+inline uint32_t acDimmerBackgroundUs(uint8_t dimmerCount, uint8_t outputFps) {
+    if (dimmerCount == 0) return 0;
+    uint32_t ticksPerFrame = frameTimeUs(outputFps) / 39; // DIMMER_TICK_US
+    return ticksPerFrame * (1 + dimmerCount);            // timer ISR base + per-channel compare
+}
+
+inline uint32_t funcGenBackgroundUs(uint8_t funcGenCount, uint8_t outputFps) {
+    if (funcGenCount == 0) return 0;
+    uint32_t samplesPerFrame = frameTimeUs(outputFps) / 50; // esp_timer minimum period in FuncGenController
+    return samplesPerFrame * 4U * funcGenCount;            // table lookup + LEDC write ISR estimate
+}
+
 inline uint32_t dmxBufferRamForChannel(uint8_t type, uint16_t ledCount, uint8_t colorOrder, uint8_t resolution, uint8_t mode) {
     switch (type) {
         case 1:
@@ -278,7 +299,7 @@ struct PerChannelCost {
 };
 
 // Per-type active-frame service-time estimates (µs/frame) for ESP32 at 240 MHz.
-// Includes serialized DMX/WS281x/TM1637 time and active I2C transactions.
+// Includes serialized DMX/TM1637 work, LED strip mapping/enqueue, and active I2C transactions.
 inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     PerChannelCost c;
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(ch.type, ch.led_count, ch.color_order, ch.mc_resolution, ch.mc_mode);
@@ -324,13 +345,26 @@ inline PerChannelCost espnowMasterCost(uint8_t peerCount, uint8_t universeCount,
 
 inline HardwareResource totalHardware(const std::vector<OutputChannel>& chs) {
     HardwareResource t;
-    for (auto& ch : chs) t = t + estimateHardware(ch);
+    bool hasDimmer = false;
+    for (auto& ch : chs) {
+        t = t + estimateHardware(ch);
+        if (ch.type == 0) hasDimmer = true;
+    }
+    if (hasDimmer) t.timer += 1;
     return t;
 }
 
-inline CpuBudget totalCpu(const std::vector<OutputChannel>& chs) {
+inline CpuBudget totalCpu(const std::vector<OutputChannel>& chs, uint8_t fps = 40) {
     CpuBudget t;
-    for (auto& ch : chs) t.usPerFrame += estimateChannelCost(ch).cpuUs;
+    uint8_t dimmerCount = 0;
+    uint8_t funcGenCount = 0;
+    for (auto& ch : chs) {
+        t.usPerFrame += estimateChannelCost(ch).cpuUs;
+        if (ch.type == 0) dimmerCount++;
+        else if (ch.type == 16) funcGenCount++;
+    }
+    t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
+    t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
     return t;
 }
 
@@ -391,7 +425,7 @@ inline HardwareResource estimateHardwareFromJson(JsonObjectConst j) {
         }
         case 14: if (src != 5) h.dac = 1; break;
         case 15: if (src == 0) h.ledc = 1; break;
-        case 16: h.ledc = 1; break;
+        case 16: h.ledc = 1; h.timer = 1; break;
         case 17: break;
         case 18: break;
     }
@@ -502,13 +536,27 @@ inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
 
 inline HardwareResource totalHardwareFromJson(JsonArrayConst arr) {
     HardwareResource t;
-    for (JsonObjectConst j : arr) t = t + estimateHardwareFromJson(j);
+    bool hasDimmer = false;
+    for (JsonObjectConst j : arr) {
+        t = t + estimateHardwareFromJson(j);
+        if ((uint8_t)(j["type"] | 0) == 0) hasDimmer = true;
+    }
+    if (hasDimmer) t.timer += 1;
     return t;
 }
 
 inline CpuBudget totalCpuFromJson(JsonArrayConst arr, uint8_t fps = 40) {
     CpuBudget t;
-    for (JsonObjectConst j : arr) t.usPerFrame += estimateChannelCostFromJson(j).cpuUs;
+    uint8_t dimmerCount = 0;
+    uint8_t funcGenCount = 0;
+    for (JsonObjectConst j : arr) {
+        uint8_t type = j["type"] | 0;
+        t.usPerFrame += estimateChannelCostFromJson(j).cpuUs;
+        if (type == 0) dimmerCount++;
+        else if (type == 16) funcGenCount++;
+    }
+    t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
+    t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
     return t;
 }
 
