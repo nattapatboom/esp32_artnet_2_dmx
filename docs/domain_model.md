@@ -559,6 +559,8 @@ Configuration must pass these gates before save/apply:
 - ESP-NOW Master adds `500 + peers×ceil(512/chunkSize)×170 + universes×100` µs overhead.
 - Limit scales with FPS: `(1,000,000 / fps) - 1,500` µs. Higher FPS = less time per frame = smaller budget.
 
+**LED strip frame skip behavior:** RGB/RGBW LED strips use NeoPixelBus/RMT and call `CanShow()` before mapping/sending a new frame. If the previous WS281x transfer is still busy (for example a very long strip exceeds the configured FPS frame window), the firmware skips that strip update for the current tick and sends the newest buffered DMX values on the next available frame. This avoids blocking Core 1 or queuing overlapping RMT transfers.
+
 **RAM Budget** estimates static/stack buffer bytes:
 - Every channel: 224 bytes for the `OutputChannel` vector slot and allocator/header slack.
 - Every channel gets a firmware DMX value buffer sized to what the output reads; DMX output uses 512 bytes and LED strips use `ceil(pixel_bytes/512)×512`.

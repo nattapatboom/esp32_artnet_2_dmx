@@ -98,6 +98,7 @@ The single source of truth for resource scoring, hard peripheral limits, physica
 - **Verification Parity:** Must match between:
   - C++ Firmware: `include/scoring.h` -> `estimateHardware()`, `estimateChannelCost()`, `checkScores()`
   - Web UI: `web/index.html` -> `channelHardware()`, `channelCost()`, `hwBlocked()/cpuBlocked()/ramBlocked()`
+- **LED strip runtime:** `OutputControl::updateLeds()` must call NeoPixelBus/RMT `CanShow()` before pixel mapping and `Show()`; if busy, skip that strip for the current tick and send the newest DMX buffer on a later frame.
 - **Hard Resource Limits:** Refer to [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#1-peripheral-limits) for LEDC (16 max), RMT (8 max), UART (2 usable), and shared I2C bus constraints.
 - **Interlocks To Preserve:** Validate every config rule in both the C++ API and Web UI. You must prevent duplicate GPIOs, pin overlaps (Status LED, I2C, ZC), PCA9685 frequency conflicts, and incorrect expander usage. See [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#6-hard-validation-rules) for details.
 

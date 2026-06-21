@@ -104,6 +104,8 @@ cpuUs = 500 + peerCount × ceil(512/chunkSize) × 170 + universeCount × 100
 ramBytes = 512 + peerCount × (chunkSize + 44)
 ```
 
+**LED strip frame skip behavior:** Runtime calls NeoPixelBus/RMT `CanShow()` before mapping pixels and calling `Show()`. If the previous WS281x transfer is still busy, that strip's update is skipped for the current frame tick and the next tick sends the newest DMX buffer. The CPU/service estimate still counts the serialized line time so long strips are limited before they create sustained frame drops.
+
 ### 3C. RamBudget — Runtime Memory Estimate
 
 RAM estimates now include the `OutputChannel` vector slot, allocator/header slack, the per-channel DMX buffer allocated by firmware, and known runtime driver objects.
@@ -254,7 +256,7 @@ The score calculator is not the only gate. Firmware and Web UI validation also e
 
 1. **Total LED Limit**
     * Keep total NeoPixels under about 4,000 pixels to avoid memory starvation.
-    * Long individual strips reduce refresh rate because WS281x timing is serialized.
+    * Long individual strips reduce refresh rate because WS281x timing is serialized; when the strip is still busy, runtime skips that frame rather than blocking Core 1.
 
 2. **Bluetooth/BLE Excluded**
     * Bluetooth/BLE is intentionally excluded because it consumes flash/RAM needed for OTA and Ethernet stability.
