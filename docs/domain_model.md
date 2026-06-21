@@ -248,26 +248,34 @@ Per-type CPU weight estimates (at 40 FPS reference). Every channel also costs a 
 
 | Type | CPU weight | RAM bytes | Notes |
 |:---:|:---:|:---:|:---|
-| 0 AC Dimmer | 0.10 | — | ZC ISR + GPIO write |
-| 1 DMX | 0.50 | 512 | 512-byte copy per frame |
-| 2 Relay | 0.05 | — | Trivial |
-| 3 RGB LED | `led_count×0.005` | `led_count×3` | Per-pixel NeoPixel update |
-| 4 Single LED | 0.10 | — | 1 PWM write |
-| 5 Analog RGB | 0.20 | — | 3-4 PWM writes |
-| 6 Motor | 0.50 | — | PWM + direction |
-| 7 Stepper | 2.00 | — | Pulse-train + state machine |
-| 8 Servo | 0.20 | — | 1 PWM write |
-| 9 Buzzer | 0.10 | — | Tone PWM |
-| 10 DFPlayer | 0.50 | 100 | UART command buffer |
-| 11 TM1637 | 0.50 | — | Bit-bang I2C-like |
-| 12 7-seg 7-pin | 1.00 | — | 7 PWM updates |
-| 13 7-seg 8-pin | 1.20 | — | 8 PWM updates |
-| 14 DAC | 0.30 | — | I2C or analog write |
-| 15 PWM DAC | 0.10 | — | 1 PWM |
-| 16 Func Gen | 2.00 | — | Timer + waveform calc |
-| 17 Solenoid | 0.10 | — | State machine |
-| 18 Smoke | 0.30 | — | Dual state machine |
-| I2C overhead | +0.30 | — | Per channel using I2C source
+| 0 AC Dimmer | 0.10 | 128 | ZC ISR + GPIO write |
+| 1 DMX | 0.50 | 640 | 512-byte copy per frame |
+| 2 Relay | 0.05 | 128 | Trivial |
+| 3 RGB LED | `led_count×0.005` | `128 + led_count×3` | Per-pixel NeoPixel update |
+| 4 Single LED | 0.10 | 128 | 1 PWM write |
+| 5 Analog RGB | 0.20 | 128 | 3-4 PWM writes |
+| 6 Motor | 0.50 | 128 | PWM + direction |
+| 7 Stepper | 2.00 | 128 | Pulse-train + state machine |
+| 8 Servo | 0.20 | 128 | 1 PWM write |
+| 9 Buzzer | 0.10 | 128 | Tone PWM |
+| 10 DFPlayer | 0.50 | 228 | UART command buffer |
+| 11 TM1637 | 0.50 | 128 | Bit-bang I2C-like |
+| 12 7-seg 7-pin | 1.00 | 128 | 7 PWM updates |
+| 13 7-seg 8-pin | 1.20 | 128 | 8 PWM updates |
+| 14 DAC | 0.30 | 128 | I2C or analog write |
+| 15 PWM DAC | 0.10 | 128 | 1 PWM |
+| 16 Func Gen | 2.00 | 128 | Timer + waveform calc |
+| 17 Solenoid | 0.10 | 128 | State machine |
+| 18 Smoke | 0.30 | 128 | Dual state machine |
+| I2C overhead | +0.30 | — | Per channel using I2C source |
+
+#### ESP-NOW Master Overhead
+
+ESP-NOW Master mode has additional CPU and RAM independent of output channels:
+
+| Source | CPU weight | RAM bytes |
+|:---|:---:|---:|
+| ESP-NOW Master | `1.0 + peers×0.2 + universes×0.3` | `512 + peers×256` |
 
 #### Offline Load Calculator
 

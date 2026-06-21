@@ -96,11 +96,29 @@ cpuWeight = 1.0 + peerCount×0.2 + universeCount×0.3
 
 ### 3C. RamBudget — Static Buffer Estimate
 
+Every channel costs 128 bytes for the `OutputChannel` struct itself, plus type-specific buffers:
+
 | Type | RAM (bytes) | Notes |
 | :--- | ---: | :--- |
-| DMX | 512 | 512-byte copy per frame |
-| DFPlayer | 100 | UART command buffer |
-| RGB LED | `count×3` | NeoPixel pixel buffer |
+| AC Dimmer (0) | 128 | struct only |
+| DMX (1) | 640 | 128 struct + 512 DMX buffer |
+| Relay (2) | 128 | struct only |
+| RGB LED (3) | `128 + count×3` | struct + NeoPixel pixel buffer |
+| Single LED (4) | 128 | struct only |
+| Analog RGB (5) | 128 | struct only |
+| Motor (6) | 128 | struct only |
+| Stepper (7) | 128 | struct only |
+| Servo (8) | 128 | struct only |
+| Buzzer (9) | 128 | struct only |
+| DFPlayer (10) | 228 | 128 struct + 100 UART command buffer |
+| TM1637 (11) | 128 | struct only |
+| 7-seg 7-pin (12) | 128 | struct only |
+| 7-seg 8-pin (13) | 128 | struct only |
+| DAC (14) | 128 | struct only |
+| PWM DAC (15) | 128 | struct only |
+| Func Gen (16) | 128 | struct only |
+| Solenoid (17) | 128 | struct only |
+| Smoke Shooter (18) | 128 | struct only |
 
 ESP-NOW Master overhead:
 ```
