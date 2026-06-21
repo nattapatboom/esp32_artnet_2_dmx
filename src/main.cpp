@@ -403,18 +403,6 @@ bool outputsUseReservedPin(JsonArray outputs, uint8_t reservedPin, const char* l
     return false;
 }
 
-bool savedOutputsUseReservedPin(uint8_t reservedPin, const char* label, String& message) {
-    if (reservedPin == 255 || !LittleFS.exists("/outputs.json")) return false;
-    File file = LittleFS.open("/outputs.json", "r");
-    if (!file) return false;
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, file);
-    file.close();
-    if (error || !doc["outputs"].is<JsonArray>()) return false;
-    return outputsUseReservedPin(doc["outputs"].as<JsonArray>(), reservedPin, label, message);
-}
-
 // Check for GPIO12 (MTDI bootstrap), GPIO34-39 (input-only), and Ethernet/system reserved pins.
 // GPIO34-39 are allowed only on pins used as inputs (e.g. stepper HOME switch on pin4).
 bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
@@ -859,12 +847,10 @@ bool validateOutputJson(JsonArray outputs, String& message) {
     }
     if (outputsUseForbiddenGpio(outputs, message)) return false;
 
-    bool hasAcDimmer = false;
     uint8_t channelNumber = 1;
     for (JsonObject output : outputs) {
         uint8_t type = output["type"] | 0;
         uint8_t source = output["source"] | 0;
-        if (type == 0) hasAcDimmer = true;
         if (type > 18) {
             message = "Invalid output type on channel " + String(channelNumber) + ".";
             return false;
@@ -1439,23 +1425,6 @@ void setupWebServer() {
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
                 return;
             }
-            if (savedOutputsUseReservedPin(requestedStatusPin, "Status LED", validationMessage)) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (savedOutputsUseReservedPin(requestedZcPin, "Zero-Crossing", validationMessage)) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (savedOutputsUseReservedPin(requestedSda, "I2C SDA", validationMessage)) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (savedOutputsUseReservedPin(requestedScl, "I2C SCL", validationMessage)) {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-
             JsonDocument outputsDoc;
             JsonArray savedOutputs = outputsDoc["outputs"].to<JsonArray>();
             if (LittleFS.exists("/outputs.json")) {

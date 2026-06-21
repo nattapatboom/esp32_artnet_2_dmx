@@ -49,11 +49,7 @@ public:
         // 1. Break and MAB
         rmt_buffer[item_count++] = {{{DMX_BREAK_US, 0, DMX_MAB_US, 1}}};
 
-        // 2. Data slots (0 Start Code + 512 channels)
-        // Since ESP-DMX already provides the start code at [0], we read 513 bytes.
-        // Wait, output_control passes dmxBuffer which is 512 bytes (channels 1-512).
-        // So we must manually send the 0x00 start code first!
-        
+        // 2. Data slots: start code + 512 channel bytes.
         uint8_t byte = 0x00; // Start code
         encodeByte(byte, item_count);
 
