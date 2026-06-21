@@ -65,6 +65,23 @@ Key rules:
 - Current layout version is `3`.
 - `web/index.html` is the UI source; `include/web_pages.h` is a generated file.
 
+#### End-User Configurable Parameters (Web UI)
+
+All `SystemConfig` fields are exposed via the Web UI settings page at `/settings`:
+- **Network:** Ethernet DHCP/IP/mask/gateway/DNS, Wi-Fi STA SSID/pass/IP/mask/gateway/DNS, AP SSID/pass, mDNS hostname
+- **Protocol:** Art-Net port, sACN enable/multicast/port
+- **Output:** Global FPS, Status LED pin, Zero-Crossing pin
+- **I2C:** SDA/SCL pins, bus speed
+- **Display:** Enable/disable, type (SSD1306/SH1106), I2C address, brightness
+- **Mode:** Device mode (Art-Net Ethernet, ESP-NOW Master, ESP-NOW Slave)
+
+Output channel layout (`/outputs.json`) is configurable via the Web UI outputs page at `/outputs`.
+
+**Not exposed in Web UI** (compile-time only):
+- Hardware pin reservations: ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC/MDIO, ETH_CLK_MODE
+- ESP-NOW chunk size (`ESPNOW_DMX_CHUNK_SIZE`), FreeRTOS queue depth, score limits
+- Default pin values (status_led=5, i2c_sda=14, i2c_scl=15, etc.) — these are code defaults, not hidden settings
+
 #### Storage Strategy
 
 The system stores configuration in two parts:
