@@ -55,6 +55,8 @@ def check_pin_safety(pin, status_led=5, zc_pin=255, role="Output", sda_pin=14, s
         return False, f"❌ CRITICAL ERROR: GPIO {pin} is reserved for Ethernet LAN8720. Using it will crash Ethernet!"
     if pin in serial_pins:
         return False, f"⚠️ WARNING: GPIO {pin} is UART0 Serial TX/RX (USB debug). Using it may interfere with flashing/logs."
+    if pin == 12 and role == "Output":
+        return False, f"❌ CRITICAL ERROR: GPIO 12 (MTDI bootstrap) is forbidden as an output. It can cause a boot loop!"
     if pin == status_led:
         return False, f"❌ CONFLICT: GPIO {pin} is configured as the Status LED pin."
     if pin == zc_pin and zc_pin != 255:
@@ -70,6 +72,8 @@ def check_pin_safety(pin, status_led=5, zc_pin=255, role="Output", sda_pin=14, s
     else:
         if pin in input_only_pins:
             return False, f"❌ CRITICAL: GPIO {pin} is an INPUT-ONLY pin (GPI). It cannot be used as an output role: '{role}'!"
+        if pin == 12:
+            return False, f"❌ CRITICAL ERROR: GPIO 12 (MTDI bootstrap) is forbidden as an output."
         if pin in safe_output_pins:
             return True, "Safe Output"
         return False, f"⚠️ WARNING: GPIO {pin} is not in the standard exposed output pin list for WT32-ETH01. Verify hardware."

@@ -414,7 +414,7 @@ bool savedOutputsUseReservedPin(uint8_t reservedPin, const char* label, String& 
     return outputsUseReservedPin(doc["outputs"].as<JsonArray>(), reservedPin, label, message);
 }
 
-// Check for GPIO12 (MTDI bootstrap — strictly forbidden) and GPIO34-39 (input-only on ESP32).
+// Check for GPIO12 (MTDI bootstrap), GPIO34-39 (input-only), and Ethernet/system reserved pins.
 // GPIO34-39 are allowed only on pins used as inputs (e.g. stepper HOME switch on pin4).
 bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
     auto isForbiddenOutput = [](int rawPin) -> int8_t {
@@ -422,6 +422,10 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
         uint8_t p = (uint8_t)rawPin;
         if (p == 12) return 12;          // bootstrap — never allowed
         if (p >= 34 && p <= 39) return (int8_t)p; // input-only on ESP32
+        // Ethernet RMII and PHY power pins (GPIO0, 16, 18, 19, 21, 22, 23, 25, 26, 27)
+        if (p == 0 || p == 16 || p == 18 || p == 19 || p == 21 || p == 22 || p == 23 || p == 25 || p == 26 || p == 27) {
+            return (int8_t)p;
+        }
         return -1;
     };
     uint8_t channel = 1;
@@ -438,8 +442,13 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
         auto forbid = [&](int rawPin, const char* label) -> bool {
             int8_t p = isForbiddenOutput(rawPin);
             if (p < 0) return false;
-            if (p == 12) message = "GPIO 12 (MTDI bootstrap) is forbidden as an output on channel " + String(channel) + label;
-            else message = "GPIO " + String(p) + " is input-only and cannot be used as an output on channel " + String(channel) + label;
+            if (p == 12) {
+                message = "GPIO 12 (MTDI bootstrap) is forbidden as an output on channel " + String(channel) + label;
+            } else if (p == 0 || p == 16 || p == 18 || p == 19 || p == 21 || p == 22 || p == 23 || p == 25 || p == 26 || p == 27) {
+                message = "GPIO " + String(p) + " is reserved for Ethernet and cannot be used as an output on channel " + String(channel) + label;
+            } else {
+                message = "GPIO " + String(p) + " is input-only and cannot be used as an output on channel " + String(channel) + label;
+            }
             return true;
         };
 
