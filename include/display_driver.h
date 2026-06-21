@@ -142,6 +142,20 @@ public:
 
     bool isActive() const { return _active; }
 
+    bool tryRecover() {
+        if (_active) return true;
+        if (_type == DISPLAY_OFF) return false;
+
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return false;
+        Wire.beginTransmission(_addr);
+        bool alive = (Wire.endTransmission() == 0);
+        if (i2cMutex) xSemaphoreGive(i2cMutex);
+
+        if (!alive) return false;
+
+        return begin(_type, _addr);
+    }
+
 private:
     bool _active = false;
     uint8_t _type = 0;

@@ -2124,6 +2124,14 @@ void networkTask(void* pvParameters) {
 
                 display.update(line1, line2, line3, line4);
             }
+        } else if (sysCfg.display_enabled) {
+            // Attempt periodic recovery if display was deactivated by I2C errors (ADR004)
+            static unsigned long lastDisplayRecover = 0;
+            unsigned long now = millis();
+            if (now - lastDisplayRecover >= 5000) {
+                lastDisplayRecover = now;
+                display.tryRecover();
+            }
         }
 
         // Process queued I2C scan request (runs on Core 0, non-blocking for HTTP)

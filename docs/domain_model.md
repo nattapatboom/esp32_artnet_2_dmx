@@ -600,6 +600,7 @@ Known implementation drift (scoring-specific):
 ### ADR004: I2C Display Recovery & Non-blocking Strategy
 - **Rationale:** I2C display may temporarily disconnect, but blocking on I2C ACK wastes output protocol time
 - **Decision:** (1) Periodically scan I2C bus for auto-reinit (2) Non-blocking/Minimum Wait I2C writes (3) Allow disabling display via Web UI
+- **Implementation:** (1) `DisplayDriver::tryRecover()` checks I2C address liveness every 5 seconds in Core 0 display loop at `display_driver.h:145` and `main.cpp:2129` (2) Display `update()` uses short I2C mutex timeout (`pdMS_TO_TICKS(100)`) and deactivates after `DISPLAY_MAX_ERRORS` (3) `display_enabled` toggle in Web UI settings
 
 ### ADR005: Low Latency Direct Update & Hold Last State
 - **Rationale:** Latency is critical in stage lighting; Frame Interpolation adds buffer lag
@@ -672,6 +673,7 @@ Questions used during the grilling session and answers inferred from the existin
 | 14 | PCA9685 frequency conflict warning (C++: Serial warning in `validateOutputJson()`) | ✅ Completed (`main.cpp`) |
 | 15 | `scoreBlockerName()` missing RamLimit case | ✅ Completed (`scoring.h`) |
 | 16 | ADR008 GPIO DAC blocking: block source=0 for Type 14 on WT32-ETH01 | ✅ Completed (`main.cpp:869`, `index.html:1416`) |
+| 17 | ADR004 I2C Display periodic auto-reinit via `tryRecover()` | ✅ Completed (`display_driver.h:145`, `main.cpp:2129`) |
 
 ### Future Features — planned but not started
 - Frame interpolation for mechanical outputs (ADR005, long-term)
