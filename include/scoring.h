@@ -145,6 +145,10 @@ inline bool usesI2C(const OutputChannel& ch) {
 }
 
 // CPU weight & RAM per channel (independent of FPS)
+// Every channel costs at least sizeof(OutputChannel) ≈ 128 bytes for the struct itself,
+// plus type-specific allocations (DMX buffer, NeoPixel buffer, DFPlayer buffer, etc.)
+constexpr uint16_t BASE_CHANNEL_RAM = 128;
+
 struct PerChannelCost {
     float cpuWeight = 0;
     uint16_t ramBytes = 0;
@@ -152,18 +156,19 @@ struct PerChannelCost {
 
 inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     PerChannelCost c;
+    c.ramBytes = BASE_CHANNEL_RAM;  // base struct overhead
     switch (ch.type) {
         case 0:  c.cpuWeight = 0.10f; break;
-        case 1:  c.cpuWeight = 0.50f; c.ramBytes = 512; break;
+        case 1:  c.cpuWeight = 0.50f; c.ramBytes += 512; break;
         case 2:  c.cpuWeight = 0.05f; break;
-        case 3:  c.cpuWeight = ch.led_count * 0.005f; c.ramBytes = ch.led_count * 3; break;
+        case 3:  c.cpuWeight = ch.led_count * 0.005f; c.ramBytes += ch.led_count * 3; break;
         case 4:  c.cpuWeight = 0.10f; break;
         case 5:  c.cpuWeight = 0.20f; break;
         case 6:  c.cpuWeight = 0.50f; break;
         case 7:  c.cpuWeight = 2.00f; break;
         case 8:  c.cpuWeight = 0.20f; break;
         case 9:  c.cpuWeight = 0.10f; break;
-        case 10: c.cpuWeight = 0.50f; c.ramBytes = 100; break;
+        case 10: c.cpuWeight = 0.50f; c.ramBytes += 100; break;
         case 11: c.cpuWeight = 0.50f; break;
         case 12: c.cpuWeight = 1.00f; break;
         case 13: c.cpuWeight = 1.20f; break;
@@ -270,19 +275,20 @@ inline bool usesI2CFromJson(JsonObjectConst j) {
 
 inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
     PerChannelCost c;
+    c.ramBytes = BASE_CHANNEL_RAM;
     uint8_t t = j["type"] | 0;
     switch (t) {
         case 0:  c.cpuWeight = 0.10f; break;
-        case 1:  c.cpuWeight = 0.50f; c.ramBytes = 512; break;
+        case 1:  c.cpuWeight = 0.50f; c.ramBytes += 512; break;
         case 2:  c.cpuWeight = 0.05f; break;
-        case 3:  c.cpuWeight = (j["led_count"] | 0) * 0.005f; c.ramBytes = (j["led_count"] | 0) * 3; break;
+        case 3:  c.cpuWeight = (j["led_count"] | 0) * 0.005f; c.ramBytes += (j["led_count"] | 0) * 3; break;
         case 4:  c.cpuWeight = 0.10f; break;
         case 5:  c.cpuWeight = 0.20f; break;
         case 6:  c.cpuWeight = 0.50f; break;
         case 7:  c.cpuWeight = 2.00f; break;
         case 8:  c.cpuWeight = 0.20f; break;
         case 9:  c.cpuWeight = 0.10f; break;
-        case 10: c.cpuWeight = 0.50f; c.ramBytes = 100; break;
+        case 10: c.cpuWeight = 0.50f; c.ramBytes += 100; break;
         case 11: c.cpuWeight = 0.50f; break;
         case 12: c.cpuWeight = 1.00f; break;
         case 13: c.cpuWeight = 1.20f; break;

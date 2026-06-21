@@ -244,7 +244,7 @@ Key rules:
 - **ESP-NOW Master overhead** is a separate CPU/RAM cost: `cpuWeight = 1.0 + peers×0.2 + universes×0.3`, `ramBytes = 512 + peers×256`.
 - All three budgets are checked independently; CPU and RAM **block saving**, hardware is **source-aware block** (types using PCA9685 or expander bypass the count).
 
-Per-type CPU weight estimates (at 40 FPS reference):
+Per-type CPU weight estimates (at 40 FPS reference). Every channel also costs a base 128 bytes for the `OutputChannel` struct itself:
 
 | Type | CPU weight | RAM bytes | Notes |
 |:---:|:---:|:---:|:---|
@@ -547,7 +547,8 @@ Configuration must pass these gates before save/apply:
 - Limit scales with FPS: `25.0 × (40/fps)`. Higher FPS = less CPU budget per frame.
 
 **RAM Budget** estimates static/stack buffer bytes:
-- DMX output: 512 bytes, DFPlayer: 100 bytes, RGB LED: `led_count × 3` bytes.
+- Every channel: 128 bytes for the `OutputChannel` struct itself.
+- DMX output: +512 bytes for DMX buffer, DFPlayer: +100 bytes for UART command buffer, RGB LED: `led_count × 3` bytes for pixel buffer.
 - ESP-NOW Master: `512 + peers×256` bytes.
 - Limit: 65535 bytes (64 KB).
 

@@ -1813,19 +1813,19 @@ function channelUsesI2C(o){
 }
 function channelCost(o){
   const t=typeId(o);
-  let cpu=0, ram=0;
+  let cpu=0, ram=BASE_CHANNEL_RAM;
   switch(t){
     case 0: cpu=0.10; break;
-    case 1: cpu=0.50; ram=512; break;
+    case 1: cpu=0.50; ram+=512; break;
     case 2: cpu=0.05; break;
-    case 3: cpu=(o.led_count||0)*0.005; ram=(o.led_count||0)*3; break;
+    case 3: cpu=(o.led_count||0)*0.005; ram+=(o.led_count||0)*3; break;
     case 4: cpu=0.10; break;
     case 5: cpu=0.20; break;
     case 6: cpu=0.50; break;
     case 7: cpu=2.00; break;
     case 8: cpu=0.20; break;
     case 9: cpu=0.10; break;
-    case 10: cpu=0.50; ram=100; break;
+    case 10: cpu=0.50; ram+=100; break;
     case 11: cpu=0.50; break;
     case 12: cpu=1.00; break;
     case 13: cpu=1.20; break;
@@ -1840,6 +1840,7 @@ function channelCost(o){
 }
 const HW_MAX={ledc:16,rmt:8,uart:2,dac:2};
 const RAM_LIMIT=65535;
+const BASE_CHANNEL_RAM=128;
 function cpuLimit(fps){ return 25*(40/(parseInt(fps)||40)); }
 function totalHardware(arr){
   const t={ledc:0,rmt:0,uart:0,dac:0};
