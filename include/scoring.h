@@ -71,11 +71,13 @@ struct RamBudget {
     }
 
     static uint16_t limit() {
-        // Use at most 20% of free heap for output buffers, capped at 64KB
-        uint32_t freeHeap = ESP.getFreeHeap();
-        uint16_t computed = (freeHeap * 20) / 100;
-        if (computed > 65535) computed = 65535;
-        return computed;
+        // Keep at least 150 KB free for system/network/runtime; use the rest for output buffers, capped at 64 KB.
+        constexpr uint32_t KEEP_FREE = 150 * 1024;
+        int32_t freeHeap = ESP.getFreeHeap();
+        int32_t available = freeHeap - KEEP_FREE;
+        if (available < 0) available = 0;
+        if (available > 65535) available = 65535;
+        return (uint16_t)available;
     }
 };
 
