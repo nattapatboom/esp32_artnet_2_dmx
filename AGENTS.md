@@ -91,11 +91,13 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 
 The single source of truth for resource scoring, hard peripheral limits, physical pin allocations, safety guidelines, and validation/interlock rules is:
 - **Source of Truth:** [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md)
-- **Scoring Formula:** `resourceScore = GPIO*0.5 + LEDC*2.5 + RMT*3.0 + UART*8.0 + DAC*2.0 + PCA*0.25 + EXP*0.125`
-- **Verification Parity:** Weight constants and compute rules must match between:
-  - C++ Firmware: `include/scoring.h` -> `estimateResources()`, `resourceScore()`, `channelComputeScore()`, `totalCombinedScore()`
-  - Web UI: `web/index.html` -> matching JS scoring functions
-  - Limit: `SCORE_LIMIT = resourceScoreLimit() + MAX_COMPUTE_SCORE`, currently about 109
+- **Scoring:** 3 independent budgets → **CPU or RAM full = blocked; hardware = source-aware block**
+  - **HardwareResource:** counts only (LEDC ≤16, RMT ≤8, UART ≤2, DAC ≤2) – GPIO/PCA/EXP not counted
+  - **CpuBudget:** per-type weight + I2C overhead + ESP-NOW Master; limit = `25.0 × (40/fps)`
+  - **RamBudget:** static byte estimate per type; limit = 65535 (64 KB)
+- **Verification Parity:** Must match between:
+  - C++ Firmware: `include/scoring.h` -> `estimateHardware()`, `estimateChannelCost()`, `checkScores()`
+  - Web UI: `web/index.html` -> `channelHardware()`, `channelCost()`, `hwBlocked()/cpuBlocked()/ramBlocked()`
 - **Hard Resource Limits:** Refer to [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#1-peripheral-limits) for LEDC (16 max), RMT (8 max), UART (2 usable), and shared I2C bus constraints.
 - **Interlocks To Preserve:** Validate every config rule in both the C++ API and Web UI. You must prevent duplicate GPIOs, pin overlaps (Status LED, I2C, ZC), PCA9685 frequency conflicts, and incorrect expander usage. See [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#6-hard-validation-rules) for details.
 

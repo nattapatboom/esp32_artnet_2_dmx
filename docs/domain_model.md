@@ -223,11 +223,15 @@ Key rules:
 - **PCA9685 Shared Frequency Conflict:** If devices with different frequency requirements (servo 50Hz + LED >200Hz) are mixed on the same PCA chip, Web UI and API show a warning but do not block saving
 - **DMX Frame Timeout:** Core 1 loop must not perform any blocking operation that causes DMX Frame Cycle to exceed 50ms; initial FPS is forced to 30-40 FPS
 
-### Capacity Scoring Context
+### Capacity Scoring Context (Refactored v2)
 
-Responsibilities:
-- Evaluate the resource weight of a configuration before saving.
-- Combine hardware resource score and compute score.
+The scoring system uses **three independent budgets**:
+
+| Budget | What it counts | Limit | Blocks save? |
+|--------|---------------|-------|:---:|
+| **HardwareResource** | Finite ESP32 peripherals: LEDC, RMT, UART, internal DAC | `ledc ≤ 16`, `rmt ≤ 8`, `uart ≤ 2`, `dac ≤ 2` | ✅ Source-aware block |
+| **CpuBudget** | Per-type CPU weight per frame × FPS scaling | `≤ 25.0 × (40/fps)` at 40 FPS baseline | ✅ Yes |
+| **RamBudget** | Static buffer estimates per type | `≤ 65535` (64 KB) | ✅ Yes |
 
 Key files:
 - `include/scoring.h`
@@ -235,22 +239,35 @@ Key files:
 - `docs/resource_calculator.md`
 
 Key rules:
-- Weight constants must match between C++ and JS.
-- Resource scoring must reflect actual routing, including hybrid pin sources, segment-level routing, and DMX UART/RMT fallback.
-- Total score limit is derived from resource max of WT32-ETH01 plus compute budget.
-- Resource score does not replace hard interlock checks; validation must still enforce peripheral limits.
+- **GPIO is NOT counted** — expanders (I2C) can substitute for GPIO pins. The I2C overhead is reflected in CPU weight instead.
+- **PCA9685 / digital expander channels are NOT counted as hardware** — they consume I2C bus time, added to CPU weight as +0.3 per I2C-routed channel.
+- **ESP-NOW Master overhead** is a separate CPU/RAM cost: `cpuWeight = 1.0 + peers×0.2 + universes×0.3`, `ramBytes = 512 + peers×256`.
+- All three budgets are checked independently; CPU and RAM **block saving**, hardware is **source-aware block** (types using PCA9685 or expander bypass the count).
 
-#### Score Formula
+Per-type CPU weight estimates (at 40 FPS reference):
 
-```text
-resourceScore = GPIO*0.5 + LEDC*2.5 + RMT*3.0 + UART*8.0 + DAC*2.0 + PCA*0.25 + EXP*0.125
-computeScore  = sum(type compute cost) + (output_fps / 60) * 5
-totalScore    = resourceScore + computeScore
-```
-
-- **Resource Weights:** GPIO (0.5), LEDC (2.5), RMT (3.0), UART (8.0), DAC (2.0), PCA (0.25), EXP (0.125)
-- **Compute Score:** Estimates CPU overhead, e.g., Stepper/Function Generator +2.0 per channel, RGB LED Pixel +0.005 per pixel
-- **Score Limit:** `SCORE_LIMIT ≈ 109.0` — if exceeded, both Web UI and firmware reject the config
+| Type | CPU weight | RAM bytes | Notes |
+|:---:|:---:|:---:|:---|
+| 0 AC Dimmer | 0.10 | — | ZC ISR + GPIO write |
+| 1 DMX | 0.50 | 512 | 512-byte copy per frame |
+| 2 Relay | 0.05 | — | Trivial |
+| 3 RGB LED | `led_count×0.005` | `led_count×3` | Per-pixel NeoPixel update |
+| 4 Single LED | 0.10 | — | 1 PWM write |
+| 5 Analog RGB | 0.20 | — | 3-4 PWM writes |
+| 6 Motor | 0.50 | — | PWM + direction |
+| 7 Stepper | 2.00 | — | Pulse-train + state machine |
+| 8 Servo | 0.20 | — | 1 PWM write |
+| 9 Buzzer | 0.10 | — | Tone PWM |
+| 10 DFPlayer | 0.50 | 100 | UART command buffer |
+| 11 TM1637 | 0.50 | — | Bit-bang I2C-like |
+| 12 7-seg 7-pin | 1.00 | — | 7 PWM updates |
+| 13 7-seg 8-pin | 1.20 | — | 8 PWM updates |
+| 14 DAC | 0.30 | — | I2C or analog write |
+| 15 PWM DAC | 0.10 | — | 1 PWM |
+| 16 Func Gen | 2.00 | — | Timer + waveform calc |
+| 17 Solenoid | 0.10 | — | State machine |
+| 18 Smoke | 0.30 | — | Dual state machine |
+| I2C overhead | +0.30 | — | Per channel using I2C source
 
 #### Offline Load Calculator
 
@@ -515,22 +532,29 @@ Configuration must pass these gates before save/apply:
 
 ### Scoring Contract
 
-Resource Score must be routing-accurate:
-- Count GPIO only for actual ESP32 GPIO-routed pins.
+**HardwareResource** counts must be routing-accurate:
 - Count LEDC only for GPIO-routed PWM outputs that actually consume LEDC.
-- Count RMT for LED strips and DMX outputs that fall back after UART allocation.
-- Count UART after DFPlayer priority allocation; DFPlayer consumes UART before DMX.
-- Count PCA9685 channels for actual PCA-routed channels.
-- Count digital expander channels for actual digital expander-routed channels.
-- Count Type 12/13 per segment using `seg_sources`, `seg_pins`, `seg_channels`, or base routing rules; Direct Dim modes can only score GPIO/LEDC or PCA segment routes because digital expanders are invalid.
-- Compute Score is separate from Resource Score and includes per-type runtime cost plus `output_fps` factor.
+- Count RMT for LED strips (1 per strip) and stepper (2 per stepper).
+- Count UART for DMX and DFPlayer (worst-case: 1 per DMX output).
+- Count DAC for internal DAC (source=0) only; I2C DAC (source=5) consumes no hardware resource.
+
+**Note:** GPIO is NOT counted. PCA9685 / digital expander channels are NOT counted as hardware.
+
+**CPU Budget** estimates per-type CPU weight per frame:
+- Each output type has a baseline CPU weight (see Capacity Scoring table).
+- Any channel using an I2C source adds +0.3 for I2C bus overhead.
+- ESP-NOW Master adds `1.0 + peers×0.2 + universes×0.3`.
+- Limit scales with FPS: `25.0 × (40/fps)`. Higher FPS = less CPU budget per frame.
+
+**RAM Budget** estimates static/stack buffer bytes:
+- DMX output: 512 bytes, DFPlayer: 100 bytes, RGB LED: `led_count × 3` bytes.
+- ESP-NOW Master: `512 + peers×256` bytes.
+- Limit: 65535 bytes (64 KB).
 
 Known implementation drift (scoring-specific):
-- C++ `totalOutputScoreFromJson()` may not copy every routing field needed for routing-accurate scoring.
-- Web UI `channelScore()` still has stale assumptions for some types and must be audited against this contract.
-- Web UI `channelScore()` uses global `outputs` for DMX/DFPlayer allocation even when scoring a candidate `newOutputs` array.
-- Web UI reserved-pin validation may miss hybrid GPIO pins when the primary source is not GPIO.
-- Web UI hardware warning counters are separate from score and may still use simplified counting.
+- C++ `totalHardwareFromJson()` may not copy every routing field needed for routing-accurate scoring.
+- Web UI hardware/resource functions use routing-accurate counts from JSON fields directly, but may miss edge cases for hybrid-routed outputs.
+- DMX/DFPlayer UART allocation priority: DFPlayer reserves before DMX; if both UARTs occupied, DMX falls back to RMT for runtime — but scoring always counts worst-case UART (1 per DMX).
 
 ---
 

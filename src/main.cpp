@@ -1503,12 +1503,12 @@ void setupWebServer() {
                 return;
             }
 
-            // Check combined resource + compute scoring
+            // Check hardware (source-aware), CPU, and RAM budgets
             uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
-            float score = totalCombinedScoreFromJson(outputs, fps);
-            if (score > SCORE_LIMIT) {
+            ScoreBlocker blocker = checkScoresFromJson(outputs, fps);
+            if (blocker != ScoreBlocker::None) {
                 char msg[96];
-                snprintf(msg, sizeof(msg), "Combined score %.1f (resource+compute) exceeds limit of %.0f at %d FPS. Reduce channels or FPS.", score, SCORE_LIMIT, fps);
+                snprintf(msg, sizeof(msg), "%s at %d FPS. Reduce channels or FPS.", scoreBlockerName(blocker), fps);
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + String(msg) + "\"}");
                 return;
             }
@@ -1812,29 +1812,42 @@ void setupWebServer() {
         request->send(200, "application/json", resp);
     });
 
-    // API Route: Output Resource + Compute Scoring
+    // API Route: Hardware + CPU + RAM budget report
     server.on("/api/scoring", HTTP_GET, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
         std::vector<OutputChannel>& chs = outputCtrl.getChannels();
         uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
-        float resourceTotal = totalOutputScore(chs);
-        float computeTotal = totalComputeScore(chs, fps);
-        float combinedTotal = resourceTotal + computeTotal;
-        doc["resource_total"] = resourceTotal;
-        doc["compute_total"] = computeTotal;
-        doc["compute_detail"] = totalComputeScore(chs, 0);
-        doc["fps_factor"] = fpsComputeFactor(fps);
-        doc["total"] = combinedTotal;
-        doc["limit"] = SCORE_LIMIT;
-        doc["remaining"] = SCORE_LIMIT - combinedTotal;
+
+        HardwareResource hw = totalHardware(chs);
+        CpuBudget cpu = totalCpu(chs);
+        RamBudget ram = totalRam(chs);
+        float cpuLimit = CpuBudget::limit(fps);
+        uint16_t ramLimit = RamBudget::limit();
+
+        doc["ledc"] = hw.ledc;   doc["ledc_max"] = MAX_LEDC_RESOURCE;
+        doc["rmt"]  = hw.rmt;    doc["rmt_max"]  = MAX_RMT_RESOURCE;
+        doc["uart"] = hw.uart;   doc["uart_max"] = MAX_UART_RESOURCE;
+        doc["dac"]  = hw.dac;    doc["dac_max"]  = MAX_DAC_RESOURCE;
+        doc["cpu_weight"] = cpu.weight;   doc["cpu_limit"] = cpuLimit;
+        doc["ram_bytes"]  = ram.bytes;    doc["ram_limit"]  = ramLimit;
+        doc["fps"] = fps;
+
+        ScoreBlocker blocker = checkScores(hw, cpu, ram, fps);
+        doc["blocked"] = (blocker != ScoreBlocker::None);
+        if (blocker != ScoreBlocker::None) doc["blocker"] = scoreBlockerName(blocker);
+
         JsonArray arr = doc["channels"].to<JsonArray>();
         for (size_t i = 0; i < chs.size(); i++) {
             JsonObject item = arr.add<JsonObject>();
             item["index"] = (uint8_t)i;
             item["type"] = chs[i].type;
             item["name"] = outputTypeName(chs[i].type);
-            item["resource_score"] = outputChannelScore(chs[i]);
-            item["compute_score"] = channelComputeScore(chs[i]);
+            PerChannelCost cc = estimateChannelCost(chs[i]);
+            item["cpu_weight"] = cc.cpuWeight;
+            item["ram_bytes"]  = cc.ramBytes;
+            HardwareResource chHw = estimateHardware(chs[i]);
+            item["ledc"] = chHw.ledc; item["rmt"] = chHw.rmt;
+            item["uart"] = chHw.uart; item["dac"] = chHw.dac;
         }
         String response;
         serializeJson(doc, response);

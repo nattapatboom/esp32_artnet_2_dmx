@@ -46,31 +46,90 @@ Implementation status: this is the domain rule and target behavior. When changin
 | 17 | Solenoid Trigger | 1 | 0 | 0 | 0 | GPIO, PCA9685, or digital expander |
 | 18 | Sequential Smoke Shooter | 2 | 0 | 0 | 0 | GPIO, PCA9685, or digital expander |
 
-## 3. Score Formula
+## 3. Score Formula (Refactored — 3 Independent Budgets)
 
-Resource score weights:
+The system uses **three independent budgets**. If any one is exceeded, saving is fully blocked.
 
-| Resource | Weight |
-| --- | ---: |
-| GPIO | 0.5 |
-| LEDC | 2.5 |
-| RMT | 3.0 |
-| UART | 8.0 |
-| DAC | 2.0 |
-| PCA9685 channel | 0.25 |
-| Digital expander channel | 0.125 |
+### 3A. HardwareResource — Finite ESP32 Peripherals
 
-Formula:
+| Resource | Max | Notes |
+| :--- | ---: | :--- |
+| LEDC | 16 | PWM timer channels |
+| RMT | 8 | WS281x / DMX fallback |
+| UART | 2 | DFPlayer or DMX |
+| DAC | 2 | Internal DAC (GPIO 25/26, both occupied by Ethernet on WT32-ETH01) |
 
-```text
-resourceScore = GPIO*0.5 + LEDC*2.5 + RMT*3.0 + UART*8.0 + DAC*2.0 + PCA*0.25 + EXP*0.125
-computeScore  = sum(type compute cost) + (output_fps / 60) * 5
-totalScore    = resourceScore + computeScore
+GPIO is NOT counted here because expanders can substitute for GPIO pins.
+PCA9685 and digital expanders are NOT counted as hardware; they use I2C bus, reflected in CPU budget.
+
+### 3B. CpuBudget — Per-Frame Processing Weight
+
+Base limit at 40 FPS: `25.0`. Scales inversely with FPS: `limit(fps) = 25.0 × (40 / fps)`.
+
+| Type | Weight | Notes |
+| :--- | ---: | :--- |
+| AC Dimmer | 0.10 | ZC ISR + GPIO write |
+| DMX | 0.50 | 512-byte copy per frame |
+| Relay | 0.05 | Trivial |
+| RGB LED | `count×0.005` | Per-pixel NeoPixel update |
+| Single LED | 0.10 | 1 PWM write |
+| Analog RGB | 0.20 | 3–4 PWM writes |
+| Motor | 0.50 | PWM + direction |
+| Stepper | 2.00 | Pulse-train ISR + state machine |
+| Servo | 0.20 | 1 PWM write |
+| Buzzer | 0.10 | Tone PWM |
+| DFPlayer | 0.50 | UART command buffer |
+| TM1637 | 0.50 | Bit-bang I2C-like |
+| 7-seg 7-pin | 1.00 | 7 PWM updates |
+| 7-seg 8-pin | 1.20 | 8 PWM updates |
+| DAC | 0.30 | I2C or analog write |
+| PWM DAC | 0.10 | 1 PWM |
+| Func Gen | 2.00 | Timer + waveform calc |
+| Solenoid | 0.10 | State machine |
+| Smoke Shooter | 0.30 | Dual state machine |
+| **I2C overhead** | **+0.30** | Any channel using I2C source |
+
+ESP-NOW Master overhead (independent of output channels):
+```
+cpuWeight = 1.0 + peerCount×0.2 + universeCount×0.3
 ```
 
-The firmware limit is `SCORE_LIMIT`, currently `resourceScoreLimit() + 25.0`.
+### 3C. RamBudget — Static Buffer Estimate
 
-Compute score is intentionally separate from hard peripheral validation. A configuration must pass both total score and interlock checks.
+| Type | RAM (bytes) | Notes |
+| :--- | ---: | :--- |
+| DMX | 512 | 512-byte copy per frame |
+| DFPlayer | 100 | UART command buffer |
+| RGB LED | `count×3` | NeoPixel pixel buffer |
+
+ESP-NOW Master overhead:
+```
+ramBytes = 512 + peerCount×256
+```
+
+**Limit:** `65535` bytes (64 KB).
+
+### Validation
+
+Hardware, CPU, and RAM are all checked independently. Hardware blocking is **source-aware**:
+types using PCA9685 or digital expanders bypass the count because they don't consume
+ESP32-native peripherals.
+
+```cpp
+// Hardware — every count ≤ max (source-aware: expander/PCA channels don't count)
+bool hwOk = total.ledc ≤ 16 && total.rmt ≤ 8 && total.uart ≤ 2 && total.dac ≤ 2;
+
+// CPU — total weight ≤ 25.0 × (40 / fps)
+bool cpuOk = cpuWeight ≤ CpuBudget::limit(fps);
+
+// RAM — total bytes ≤ 65535
+bool ramOk = ramBytes ≤ RamBudget::limit();
+
+// First failure blocks the save
+ScoreBlocker blocker = checkScores(hw, cpu, ram, fps);
+```
+
+This replaces the old single combined `SCORE_LIMIT` (109) approach.
 
 ## 4. WT32-ETH01 Physical Pin Allocations & Safety
 
