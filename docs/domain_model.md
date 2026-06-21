@@ -91,7 +91,7 @@ The system stores configuration in two parts:
 - Enables Dual Network: Ethernet and Wi-Fi AP simultaneously; AP SSID is `ESP32-ArtNet-Recovery-XXXX` as an open AP (no password)
 - Disables all output functions and lighting stream tasks
 - Async Web Server stays active for config and `/update` page for OTA firmware recovery
-- **Consecutive Reset Counter:** Uses `bootCount` in RTC Fast Memory; incremented on each boot; `resetBootCountTask` delays 15 seconds then clears the counter; if counter reaches 5 before clearing, the system enters Recovery Mode on the next boot
+- **Consecutive Reset Counter:** Uses `bootCount` in RTC Fast Memory; incremented on each boot; `resetBootCountTask` delays 15 seconds then clears the counter; if counter reaches `>= 5` before clearing, the system enters Recovery Mode on the next boot
 - **Physical GPIO0 Trigger:** If GPIO0 is detected as LOW in `setup()`, the system enters Recovery Mode directly
 
 #### Wi-Fi Auto-Reconnection
@@ -231,7 +231,7 @@ computeScore  = sum(type compute cost) + (output_fps / 60) * 5
 totalScore    = resourceScore + computeScore
 ```
 
-- **Resource Weights:** GPIO (0.5), LEDC (2.5), RMT (3.0), UART (8.0), EXP (0.125), PCA (0.25)
+- **Resource Weights:** GPIO (0.5), LEDC (2.5), RMT (3.0), UART (8.0), DAC (2.0), PCA (0.25), EXP (0.125)
 - **Compute Score:** Estimates CPU overhead, e.g., Stepper/Function Generator +2.0 per channel, RGB LED Pixel +0.005 per pixel
 - **Score Limit:** `SCORE_LIMIT ≈ 109.0` — if exceeded, both Web UI and firmware reject the config
 
@@ -511,6 +511,15 @@ Known implementation drift to fix later:
 - Web UI `channelScore()` uses global `outputs` for DMX/DFPlayer allocation even when scoring a candidate `newOutputs` array.
 - Web UI reserved-pin validation may miss hybrid GPIO pins when the primary source is not GPIO.
 - Web UI hardware warning counters are separate from score and may still use simplified counting.
+- **DAC mis-scored as expander:** I2C DAC (source=5) is counted with `EXP` weight (0.125) in C++ `resourceScore()` because there is no separate DAC branch; this also affects `estimateResources()` and `readOutputJson()`. The contract requires DAC weight 2.0.
+- **`resourceScoreLimit()` omits PCA and EXP:** The limit formula in C++ `resourceScoreLimit()` only sums GPIO * 0.5 + LEDC * 2.5 + RMT * 3.0 + UART * 8.0 + DAC * 2.0, omitting PCA * 0.25 and EXP * 0.125. In practice PCA/EXP are not accounted in the hard limit. The JS side does not call `resourceScoreLimit()` at all — it uses `isOverLimit` in the Web UI, which totals against the 109 SCORE_LIMIT directly. Web UI scoring has separate limits for PCA (max 16) and EXP (max 16/40 per chip).
+- **`artnet_enabled` flag not yet implemented:** ADR012 defines this as future work, but the contract lists it as if available.
+- **Boot count threshold mismatch:** Doc spec requires `bootCount >= 5` for Recovery Mode, but code (`main.cpp:2126`) uses `bootCount >= 3`. Spec is the correct target; code must be aligned.
+- **GPIO12 not blocked in C++ API:** Only Web UI warns on GPIO12 input; `validateOutputJson()` in `main.cpp` does not reject GPIO12.
+- **AC Dimmer ZC pin not validated in C++ API:** Web UI warns if ZC is disabled + AC dimmer exists, but `validateOutputJson()` does not check this.
+- **PCA9685 frequency conflict check not implemented:** Neither C++ nor Web UI detects mixed-frequency devices on the same PCA chip.
+- **`/api/outputs` POST skips `validateSettingsAndOutputs()`:** Only `/api/config/import` calls both validators; the outputs-only endpoint may miss global pin conflicts.
+- **No PCF8574 LCD display type in SystemConfig:** The `display_type` enum in `config.h` only maps SSD1306/SH1106, but the I2C Address Contract lists PCF8574 LCD backpack addresses (`0x27`, `0x3F`) for LCD support.
 
 ---
 
@@ -597,3 +606,5 @@ Questions used during the grilling session and answers inferred from the existin
 | Hardware docs drift | Users may wire circuits incorrectly or choose wrong pins | Use `docs/domain_model.md` and `docs/resource_calculator.md` together |
 | Resource scoring drift | C++/JS scores may accept overly heavy configs or reject valid ones | When modifying routing fields, sync `include/scoring.h` and `web/index.html` for routing-accurate scoring |
 | Current scoring implementation drift | Domain rules require routing-accurate score but some C++ JSON scoring paths may not copy all routing fields | Audit/fix `totalOutputScoreFromJson()` and compare against JS `channelScore()` |
+| C++ validation gaps (GPIO12, ZC, PCA freq) | API may accept configs that create hardware conflicts or undefined behavior | Add GPIO12 avoidance, ZC interlock, and PCA freq conflict checks to C++ `validateOutputJson()` |
+| `validateSettingsAndOutputs()` not called on `/api/outputs` | Combined system + output config may violate global constraints that only the combined validator catches | Call `validateSettingsAndOutputs()` in the `/api/outputs` POST handler |
