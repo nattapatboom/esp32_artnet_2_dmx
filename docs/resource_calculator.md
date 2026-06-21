@@ -40,7 +40,7 @@ Implementation status: this is the domain rule and target behavior. When changin
 | 11 | 7-Segment TM1637 | 2 | 0 | 0 | 0 | GPIO only |
 | 12 | 7-Segment DD 7-Pin PWM | per segment | 0 | routing-dependent | 0 | Direct Dim uses GPIO/PCA9685 only; No Dim/Common Dim may use digital expanders for digital segment pins |
 | 13 | 7-Segment DD 8-Pin PWM | per segment | 0 | routing-dependent | 0 | Direct Dim uses GPIO/PCA9685 only; No Dim/Common Dim may use digital expanders for digital segment pins |
-| 14 | DAC | 1 | 0 | 0 | 0 | GPIO DAC is unavailable on WT32-ETH01; MCP4725 source recommended |
+| 14 | DAC | 1 | 0 | 0 | 0 | GPIO DAC is unavailable on WT32-ETH01; I2C DAC source (5/6/7) recommended |
 | 15 | PWM DAC | 1 | 0 | 1 | 0 | GPIO+LEDC or PCA9685; duty calibration supports external 0-10V / 4-20mA interface circuits |
 | 16 | Function Generator | 1 | 0 | 1 | 0 | GPIO only; uses timer/compute budget |
 | 17 | Solenoid Trigger | 1 | 0 | 0 | 0 | GPIO, PCA9685, or digital expander |

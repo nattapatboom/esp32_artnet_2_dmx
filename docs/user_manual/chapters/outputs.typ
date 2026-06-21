@@ -56,14 +56,7 @@ Each output channel is defined by a start universe, start DMX address, type (0--
 
 == Resource \& Compute Scoring System
 
-To guarantee dual-core task stability under heavy configurations, the firmware uses a combined resource and compute score limit.
-The total budget is capped at *109 points*.
-
-$ "Total Score" = "Resource Score" + "Compute Score" <= 109 $
-
-The resource score reflects hardware peripherals used, and the compute score reflects CPU ticks based on active output channels and FPS.
-
-=== Resource Weight Multipliers
+To guarantee dual-core stability, the firmware checks *three independent budgets* before accepting a configuration. If any one is exceeded, saving is blocked:
 
 #align(center)[
 #table(
@@ -71,16 +64,16 @@ The resource score reflects hardware peripherals used, and the compute score ref
   inset: 8pt,
   align: (left, center, left),
   stroke: 0.5pt + gray,
-  [*Peripheral*], [*Weight*], [*Usage Detail*],
-  [ESP32 GPIO Pin], [0.5], [Standard digital input or output pin],
-  [LEDC (PWM Channel)], [2.5], [Direct hardware PWM channel (max 16)],
-  [RMT Channel], [3.0], [RGB LED strips or DMX RMT fallbacks (max 8)],
-  [UART Port], [8.0], [Serial DMX output or DFPlayer MP3 module (max 2)],
-  [DAC Channel], [2.0], [Internal ESP32 DAC (unavailable on WT32-ETH01)],
-  [PCA9685 Channel], [0.25], [I2C-based PWM expander channel],
-  [I2C Expander Pin], [0.125], [MCP23017, TCA9555, or PCF857x expander pin],
+  [*Budget*], [*Limit*], [*What It Counts*],
+  [HardwareResource], [LEDC ≤ 16, RMT ≤ 8, UART ≤ 2, DAC ≤ 2, Timer ≤ 4], [Finite ESP32 peripherals (PWM, serial, etc.) — expander/PCA channels bypass this count],
+  [CpuBudget], [$<= (1\,000\,000 / "fps") - 1\,500$ µs per frame], [Total output service time including DMX transmit, pixel mapping, I2C writes, and 500 µs base overhead],
+  [RamBudget], [≤ 64 KB], [Static buffer estimates per channel plus runtime driver objects; leaves 150 KB free for system/network],
 )
 ]
+
+=== Per-Type Resource Footprint
+
+Each output type has estimated CPU service time and RAM usage. Refer to the full tables in `docs/resource_calculator.md` for exact µs/frame and byte estimates by type, source, and routing mode.
 
 == Output Type Reference
 
@@ -105,7 +98,7 @@ The resource score reflects hardware peripherals used, and the compute score ref
   [11], [7-Segment (TM1637)], [2--4], [GPIO Only], [GPIO 2],
   [12], [7-Segment DD 7-Pin], [1--2], [GPIO, PCA, Expander], [Seg-level routing],
   [13], [7-Segment DD 8-Pin], [1--2], [GPIO, PCA, Expander], [Seg-level routing],
-  [14], [DAC (Analog Out)], [1], [MCP4725, DAC757x], [I2C Bus],
+  [14], [DAC (Analog Out)], [1], [MCP4725 (src 5), DAC7571 (src 6), DAC7573 (src 7)], [I2C Bus],
   [15], [PWM DAC (RC Filter)], [1], [GPIO, PCA], [LEDC 1 / PCA 1],
   [16], [Function Generator], [5], [GPIO Only], [LEDC 1 + timer],
   [17], [Solenoid Trigger], [1], [GPIO, PCA, Expander], [GPIO / PCA / Exp 1],

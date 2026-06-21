@@ -37,7 +37,7 @@ graph TD
 | --- | --- | --- |
 | Output Channel | A single config entry controlling one device | `OutputChannel` in `include/output_control.h` |
 | Output Type | Device type ID v3 `0..18` | `outputTypeName()` in `include/scoring.h` |
-| Source | Origin of a pin/channel: ESP32 GPIO, PCA9685, digital expander, MCP4725 | `source` fields in `OutputChannel` |
+| Source | Origin of a pin/channel: ESP32 GPIO, PCA9685, digital expander, I2C DAC (MCP4725, DAC7571, DAC7573) | `source` fields in `OutputChannel` |
 | DMX Start Universe | The first universe this channel reads from | `start_universe` |
 | DMX Start Address | 1-based DMX address within the universe | `start_address` |
 | Resource Score | Hardware resource usage score | Contract: Configuration Contract; implementation: `estimateResources()`, `resourceScore()` |
@@ -120,7 +120,7 @@ The system stores configuration in two parts:
 
 Responsibilities:
 - Convert DMX bytes into signals appropriate for each device.
-- Handle multiple source types: GPIO, PCA9685, MCP23017, TCA9555, PCF857x, MCP4725.
+- Handle multiple source types: GPIO, PCA9685, MCP23017, TCA9555, PCF857x, MCP4725, DAC7571, DAC7573.
 - Support hybrid routing for multi-pin outputs such as stepper, motor, RGB/RGBW, 7-segment, and smoke shooter.
 
 Key files:
@@ -398,7 +398,7 @@ Invariants:
 - UART usable for DMX/DFPlayer <= 2.
 - LEDC <= 16.
 - Timer <= 4. AC Dimmer consumes one shared hardware timer; Function Generator consumes one timer-like runtime slot per channel.
-- Total combined score <= `SCORE_LIMIT`.
+- HardwareResource, CpuBudget, RamBudget checked independently via `checkScores()` (see Capacity Scoring Context).
 
 ---
 
@@ -544,7 +544,7 @@ Configuration must pass these gates before save/apply:
 - LEDC use must be `<= 16`.
 - 7-segment Type 12/13 Direct Dim modes (`mc_mode` 4/5) must route segments to ESP32 GPIO or PCA9685, not digital expanders.
 - PCA9685 shared frequency conflicts must be surfaced; servo forces 50 Hz per chip.
-- combined score must be `<= SCORE_LIMIT`.
+- all three budgets (HardwareResource, CpuBudget, RamBudget) must pass independently.
 
 ### Scoring Contract
 
@@ -651,17 +651,17 @@ Questions used during the grilling session and answers inferred from the existin
 
 ## Current Plan
 
-### Backlog — priority items to fix in code
-| # | Item | Scope | Effort |
-|---|------|-------|--------|
-| 1 | Boot count threshold: code `>= 3` → spec `>= 5` (`main.cpp:2126`) | C++ | 1 line |
-| 2 | ~~DAC (source=5) scored as EXP (0.125) instead of DAC (2.0) in `resourceScore()`~~ **Fixed:** source IDs 5-7 are I2C DAC, counted correctly | docs + code | done |
-| 3 | GPIO12 rejection in `validateOutputJson()` | C++ API | 3 lines |
-| 4 | AC Dimmer ZC pin check in `validateOutputJson()` | C++ API | 5 lines |
-| 5 | GPIO34-39 input-only rejection in `validateOutputJson()` | C++ API | 3 lines |
-| 6 | Call `validateSettingsAndOutputs()` in `/api/outputs` POST | C++ API | 1 line |
-| 7 | `resourceScoreLimit()` include PCA and EXP terms | C++ scoring | add 2 terms |
-| 8 | PCF8574 LCD display type enum in `SystemConfig` | C++ + Web UI | small |
+### Backlog — priority items to fix in code *(all resolved)*
+| # | Item | Status |
+|---|------|--------|
+| 1 | Boot count threshold: code `>= 3` → spec `>= 5` | ✅ Completed (`bootCount >= 5` at `main.cpp:2252`) |
+| 2 | DAC (source=5) scored as EXP (0.125) instead of DAC (2.0) in `resourceScore()` | ✅ Fixed: sources 5-7 are I2C DAC, counted correctly |
+| 3 | GPIO12 rejection in `validateOutputJson()` | ✅ Completed (`outputsUseForbiddenGpio` checks GPIO12) |
+| 4 | AC Dimmer ZC pin check in `validateOutputJson()` | ✅ Completed (check at `main.cpp:1066`) |
+| 5 | GPIO34-39 input-only rejection in `validateOutputJson()` | ✅ Completed (`outputsUseForbiddenGpio` checks GPIO34-39) |
+| 6 | Call `validateSettingsAndOutputs()` in `/api/outputs` POST | ✅ Completed (called at `main.cpp:1536`) |
+| 7 | `resourceScoreLimit()` include PCA and EXP terms | ❌ Obsolete (scoring system replaced by 3 independent budgets) |
+| 8 | PCF8574 LCD display type enum in `SystemConfig` | ✅ Completed (defined in `config.h:88`) |
 
 ### Future Features — planned but not started
 - `artnet_enabled` checkbox in Web UI + backend (ADR012)
