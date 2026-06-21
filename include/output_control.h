@@ -38,6 +38,7 @@ class PixelStripWrapper {
 public:
     virtual ~PixelStripWrapper() {}
     virtual void Begin() = 0;
+    virtual bool CanShow() const = 0;
     virtual void Show() = 0;
     virtual void SetPixelColor(uint16_t index, RgbColor color) = 0;
     virtual void SetPixelColorRgbw(uint16_t index, RgbwColor color) {}
@@ -59,6 +60,9 @@ public:
     }
     void Begin() override {
         if (strip) strip->Begin();
+    }
+    bool CanShow() const override {
+        return strip && strip->CanShow();
     }
     void Show() override {
         if (strip) strip->Show();
@@ -85,6 +89,9 @@ public:
     }
     void Begin() override {
         if (strip) strip->Begin();
+    }
+    bool CanShow() const override {
+        return strip && strip->CanShow();
     }
     void Show() override {
         if (strip) strip->Show();
@@ -1138,6 +1145,7 @@ public:
         for (auto& ch : channels) {
             if (ch.type != 3) continue; // LED only (v3)
             if (ch.pixelStrip == nullptr || ch.dmxBuffer == nullptr) continue;
+            if (!ch.pixelStrip->CanShow()) continue;
 
             const uint8_t colorOrder = ch.color_order;
             const uint16_t ledCount = ch.led_count;
