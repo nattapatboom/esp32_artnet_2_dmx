@@ -874,6 +874,10 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             message = "I2C DAC source is only supported by DAC output channel " + String(channelNumber);
             return false;
         }
+        if (type == 14 && source == 0) {
+            message = "DAC output does not support ESP32 GPIO (source 0) on WT32-ETH01; use I2C DAC (source 5-7) on channel " + String(channelNumber);
+            return false;
+        }
         if (source > 7) {
             message = "Unsupported output source on channel " + String(channelNumber);
             return false;

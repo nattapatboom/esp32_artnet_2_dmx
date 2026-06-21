@@ -1376,13 +1376,13 @@ function renderPinRows(){
   const usePin3=isAnalog||(isMotor&&mcMode===2)||isStepper||(is7Seg&&mcMode===1);
   const showPin4=(isStepper&&hMode===0)||(isAnalog&&colorOrder>=4);
   const pinDefs=[];
-  const srcOpts=(allowPca,allowDig,allowDac=false)=>{
-    let h=`<option value="0">ESP32 GPIO</option>`;
+const srcOpts=(allowPca,allowDig,allowDac=false,allowGpio=true)=>{
+    let h=allowGpio?`<option value="0">ESP32 GPIO</option>`:'';
     if(allowPca) h+=`<option value="1">PCA9685</option>`;
     if(allowDig) h+=`<option value="2">MCP23017</option><option value="3">TCA9555</option><option value="4">PCF857x</option>`;
     if(allowDac) h+=`<option value="5">MCP4725</option><option value="6">DAC7571</option><option value="7">DAC7573</option>`;
     return h;
-  };
+};
   const mkSel=(id,opts)=>`<select id="${id}" onchange="toggleOutFields()" style="width:100%">${opts}</select>`;
   const addrOpts=(f)=>{
     const gs=[
@@ -1413,7 +1413,7 @@ function renderPinRows(){
   const p1DescText = isCommonDim ? 'Common Anode/Cathode PWM Pin' : isSegADirect ? 'Segment A' : p1Desc;
   if (isDac) {
     const chOptsDac=[['0','A'],['1','B'],['2','C'],['3','D']].map(([v,l])=>`<option value="${v}">CH ${l}</option>`).join('');
-    pinDefs.push({label:'DAC',desc:p1Src>=5?'I2C Analog Out':p1Desc,srcHtml:mkSel('no_source',srcOpts(false,false,true)),addrHtml:p1Src>=5?mkSel('no_pca_addr',addrOpts(p1Src)):localBadge('DAC only'),pinHtml:p1Src>=5?localBadge('12-bit I2C'):mkSel('no_pin',['25','26'].map(v=>`<option value="${v}">GPIO ${v} (DAC${v===25?'1':'2'})</option>`).join('')),invId:p1Src>=5?'':'no_pin_invert'});
+    pinDefs.push({label:'DAC',desc:'I2C Analog Out',srcHtml:mkSel('no_source',srcOpts(false,false,true,false)),addrHtml:mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:localBadge('12-bit I2C'),invId:''});
     if(p1Src>=5){
       const dacLabel=p1Src===5?'MCP4725':p1Src===6?'DAC7571':'DAC7573';
       pinDefs.push({label:'DAC IC',desc:dacLabel,srcHtml:localBadge('I2C DAC'),addrHtml:localBadge(dacLabel),pinHtml:p1Src===7?mkSel('no_pca_channel',chOptsDac):localBadge('CH A'),invId:''});

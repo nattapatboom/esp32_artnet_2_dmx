@@ -497,7 +497,7 @@ This section is the central contract for `/outputs.json`, Web UI, C++ validation
 | 11 | 7-Segment TM1637 | GPIO only | CLK/DIO GPIO pins | TM1637 is not expander-routed; direct-drive displays use type 12/13 |
 | 12 | 7-Segment DD 7-Pin PWM | GPIO or PCA9685 for Direct Dim; GPIO, PCA9685, or digital expander for No Dim/Common Dim segments | segment-level routing via `seg_*` or base routing | Direct Dim modes need PWM per segment, so MCP23017/TCA9555/PCF857x are invalid there |
 | 13 | 7-Segment DD 8-Pin PWM | GPIO or PCA9685 for Direct Dim; GPIO, PCA9685, or digital expander for No Dim/Common Dim segments | segment-level routing via `seg_*` or base routing | Direct Dim modes need PWM per segment, so MCP23017/TCA9555/PCF857x are invalid there |
-| 14 | DAC | I2C DAC (source 5-7) preferred; ESP32 DAC GPIO path is legacy/unsafe on WT32-ETH01 | MCP4725/DAC7571 single-channel, DAC7573 channel A-D via `pca_channel` | GPIO25/26 are occupied by Ethernet; supported I2C DAC models are MCP4725, DAC7571, and DAC7573 |
+| 14 | DAC | I2C DAC only (source 5-7); ESP32 GPIO DAC blocked on WT32-ETH01 | MCP4725/DAC7571 single-channel, DAC7573 channel A-D via `pca_channel` | GPIO25/26 are occupied by Ethernet; supported I2C DAC models are MCP4725, DAC7571, and DAC7573 |
 | 15 | PWM DAC | GPIO or PCA9685 | none | GPIO path uses LEDC; supports duty calibration for external 0-10V or 4-20mA interface circuits |
 | 16 | Function Generator | GPIO only | none | uses LEDC/timer-like runtime load |
 | 17 | Solenoid | GPIO, PCA9685, digital expander | none | trigger/pulse state machine |
@@ -616,6 +616,7 @@ Known implementation drift (scoring-specific):
 ### ADR008: Internal GPIO DAC Blocking (WT32-ETH01)
 - **Rationale:** GPIO 25/26 (Internal DAC) conflict with LAN8720A Ethernet PHY
 - **Decision:** (1) Hide/disable Source 0 (GPIO) for DAC Type 14 on WT32-ETH01; force I2C DAC usage (2) Keep `dacWrite()` code for compatibility with other boards in the future
+- **Implementation:** (1) C++ `validateOutputJson()` block type 14 + source 0 at `main.cpp:867` (2) Web UI `srcOpts()` excludes GPIO option for DAC type 14 at `index.html:1416` (3) `dacWrite()` runtime code in `motion_control.h` preserved for legacy/other-board use
 
 ### ADR009: ESP-NOW Slave Wi-Fi Channel Selection Policy
 - **Rationale:** ESP-NOW requires Master and Slave to be on the same Wi-Fi channel
@@ -625,9 +626,10 @@ Known implementation drift (scoring-specific):
 - **Rationale:** Homing switches can be either NO or NC in the field
 - **Decision:** Expose `pin_invert`, `pin4_invert` in Web UI; allow users to configure `val ^ inv` in `readOutputPin()` based on switch type
 
-### ADR011: DMX Resource Scoring Parity Drift (C++ vs JS) — Known
+### ADR011: DMX Resource Scoring Parity Drift (C++ vs JS) — Resolved
 - **Rationale:** JS calculates DMX Fallback → RMT (3.0) dynamically; C++ estimates worst-case UART (8.0)
 - **Decision:** (1) C++ uses worst-case static estimation (prevents over-allocation) (2) Runtime allocation is separate from scoring logic (3) Recorded as Known Drift for future improvement
+- **Resolution:** Both C++ and JS now use harmonized logic — `estimateHardwareFromJson()` and `channelHardware()` both report `uart=1` for DMX; RAM scoring dynamically calculates RMT fallback identically. The documented drift no longer exists.
 
 ### ADR012: Independent Art-Net Enablement Option
 - **Rationale:** In networks with heavy Art-Net traffic, users may want to disable Art-Net to prevent overlap
@@ -669,12 +671,13 @@ Questions used during the grilling session and answers inferred from the existin
 | 13 | sACN multicast multi-UDP per universe (prevents last-group-only join) | ✅ Completed (`sacn_control.h`) |
 | 14 | PCA9685 frequency conflict warning (C++: Serial warning in `validateOutputJson()`) | ✅ Completed (`main.cpp`) |
 | 15 | `scoreBlockerName()` missing RamLimit case | ✅ Completed (`scoring.h`) |
+| 16 | ADR008 GPIO DAC blocking: block source=0 for Type 14 on WT32-ETH01 | ✅ Completed (`main.cpp:869`, `index.html:1416`) |
 
 ### Future Features — planned but not started
 - Frame interpolation for mechanical outputs (ADR005, long-term)
 
 ### Known Limitations (accepted, not on roadmap)
-- C++/JS scoring parity drift: `totalOutputScoreFromJson()` copies fewer fields than JS `channelScore()`; C++ uses worst-case UART (8.0) while JS estimates dynamic RMT fallback (3.0) — see ADR011
+- ADR011 scoring parity drift: **Resolved** — both C++ and JS now use harmonized logic (see ADR011)
 - `OutputChannel` struct combines persisted + runtime fields; splitting risks save/load/pointer lifecycle — postponed
 - Web UI `channelScore()` uses global `outputs` array when scoring candidate `newOutputs` — stale if page unsaved
 - Web UI reserved-pin validation may miss hybrid GPIO pins when primary source is not GPIO
