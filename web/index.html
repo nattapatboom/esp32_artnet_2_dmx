@@ -135,6 +135,31 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
             <option value="2">ESP-NOW Slave</option>
           </select>
         </div>
+        <div class="f" id="espnow_channel_grp">
+          <label for="espnow_channel">ESP-NOW Wi-Fi Channel</label>
+          <select id="espnow_channel" name="espnow_channel">
+            <option value="0">Auto-Scan (Slave Only)</option>
+            <option value="1">Channel 1</option>
+            <option value="2">Channel 2</option>
+            <option value="3">Channel 3</option>
+            <option value="4">Channel 4</option>
+            <option value="5">Channel 5</option>
+            <option value="6">Channel 6</option>
+            <option value="7">Channel 7</option>
+            <option value="8">Channel 8</option>
+            <option value="9">Channel 9</option>
+            <option value="10">Channel 10</option>
+            <option value="11">Channel 11</option>
+            <option value="12">Channel 12</option>
+            <option value="13">Channel 13</option>
+          </select>
+          <div class="hint">Master must be on a fixed channel. Slaves can auto-scan or use a fixed channel.</div>
+        </div>
+        <div class="f" id="espnow_chunk_size_grp">
+          <label for="espnow_chunk_size">ESP-NOW Chunk Size (bytes)</label>
+          <input type="number" id="espnow_chunk_size" name="espnow_chunk_size" value="200" min="16" max="230" oninput="updateScoreBar()">
+          <div class="hint">Payload size per wireless packet (16 to 230 bytes). Default is 200.</div>
+        </div>
         <div class="f">
           <label for="mdns_name">mDNS Hostname</label>
           <input type="text" id="mdns_name" name="mdns_name" placeholder="artnet">
@@ -979,7 +1004,10 @@ async function loadSettings(){
     const d=await(await fetch('/api/settings')).json();
     const s=(id,val)=>{const e=document.getElementById(id);if(e&&val!==undefined)e.value=val};
     const c=(id,val)=>{const e=document.getElementById(id);if(e)e.checked=!!val};
-    s('device_mode',d.device_mode); s('mdns_name',d.mdns_name);
+    s('device_mode',d.device_mode);
+    s('espnow_channel',d.espnow_channel);
+    s('espnow_chunk_size',d.espnow_chunk_size);
+    s('mdns_name',d.mdns_name);
     const fw=document.getElementById('firmware_version');
     if(fw) fw.textContent=d.firmware_version||'Unknown';
     s('artnet_port',d.artnet_port);
@@ -1026,7 +1054,7 @@ async function saveSettings(e){
   const obj={};
   fd.forEach((v,k)=>{
     if(['eth_dhcp','wifi_dhcp','artnet_enabled','sacn_enabled','sacn_multicast','wifi_enable_in_eth_mode','ap_enable_in_eth_mode'].includes(k)) obj[k]=true;
-    else if(['device_mode','status_led_pin','zc_pin','eth_dhcp','wifi_dhcp',
+    else if(['device_mode','espnow_channel','espnow_chunk_size','status_led_pin','zc_pin','eth_dhcp','wifi_dhcp',
              'artnet_port','sacn_port',
              'output_fps','i2c_sda','i2c_scl','i2c_speed',
              'display_enabled','display_i2c_addr','display_brightness'].includes(k))
@@ -1042,6 +1070,14 @@ async function saveSettings(e){
   });
   if(!obj.artnet_enabled && !obj.sacn_enabled){
     alert('Cannot disable both Art-Net and sACN protocols.');
+    return;
+  }
+  if(obj.device_mode === 1 && obj.espnow_channel === 0){
+    alert('ESP-NOW Master cannot use Auto-Scan channel mode. Please select a fixed channel (1-13).');
+    return;
+  }
+  if(obj.espnow_chunk_size < 16 || obj.espnow_chunk_size > 230){
+    alert('ESP-NOW Chunk Size must be between 16 and 230 bytes.');
     return;
   }
   if(obj.status_led_pin!==255&&obj.zc_pin!==255&&obj.status_led_pin===obj.zc_pin){
@@ -1977,7 +2013,8 @@ function totalCpu(arr,fps){
   if (modeVal === 1) {
     const unis = new Set(arr.map(o => parseInt(o.start_universe || 0)));
     const peerCount = Math.max(1, espPeers.length);
-    us += espnowMasterCost(peerCount, unis.size).cpu;
+    const chunkSize = parseInt(document.getElementById('espnow_chunk_size')?.value || 200);
+    us += espnowMasterCost(peerCount, unis.size, chunkSize).cpu;
   }
   return us;
 }
@@ -1995,7 +2032,8 @@ function totalRam(arr){
   const modeVal = parseInt(document.getElementById('device_mode')?.value || 0);
   if (modeVal === 1) {
     const peerCount = Math.max(1, espPeers.length);
-    ramVal += espnowMasterCost(peerCount, 0).ram;
+    const chunkSize = parseInt(document.getElementById('espnow_chunk_size')?.value || 200);
+    ramVal += espnowMasterCost(peerCount, 0, chunkSize).ram;
   }
   return ramVal;
 }

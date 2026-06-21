@@ -705,6 +705,7 @@ void addSettingsToJson(JsonObject target) {
     target["eth_dns"] = sysCfg.eth_dns;
     target["ap_ssid"] = sysCfg.ap_ssid;
     target["ap_pass"] = sysCfg.ap_pass;
+    target["espnow_channel"] = sysCfg.espnow_channel;
     target["artnet_enabled"] = sysCfg.artnet_enabled;
     target["artnet_port"] = sysCfg.artnet_port;
     target["sacn_enabled"] = sysCfg.sacn_enabled;
@@ -740,6 +741,7 @@ void applySettingsFromJson(JsonObjectConst doc) {
     if (doc["eth_dns"].is<const char*>()) copyConfigString(sysCfg.eth_dns, sizeof(sysCfg.eth_dns), doc["eth_dns"]);
     if (doc["ap_ssid"].is<const char*>()) copyConfigString(sysCfg.ap_ssid, sizeof(sysCfg.ap_ssid), doc["ap_ssid"]);
     if (doc["ap_pass"].is<const char*>()) copyConfigString(sysCfg.ap_pass, sizeof(sysCfg.ap_pass), doc["ap_pass"]);
+    if (doc["espnow_channel"].is<int>()) sysCfg.espnow_channel = doc["espnow_channel"];
     if (doc["artnet_enabled"].is<bool>()) sysCfg.artnet_enabled = doc["artnet_enabled"];
     if (doc["artnet_port"].is<int>()) {
         int port = doc["artnet_port"];
@@ -1144,10 +1146,11 @@ void startAP() {
     IPAddress apIP(192, 168, 4, 1);
     WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
     
+    int apChannel = (sysCfg.espnow_channel > 0) ? sysCfg.espnow_channel : 1;
     if (strlen(sysCfg.ap_pass) >= 8) {
-        WiFi.softAP(sysCfg.ap_ssid, sysCfg.ap_pass);
+        WiFi.softAP(sysCfg.ap_ssid, sysCfg.ap_pass, apChannel);
     } else {
-        WiFi.softAP(sysCfg.ap_ssid);
+        WiFi.softAP(sysCfg.ap_ssid, NULL, apChannel);
     }
     
     Serial.printf("Access Point started: SSID = %s, IP = %s\n", sysCfg.ap_ssid, WiFi.softAPIP().toString().c_str());
@@ -1315,6 +1318,7 @@ void setupWebServer() {
         doc["eth_dns"] = sysCfg.eth_dns;
         doc["ap_ssid"] = sysCfg.ap_ssid;
         doc["ap_pass"] = sysCfg.ap_pass;
+        doc["espnow_channel"] = sysCfg.espnow_channel;
         doc["artnet_enabled"] = sysCfg.artnet_enabled;
         doc["artnet_port"] = sysCfg.artnet_port;
         doc["sacn_enabled"] = sysCfg.sacn_enabled;
@@ -1368,6 +1372,14 @@ void setupWebServer() {
             uint8_t requestedDisplayType = doc["display_enabled"].is<int>() ? (uint8_t)(int)doc["display_enabled"] : sysCfg.display_enabled;
             uint8_t requestedDisplayAddr = doc["display_i2c_addr"].is<int>() ? (uint8_t)(int)doc["display_i2c_addr"] : sysCfg.display_i2c_addr;
             String validationMessage;
+
+            uint8_t requestedMode = doc["device_mode"].is<int>() ? (uint8_t)(int)doc["device_mode"] : sysCfg.device_mode;
+            uint8_t requestedChan = doc["espnow_channel"].is<int>() ? (uint8_t)(int)doc["espnow_channel"] : sysCfg.espnow_channel;
+            if (requestedMode == MODE_ESPNOW_MASTER && requestedChan == 0) {
+                validationMessage = "ESP-NOW Master cannot use Auto-Scan channel mode";
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
+                return;
+            }
 
             bool nextArtnetEnabled = doc.containsKey("artnet_enabled") ? doc["artnet_enabled"].as<bool>() : sysCfg.artnet_enabled;
             bool nextSacnEnabled = doc.containsKey("sacn_enabled") ? doc["sacn_enabled"].as<bool>() : sysCfg.sacn_enabled;
@@ -1428,6 +1440,7 @@ void setupWebServer() {
             if (doc["eth_dns"].is<const char*>()) copyConfigString(sysCfg.eth_dns, sizeof(sysCfg.eth_dns), doc["eth_dns"]);
             if (doc["ap_ssid"].is<const char*>()) copyConfigString(sysCfg.ap_ssid, sizeof(sysCfg.ap_ssid), doc["ap_ssid"]);
             if (doc["ap_pass"].is<const char*>()) copyConfigString(sysCfg.ap_pass, sizeof(sysCfg.ap_pass), doc["ap_pass"]);
+            if (doc["espnow_channel"].is<int>()) sysCfg.espnow_channel = doc["espnow_channel"];
             if (doc["artnet_enabled"].is<bool>()) sysCfg.artnet_enabled = doc["artnet_enabled"];
             if (doc["artnet_port"].is<int>()) {
                 int port = doc["artnet_port"];
@@ -2067,6 +2080,11 @@ void networkTask(void* pvParameters) {
         // Process sACN packets if enabled
         if (sysCfg.sacn_enabled && (sysCfg.device_mode == MODE_ARTNET_ETHERNET || sysCfg.device_mode == MODE_ESPNOW_MASTER)) {
             sacnCtrl.process();
+        }
+        
+        // Process ESP-NOW auto-channel scanning
+        if (sysCfg.device_mode == MODE_ESPNOW_SLAVE) {
+            espNowCtrl.loop();
         }
         
         // ESP-NOW Slave keeps AP active so it can always be configured in the field.

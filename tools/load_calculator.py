@@ -308,7 +308,7 @@ def get_espnow_peer_count():
                 pass
     return 0
 
-def run_calculation_on_channels(outputs, status_led=5, zc_pin=255, sda_pin=14, scl_pin=15, output_fps=40, is_master=False):
+def run_calculation_on_channels(outputs, status_led=5, zc_pin=255, sda_pin=14, scl_pin=15, output_fps=40, is_master=False, chunk_size=200):
     """
     Performs resource analysis on a list of channel configurations using the 3 budgets model.
     """
@@ -464,7 +464,7 @@ def run_calculation_on_channels(outputs, status_led=5, zc_pin=255, sda_pin=14, s
     peer_count = get_espnow_peer_count()
     if is_master or peer_count > 0:
         actual_peers = peer_count if peer_count > 0 else 1
-        now_cost = espnow_master_cost(actual_peers, len(unique_universes))
+        now_cost = espnow_master_cost(actual_peers, len(unique_universes), chunk_size)
         total_cpu_us += now_cost["cpu"]
         total_ram_bytes += now_cost["ram"]
         print(f" 📡 ESP-NOW Master mode active. Added overhead for {actual_peers} peers.")
@@ -650,8 +650,13 @@ def run_interactive():
     output_fps = int(input("Enter output FPS: [40] ") or 40)
     is_master_input = input("Is ESP-NOW Master mode active? (y/n) [n] ") or "n"
     is_master = is_master_input.lower() == 'y'
+    chunk_size = 200
+    if is_master:
+        chunk_size = int(input("Enter ESP-NOW Chunk Size (16-230): [200] ") or 200)
+        if chunk_size < 16 or chunk_size > 230:
+            chunk_size = 200
     
-    run_calculation_on_channels(dummy_outputs, status_led=status_pin, zc_pin=zc_pin, output_fps=output_fps, is_master=is_master)
+    run_calculation_on_channels(dummy_outputs, status_led=status_pin, zc_pin=zc_pin, output_fps=output_fps, is_master=is_master, chunk_size=chunk_size)
 
 def main():
     print_banner()

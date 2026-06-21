@@ -5,13 +5,14 @@
 #include <atomic>
 #include <WiFi.h>
 #include <esp_now.h>
+#include <esp_wifi.h>
 #include <vector>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include "config.h"
 #include "output_control.h"
 
-#define ESPNOW_DMX_CHUNK_SIZE 200
+#define ESPNOW_DMX_CHUNK_SIZE 230
 
 // Custom ESP-NOW packet layout
 struct EspNowDmxPacket {
@@ -35,12 +36,22 @@ struct PeerRoute {
 
 extern QueueHandle_t espNowQueue;
 
+class EspNowControl;
+extern EspNowControl espNowCtrl;
+
 class EspNowControl {
 private:
     bool initialized = false;
     esp_now_peer_info_t peerInfo;
     std::vector<PeerRoute> peerList;
 
+public:
+    bool channelLocked = false;
+    uint8_t currentScanChannel = 1;
+    unsigned long lastChannelSwitchTime = 0;
+    unsigned long lastPacketRecvTime = 0;
+
+private:
     // Parser for "AA:BB:CC:DD:EE:FF" MAC addresses
     bool parseMacAddress(const char* macStr, uint8_t* macBytes) {
         int values[6];
@@ -142,6 +153,30 @@ public:
         Serial.printf("ESP-NOW: Loaded %d peers\n", peerList.size());
     }
 
+    void loop() {
+        if (sysCfg.device_mode == MODE_ESPNOW_SLAVE && sysCfg.espnow_channel == 0) {
+            unsigned long now = millis();
+            if (!channelLocked) {
+                if (now - lastChannelSwitchTime > 150) {
+                    currentScanChannel++;
+                    if (currentScanChannel > 13) currentScanChannel = 1;
+                    
+                    esp_wifi_set_channel(currentScanChannel, WIFI_SECOND_CHAN_NONE);
+                    lastChannelSwitchTime = now;
+                }
+            } else {
+                if (now - lastPacketRecvTime > 5000) {
+                    channelLocked = false;
+                    currentScanChannel = 1;
+                    esp_wifi_set_channel(currentScanChannel, WIFI_SECOND_CHAN_NONE);
+                    lastChannelSwitchTime = now;
+                    lastPacketRecvTime = now;
+                    Serial.println("ESP-NOW Slave: Lost contact with Master. Restarting channel scan...");
+                }
+            }
+        }
+    }
+
     void begin() {
         if (initialized) return;
 
@@ -162,9 +197,26 @@ public:
         if (sysCfg.device_mode == MODE_ESPNOW_MASTER) {
             esp_now_register_send_cb(onDataSent);
             loadPeers();
+            if (sysCfg.espnow_channel > 0) {
+                esp_wifi_set_channel(sysCfg.espnow_channel, WIFI_SECOND_CHAN_NONE);
+                Serial.printf("ESP-NOW Master: set Wi-Fi channel to %d\n", sysCfg.espnow_channel);
+            }
         } else if (sysCfg.device_mode == MODE_ESPNOW_SLAVE) {
             esp_now_register_recv_cb(onDataRecv);
             Serial.println("ESP-NOW Slave callback registered");
+            
+            channelLocked = false;
+            currentScanChannel = (sysCfg.espnow_channel > 0) ? sysCfg.espnow_channel : 1;
+            lastChannelSwitchTime = millis();
+            lastPacketRecvTime = millis();
+            
+            if (sysCfg.espnow_channel > 0) {
+                esp_wifi_set_channel(sysCfg.espnow_channel, WIFI_SECOND_CHAN_NONE);
+                Serial.printf("ESP-NOW Slave: locked on Wi-Fi channel %d\n", sysCfg.espnow_channel);
+            } else {
+                esp_wifi_set_channel(currentScanChannel, WIFI_SECOND_CHAN_NONE);
+                Serial.printf("ESP-NOW Slave: auto-scan started on channel %d\n", currentScanChannel);
+            }
         }
     }
 
@@ -179,13 +231,16 @@ public:
             if (firstOffset >= totalLength) continue;
             if (lastOffsetExclusive > totalLength) lastOffsetExclusive = totalLength;
 
-            for (uint16_t offset = firstOffset; offset < lastOffsetExclusive; offset += ESPNOW_DMX_CHUNK_SIZE) {
+            uint16_t chunkSize = sysCfg.espnow_chunk_size;
+            if (chunkSize < 16 || chunkSize > ESPNOW_DMX_CHUNK_SIZE) chunkSize = 200;
+
+            for (uint16_t offset = firstOffset; offset < lastOffsetExclusive; offset += chunkSize) {
                 EspNowDmxPacket packet;
                 memcpy(packet.header, "DMX", 4);
                 packet.universe = universe;
                 packet.offset = offset;
                 packet.totalLength = 512;
-                packet.length = min((uint16_t)ESPNOW_DMX_CHUNK_SIZE, (uint16_t)(lastOffsetExclusive - offset));
+                packet.length = min((uint16_t)chunkSize, (uint16_t)(lastOffsetExclusive - offset));
                 memcpy(packet.data, dmxData + offset, packet.length);
 
                 size_t packetSize = sizeof(packet.header) + sizeof(packet.universe) +
@@ -228,9 +283,24 @@ private:
             if (packet.offset >= 512) return;
             uint16_t available = 512 - packet.offset;
             packet.length = packet.length > available ? available : packet.length;
+            if (packet.length > ESPNOW_DMX_CHUNK_SIZE) return;
             if ((int)(minHeaderLen + packet.length) > len) return;
 
             memcpy(packet.data, incomingData + minHeaderLen, packet.length);
+
+            // Channel lock logic for Auto-Scan mode on Slave
+            if (sysCfg.device_mode == MODE_ESPNOW_SLAVE && sysCfg.espnow_channel == 0) {
+                if (!espNowCtrl.channelLocked) {
+                    uint8_t primaryChan = 0;
+                    wifi_second_chan_t secondChan;
+                    if (esp_wifi_get_channel(&primaryChan, &secondChan) == ESP_OK) {
+                        espNowCtrl.channelLocked = true;
+                        espNowCtrl.currentScanChannel = primaryChan;
+                        Serial.printf("ESP-NOW Slave: Locked onto Master channel %d\n", primaryChan);
+                    }
+                }
+                espNowCtrl.lastPacketRecvTime = millis();
+            }
 
             // Queue for thread-safe processing on Core 1 loop
             if (espNowQueue != nullptr) {

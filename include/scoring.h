@@ -422,7 +422,7 @@ inline CpuBudget totalCpu(const std::vector<OutputChannel>& chs, uint8_t fps = 4
     if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
         uint8_t peerCount = getEspNowPeerCount();
         uint8_t universeCount = countUniqueUniverses(chs);
-        t.usPerFrame += espnowMasterCost(peerCount, universeCount).cpuUs;
+        t.usPerFrame += espnowMasterCost(peerCount, universeCount, sysCfg.espnow_chunk_size).cpuUs;
     }
     return t;
 }
@@ -442,7 +442,7 @@ inline RamBudget totalRam(const std::vector<OutputChannel>& chs) {
 
     if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
         uint8_t peerCount = getEspNowPeerCount();
-        t.bytes += espnowMasterCost(peerCount, 0).ramBytes;
+        t.bytes += espnowMasterCost(peerCount, 0, sysCfg.espnow_chunk_size).ramBytes;
     }
     return t;
 }
@@ -625,7 +625,7 @@ inline CpuBudget totalCpuFromJson(JsonArrayConst arr, uint8_t fps = 40) {
     if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
         uint8_t peerCount = getEspNowPeerCount();
         uint8_t universeCount = countUniqueUniversesFromJson(arr);
-        t.usPerFrame += espnowMasterCost(peerCount, universeCount).cpuUs;
+        t.usPerFrame += espnowMasterCost(peerCount, universeCount, sysCfg.espnow_chunk_size).cpuUs;
     }
     return t;
 }
@@ -647,7 +647,7 @@ inline RamBudget totalRamFromJson(JsonArrayConst arr) {
 
     if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
         uint8_t peerCount = getEspNowPeerCount();
-        t.bytes += espnowMasterCost(peerCount, 0).ramBytes;
+        t.bytes += espnowMasterCost(peerCount, 0, sysCfg.espnow_chunk_size).ramBytes;
     }
     return t;
 }

@@ -47,6 +47,10 @@ struct SystemConfig {
     char ap_ssid[32];
     char ap_pass[64];
 
+    // ESP-NOW Settings
+    uint8_t espnow_channel;    // 0 = Auto (Slave only), 1-13 = Fixed channel
+    uint16_t espnow_chunk_size; // 16 to 230 bytes payload per packet
+
     // Art-Net Settings
     bool artnet_enabled;       // Enable Art-Net listener
     uint16_t artnet_port;
@@ -134,6 +138,9 @@ inline void loadConfig(SystemConfig& cfg) {
     strncpy(cfg.ap_pass, pass.c_str(), sizeof(cfg.ap_pass) - 1);
     cfg.ap_pass[sizeof(cfg.ap_pass) - 1] = '\0';
 
+    cfg.espnow_channel = prefs.getUChar("now_chan", 0);
+    cfg.espnow_chunk_size = prefs.getUShort("now_chunk", 200);
+    if (cfg.espnow_chunk_size < 16 || cfg.espnow_chunk_size > 230) cfg.espnow_chunk_size = 200;
     cfg.artnet_enabled = prefs.getBool("art_on", true); // Default to true
     cfg.artnet_port = prefs.getUShort("art_port", 6454);
     if (cfg.artnet_port == 0) cfg.artnet_port = 6454;
@@ -200,6 +207,8 @@ inline void saveConfig(const SystemConfig& cfg) {
     prefs.putString("dns", String(cfg.eth_dns));
     prefs.putString("ap_ssid", String(cfg.ap_ssid));
     prefs.putString("ap_pass", String(cfg.ap_pass));
+    prefs.putUChar("now_chan", cfg.espnow_channel);
+    prefs.putUShort("now_chunk", cfg.espnow_chunk_size);
     prefs.putBool("art_on", cfg.artnet_enabled);
     prefs.putUShort("art_port", cfg.artnet_port);
     prefs.putBool("sacn_on", cfg.sacn_enabled);
