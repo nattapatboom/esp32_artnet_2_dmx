@@ -242,7 +242,7 @@ private:
 
     void setStepperEnable(OutputChannel& ch, bool enabled) {
         if (ch.pin3_source == 0) return;
-        writeOutputPin(ch, 3, !enabled);
+        writeOutputPin(ch, 3, ch.mc_enable_active_high ? enabled : !enabled);
     }
 
 public:
