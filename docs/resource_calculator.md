@@ -109,6 +109,8 @@ ramBytes = 512 + peerCount × (chunkSize + 44)
 
 **LED strip frame skip behavior:** Runtime calls NeoPixelBus/RMT `CanShow()` before mapping pixels and calling `Show()`. If the previous WS281x transfer is still busy, that strip's update is skipped for the current frame tick and the next tick sends the newest DMX buffer. The CPU/service estimate intentionally counts only CPU prep/enqueue time, not the full WS281x wire time, because long LED strips are allowed to refresh below the configured global FPS instead of blocking other outputs.
 
+**DMX output frame skip behavior:** UART and RMT DMX output paths check whether the previous transmission has completed before queueing a new packet. If the peripheral is still busy, that DMX output is skipped for the current tick and the next available tick sends the newest buffered DMX values. CPU budget counts enqueue/copy time, not 250 kbps wire time.
+
 ### 3C. RamBudget — Runtime Memory Estimate
 
 RAM estimates now include the `OutputChannel` vector slot, allocator/header slack, the per-channel DMX buffer allocated by firmware, and known runtime driver objects.

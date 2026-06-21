@@ -770,8 +770,8 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
         message = "Status LED GPIO and Zero-Crossing GPIO cannot use the same pin";
         return false;
     }
-    if (statusPin == 12 || sdaPin == 12 || sclPin == 12) {
-        message = "GPIO 12 (MTDI bootstrap) cannot be used as Status LED, I2C SDA, or I2C SCL";
+    if (statusPin == 12 || zcPin == 12 || sdaPin == 12 || sclPin == 12) {
+        message = "GPIO 12 (MTDI bootstrap) cannot be used as Status LED, Zero-Crossing, I2C SDA, or I2C SCL";
         return false;
     }
     if (sdaPin != 255 && sclPin != 255 && sdaPin == sclPin) {
@@ -797,7 +797,36 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
     if (outputsUseForbiddenGpio(outputs, message)) return false;
     if (outputsHaveDuplicateGpio(outputs, message)) return false;
     if (outputsHaveDuplicateExpanderChannel(outputs, message)) return false;
+    for (JsonObjectConst output : outputs) {
+        if ((uint8_t)(output["type"] | 0) == 0 && zcPin == 255) {
+            message = "Zero-Crossing pin is not configured (GPIO 255). AC Dimmer outputs require a ZC pin to operate.";
+            return false;
+        }
+    }
     return true;
+}
+
+bool validateScoresForSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, String& message) {
+    uint8_t fps = settings["output_fps"].is<int>() ? (uint8_t)(int)settings["output_fps"] : sysCfg.output_fps;
+    uint8_t oldMode = sysCfg.device_mode;
+    uint16_t oldChunkSize = sysCfg.espnow_chunk_size;
+
+    if (settings["device_mode"].is<int>()) sysCfg.device_mode = settings["device_mode"];
+    if (settings["espnow_chunk_size"].is<int>()) {
+        int chunkSize = settings["espnow_chunk_size"];
+        sysCfg.espnow_chunk_size = (chunkSize >= 16 && chunkSize <= 230) ? chunkSize : 200;
+    }
+
+    ScoreBlocker blocker = checkScoresFromJson(outputs, fps);
+
+    sysCfg.device_mode = oldMode;
+    sysCfg.espnow_chunk_size = oldChunkSize;
+
+    if (blocker == ScoreBlocker::None) return true;
+    char msg[96];
+    snprintf(msg, sizeof(msg), "%s at %d FPS. Reduce channels or FPS.", scoreBlockerName(blocker), fps);
+    message = msg;
+    return false;
 }
 
 bool validateOutputJson(JsonArray outputs, String& message) {
@@ -1053,10 +1082,6 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
         }
         channelNumber++;
-    }
-    if (hasAcDimmer && sysCfg.zc_pin == 255) {
-        message = "Zero-Crossing pin is not configured (GPIO 255). AC Dimmer outputs require a ZC pin to operate.";
-        return false;
     }
     // PCA9685 shared frequency conflict detection (non-blocking warning)
     {
@@ -1431,6 +1456,24 @@ void setupWebServer() {
                 return;
             }
 
+            JsonDocument outputsDoc;
+            JsonArray savedOutputs = outputsDoc["outputs"].to<JsonArray>();
+            if (LittleFS.exists("/outputs.json")) {
+                File outputsFile = LittleFS.open("/outputs.json", "r");
+                DeserializationError outputsError = deserializeJson(outputsDoc, outputsFile);
+                outputsFile.close();
+                if (outputsError || !outputsDoc["outputs"].is<JsonArray>()) {
+                    request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Saved outputs file is invalid\"}");
+                    return;
+                }
+                savedOutputs = outputsDoc["outputs"].as<JsonArray>();
+            }
+            if (!validateSettingsAndOutputs(doc.as<JsonObjectConst>(), savedOutputs, validationMessage) ||
+                !validateScoresForSettingsAndOutputs(doc.as<JsonObjectConst>(), savedOutputs, validationMessage)) {
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
+                return;
+            }
+
             // Apply only fields present in the JSON payload (partial update support)
             if (doc["device_mode"].is<int>()) sysCfg.device_mode = doc["device_mode"];
             if (doc["eth_dhcp"].is<bool>()) sysCfg.eth_dhcp = doc["eth_dhcp"];
@@ -1441,6 +1484,10 @@ void setupWebServer() {
             if (doc["ap_ssid"].is<const char*>()) copyConfigString(sysCfg.ap_ssid, sizeof(sysCfg.ap_ssid), doc["ap_ssid"]);
             if (doc["ap_pass"].is<const char*>()) copyConfigString(sysCfg.ap_pass, sizeof(sysCfg.ap_pass), doc["ap_pass"]);
             if (doc["espnow_channel"].is<int>()) sysCfg.espnow_channel = doc["espnow_channel"];
+            if (doc["espnow_chunk_size"].is<int>()) {
+                int chunkSize = doc["espnow_chunk_size"];
+                sysCfg.espnow_chunk_size = (chunkSize >= 16 && chunkSize <= 230) ? chunkSize : 200;
+            }
             if (doc["artnet_enabled"].is<bool>()) sysCfg.artnet_enabled = doc["artnet_enabled"];
             if (doc["artnet_port"].is<int>()) {
                 int port = doc["artnet_port"];
@@ -1547,7 +1594,8 @@ void setupWebServer() {
             JsonArray outputs = doc["outputs"].as<JsonArray>();
             String validationMessage;
             if (!validateOutputJson(outputs, validationMessage) ||
-                !validateSettingsAndOutputs(settings, outputs, validationMessage)) {
+                !validateSettingsAndOutputs(settings, outputs, validationMessage) ||
+                !validateScoresForSettingsAndOutputs(settings, outputs, validationMessage)) {
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
                 return;
             }

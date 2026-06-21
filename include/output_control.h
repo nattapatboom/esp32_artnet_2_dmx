@@ -1207,15 +1207,13 @@ private:
             if (ch.type == 1 && ch.dmxBuffer != nullptr) {
                 if (ch.dmxPort != 255) {
                     dmx_port_t port = (dmx_port_t)ch.dmxPort;
+                    if (!dmx_wait_sent(port, 0)) continue;
                     dmxTxBuffer[0] = 0x00;
                     memcpy(dmxTxBuffer + 1, ch.dmxBuffer, 512);
 
                     // Write and send via hardware serial
                     dmx_write(port, dmxTxBuffer, DMX_PACKET_SIZE);
                     dmx_send(port, DMX_PACKET_SIZE);
-                    
-                    // Wait for send to complete
-                    dmx_wait_sent(port, DMX_TIMEOUT_TICK);
                 } else if (ch.rmtDmx != nullptr) {
                     ch.rmtDmx->send(ch.dmxBuffer);
                 }

@@ -92,7 +92,7 @@ private:
         if (size < ARTNET_HEADER_SIZE) return;
 
         // Protocol version check (Art-Net 4 requires >= 14)
-        if ((buf[10] | (buf[11] << 8)) < 14) return;
+        if (((uint16_t)buf[10] << 8 | buf[11]) < 14) return;
 
         // Universe (Little Endian, low-byte first)
         uint16_t universe = buf[14] | (buf[15] << 8);

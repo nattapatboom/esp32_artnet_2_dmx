@@ -65,12 +65,19 @@ private:
                (uint32_t)buf[offset + 3];
     }
 
+    bool validatePduFlagsLength(const uint8_t* buf, int len, int offset) {
+        if (offset + 2 > len) return false;
+        uint16_t flagsLength = readUint16BE(buf, offset);
+        if ((flagsLength & 0xF000) != 0x7000) return false;
+        uint16_t pduLength = flagsLength & 0x0FFF;
+        return pduLength >= 2 && offset + pduLength <= len;
+    }
+
     bool validatePacket(const uint8_t* buf, int len) {
         if (len < 126) return false;
-        // E1.31: root Flags/Length — upper 2 bits must be 0 (PHT), lower 14 bits = PDU length
-        uint16_t rootLen = ((uint16_t)buf[0] << 8) | buf[1];
-        if ((rootLen & 0xC000) != 0) return false; // flags must be PHT (00)
-        if (rootLen > (uint16_t)len) return false; // claimed length exceeds received data
+        if (!validatePduFlagsLength(buf, len, 16)) return false;
+        if (!validatePduFlagsLength(buf, len, 38)) return false;
+        if (!validatePduFlagsLength(buf, len, 115)) return false;
         if (readUint32BE(buf, SACN_ROOT_VECTOR) != SACN_ROOT_VECTOR_VAL) return false;
         if (readUint32BE(buf, SACN_FRAMING_VECTOR) != SACN_FRAMING_VECTOR_VAL) return false;
         if (buf[SACN_DMP_VECTOR] != SACN_DMP_VECTOR_VAL) return false;
@@ -81,7 +88,7 @@ private:
 
     bool shouldAcceptSource(const uint8_t* cid, uint8_t priority) {
         int freeSlot = -1;
-        uint8_t maxPriority = 0;
+        int existingSlot = -1;
 
         for (int i = 0; i < SACN_MAX_SOURCES; i++) {
             if (!sources[i].active) {
@@ -90,15 +97,26 @@ private:
             }
 
             if (memcmp(sources[i].cid, cid, 16) == 0) {
+                existingSlot = i;
                 sources[i].priority = priority;
                 sources[i].lastSeen = millis();
-                return true;
-            }
-
-            if (sources[i].priority > maxPriority) {
-                maxPriority = sources[i].priority;
             }
         }
+
+        if (existingSlot < 0 && freeSlot >= 0) {
+            memcpy(sources[freeSlot].cid, cid, 16);
+            sources[freeSlot].priority = priority;
+            sources[freeSlot].lastSeen = millis();
+            sources[freeSlot].active = true;
+            existingSlot = freeSlot;
+        }
+
+        uint8_t maxPriority = 0;
+        for (int i = 0; i < SACN_MAX_SOURCES; i++) {
+            if (sources[i].active && sources[i].priority > maxPriority) maxPriority = sources[i].priority;
+        }
+
+        if (existingSlot >= 0) return priority >= maxPriority;
 
         if (priority >= maxPriority) {
             if (freeSlot >= 0) {

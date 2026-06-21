@@ -43,6 +43,7 @@ public:
 
     void send(uint8_t* dmx_data) {
         if (!rmt_buffer) return;
+        if (rmt_wait_tx_done(channel, 0) != ESP_OK) return;
         size_t item_count = 0;
 
         // 1. Break and MAB
@@ -64,7 +65,7 @@ public:
         rmt_buffer[item_count++] = {{{0, 0, 0, 0}}};
         
         // Write to RMT
-        rmt_write_items(channel, rmt_buffer, item_count, true);
+        rmt_write_items(channel, rmt_buffer, item_count, false);
     }
 
 private:

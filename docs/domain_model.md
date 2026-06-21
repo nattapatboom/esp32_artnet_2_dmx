@@ -567,6 +567,8 @@ Configuration must pass these gates before save/apply:
 
 **LED strip frame skip behavior:** RGB/RGBW LED strips use NeoPixelBus/RMT and call `CanShow()` before mapping/sending a new frame. If the previous WS281x transfer is still busy (for example a very long strip exceeds the configured FPS frame window), the firmware skips that strip update for the current tick and sends the newest buffered DMX values on the next available frame. CPU budget counts only mapping/enqueue time, not full WS281x wire time, because long LED strips are allowed to refresh below global FPS instead of blocking Core 1 or other output types.
 
+**DMX output frame skip behavior:** DMX UART/RMT outputs check whether the previous 250 kbps frame has completed before queueing the next frame. If still busy, that DMX output is skipped for the current tick and the newest buffered values are sent on the next available tick, preventing Core 1 from blocking on wire time.
+
 **RAM Budget** estimates static/stack buffer bytes:
 - Every channel: 224 bytes for the `OutputChannel` vector slot and allocator/header slack.
 - Every channel gets a firmware DMX value buffer sized to what the output reads; DMX output uses 512 bytes and LED strips use `ceil(pixel_bytes/512)×512`.
