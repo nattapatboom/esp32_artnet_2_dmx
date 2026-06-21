@@ -63,14 +63,11 @@ public:
     void displayNum(uint16_t num) {
         if (num > 9999) num = 9999;
         // Segment codes for digits 0-9
-        const uint8_t segDigits[] = {
-            0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f
-        };
         uint8_t data[4];
-        data[0] = segDigits[num / 1000];
-        data[1] = segDigits[(num % 1000) / 100];
-        data[2] = segDigits[(num % 100) / 10];
-        data[3] = segDigits[num % 10];
+        data[0] = SEG_DIGITS[num / 1000];
+        data[1] = SEG_DIGITS[(num % 1000) / 100];
+        data[2] = SEG_DIGITS[(num % 100) / 10];
+        data[3] = SEG_DIGITS[num % 10];
         
         // Command 1: Data setting
         start();
@@ -885,11 +882,9 @@ public:
                     if (ch.mc_resolution == 10) {
                         uint8_t raw = ch.dmxBuffer[0];
                         if (raw <= 9) {
-                            const uint8_t segDigits[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
-                            segByte = segDigits[raw];
+                            segByte = SEG_DIGITS[raw];
                         } else if (raw >= 10 && raw <= 19) {
-                            const uint8_t segDigits[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
-                            segByte = segDigits[raw - 10] | 0x80;
+                            segByte = SEG_DIGITS[raw - 10] | 0x80;
                         }
                     } else {
                         segByte = asciiToSegment(ch.dmxBuffer[0]);

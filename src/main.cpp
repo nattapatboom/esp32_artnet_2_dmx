@@ -310,6 +310,40 @@ bool displayAddressValid(uint8_t displayType, uint8_t address) {
     return false;
 }
 
+static bool isPin2GpioRouting(uint8_t type, uint8_t source, uint8_t pin2Source) {
+    if (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || (type == 7 && pin2Source == 0))
+        return pin2Source == 0;
+    if (type == 11 || type == 10)
+        return source == 0;
+    return false;
+}
+
+static bool isPin3GpioRouting(uint8_t type, uint8_t pin3Source, uint8_t mcMode) {
+    if (type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2) || type == 7)
+        return pin3Source == 0;
+    return false;
+}
+
+static bool isPin4GpioRouting(uint8_t type, uint8_t pin4Source, uint8_t colorOrder, uint8_t homingMode) {
+    if (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4)
+        return pin4Source == 0;
+    if (type == 7 && homingMode == 0)
+        return pin4Source == 0;
+    return false;
+}
+
+static bool isPin4Input(uint8_t type, uint8_t homingMode) {
+    return type == 7 && homingMode == 0;
+}
+
+static uint8_t numSegPins(uint8_t type) {
+    return (type == 13) ? 8 : 7;
+}
+
+static bool isSegCommonDim(uint8_t mcMode) {
+    return mcMode >= 6 && mcMode <= 9;
+}
+
 bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
     if (reservedPin == 255) return false;
     uint8_t source = output["source"] | 0;
@@ -325,13 +359,12 @@ bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
 
     if (type == 12 || type == 13) {
         if (pin2Source == 0) {
-            uint8_t numSeg = (type == 13) ? 8 : 7;
-            bool isCommonDim = (mcMode >= 6 && mcMode <= 9);
-            uint8_t startIdx = isCommonDim ? 0 : 1;
+            uint8_t nSeg = numSegPins(type);
+            uint8_t startIdx = isSegCommonDim(mcMode) ? 0 : 1;
             if (output.containsKey("seg_pins")) {
                 JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
                 JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
-                for (int s = startIdx; s < numSeg; s++) {
+                for (int s = startIdx; s < nSeg; s++) {
                     if (s < segSources.size() && (uint8_t)(segSources[s] | 0) != 0) continue;
                     if (s < segArr.size()) {
                         if (jsonPinMatches(segArr[s], reservedPin)) return true;
@@ -343,38 +376,16 @@ bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
             } else if (source == 0) {
                 int basePin = output["pin"] | 255;
                 if (basePin != 255) {
-                    for (int s = startIdx; s < numSeg; s++) {
+                    for (int s = startIdx; s < nSeg; s++) {
                         if ((basePin + s) == reservedPin) return true;
                     }
                 }
             }
         }
     } else {
-        bool p2IsGpio = false;
-        if (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || (type == 7 && pin2Source == 0)) {
-            p2IsGpio = (pin2Source == 0);
-        } else if (type == 11 || type == 10) {
-            p2IsGpio = (source == 0);
-        }
-        if (p2IsGpio && jsonPinMatches(output["pin2"], reservedPin)) return true;
-
-        bool p3IsGpio = false;
-        if (type == CHAN_TYPE_ANALOG_RGB) {
-            p3IsGpio = (pin3Source == 0);
-        } else if (type == 6 && mcMode == 2) {
-            p3IsGpio = (pin3Source == 0);
-        } else if (type == 7 && pin3Source == 0) {
-            p3IsGpio = true;
-        }
-        if (p3IsGpio && jsonPinMatches(output["pin3"], reservedPin)) return true;
-
-        bool p4IsGpio = false;
-        if (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4) {
-            p4IsGpio = (pin4Source == 0);
-        } else if (type == 7 && homingMode == 0) {
-            p4IsGpio = (pin4Source == 0);
-        }
-        if (p4IsGpio && jsonPinMatches(output["pin4"], reservedPin)) return true;
+        if (isPin2GpioRouting(type, source, pin2Source) && jsonPinMatches(output["pin2"], reservedPin)) return true;
+        if (isPin3GpioRouting(type, pin3Source, mcMode) && jsonPinMatches(output["pin3"], reservedPin)) return true;
+        if (isPin4GpioRouting(type, pin4Source, colorOrder, homingMode) && jsonPinMatches(output["pin4"], reservedPin)) return true;
     }
     return false;
 }
@@ -448,13 +459,12 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
 
         if (type == 12 || type == 13) {
             if (pin2Source == 0) {
-                uint8_t numSeg = (type == 13) ? 8 : 7;
-                bool isCommonDim = (mcMode >= 6 && mcMode <= 9);
-                uint8_t startIdx = isCommonDim ? 0 : 1;
+                uint8_t nSeg = numSegPins(type);
+                uint8_t startIdx = isSegCommonDim(mcMode) ? 0 : 1;
                 if (output.containsKey("seg_pins")) {
                     JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
                     JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
-                    for (int s = startIdx; s < numSeg; s++) {
+                    for (int s = startIdx; s < nSeg; s++) {
                         if (s < segSources.size() && (uint8_t)(segSources[s] | 0) != 0) continue;
                         int pVal = 255;
                         if (s < segArr.size()) pVal = segArr[s] | 255;
@@ -466,25 +476,19 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
                     }
                 } else if (source == 0) {
                     int basePin = output["pin"] | 255;
-                    for (int s = startIdx; s < numSeg; s++) {
+                    for (int s = startIdx; s < nSeg; s++) {
                         if (forbid((basePin != 255) ? (basePin + s) : 255, " segment")) return true;
                     }
                 }
             }
         } else {
-            bool p2IsGpio = (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || (type == 7 && pin2Source == 0)) ? (pin2Source == 0) : ((type == 11 || type == 10) ? (source == 0) : false);
-            if (p2IsGpio && forbid(output["pin2"] | 255, " pin2")) return true;
+            if (isPin2GpioRouting(type, source, pin2Source) && forbid(output["pin2"] | 255, " pin2")) return true;
+            if (isPin3GpioRouting(type, pin3Source, mcMode) && forbid(output["pin3"] | 255, " pin3")) return true;
 
-            bool p3IsGpio = (type == CHAN_TYPE_ANALOG_RGB) ? (pin3Source == 0) : ((type == 6 && mcMode == 2) ? (pin3Source == 0) : (type == 7 && pin3Source == 0));
-            if (p3IsGpio && forbid(output["pin3"] | 255, " pin3")) return true;
-
-            // pin4: stepper HOME is an input — GPIO34-39 allowed; GPIO12 still forbidden
-            bool p4IsInput = (type == 7 && homingMode == 0);
-            bool p4IsOutput = (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4);
             int p4Pin = output["pin4"] | 255;
-            if (p4IsOutput && pin4Source == 0) {
+            if (isPin4GpioRouting(type, pin4Source, colorOrder, homingMode)) {
                 if (forbid(p4Pin, " pin4")) return true;
-            } else if (p4IsInput && pin4Source == 0 && p4Pin == 12) {
+            } else if (isPin4Input(type, homingMode) && pin4Source == 0 && p4Pin == 12) {
                 message = "GPIO 12 (MTDI bootstrap) is forbidden on channel " + String(channel) + " pin4";
                 return true;
             }
@@ -535,13 +539,12 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
 
         if (type == 12 || type == 13) {
             if (pin2Source == 0) {
-                uint8_t numSeg = (type == 13) ? 8 : 7;
-                bool isCommonDim = (mcMode >= 6 && mcMode <= 9);
-                uint8_t startIdx = isCommonDim ? 0 : 1;
+                uint8_t nSeg = numSegPins(type);
+                uint8_t startIdx = isSegCommonDim(mcMode) ? 0 : 1;
                 if (output.containsKey("seg_pins")) {
                     JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
                     JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
-                    for (int s = startIdx; s < numSeg; s++) {
+                    for (int s = startIdx; s < nSeg; s++) {
                         if (s < segSources.size() && (uint8_t)(segSources[s] | 0) != 0) continue;
                         int pVal = 255;
                         if (s < segArr.size()) {
@@ -556,7 +559,7 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
                 } else {
                     if (source == 0) {
                         int basePin = output["pin"] | 255;
-                        for (int s = startIdx; s < numSeg; s++) {
+                        for (int s = startIdx; s < nSeg; s++) {
                             int pVal = (basePin != 255) ? (basePin + s) : 255;
                             if (addPin(pVal, channel)) return true;
                         }
@@ -564,31 +567,9 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
                 }
             }
         } else {
-            bool p2IsGpio = false;
-            if (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || (type == 7 && pin2Source == 0)) {
-                p2IsGpio = (pin2Source == 0);
-            } else if (type == 11 || type == 10) {
-                p2IsGpio = (source == 0);
-            }
-            if (p2IsGpio && addPin(output["pin2"] | 255, channel)) return true;
-
-            bool p3IsGpio = false;
-            if (type == CHAN_TYPE_ANALOG_RGB) {
-                p3IsGpio = (pin3Source == 0);
-            } else if (type == 6 && mcMode == 2) {
-                p3IsGpio = (pin3Source == 0);
-            } else if (type == 7 && pin3Source == 0) {
-                p3IsGpio = true;
-            }
-            if (p3IsGpio && addPin(output["pin3"] | 255, channel)) return true;
-
-            bool p4IsGpio = false;
-            if (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4) {
-                p4IsGpio = (pin4Source == 0);
-            } else if (type == 7 && homingMode == 0) {
-                p4IsGpio = (pin4Source == 0);
-            }
-            if (p4IsGpio && addPin(output["pin4"] | 255, channel)) return true;
+            if (isPin2GpioRouting(type, source, pin2Source) && addPin(output["pin2"] | 255, channel)) return true;
+            if (isPin3GpioRouting(type, pin3Source, mcMode) && addPin(output["pin3"] | 255, channel)) return true;
+            if (isPin4GpioRouting(type, pin4Source, colorOrder, homingMode) && addPin(output["pin4"] | 255, channel)) return true;
         }
         channel++;
     }

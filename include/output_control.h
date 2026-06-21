@@ -33,6 +33,8 @@ extern unsigned long lastDmxUpdateTime;
 extern bool systemActive;
 extern std::atomic<bool> networkFramePending;
 
+const uint8_t SEG_DIGITS[10] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
+
 class PixelStripWrapper {
 public:
     virtual ~PixelStripWrapper() {}
@@ -351,10 +353,7 @@ inline bool readOutputPin(OutputChannel& ch, uint8_t pinNum) {
 inline uint8_t asciiToSegment(uint8_t c) {
     if (c >= 'a' && c <= 'z') c -= 32;
     if (c >= '0' && c <= '9') {
-        const uint8_t segDigits[] = {
-            0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f
-        };
-        return segDigits[c - '0'];
+        return SEG_DIGITS[c - '0'];
     }
     switch (c) {
         case 'A': return 0x77;
@@ -889,6 +888,10 @@ public:
                 delete ch.funcGen;
                 ch.funcGen = nullptr;
             }
+            ch.dmxPort = 255;
+            ch.ledc_chan2 = 255;
+            ch.ledc_chan3 = 255;
+            ch.ledc_chan4 = 255;
         }
         channels.clear();
     }
