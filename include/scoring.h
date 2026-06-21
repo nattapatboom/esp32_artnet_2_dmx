@@ -238,6 +238,7 @@ constexpr uint32_t STEPPER_RUNTIME_RAM = 512;
 constexpr uint32_t FUNCGEN_OBJECT_RAM = 1120;  // 4 waveform tables + esp_timer handle/object slack
 constexpr uint32_t RMT_DMX_DRIVER_RAM = 5150UL * sizeof(rmt_item32_t) + 32;
 constexpr uint32_t I2C_ROUTE_RAM = 32;
+constexpr uint32_t DMX_OUTPUT_SERVICE_US = 250;  // UART/RMT enqueue CPU time; wire transfer runs in peripheral/driver.
 
 inline uint32_t frameTimeUs(uint8_t outputFps) {
     if (outputFps < 1) outputFps = 40;
@@ -307,7 +308,7 @@ inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(ch.type, ch.led_count, ch.color_order, ch.mc_resolution, ch.mc_mode);
     switch (ch.type) {
         case 0:  c.cpuUs = 5; break;
-        case 1:  c.cpuUs = 22600; break;
+        case 1:  c.cpuUs = DMX_OUTPUT_SERVICE_US; break;
         case 2:  c.cpuUs = 5; break;
         case 3:  c.cpuUs = ledStripServiceUs(ch.led_count, ch.color_order); c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order) + PIXEL_STRIP_OBJECT_RAM; break;
         case 4:  c.cpuUs = 6; break;
@@ -419,7 +420,7 @@ inline CpuBudget totalCpu(const std::vector<OutputChannel>& chs, uint8_t fps = 4
     t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
     t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
     
-    if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
+    if (sysCfg.device_mode == MODE_ESPNOW_MASTER) {
         uint8_t peerCount = getEspNowPeerCount();
         uint8_t universeCount = countUniqueUniverses(chs);
         t.usPerFrame += espnowMasterCost(peerCount, universeCount, sysCfg.espnow_chunk_size).cpuUs;
@@ -440,7 +441,7 @@ inline RamBudget totalRam(const std::vector<OutputChannel>& chs) {
     uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
     t.bytes += (uint32_t)dmxRmtUse * RMT_DMX_DRIVER_RAM;
 
-    if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
+    if (sysCfg.device_mode == MODE_ESPNOW_MASTER) {
         uint8_t peerCount = getEspNowPeerCount();
         t.bytes += espnowMasterCost(peerCount, 0, sysCfg.espnow_chunk_size).ramBytes;
     }
@@ -574,7 +575,7 @@ inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(t, ledCount, colorOrder, j["mc_resolution"] | 8, j["mc_mode"] | 0);
     switch (t) {
         case 0:  c.cpuUs = 5; break;
-        case 1:  c.cpuUs = 22600; break;
+        case 1:  c.cpuUs = DMX_OUTPUT_SERVICE_US; break;
         case 2:  c.cpuUs = 5; break;
         case 3:  c.cpuUs = ledStripServiceUs(ledCount, colorOrder); c.ramBytes += pixelBufferRam(ledCount, colorOrder) + PIXEL_STRIP_OBJECT_RAM; break;
         case 4:  c.cpuUs = 6; break;
@@ -622,7 +623,7 @@ inline CpuBudget totalCpuFromJson(JsonArrayConst arr, uint8_t fps = 40) {
     t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
     t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
 
-    if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
+    if (sysCfg.device_mode == MODE_ESPNOW_MASTER) {
         uint8_t peerCount = getEspNowPeerCount();
         uint8_t universeCount = countUniqueUniversesFromJson(arr);
         t.usPerFrame += espnowMasterCost(peerCount, universeCount, sysCfg.espnow_chunk_size).cpuUs;
@@ -645,7 +646,7 @@ inline RamBudget totalRamFromJson(JsonArrayConst arr) {
     uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
     t.bytes += (uint32_t)dmxRmtUse * RMT_DMX_DRIVER_RAM;
 
-    if (sysCfg.device_mode == 1) { // MODE_ESPNOW_MASTER
+    if (sysCfg.device_mode == MODE_ESPNOW_MASTER) {
         uint8_t peerCount = getEspNowPeerCount();
         t.bytes += espnowMasterCost(peerCount, 0, sysCfg.espnow_chunk_size).ramBytes;
     }

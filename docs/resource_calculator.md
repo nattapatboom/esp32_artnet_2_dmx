@@ -65,7 +65,7 @@ PCA9685 and digital expanders are NOT counted as hardware; they use I2C bus, ref
 
 ### 3B. CpuBudget — Output Service Time (Microseconds)
 
-CPU budget is now modeled as **output service time** in microseconds per frame (µs/frame), not just core compute cycles. It includes blocking/serialized output work such as DMX512 transmit, LED strip pixel mapping/RMT enqueue, TM1637 bit-bang time, and active I2C transactions.
+CPU budget is now modeled as **output service time** in microseconds per frame (µs/frame), not just core compute cycles. It includes firmware-side work such as DMX packet enqueue/copy, LED strip pixel mapping/RMT enqueue, TM1637 bit-bang time, and active I2C transactions. Peripheral wire time is enforced by hardware limits instead of CPU budget.
 
 Timer-driven outputs have two costs: foreground set/update cost in the table below, plus background per-frame equivalent ISR/timer cost. AC Dimmer adds a shared hardware timer cost if any dimmer exists. Function Generator adds per-channel esp_timer ISR cost even when DMX values are unchanged.
 
@@ -81,7 +81,7 @@ Higher FPS = less time per frame = smaller budget:
 | Type | µs/frame | Notes |
 | :--- | ---: | :--- |
 | AC Dimmer (0) | 5 + background timer cost | GPIO/state update; ZC timing handled by ISR; consumes 1 shared timer |
-| DMX (1) | 22,600 | Full DMX512 frame transmit (513 slots × 11 bits @250kbps) |
+| DMX (1) | 250 | UART/RMT packet enqueue and buffer copy; DMX wire transfer runs in the peripheral/driver and is constrained by UART/RMT limits rather than CPU budget |
 | Relay (2) | 5 | Digital state update |
 | RGB LED (3) | `80 + count×3` RGB, `80 + count×4` RGBW | CPU pixel mapping + RMT `Show()` enqueue only |
 | Single LED (4) | 6 | 1 LEDC or PCA write setup |

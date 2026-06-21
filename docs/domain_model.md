@@ -230,7 +230,7 @@ The scoring system uses **three independent budgets**:
 | Budget | What it counts | Limit | Blocks save? |
 |--------|---------------|-------|:---:|
 | **HardwareResource** | Finite ESP32 peripherals: LEDC, RMT, UART, internal DAC, timers | `ledc ≤ 16`, `rmt ≤ 8`, `uart ≤ 2`, `dac ≤ 2`, `timer ≤ 4` | ✅ Source-aware block |
-| **CpuBudget** | Output service time: serialized DMX/WS281x/TM1637, active I2C writes, and 500 µs base overhead | `≤ (1,000,000/fps) - 1,500` µs | ✅ Yes |
+| **CpuBudget** | Output service time: DMX enqueue/copy, WS281x mapping/enqueue, TM1637 bit-bang, active I2C writes, and 500 µs base overhead | `≤ (1,000,000/fps) - 1,500` µs | ✅ Yes |
 | **RamBudget** | Static buffer estimates per type | `≤ 65535` (64 KB) | ✅ Yes |
 
 Key files:
@@ -249,7 +249,7 @@ Per-type active-frame service-time estimates in µs per frame. RAM includes `224
 | Type | CPU µs | RAM bytes | Notes |
 |:---:|:---:|:---:|:---|
 | 0 AC Dimmer | 5 + shared background timer cost | 225 | GPIO/state update; uses 1 shared hardware timer if any dimmer exists |
-| 1 DMX | 22600 | 736 UART path; +20632 if RMT fallback | Full DMX512 transmit frame |
+| 1 DMX | 250 | 736 UART path; +20632 if RMT fallback | UART/RMT packet enqueue and buffer copy; wire transfer runs in the peripheral/driver |
 | 2 Relay | 5 | 225 | Digital state update |
 | 3 RGB LED | `80 + led_count×3` RGB, `80 + led_count×4` RGBW | `224 + universes×512 + led_count×3 + 256` RGB, `224 + universes×512 + led_count×4 + 256` RGBW | CPU pixel mapping + RMT enqueue; RAM includes DMX + pixel buffers |
 | 4 Single LED | 6 | `224 + valueBytes` | 1 PWM/PCA update setup |
@@ -558,7 +558,7 @@ Configuration must pass these gates before save/apply:
 **Note:** GPIO is NOT counted. PCA9685 / digital expander channels are NOT counted as hardware.
 
 **CPU Budget** estimates output service time in microseconds:
-- Every channel has an active-frame service cost in µs (e.g., DMX 22600 µs, RGB LED CPU mapping/enqueue time, TM1637 900 µs).
+- Every channel has an active-frame service cost in µs (e.g., DMX enqueue service, RGB LED CPU mapping/enqueue time, TM1637 900 µs).
 - The output loop itself adds `BASE_OVERHEAD_US = 500` µs per frame (flag checks, channel iteration, RTOS overhead).
 - AC Dimmer and Function Generator add per-frame equivalent background timer/ISR cost even when DMX values do not change.
 - Each active I2C write adds +180 µs; multi-pin outputs add multiple transactions.

@@ -610,7 +610,8 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
         uint8_t address = output["pca_addr"] | 0x40;
         uint8_t mcMode = output["mc_mode"] | 0;
         uint8_t colorOrder = output["color_order"] | 0;
-        if (source != 0) {
+        bool primaryIsSevenSegA = (type == 12 || type == 13) && (mcMode >= 2 && mcMode <= 5);
+        if (source != 0 && !primaryIsSevenSegA) {
             if (addChannel(source, address, output["pca_channel"] | 0, outputIndex)) return true;
             if ((type == 6 || type == 7 || type == CHAN_TYPE_ANALOG_RGB || type == 18) &&
                 addChannel(source, address, output["pca_channel2"] | 255, outputIndex)) return true;

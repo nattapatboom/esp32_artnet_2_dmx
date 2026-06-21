@@ -1862,7 +1862,7 @@ function channelCost(o){
   ram+=dmxBufferRam(t,ledCount,parseInt(o.color_order||0),parseInt(o.mc_resolution||8),parseInt(o.mc_mode||0));
   switch(t){
     case 0: cpu=5; break;
-    case 1: cpu=22600; break;
+    case 1: cpu=DMX_OUTPUT_SERVICE_US; break;
     case 2: cpu=5; break;
     case 3: cpu=ledStripServiceUs(ledCount, parseInt(o.color_order||0)); ram+=pixelBufferRam(ledCount,parseInt(o.color_order||0))+PIXEL_STRIP_OBJECT_RAM; break;
     case 4: cpu=6; break;
@@ -1899,6 +1899,7 @@ const STEPPER_RUNTIME_RAM=512;
 const FUNCGEN_OBJECT_RAM=1120;
 const RMT_DMX_DRIVER_RAM=5150*4+32;
 const I2C_ROUTE_RAM=32;
+const DMX_OUTPUT_SERVICE_US=250;
 
 function dmxBufferRam(type,ledCount,colorOrder,resolution=8,mode=0){
   type=parseInt(type); mode=parseInt(mode||0);
@@ -2997,10 +2998,11 @@ function addOrUpdateOutput(){
       const type = o.type;
       const mcMode = parseInt(o.mc_mode||0);
       const colorOrder = parseInt(o.color_order||0);
+      const is7SegDD = (type===12||type===13) && (mcMode>=2 && mcMode<=9);
+      const primaryIsSevenSegA = (type===12||type===13) && (mcMode>=2 && mcMode<=5);
 
       // Primary source (pca_channel)
-      const is7SegDD = (type===12||type===13) && (mcMode>=2 && mcMode<=9);
-      if (src !== 0) {
+      if (src !== 0 && !primaryIsSevenSegA) {
         if(addUsedExpander(src, o.pca_addr, o.pca_channel, i)) return;
         if ((type===6||type===7||type===5||type===18) && o.pca_channel2!==255)
           if(addUsedExpander(src, o.pca_addr, o.pca_channel2, i)) return;
