@@ -160,8 +160,7 @@ constexpr uint16_t I2C_WRITE_US = 180;
 
 inline uint32_t ledStripServiceUs(uint16_t ledCount, uint8_t colorOrder) {
     uint8_t bytesPerPixel = colorOrder >= 4 ? 4 : 3;
-    uint16_t wireUsPerPixel = bytesPerPixel == 4 ? 40 : 30;  // WS281x serialized line time
-    return 80 + ledCount * (wireUsPerPixel + 2);             // +2 µs/pixel software mapping
+    return 80 + ledCount * (bytesPerPixel == 4 ? 4 : 3);  // CPU prep + Show enqueue; RMT wire time can be skipped
 }
 
 inline uint8_t sevenSegCount(uint8_t type, uint8_t mode) {

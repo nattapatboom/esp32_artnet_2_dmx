@@ -80,7 +80,7 @@ Higher FPS = less time per frame = smaller budget:
 | AC Dimmer (0) | 5 | GPIO/state update; ZC timing handled by ISR |
 | DMX (1) | 22,600 | Full DMX512 frame transmit (513 slots × 11 bits @250kbps) |
 | Relay (2) | 5 | Digital state update |
-| RGB LED (3) | `80 + count×32` RGB, `80 + count×42` RGBW | WS281x serialized line time + pixel mapping |
+| RGB LED (3) | `80 + count×3` RGB, `80 + count×4` RGBW | CPU pixel mapping + RMT `Show()` enqueue only |
 | Single LED (4) | 6 | 1 LEDC or PCA write setup |
 | Analog RGB (5) | 18 | 3-4 PWM updates before I2C additions |
 | Motor (6) | 35 | Deadband/direction/PWM calculation |
@@ -104,7 +104,7 @@ cpuUs = 500 + peerCount × ceil(512/chunkSize) × 170 + universeCount × 100
 ramBytes = 512 + peerCount × (chunkSize + 44)
 ```
 
-**LED strip frame skip behavior:** Runtime calls NeoPixelBus/RMT `CanShow()` before mapping pixels and calling `Show()`. If the previous WS281x transfer is still busy, that strip's update is skipped for the current frame tick and the next tick sends the newest DMX buffer. The CPU/service estimate still counts the serialized line time so long strips are limited before they create sustained frame drops.
+**LED strip frame skip behavior:** Runtime calls NeoPixelBus/RMT `CanShow()` before mapping pixels and calling `Show()`. If the previous WS281x transfer is still busy, that strip's update is skipped for the current frame tick and the next tick sends the newest DMX buffer. The CPU/service estimate intentionally counts only CPU prep/enqueue time, not the full WS281x wire time, because long LED strips are allowed to refresh below the configured global FPS instead of blocking other outputs.
 
 ### 3C. RamBudget — Runtime Memory Estimate
 

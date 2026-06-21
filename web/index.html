@@ -1879,8 +1879,7 @@ function pixelBufferRam(ledCount,colorOrder){ return (parseInt(ledCount)||0)*(pa
 
 function ledStripServiceUs(ledCount,colorOrder){
   const bytesPerPixel=parseInt(colorOrder||0)>=4?4:3;
-  const wireUsPerPixel=bytesPerPixel===4?40:30;
-  return 80+ledCount*(wireUsPerPixel+2);
+  return 80+ledCount*(bytesPerPixel===4?4:3);
 }
 
 function sevenSegCount(o){ return typeId(o)===13?8:(typeId(o)===12?7:0); }

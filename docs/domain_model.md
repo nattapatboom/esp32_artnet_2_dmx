@@ -251,7 +251,7 @@ Per-type active-frame service-time estimates in µs per frame. RAM includes `224
 | 0 AC Dimmer | 5 | 225 | GPIO/state update; ZC ISR separate |
 | 1 DMX | 22600 | 736 UART path; +20632 if RMT fallback | Full DMX512 transmit frame |
 | 2 Relay | 5 | 225 | Digital state update |
-| 3 RGB LED | `80 + led_count×32` RGB, `80 + led_count×42` RGBW | `224 + universes×512 + led_count×3 + 256` RGB, `224 + universes×512 + led_count×4 + 256` RGBW | WS281x serialized line time + mapping; RAM includes DMX + pixel buffers |
+| 3 RGB LED | `80 + led_count×3` RGB, `80 + led_count×4` RGBW | `224 + universes×512 + led_count×3 + 256` RGB, `224 + universes×512 + led_count×4 + 256` RGBW | CPU pixel mapping + RMT enqueue; RAM includes DMX + pixel buffers |
 | 4 Single LED | 6 | `224 + valueBytes` | 1 PWM/PCA update setup |
 | 5 Analog RGB | 18 | 227 RGB / 228 RGBW | 3-4 PWM updates before I2C writes |
 | 6 Motor | 35 | `224 + valueBytes` | Deadband/direction/PWM calculation |
@@ -553,13 +553,13 @@ Configuration must pass these gates before save/apply:
 **Note:** GPIO is NOT counted. PCA9685 / digital expander channels are NOT counted as hardware.
 
 **CPU Budget** estimates output service time in microseconds:
-- Every channel has an active-frame service cost in µs (e.g., DMX 22600 µs, RGB LED serialized WS281x time, TM1637 900 µs).
+- Every channel has an active-frame service cost in µs (e.g., DMX 22600 µs, RGB LED CPU mapping/enqueue time, TM1637 900 µs).
 - The output loop itself adds `BASE_OVERHEAD_US = 500` µs per frame (flag checks, channel iteration, RTOS overhead).
 - Each active I2C write adds +180 µs; multi-pin outputs add multiple transactions.
 - ESP-NOW Master adds `500 + peers×ceil(512/chunkSize)×170 + universes×100` µs overhead.
 - Limit scales with FPS: `(1,000,000 / fps) - 1,500` µs. Higher FPS = less time per frame = smaller budget.
 
-**LED strip frame skip behavior:** RGB/RGBW LED strips use NeoPixelBus/RMT and call `CanShow()` before mapping/sending a new frame. If the previous WS281x transfer is still busy (for example a very long strip exceeds the configured FPS frame window), the firmware skips that strip update for the current tick and sends the newest buffered DMX values on the next available frame. This avoids blocking Core 1 or queuing overlapping RMT transfers.
+**LED strip frame skip behavior:** RGB/RGBW LED strips use NeoPixelBus/RMT and call `CanShow()` before mapping/sending a new frame. If the previous WS281x transfer is still busy (for example a very long strip exceeds the configured FPS frame window), the firmware skips that strip update for the current tick and sends the newest buffered DMX values on the next available frame. CPU budget counts only mapping/enqueue time, not full WS281x wire time, because long LED strips are allowed to refresh below global FPS instead of blocking Core 1 or other output types.
 
 **RAM Budget** estimates static/stack buffer bytes:
 - Every channel: 224 bytes for the `OutputChannel` vector slot and allocator/header slack.
