@@ -44,6 +44,7 @@ struct SacnSource {
 class SACNControl {
 private:
     WiFiUDP udp;
+    std::vector<WiFiUDP*> mcastInstances;
     uint8_t rxBuf[SACN_PACKET_SIZE];
     bool initialized = false;
     bool multicastMode = false;
@@ -121,12 +122,31 @@ private:
         }
     }
 
+    void leaveAllMulticast() {
+        for (auto* m : mcastInstances) {
+            m->stop();
+            delete m;
+        }
+        mcastInstances.clear();
+    }
+
     void joinMulticast(uint16_t universe) {
+        WiFiUDP* m = new WiFiUDP();
         uint8_t hi = (universe >> 8) & 0xFF;
         uint8_t lo = universe & 0xFF;
         IPAddress mcast(239, 255, hi, lo);
-        udp.beginMulticast(mcast, sysCfg.sacn_port);
+        m->beginMulticast(mcast, sysCfg.sacn_port);
+        mcastInstances.push_back(m);
         Serial.printf("[sACN] Joined multicast 239.255.%d.%d for universe %d on port %u\n", hi, lo, universe, sysCfg.sacn_port);
+    }
+
+    void reloadMulticastGroups() {
+        leaveAllMulticast();
+        for (auto& ch : outputCtrl.getChannels()) {
+            for (uint16_t u = 0; u < outputCtrl.getUniverseCount(ch); u++) {
+                joinMulticast(ch.start_universe + u);
+            }
+        }
     }
 
 public:
@@ -146,8 +166,9 @@ public:
         }
 
         initialized = true;
-        Serial.printf("[sACN] Initialized (%s mode, port %u)\n",
-                      useMulticast ? "multicast" : "unicast", sysCfg.sacn_port);
+        Serial.printf("[sACN] Initialized (%s mode, port %u, %u multicast groups)\n",
+                      useMulticast ? "multicast" : "unicast", sysCfg.sacn_port,
+                      useMulticast ? (unsigned)mcastInstances.size() : 0);
     }
 
     void process() {
@@ -159,11 +180,18 @@ public:
             lastExpire = millis();
         }
 
+        WiFiUDP* src = &udp;
         int len = udp.parsePacket();
+        if (len <= 0) {
+            for (auto* m : mcastInstances) {
+                len = m->parsePacket();
+                if (len > 0) { src = m; break; }
+            }
+        }
         if (len <= 0) return;
 
         if (len > SACN_PACKET_SIZE) len = SACN_PACKET_SIZE;
-        udp.read(rxBuf, len);
+        src->read(rxBuf, len);
 
         if (!validatePacket(rxBuf, len)) {
             errorCount++;

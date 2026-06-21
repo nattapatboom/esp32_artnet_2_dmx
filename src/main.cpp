@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <atomic>
+#include <map>
 #include <ETH.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -1071,6 +1072,29 @@ bool validateOutputJson(JsonArray outputs, String& message) {
     if (hasAcDimmer && sysCfg.zc_pin == 255) {
         message = "Zero-Crossing pin is not configured (GPIO 255). AC Dimmer outputs require a ZC pin to operate.";
         return false;
+    }
+    // PCA9685 shared frequency conflict detection (non-blocking warning)
+    {
+        struct PcaRequirement { uint16_t freq; bool isServo; };
+        std::map<uint8_t, PcaRequirement> pcaFreqMap;
+        for (JsonObject output : outputs) {
+            uint8_t type = output["type"] | 0;
+            uint8_t source = output["source"] | 0;
+            if (source != 1) continue;
+            uint8_t addr = output["pca_addr"] | 0x40;
+            auto it = pcaFreqMap.find(addr);
+            if (type == 8) { // servo forces 50 Hz
+                if (it != pcaFreqMap.end() && !it->second.isServo) {
+                    Serial.printf("[WARN] PCA9685 at 0x%02X: servo (50 Hz) conflicts with other PWM types on same chip\n", addr);
+                }
+                pcaFreqMap[addr] = {50, true};
+            } else {
+                if (it != pcaFreqMap.end() && it->second.isServo) {
+                    Serial.printf("[WARN] PCA9685 at 0x%02X: non-servo channel conflicts with servo (50 Hz) on same chip\n", addr);
+                }
+                pcaFreqMap[addr] = {200, false};
+            }
+        }
     }
     return true;
 }

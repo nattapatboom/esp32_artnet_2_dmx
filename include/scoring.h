@@ -676,6 +676,7 @@ inline const char* scoreBlockerName(ScoreBlocker b) {
     switch (b) {
         case ScoreBlocker::HardwareLimit: return "Hardware limit exceeded";
         case ScoreBlocker::CpuLimit:      return "CPU time exceeded — reduce channels or lower FPS";
+        case ScoreBlocker::RamLimit:      return "RAM budget exceeded — reduce channels";
         default:                          return "";
     }
 }

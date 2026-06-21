@@ -169,7 +169,7 @@ Key rules:
 #### sACN Protocol (ANSI E1.31)
 
 - Supports both Unicast and Multicast
-- **Multicast Group Registration:** Automatically calculates and joins the Multicast IP (`239.255.X.Y`) based on each output's universe
+- **Multicast Group Registration:** Automatically calculates and joins the Multicast IP (`239.255.X.Y`) based on each output's universe. Each multicast group gets a dedicated WiFiUDP instance (multi-instance approach) so multiple universes are joined simultaneously
 - **Priority-based Source Selection:** Listens to up to 4 sources simultaneously; compares sACN Priority (0-200); processes only the highest-priority source; if the primary source is lost for over 2500 ms, falls back to the next source
 
 #### ESP-NOW Master
@@ -220,7 +220,7 @@ Key rules:
 - Source must match the output type.
 - **GPIO12 (MTDI) Avoidance:** GPIO 12 is a Bootstrap Pin — strictly forbidden; Web UI must show a warning if the user enters GPIO 12
 - **AC Dimmer Zero-Crossing Interlock:** If `zc_pin == 255` (disabled), AC Dimmer output is locked to 0; Web UI must show a ZC Pin Missing Warning
-- **PCA9685 Shared Frequency Conflict (Planned):** If devices with different frequency requirements (servo 50Hz + LED >200Hz) are mixed on the same PCA chip, a future warning mechanism will surface the conflict without blocking saving
+- **PCA9685 Shared Frequency Conflict (Warning):** If devices with different frequency requirements (servo 50Hz + LED >200Hz) are mixed on the same PCA chip, a warning is logged via Serial (C++) and a `confirm()` dialog is shown in Web UI. Does not block saving.
 - **DMX Frame Timeout:** Core 1 loop must not perform any blocking operation that causes DMX Frame Cycle to exceed 50ms; initial FPS is forced to 30-40 FPS
 
 ### Capacity Scoring Context (Refactored v2)
@@ -662,10 +662,16 @@ Questions used during the grilling session and answers inferred from the existin
 | 6 | Call `validateSettingsAndOutputs()` in `/api/outputs` POST | ✅ Completed (called at `main.cpp:1536`) |
 | 7 | `resourceScoreLimit()` include PCA and EXP terms | ❌ Obsolete (scoring system replaced by 3 independent budgets) |
 | 8 | PCF8574 LCD display type enum in `SystemConfig` | ✅ Completed (defined in `config.h:88`) |
+| 9 | DAC7571 protocol fix (3-byte → correct 2-byte per TI datasheet) | ✅ Completed (`motion_control.h`) |
+| 10 | DAC7573 control byte fix (removed spurious 0x10 base, corrected channel select) | ✅ Completed (`motion_control.h`) |
+| 11 | Art-Net protocol version check (reject < 14) | ✅ Completed (`artnet_control.h`) |
+| 12 | sACN Flags/Length validation (PHT flag check, claimed ≤ received length) | ✅ Completed (`sacn_control.h`) |
+| 13 | sACN multicast multi-UDP per universe (prevents last-group-only join) | ✅ Completed (`sacn_control.h`) |
+| 14 | PCA9685 frequency conflict warning (C++: Serial warning in `validateOutputJson()`) | ✅ Completed (`main.cpp`) |
+| 15 | `scoreBlockerName()` missing RamLimit case | ✅ Completed (`scoring.h`) |
 
 ### Future Features — planned but not started
 - Frame interpolation for mechanical outputs (ADR005, long-term)
-- PCA9685 frequency conflict detection (C++ + Web UI)
 
 ### Known Limitations (accepted, not on roadmap)
 - C++/JS scoring parity drift: `totalOutputScoreFromJson()` copies fewer fields than JS `channelScore()`; C++ uses worst-case UART (8.0) while JS estimates dynamic RMT fallback (3.0) — see ADR011
