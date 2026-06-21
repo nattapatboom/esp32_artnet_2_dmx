@@ -339,7 +339,7 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
       <div id="display-config" class="fg">
         <div class="f">
           <label for="display_enabled">Display Type</label>
-          <select id="display_enabled" name="display_enabled">
+            <select id="display_enabled" name="display_enabled" onchange="updateDisplayAddressOptions()">
             <option value="0">Disabled</option>
             <option value="1">SSD1306 OLED (128x64)</option>
             <option value="2">SH1106 OLED (128x64)</option>
@@ -352,8 +352,6 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
           <select id="display_i2c_addr" name="display_i2c_addr">
             <option value="60">0x3C (OLED default)</option>
             <option value="61">0x3D</option>
-            <option value="39">0x27 (LCD default)</option>
-            <option value="63">0x3F (LCD alt)</option>
           </select>
         </div>
         <div class="f">
@@ -567,6 +565,7 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
           </div>
           <div class="f" id="mc_freq_grp"><label for="mc_freq" id="mc_freq_lbl">Frequency (Hz) / Max Speed</label><input type="number" id="mc_freq" value="1000" min="1" max="40000"></div>
           <div id="rc_filter_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:8px 0 2px">RC Low-Pass Filter Reference</div><div style="display:flex;flex-wrap:wrap;gap:8px"><div class="f" style="flex:1"><label for="rc_r">R (&Omega;)</label><input type="number" id="rc_r" value="1000" min="1" max="10000000" oninput="calcRcCutoff()"></div><div class="f" style="flex:1"><label for="rc_c">C (nF)</label><input type="number" id="rc_c" value="10" min="1" max="1000000" oninput="calcRcCutoff()"></div><div class="f" style="flex:1"><label>fc ≈ <span id="rc_fc">15915</span> Hz</label><div class="hint">Set PWM Carrier Freq above to 3-5x fc</div></div></div></div>
+          <div id="pwm_dac_cal_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:8px 0 2px">PWM DAC Calibration</div><div style="display:flex;flex-wrap:wrap;gap:8px"><div class="f" style="flex:1"><label for="pwm_dac_mode">Output Use</label><select id="pwm_dac_mode"><option value="0">Custom</option><option value="1">0-10V interface</option><option value="2">4-20mA interface</option></select><div class="hint">Label only; duty calibration below controls output.</div></div><div class="f" style="flex:1"><label for="pwm_dac_min">DMX 0 Duty (%)</label><input type="number" id="pwm_dac_min" value="0" min="0" max="100" step="0.01"></div><div class="f" style="flex:1"><label for="pwm_dac_max">DMX Full Duty (%)</label><input type="number" id="pwm_dac_max" value="100" min="0" max="100" step="0.01"><div class="hint">Use trim values matching your 0-10V / 4-20mA module.</div></div></div></div>
           <div class="f" id="mc_deadband_grp"><label for="mc_deadband">Center Deadband</label><input type="number" id="mc_deadband" value="10" min="0" max="255"></div>
           <div class="f" id="mc_min_us_grp"><label for="mc_min_us">Servo Min &micro;s</label><input type="number" id="mc_min_us" value="1000" min="500" max="1500"></div>
           <div class="f" id="mc_max_us_grp"><label for="mc_max_us">Servo Max &micro;s</label><input type="number" id="mc_max_us" value="2000" min="1500" max="2500"></div>
@@ -939,6 +938,19 @@ function toggleDisplayCfg(){
   const en=document.getElementById('disp_enable_ck').checked;
   document.getElementById('display-config').style.display=en?'':'none';
   if(!en) document.getElementById('display_enabled').value=0;
+  updateDisplayAddressOptions();
+}
+
+function updateDisplayAddressOptions(){
+  const type=parseInt(document.getElementById('display_enabled')?.value||0);
+  const sel=document.getElementById('display_i2c_addr');
+  if(!sel) return;
+  const current=parseInt(sel.value||60);
+  const opts=(type===3)
+    ? [[0x27,'0x27 (LCD default)'],[0x3F,'0x3F (LCD alt)']]
+    : [[0x3C,'0x3C (OLED default)'],[0x3D,'0x3D']];
+  sel.innerHTML=opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  sel.value=opts.some(([v])=>v===current)?current:opts[0][0];
 }
 
 // Settings load / save
@@ -971,11 +983,12 @@ async function loadSettings(){
     c('i2c_enabled',i2cEn);
     toggleI2c();
     s('display_enabled',d.display_enabled);
-    s('display_i2c_addr',d.display_i2c_addr);
-    s('display_brightness',d.display_brightness);
     const dispEn=(d.display_enabled!==0);
     c('disp_enable_ck',dispEn);
     toggleDisplayCfg();
+    s('display_i2c_addr',d.display_i2c_addr);
+    updateDisplayAddressOptions();
+    s('display_brightness',d.display_brightness);
     toggleEth(); toggleWifiIp(); updateMdnsPreview();
     autoAssignOutputPins();
     document.getElementById('mdns_name').addEventListener('input',updateMdnsPreview);
@@ -1020,6 +1033,10 @@ async function saveSettings(e){
   }
   if(obj.zc_pin!==255&&(obj.zc_pin===obj.i2c_sda||obj.zc_pin===obj.i2c_scl)){
     alert('Zero-Crossing GPIO cannot overlap with I2C SDA or SCL.');
+    return;
+  }
+  if(!displayAddressValid(obj.display_enabled, obj.display_i2c_addr)){
+    alert('I2C display address is invalid for the selected display type. OLED uses 0x3C/0x3D; PCF8574 LCD uses 0x27/0x3F.');
     return;
   }
   const conflict=outputReservedPinConflict(outputs,obj.status_led_pin);
@@ -1144,7 +1161,8 @@ function pickSsid(){
 // Output Channels
 const ORDERS=['GRB','RGB','BRG','RBG','RGBW','GRBW','BRGW','WRGB'];
 const TYPES={0:'AC Dimmer', 1:'DMX Output', 2:'Relay', 3:'RGB LED', 4:'Single Color LED', 5:'Analog RGB / RGBW', 6:'DC Motor', 7:'Stepper', 8:'RC Servo', 9:'Passive Buzzer', 10:'DFPlayer MP3', 11:'7-Segment 2-Pin', 12:'7-Segment DD 7-Pin PWM', 13:'7-Segment DD 8-Pin PWM', 14:'DAC', 15:'PWM DAC', 16:'Function Gen', 17:'Solenoid Trigger', 18:'Smoke Shooter'};
-const SOURCES={0:'ESP32',1:'PCA9685',2:'MCP23017',3:'TCA9555',4:'PCF857x',5:'MCP4725 DAC'};
+const SOURCES={0:'ESP32',1:'PCA9685',2:'MCP23017',3:'TCA9555',4:'PCF857x',5:'I2C DAC'};
+const DAC_MODELS={0:'MCP4725',1:'DAC7571',2:'DAC7573'};
 const OUTPUT_GPIOS=[4,12,14,15,2,17,32,33];
 const INPUT_GPIOS=[36,39,34,35,32,33];
 const INPUT_ONLY_GPIOS=[36,39,34,35];
@@ -1251,6 +1269,19 @@ function parseAddrInput(id, fallback){
   return isNaN(val)?fallback:val;
 }
 
+function dutyPctToInt(id, fallback){
+  const el=document.getElementById(id);
+  const val=parseFloat(el?.value ?? fallback);
+  if(isNaN(val)) return fallback;
+  return Math.max(0, Math.min(10000, Math.round(val*100)));
+}
+
+function intToDutyPct(v, fallback){
+  v=parseInt(v);
+  if(isNaN(v)) v=fallback;
+  return (Math.max(0, Math.min(10000, v))/100).toFixed(2);
+}
+
 const PIN_GPIOS=['4','12','14','15','2','17','32','33'];
 const PIN_CHANS=['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15'];
 
@@ -1259,7 +1290,7 @@ function renderPinRows(){
   if(!container) return;
   // Save all pin field values before destroying elements
   const saved={};
-  ['no_source','no_pin','no_pca_addr','no_pca_channel','no_pin2','no_pin2_source','no_pin2_addr','no_pin2_channel','no_pin3','no_pin3_source','no_pin3_addr','no_pin3_channel','no_pin4','no_pin4_source','no_pin4_addr','no_pin4_channel'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.value;});
+  ['no_source','no_pin','no_pca_addr','no_pca_channel','no_dac_model','no_pin2','no_pin2_source','no_pin2_addr','no_pin2_channel','no_pin3','no_pin3_source','no_pin3_addr','no_pin3_channel','no_pin4','no_pin4_source','no_pin4_addr','no_pin4_channel'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.value;});
   ['no_pin_invert','no_pin2_invert','no_pin3_invert','no_pin4_invert'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.checked;});
   for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_pin_'+s);if(el)saved['no_seg_pin_'+s]=el.value;}
   for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_source_'+s);if(el)saved['no_seg_source_'+s]=el.value;}
@@ -1277,8 +1308,9 @@ function renderPinRows(){
   const isStepper=t===7, isMotor=t===6, is7Seg=t>=11&&t<=13, isAnalog=t===5, isSmoke=t===18, isDfPlayer=t===10, isDac=t===14, isFuncGen=t===16;
   const isCommonDim=is7Seg&&(mcMode>=6&&mcMode<=9);
   const is7SegDD=is7Seg&&(mcMode>=2&&mcMode<=9);
+  const is7SegDirectDim=is7Seg&&(mcMode===4||mcMode===5);
   const canUsePca=(t===2||t===4||t===6||t===8||t===5||t===15||t===17||t===18||is7SegDD);
-  const canUseDig=(t===2||t===17||t===18||(is7SegDD&&!isCommonDim));
+  const canUseDig=(t===2||t===17||t===18||(is7SegDD&&!isCommonDim&&!is7SegDirectDim));
   const mainExpander=src!==0;
   const usePin2=isMotor||isAnalog||t===18||is7Seg||isDfPlayer||(isStepper&&(pin2Src===0||pin2Src!==0));
   const usePin3=isAnalog||(isMotor&&mcMode===2)||isStepper||(is7Seg&&mcMode===1);
@@ -1288,18 +1320,25 @@ function renderPinRows(){
     let h=`<option value="0">ESP32 GPIO</option>`;
     if(allowPca) h+=`<option value="1">PCA9685</option>`;
     if(allowDig) h+=`<option value="2">MCP23017</option><option value="3">TCA9555</option><option value="4">PCF857x</option>`;
-    if(allowDac) h+=`<option value="5">MCP4725 DAC</option>`;
+    if(allowDac) h+=`<option value="5">I2C DAC</option>`;
     return h;
   };
   const mkSel=(id,opts)=>`<select id="${id}" onchange="toggleOutFields()" style="width:100%">${opts}</select>`;
   const addrOpts=(f)=>{
     const gs=[
-      {l:'GPIO Expanders 0x20-0x27 (MCP23017/TCA9555/PCF857x)', s:[2,3,4], r:[0x20,0x27]},
+      {l:'MCP23017 / TCA9555 0x20-0x27', s:[2,3], r:[0x20,0x27]},
+      {l:'PCF857x 0x20-0x27', s:[4], r:[0x20,0x27]},
+      {l:'PCF8574A 0x38-0x3F', s:[4], r:[0x38,0x3F]},
       {l:'PCA9685 PWM 0x40-0x47', s:[1], r:[0x40,0x47]},
-      {l:'MCP4725 DAC 0x60-0x67', s:[5], r:[0x60,0x67]},
-      {l:'Other I2C 0x38-0x3F', s:[1,2,3,4], r:[0x38,0x3F]}
+      {l:'MCP4725 DAC 0x60-0x61', s:[5], r:[0x60,0x61]},
+      {l:'DAC7571 0x4C-0x4D', s:[5], r:[0x4C,0x4D]},
+      {l:'DAC7573 0x4C-0x5B', s:[5], r:[0x4C,0x5B]}
     ];
     return gs.filter(g=>f===undefined||g.s.includes(f)).map(g=>`<optgroup label="${g.l}">${Array.from({length:g.r[1]-g.r[0]+1},(_,i)=>`<option value="${g.r[0]+i}">0x${(g.r[0]+i).toString(16).toUpperCase()}</option>`).join('')}</optgroup>`).join('');
+  };
+  const dacAddrOpts=(model)=>{
+    const ranges=model===1?[[0x4C,0x4D,'DAC7571 0x4C-0x4D']]:model===2?[[0x4C,0x5B,'DAC7573 0x4C-0x5B']]:[[0x60,0x61,'MCP4725 0x60-0x61']];
+    return ranges.map(([a,b,l])=>`<optgroup label="${l}">${Array.from({length:b-a+1},(_,i)=>`<option value="${a+i}">0x${(a+i).toString(16).toUpperCase()}</option>`).join('')}</optgroup>`).join('');
   };
   const chOpts=PIN_CHANS.map(v=>`<option value="${v}">CH ${v}</option>`).join('');
 
@@ -1317,7 +1356,13 @@ function renderPinRows(){
   const p1Label = isCommonDim ? 'COM Pin' : isSegADirect ? 'Seg A' : 'Pin 1';
   const p1DescText = isCommonDim ? 'Common Anode/Cathode PWM Pin' : isSegADirect ? 'Segment A' : p1Desc;
   if (isDac) {
-    pinDefs.push({label:'DAC',desc:p1Src===5?'I2C Analog Out':p1Desc,srcHtml:mkSel('no_source',srcOpts(false,false,true)),addrHtml:p1Src===5?mkSel('no_pca_addr',addrOpts(5)):localBadge('DAC only'),pinHtml:p1Src===5?localBadge('12-bit I2C'):mkSel('no_pin',['25','26'].map(v=>`<option value="${v}">GPIO ${v} (DAC${v===25?'1':'2'})</option>`).join('')),invId:p1Src===5?'':'no_pin_invert'});
+    const dacModel=parseInt(saved.no_dac_model||0);
+    pinDefs.push({label:'DAC',desc:p1Src===5?'I2C Analog Out':p1Desc,srcHtml:mkSel('no_source',srcOpts(false,false,true)),addrHtml:p1Src===5?mkSel('no_pca_addr',dacAddrOpts(dacModel)):localBadge('DAC only'),pinHtml:p1Src===5?localBadge('12-bit I2C'):mkSel('no_pin',['25','26'].map(v=>`<option value="${v}">GPIO ${v} (DAC${v===25?'1':'2'})</option>`).join('')),invId:p1Src===5?'':'no_pin_invert'});
+    if(p1Src===5){
+      const modelOpts=Object.entries(DAC_MODELS).map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+      const chOptsDac=[['0','A'],['1','B'],['2','C'],['3','D']].map(([v,l])=>`<option value="${v}">CH ${l}</option>`).join('');
+      pinDefs.push({label:'DAC IC',desc:'Model / Channel',srcHtml:localBadge('I2C DAC'),addrHtml:mkSel('no_dac_model',modelOpts),pinHtml:dacModel===2?mkSel('no_pca_channel',chOptsDac):localBadge('CH A'),invId:''});
+    }
   } else if (t===15) { // PWM DAC
     pinDefs.push({label:'Pin 1',desc:'PWM Out',srcHtml:mkSel('no_source',srcOpts(true,false)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.concat(['25','26','27']).map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
   } else if (isFuncGen) {
@@ -1340,14 +1385,14 @@ function renderPinRows(){
         pinDefs.push({
           label: segLabels[s],
           desc: 'Segment ' + segLabels[s].split(' ')[1],
-          srcHtml: (s === startSeg ? '<input type="hidden" id="no_pin2_source" value="0">' : '') + mkSel('no_seg_source_' + s, srcOpts(true,true)),
+          srcHtml: (s === startSeg ? '<input type="hidden" id="no_pin2_source" value="0">' : '') + mkSel('no_seg_source_' + s, srcOpts(true,!is7SegDirectDim)),
           addrHtml: segSrc===0 ? localBadge('GPIO Only') : mkSel('no_seg_addr_' + s, addrOpts(segSrc)),
           pinHtml: segSrc===0 ? mkSel('no_seg_pin_' + s, `<option value="255">None</option>` + PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')) : mkSel('no_seg_channel_' + s, `<option value="255">None</option>${chOpts}`),
           invId: 'no_seg_pin_invert_' + s
         });
       }
     } else {
-      const srcSel=mkSel('no_pin2_source',srcOpts(isStepper||isMotor||isAnalog||t===18||is7SegDD,isStepper||isMotor||is7SegDD||t===18));
+      const srcSel=mkSel('no_pin2_source',srcOpts(isStepper||isMotor||isAnalog||t===18||is7SegDD,isStepper||isMotor||(is7SegDD&&!is7SegDirectDim)||t===18));
       const addrEl=showAddr?mkSel('no_pin2_addr',addrOpts(p2Src)):localBadge('ESP32 GPIO');
       let pinOpts;
       if(showAddr){
@@ -1420,9 +1465,13 @@ function renderPinRows(){
 
 function populateExpanderAddresses(el, filterSource){
   const groups=[
-    {label:'GPIO Expanders 0x20-0x27 (MCP23017/TCA9555/PCF857x)', sources:[2,3,4], range:[0x20,0x27]},
+    {label:'MCP23017 / TCA9555 0x20-0x27', sources:[2,3], range:[0x20,0x27]},
+    {label:'PCF857x 0x20-0x27', sources:[4], range:[0x20,0x27]},
+    {label:'PCF8574A 0x38-0x3F', sources:[4], range:[0x38,0x3F]},
     {label:'PCA9685 PWM 0x40-0x47', sources:[1], range:[0x40,0x47]},
-    {label:'Other I2C 0x38-0x3F', sources:[1,2,3,4], range:[0x38,0x3F]}
+    {label:'MCP4725 DAC 0x60-0x61', sources:[5], range:[0x60,0x61]},
+    {label:'DAC7571 0x4C-0x4D', sources:[5], range:[0x4C,0x4D]},
+    {label:'DAC7573 0x4C-0x5B', sources:[5], range:[0x4C,0x5B]}
   ];
   el.innerHTML='';
   groups.forEach(g=>{
@@ -1437,6 +1486,56 @@ function populateExpanderAddresses(el, filterSource){
     }
     el.appendChild(og);
   });
+}
+
+function sourceAddressValid(src, addr){
+  src=parseInt(src||0); addr=parseInt(addr);
+  if(src===0) return true;
+  if(src===1) return addr>=0x40 && addr<=0x47;
+  if(src===2 || src===3) return addr>=0x20 && addr<=0x27;
+  if(src===4) return (addr>=0x20 && addr<=0x27) || (addr>=0x38 && addr<=0x3F);
+  if(src===5) return (addr>=0x4C && addr<=0x5B) || addr===0x60 || addr===0x61;
+  return false;
+}
+
+function sourceAddressRangeLabel(src){
+  src=parseInt(src||0);
+  if(src===1) return 'PCA9685 address must be 0x40-0x47';
+  if(src===2) return 'MCP23017 address must be 0x20-0x27';
+  if(src===3) return 'TCA9555 address must be 0x20-0x27';
+  if(src===4) return 'PCF857x address must be 0x20-0x27 or 0x38-0x3F';
+  if(src===5) return 'I2C DAC address must match the selected DAC model';
+  return 'Unsupported I2C source';
+}
+
+function validateSourceAddress(src, addr, label){
+  if(sourceAddressValid(src, addr)) return true;
+  alert(label+' has invalid I2C address 0x'+parseInt(addr).toString(16).toUpperCase()+'. '+sourceAddressRangeLabel(src)+'.');
+  return false;
+}
+
+function displayAddressValid(type, addr){
+  type=parseInt(type||0); addr=parseInt(addr);
+  if(type===0) return true;
+  if(type===1 || type===2) return addr===0x3C || addr===0x3D;
+  if(type===3) return addr===0x27 || addr===0x3F;
+  return false;
+}
+
+function dacAddressValid(model, addr){
+  model=parseInt(model||0); addr=parseInt(addr);
+  if(model===0) return addr===0x60 || addr===0x61;
+  if(model===1) return addr===0x4C || addr===0x4D;
+  if(model===2) return addr>=0x4C && addr<=0x5B;
+  return false;
+}
+
+function dacAddressRangeLabel(model){
+  model=parseInt(model||0);
+  if(model===0) return 'MCP4725 address must be 0x60 or 0x61';
+  if(model===1) return 'DAC7571 address must be 0x4C or 0x4D';
+  if(model===2) return 'DAC7573 address must be 0x4C-0x5B';
+  return 'Unsupported I2C DAC model';
 }
 
 function setHybridDefaultAddr(sourceId, addrId){
@@ -1623,7 +1722,10 @@ function outputConfigLabel(o){
   if(t>=11&&t<=13){if(t===11){const m=parseInt(o.mc_mode||0);return m===1?'7-Seg 2-Pin ASCII':'7-Seg 2-Pin Numeric';}else{return t===12?'7-Seg DD 7-Pin PWM':'7-Seg DD 8-Pin PWM';}}
   if(t===10) return 'DFPlayer MP3 Module';
   if(t===14) return 'DAC';
-  if(t===15) return `PWM DAC @ ${o.mc_freq||50000}Hz ${o.mc_resolution||8}-bit`;
+  if(t===15) {
+    const modes=['Custom','0-10V','4-20mA'];
+    return `PWM DAC ${modes[o.pwm_dac_mode||0]||'Custom'} @ ${o.mc_freq||50000}Hz ${o.mc_resolution||8}-bit`;
+  }
   if(t===16) return `Function Generator @ ${o.mc_freq||50000}Hz PWM`;
   return `Raw type: ${o.type}`;
 }
@@ -2196,10 +2298,11 @@ function toggleOutFields(){
   const isDac = t===14;
   const isCommonDim = is7Seg && mcMode >= 6 && mcMode <= 9;
   const is7SegDD = is7Seg && mcMode >= 2 && mcMode <= 9;
+  const is7SegDirectDim = is7Seg && (mcMode === 4 || mcMode === 5);
 
   // Expander source compatibility
   const canUsePca = (t===2 || t===4 || t===6 || t===8 || t===5 || t===15 || t===17 || t===18 || is7SegDD);
-  const canUseDigitalExpander = (t===2 || t===17 || t===18 || (is7SegDD && !isCommonDim));
+  const canUseDigitalExpander = (t===2 || t===17 || t===18 || (is7SegDD && !isCommonDim && !is7SegDirectDim));
   const isGpioOnly = t===16;
   
   if (srcSelect && srcSelect.tagName === 'SELECT') {
@@ -2253,30 +2356,37 @@ function toggleOutFields(){
     if(resLbl) resLbl.textContent = is7Seg ? 'Decode Mode' : 'Resolution';
     const freqGrp = document.getElementById('mc_freq_grp');
     const freqLbl = document.getElementById('mc_freq_lbl');
+    const pwmDacCalGrp = document.getElementById('pwm_dac_cal_grp');
     if (isFuncGen || isPwmDac) {
       freqGrp.style.display = '';
       freqLbl.textContent = "PWM Carrier Frequency (Hz)";
       document.getElementById('rc_filter_grp').style.display = '';
+      if(pwmDacCalGrp) pwmDacCalGrp.style.display = isPwmDac ? '' : 'none';
       calcRcCutoff();
     } else if (is7Seg) {
       freqGrp.style.display = (t >= 12) ? '' : 'none';
       freqLbl.textContent = "PWM Frequency (Hz)";
       document.getElementById('rc_filter_grp').style.display = 'none';
+      if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
     } else if (isPwmDimmer || isMotor) {
       freqGrp.style.display = '';
       freqLbl.textContent = "Frequency (Hz)";
       document.getElementById('rc_filter_grp').style.display = 'none';
+      if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
     } else if (isStepper) {
       freqGrp.style.display = '';
       freqLbl.textContent = "Speed (Hz)";
       document.getElementById('rc_filter_grp').style.display = 'none';
+      if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
     } else if (isAnalogRgb) {
       freqGrp.style.display = '';
       freqLbl.textContent = "Frequency (Hz)";
       document.getElementById('rc_filter_grp').style.display = 'none';
+      if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
     } else {
       freqGrp.style.display = 'none';
       document.getElementById('rc_filter_grp').style.display = 'none';
+      if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
     }
     
     document.getElementById('mc_deadband_grp').style.display = isMotor ? '' : 'none';
@@ -2323,6 +2433,7 @@ function editOutput(idx){
   setVal('no_pin',o.pin);
   setVal('no_pca_addr',o.pca_addr??64);
   setVal('no_pca_channel',o.pca_channel??0);
+  setVal('no_dac_model',o.dac_model??0);
   setVal('no_pca_channel2',o.pca_channel2??255);
   setVal('no_pca_channel3',o.pca_channel3??255);
   setVal('no_pca_channel4',o.pca_channel4??255);
@@ -2348,6 +2459,9 @@ function editOutput(idx){
   setVal('mc_mode',o.mc_mode||0);
   setVal('mc_resolution',o.mc_resolution||8);
   setVal('mc_freq',o.mc_freq||1000);
+  setVal('pwm_dac_mode',o.pwm_dac_mode??0);
+  setVal('pwm_dac_min',intToDutyPct(o.pwm_dac_min,0));
+  setVal('pwm_dac_max',intToDutyPct(o.pwm_dac_max,10000));
   setVal('mc_deadband',o.mc_deadband||10);
   setVal('mc_min_us',o.mc_min_us||1000);
   setVal('mc_max_us',o.mc_max_us||2000);
@@ -2383,6 +2497,12 @@ function editOutput(idx){
 
   // Re-render to apply visibility with correct values
   toggleOutFields();
+  if(o.type===14){
+    setVal('no_dac_model',o.dac_model??0);
+    toggleOutFields();
+    setVal('no_pca_addr',o.pca_addr??64);
+    setVal('no_pca_channel',o.pca_channel??0);
+  }
   
   // Set segment pins, addresses, channels, inverts if editing 7-seg DD channel
   const sps = o.seg_pins || [];
@@ -2406,6 +2526,7 @@ function editOutput(idx){
 
 function cancelEditOutput(){
   editOutIdx=-1;
+  const setVal=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val;};
   document.getElementById('no_pca_channel2').value=255;
   document.getElementById('no_pca_channel3').value=255;
   document.getElementById('no_pca_channel4').value=255;
@@ -2417,6 +2538,11 @@ function cancelEditOutput(){
   document.getElementById('no_pin2_channel').value=255;
   document.getElementById('no_pin3_source').value=0;
   document.getElementById('no_pin3_channel').value=255;
+  const dacModelEl=document.getElementById('no_dac_model');
+  if(dacModelEl) dacModelEl.value=0;
+  setVal('pwm_dac_mode',0);
+  setVal('pwm_dac_min','0.00');
+  setVal('pwm_dac_max','100.00');
   for(let s=0; s<=7; s++){
     const pinEl=document.getElementById('no_seg_pin_'+s);
     const srcEl=document.getElementById('no_seg_source_'+s);
@@ -2457,6 +2583,7 @@ function addOrUpdateOutput(){
     led_count:parseInt(document.getElementById('no_cnt').value)||170,
     color_order:parseInt(document.getElementById('no_ord').value),
     led_protocol:parseInt(document.getElementById('no_led_proto').value||0),
+    dac_model: gv('no_dac_model',0),
     pin_invert: document.getElementById('no_pin_invert')?.checked || false,
     pin2_invert: document.getElementById('no_pin2_invert')?.checked || false,
     pin3_invert: document.getElementById('no_pin3_invert')?.checked || false,
@@ -2476,6 +2603,9 @@ function addOrUpdateOutput(){
     mc_mode: parseInt(document.getElementById('mc_mode').value),
     mc_resolution: parseInt(document.getElementById('mc_resolution').value),
     mc_freq: parseInt(document.getElementById('mc_freq').value),
+    pwm_dac_mode: parseInt(document.getElementById('pwm_dac_mode')?.value || 0),
+    pwm_dac_min: dutyPctToInt('pwm_dac_min', 0),
+    pwm_dac_max: dutyPctToInt('pwm_dac_max', 10000),
     mc_deadband: parseInt(document.getElementById('mc_deadband').value),
     mc_min_us: parseInt(document.getElementById('mc_min_us').value),
     mc_max_us: parseInt(document.getElementById('mc_max_us').value),
@@ -2577,6 +2707,10 @@ function addOrUpdateOutput(){
       alert('Stepper ENABLE expander channel is required.');
       return;
     }
+    if(ch.mc_homing_mode===0 && ch.pin4_source!==0 && ch.pin4_channel===255){
+      alert('Stepper HOME expander channel is required.');
+      return;
+    }
   }
   if(type===18){
     if(ch.pin2_source>4){
@@ -2599,13 +2733,68 @@ function addOrUpdateOutput(){
   }
   if((type===12||type===13) && ch.seg_sources){
     const numSeg = type===13 ? 8 : 7;
+    const isDirectDim = ch.mc_mode===4 || ch.mc_mode===5;
+    if(isDirectDim && ch.pin2_source>=2 && ch.pin2_source<=4){
+      alert('7-Segment Direct Dim needs PWM per segment. Use ESP32 GPIO or PCA9685, not a digital GPIO expander.');
+      return;
+    }
     for(let s=0; s<numSeg; s++){
+      if(isDirectDim && (ch.seg_sources[s]||0)>=2 && (ch.seg_sources[s]||0)<=4){
+        alert('7-Segment Direct Dim segment '+(s+1)+' needs ESP32 GPIO or PCA9685, not a digital GPIO expander.');
+        return;
+      }
       if((ch.seg_sources[s]||0)!==0 && (ch.seg_channels[s]===undefined || ch.seg_channels[s]===255)){
         alert('7-Segment segment '+(s+1)+' expander channel is required.');
         return;
       }
     }
   }
+  const validateOutputI2cAddresses=()=>{
+    const check=(src,addr,label)=>validateSourceAddress(parseInt(src||0), parseInt(addr||0), label);
+    if(type===14 && ch.source===5){
+      if(![0,1,2].includes(ch.dac_model)){
+        alert('Unsupported I2C DAC model.');
+        return false;
+      }
+      if(!dacAddressValid(ch.dac_model, ch.pca_addr)){
+        alert('I2C DAC has invalid address 0x'+parseInt(ch.pca_addr).toString(16).toUpperCase()+'. '+dacAddressRangeLabel(ch.dac_model)+'.');
+        return false;
+      }
+      if(ch.dac_model!==2 && ch.pca_channel!==0){
+        alert('Only DAC7573 supports DAC channels B-D.');
+        return false;
+      }
+      if(ch.dac_model===2 && (ch.pca_channel<0 || ch.pca_channel>3)){
+        alert('DAC7573 channel must be A-D.');
+        return false;
+      }
+    } else if(ch.source!==0 && !check(ch.source, ch.pca_addr, 'Primary source')) return false;
+    if(type===12||type===13){
+      if(ch.pin2_source!==0 && !check(ch.pin2_source, ch.pin2_addr, '7-Segment segment base source')) return false;
+      const numSeg = type===13 ? 8 : 7;
+      for(let s=0; s<numSeg; s++){
+        const src=parseInt(ch.seg_sources?.[s]||0);
+        if(src!==0 && !check(src, ch.seg_addrs?.[s]||32, '7-Segment segment '+(s+1)+' source')) return false;
+      }
+    }
+    if(type===5){
+      if(ch.pin2_source!==0 && !check(ch.pin2_source, ch.pin2_addr, 'Analog RGB/RGBW Green source')) return false;
+      if(ch.pin3_source!==0 && !check(ch.pin3_source, ch.pin3_addr, 'Analog RGB/RGBW Blue source')) return false;
+      if((ch.color_order||0)>=4 && ch.pin4_source!==0 && !check(ch.pin4_source, ch.pin4_addr, 'Analog RGB/RGBW White source')) return false;
+    }
+    if(type===6){
+      if(ch.pin2_source!==0 && !check(ch.pin2_source, ch.pin2_addr, 'Motor IN2/DIR source')) return false;
+      if(ch.pin3_source!==0 && !check(ch.pin3_source, ch.pin3_addr, 'Motor EN source')) return false;
+    }
+    if(type===7){
+      if(ch.pin2_source!==0 && !check(ch.pin2_source, ch.pin2_addr, 'Stepper DIR source')) return false;
+      if(ch.pin3_source!==0 && !check(ch.pin3_source, ch.pin3_addr, 'Stepper ENABLE source')) return false;
+      if(ch.mc_homing_mode===0 && ch.pin4_source!==0 && !check(ch.pin4_source, ch.pin4_addr, 'Stepper HOME source')) return false;
+    }
+    if(type===18 && ch.pin2_source!==0 && !check(ch.pin2_source, ch.pin2_addr, 'Smoke Shooter shoot source')) return false;
+    return true;
+  };
+  if(!validateOutputI2cAddresses()) return;
   if(type===6 && ch.mc_mode===2){
     if(ch.pin3_source>=2){
       alert('Motor EN pin needs PWM. Use ESP32 GPIO or PCA9685 for EN, not a digital expander.');
@@ -2613,6 +2802,16 @@ function addOrUpdateOutput(){
     }
     if(ch.pin3_source===1 && ch.pin3_channel===255){
       alert('Motor EN PCA9685 channel is required.');
+      return;
+    }
+  }
+  if(type===15){
+    if(ch.pwm_dac_mode<0 || ch.pwm_dac_mode>2){
+      alert('Unsupported PWM DAC calibration mode.');
+      return;
+    }
+    if(ch.pwm_dac_min<0 || ch.pwm_dac_min>10000 || ch.pwm_dac_max<0 || ch.pwm_dac_max>10000){
+      alert('PWM DAC calibration duty must be between 0.00% and 100.00%.');
       return;
     }
   }

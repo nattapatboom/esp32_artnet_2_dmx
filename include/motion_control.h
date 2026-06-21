@@ -149,11 +149,33 @@ private:
         return ch.mc_resolution > 16 ? 16 : ch.mc_resolution;
     }
 
+    uint32_t calibratedPwmDacDuty(OutputChannel& ch, uint32_t value, uint32_t inputMax, uint32_t outputMax) {
+        if (inputMax == 0) return 0;
+        uint16_t minPct = ch.pwm_dac_min > 10000 ? 10000 : ch.pwm_dac_min;
+        uint16_t maxPct = ch.pwm_dac_max > 10000 ? 10000 : ch.pwm_dac_max;
+        uint32_t minDuty = ((uint64_t)outputMax * minPct) / 10000;
+        uint32_t maxDuty = ((uint64_t)outputMax * maxPct) / 10000;
+        if (maxDuty >= minDuty) return minDuty + ((uint64_t)value * (maxDuty - minDuty)) / inputMax;
+        return minDuty - ((uint64_t)value * (minDuty - maxDuty)) / inputMax;
+    }
+
     void writeMcp4725(uint8_t addr, uint8_t value) {
         uint16_t dac = ((uint16_t)value << 4) | (value >> 4);
         if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
         Wire.beginTransmission(addr);
         Wire.write(0x40);
+        Wire.write((dac >> 4) & 0xFF);
+        Wire.write((dac & 0x0F) << 4);
+        Wire.endTransmission();
+        if (i2cMutex) xSemaphoreGive(i2cMutex);
+    }
+
+    void writeDac757x(uint8_t addr, uint8_t channel, uint8_t value) {
+        uint16_t dac = ((uint16_t)value << 4) | (value >> 4);
+        uint8_t cmd = 0x10 | ((channel & 0x03) << 1);
+        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
+        Wire.beginTransmission(addr);
+        Wire.write(cmd);
         Wire.write((dac >> 4) & 0xFF);
         Wire.write((dac & 0x0F) << 4);
         Wire.endTransmission();
@@ -554,7 +576,7 @@ public:
 
             if (ch.source == 1) { // PCA9685 Expander
                 if (ch.type == 4 || ch.type == 15) { // PWM Dimmer / PWM DAC
-                    uint16_t duty = (uint32_t)((uint64_t)val * 4095) / max_val;
+                    uint16_t duty = ch.type == 15 ? calibratedPwmDacDuty(ch, val, max_val, 4095) : (uint32_t)((uint64_t)val * 4095) / max_val;
                     pcaManager.write(ch.pca_addr, ch.pca_channel, duty);
                 }
                 else if (ch.type == 8) { // RC Servo (50 Hz) (v3)
@@ -613,8 +635,11 @@ public:
                 }
 
                 continue; // Skip ESP32 direct hardware update
-            } else if (ch.source == 5) { // MCP4725 I2C DAC
-                if (ch.type == 14) writeMcp4725(ch.pca_addr, ch.dmxBuffer[0]);
+            } else if (ch.source == 5) { // I2C DAC family
+                if (ch.type == 14) {
+                    if (ch.dac_model == 0) writeMcp4725(ch.pca_addr, ch.dmxBuffer[0]);
+                    else writeDac757x(ch.pca_addr, ch.dac_model == 2 ? ch.pca_channel : 0, ch.dmxBuffer[0]);
+                }
                 continue;
             } else if (ch.source != 0) {
                 continue; // Digital expanders are handled by OutputControl for on/off modes.
@@ -624,7 +649,7 @@ public:
                 ledcWrite(ch.dmxPort, val);
             }
             else if (ch.type == 15) { // PWM DAC
-                ledcWrite(ch.dmxPort, val);
+                ledcWrite(ch.dmxPort, calibratedPwmDacDuty(ch, val, max_val, max_val));
             }
             else if (ch.type == 8) { // SERVO (v3)
                 // map DMX value to min_us -> max_us

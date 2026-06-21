@@ -106,6 +106,10 @@ struct OutputChannel {
     uint16_t led_count = 0;
     uint8_t color_order = 0;
     uint8_t led_protocol = 0;
+    uint8_t dac_model = 0; // 0=MCP4725, 1=DAC7571, 2=DAC7573
+    uint8_t pwm_dac_mode = 0; // 0=custom, 1=0-10V, 2=4-20mA
+    uint16_t pwm_dac_min = 0; // duty percent * 100
+    uint16_t pwm_dac_max = 10000;
     
 
     char dest_ip[16] = "192.168.1.100";
@@ -602,6 +606,10 @@ public:
             ch.led_count = item["led_count"] | 170;
             ch.color_order = item["color_order"] | 0;
             ch.led_protocol = item["led_protocol"] | 0;
+            ch.dac_model = item["dac_model"] | 0;
+            ch.pwm_dac_mode = item["pwm_dac_mode"] | 0;
+            ch.pwm_dac_min = constrain((int)(item["pwm_dac_min"] | 0), 0, 10000);
+            ch.pwm_dac_max = constrain((int)(item["pwm_dac_max"] | 10000), 0, 10000);
             ch.pixelStrip = nullptr;
             ch.dmxPort = 255;
             
@@ -730,6 +738,10 @@ public:
              item["led_count"] = ch.led_count;
              item["color_order"] = ch.color_order;
              item["led_protocol"] = ch.led_protocol;
+             item["dac_model"] = ch.dac_model;
+             item["pwm_dac_mode"] = ch.pwm_dac_mode;
+             item["pwm_dac_min"] = ch.pwm_dac_min;
+             item["pwm_dac_max"] = ch.pwm_dac_max;
              item["pin_invert"] = ch.pin_invert;
              item["pin2_invert"] = ch.pin2_invert;
              item["pin3_invert"] = ch.pin3_invert;

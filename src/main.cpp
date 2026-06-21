@@ -270,6 +270,56 @@ bool jsonPinMatches(JsonVariantConst value, uint8_t reservedPin) {
     return reservedPin != 255 && pin != 255 && pin == reservedPin;
 }
 
+bool sourceAddressValid(uint8_t source, uint8_t address) {
+    switch (source) {
+        case 1: return address >= 0x40 && address <= 0x47; // PCA9685
+        case 2: return address >= 0x20 && address <= 0x27; // MCP23017
+        case 3: return address >= 0x20 && address <= 0x27; // TCA9555
+        case 4: return (address >= 0x20 && address <= 0x27) || (address >= 0x38 && address <= 0x3F); // PCF857x / PCF8574A
+        case 5: return (address >= 0x4C && address <= 0x5B) || address == 0x60 || address == 0x61; // I2C DAC family
+        default: return source == 0;
+    }
+}
+
+const char* sourceAddressRangeLabel(uint8_t source) {
+    switch (source) {
+        case 1: return "PCA9685 address must be 0x40-0x47";
+        case 2: return "MCP23017 address must be 0x20-0x27";
+        case 3: return "TCA9555 address must be 0x20-0x27";
+        case 4: return "PCF857x address must be 0x20-0x27 or 0x38-0x3F";
+        case 5: return "I2C DAC address must match the selected DAC model";
+        default: return "Unsupported I2C source";
+    }
+}
+
+bool validateSourceAddress(uint8_t source, uint8_t address, const String& label, String& message) {
+    if (source == 0) return true;
+    if (sourceAddressValid(source, address)) return true;
+    message = label + " has invalid I2C address 0x" + String(address, HEX) + ". " + sourceAddressRangeLabel(source);
+    return false;
+}
+
+bool displayAddressValid(uint8_t displayType, uint8_t address) {
+    if (displayType == 0) return true;
+    if (displayType == 1 || displayType == 2) return address == 0x3C || address == 0x3D;
+    if (displayType == 3) return address == 0x27 || address == 0x3F;
+    return false;
+}
+
+bool dacAddressValid(uint8_t model, uint8_t address) {
+    if (model == 0) return address == 0x60 || address == 0x61; // MCP4725
+    if (model == 1) return address == 0x4C || address == 0x4D; // DAC7571
+    if (model == 2) return address >= 0x4C && address <= 0x5B; // DAC7573
+    return false;
+}
+
+const char* dacAddressRangeLabel(uint8_t model) {
+    if (model == 0) return "MCP4725 address must be 0x60 or 0x61";
+    if (model == 1) return "DAC7571 address must be 0x4C or 0x4D";
+    if (model == 2) return "DAC7573 address must be 0x4C-0x5B";
+    return "Unsupported I2C DAC model";
+}
+
 bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
     if (reservedPin == 255) return false;
     uint8_t source = output["source"] | 0;
@@ -642,6 +692,8 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
     uint8_t zcPin = settings["zc_pin"].is<int>() ? (uint8_t)(int)settings["zc_pin"] : sysCfg.zc_pin;
     uint8_t sdaPin = settings["i2c_sda"].is<int>() ? (uint8_t)(int)settings["i2c_sda"] : sysCfg.i2c_sda;
     uint8_t sclPin = settings["i2c_scl"].is<int>() ? (uint8_t)(int)settings["i2c_scl"] : sysCfg.i2c_scl;
+    uint8_t displayType = settings["display_enabled"].is<int>() ? (uint8_t)(int)settings["display_enabled"] : sysCfg.display_enabled;
+    uint8_t displayAddr = settings["display_i2c_addr"].is<int>() ? (uint8_t)(int)settings["display_i2c_addr"] : sysCfg.display_i2c_addr;
 
     if (statusPin != 255 && zcPin != 255 && statusPin == zcPin) {
         message = "Status LED GPIO and Zero-Crossing GPIO cannot use the same pin";
@@ -657,6 +709,10 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
     }
     if (zcPin != 255 && (zcPin == sdaPin || zcPin == sclPin)) {
         message = "Zero-Crossing pin cannot overlap with I2C SDA or SCL";
+        return false;
+    }
+    if (!displayAddressValid(displayType, displayAddr)) {
+        message = "I2C display address is invalid for the selected display type";
         return false;
     }
     if (outputsUseReservedPin(outputs, statusPin, "Status LED", message)) return false;
@@ -706,7 +762,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         }
         uint8_t mcMode = output["mc_mode"] | 0;
         bool pcaOk = (type == 2 || type == 4 || type == 6 || type == 7 || type == 8 || type == CHAN_TYPE_ANALOG_RGB || type == 15 || type == 17 || type == 18 || type == 12 || type == 13);
-        bool digitalOk = (type == 2 || type == 17 || type == 18 || ((type == 12 || type == 13) && mcMode >= 2 && mcMode <= 5));
+        bool digitalOk = (type == 2 || type == 17 || type == 18 || ((type == 12 || type == 13) && (mcMode == 2 || mcMode == 3)));
         if (source == 1 && !pcaOk) {
             message = "PCA9685 source is not supported by output channel " + String(channelNumber);
             return false;
@@ -716,17 +772,55 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             return false;
         }
         if (source == 5 && type != 14) {
-            message = "MCP4725 DAC source is only supported by DAC output channel " + String(channelNumber);
+            message = "I2C DAC source is only supported by DAC output channel " + String(channelNumber);
             return false;
         }
         if (source > 5) {
             message = "Unsupported output source on channel " + String(channelNumber);
             return false;
         }
+        auto defaultAddrForSource = [](uint8_t s) -> uint8_t {
+            if (s == 1) return 0x40;
+            if (s == 5) return 0x60;
+            return 0x20;
+        };
+        if (source != 0 && source != 5) {
+            uint8_t addr = output["pca_addr"] | defaultAddrForSource(source);
+            if (!validateSourceAddress(source, addr, "Primary I2C source on channel " + String(channelNumber), message)) return false;
+        }
+        if (type == 14 && source == 5) {
+            uint8_t dacModel = output["dac_model"] | 0;
+            uint8_t addr = output["pca_addr"] | (dacModel == 0 ? 0x60 : 0x4C);
+            uint8_t dacChannel = output["pca_channel"] | 0;
+            if (dacModel > 2) {
+                message = "Unsupported I2C DAC model on channel " + String(channelNumber);
+                return false;
+            }
+            if (!dacAddressValid(dacModel, addr)) {
+                message = "I2C DAC source on channel " + String(channelNumber) + " has invalid address 0x" + String(addr, HEX) + ". " + dacAddressRangeLabel(dacModel);
+                return false;
+            }
+            if (dacModel != 2 && dacChannel != 0) {
+                message = "Only DAC7573 supports DAC channels B-D on channel " + String(channelNumber);
+                return false;
+            }
+            if (dacModel == 2 && dacChannel > 3) {
+                message = "DAC7573 channel must be 0-3 on channel " + String(channelNumber);
+                return false;
+            }
+        }
         if (type == 12 || type == 13) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             if (pin2Source != 0 && pin2Source > 4) {
                 message = "Unsupported segment expander source on channel " + String(channelNumber);
+                return false;
+            }
+            if (pin2Source != 0) {
+                uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
+                if (!validateSourceAddress(pin2Source, pin2Addr, "Segment base I2C source on channel " + String(channelNumber), message)) return false;
+            }
+            if ((mcMode == 4 || mcMode == 5) && pin2Source >= 2 && pin2Source <= 4) {
+                message = "7-Segment Direct Dim requires ESP32 GPIO or PCA9685 segment source on channel " + String(channelNumber);
                 return false;
             }
             if (pin2Source != 0 && (int)(output["pin2_channel"] | 255) == 255) {
@@ -735,12 +829,21 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
             if (output.containsKey("seg_sources")) {
                 JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
+                JsonArrayConst segAddrs = output["seg_addrs"].as<JsonArrayConst>();
                 JsonArrayConst segChannels = output["seg_channels"].as<JsonArrayConst>();
                 uint8_t numSeg = (type == 13) ? 8 : 7;
                 for (int s = 0; s < segSources.size(); s++) {
                     uint8_t sSrc = segSources[s] | 0;
                     if (sSrc != 0 && sSrc > 4) {
                         message = "Unsupported segment expander source on channel " + String(channelNumber);
+                        return false;
+                    }
+                    if (sSrc != 0) {
+                        uint8_t sAddr = (s < segAddrs.size()) ? (uint8_t)(segAddrs[s] | defaultAddrForSource(sSrc)) : defaultAddrForSource(sSrc);
+                        if (!validateSourceAddress(sSrc, sAddr, "Segment " + String(s + 1) + " I2C source on channel " + String(channelNumber), message)) return false;
+                    }
+                    if ((mcMode == 4 || mcMode == 5) && sSrc >= 2 && sSrc <= 4) {
+                        message = "7-Segment Direct Dim requires ESP32 GPIO or PCA9685 segment source on channel " + String(channelNumber);
                         return false;
                     }
                     if (s < numSeg && sSrc != 0 && (s >= segChannels.size() || (int)(segChannels[s] | 255) == 255)) {
@@ -753,17 +856,35 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         if (type == 7) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             uint8_t pin3Source = output["pin3_source"] | 0;
+            uint8_t pin4Source = output["pin4_source"] | 0;
+            uint8_t homingMode = output["mc_homing_mode"] | 0;
             if (source != 0) {
                 message = "Stepper STEP pin must use ESP32 GPIO on channel " + String(channelNumber);
                 return false;
             }
-            if (pin2Source > 4 || pin3Source > 4) {
+            if (pin2Source > 4 || pin3Source > 4 || pin4Source > 4) {
                 message = "Unsupported stepper hybrid pin source on channel " + String(channelNumber);
                 return false;
+            }
+            if (pin2Source != 0) {
+                uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
+                if (!validateSourceAddress(pin2Source, pin2Addr, "Stepper DIR I2C source on channel " + String(channelNumber), message)) return false;
+            }
+            if (pin3Source != 0) {
+                uint8_t pin3Addr = output["pin3_addr"] | defaultAddrForSource(pin3Source);
+                if (!validateSourceAddress(pin3Source, pin3Addr, "Stepper ENABLE I2C source on channel " + String(channelNumber), message)) return false;
+            }
+            if (homingMode == 0 && pin4Source != 0) {
+                uint8_t pin4Addr = output["pin4_addr"] | defaultAddrForSource(pin4Source);
+                if (!validateSourceAddress(pin4Source, pin4Addr, "Stepper HOME I2C source on channel " + String(channelNumber), message)) return false;
             }
             if ((pin2Source != 0 && (int)(output["pin2_channel"] | 255) == 255) ||
                 (pin3Source != 0 && (int)(output["pin3_channel"] | 255) == 255)) {
                 message = "Stepper hybrid expander channel is missing on channel " + String(channelNumber);
+                return false;
+            }
+            if (homingMode == 0 && pin4Source != 0 && (int)(output["pin4_channel"] | 255) == 255) {
+                message = "Stepper HOME expander channel is missing on channel " + String(channelNumber);
                 return false;
             }
         }
@@ -775,6 +896,18 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             if (source > 1 || pin2Source > 1 || pin3Source > 1 || pin4Source > 1) {
                 message = "Analog RGB/RGBW channels only support ESP32 GPIO or PCA9685 sources on channel " + String(channelNumber);
                 return false;
+            }
+            if (pin2Source != 0) {
+                uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
+                if (!validateSourceAddress(pin2Source, pin2Addr, "Analog RGB/RGBW Green I2C source on channel " + String(channelNumber), message)) return false;
+            }
+            if (pin3Source != 0) {
+                uint8_t pin3Addr = output["pin3_addr"] | defaultAddrForSource(pin3Source);
+                if (!validateSourceAddress(pin3Source, pin3Addr, "Analog RGB/RGBW Blue I2C source on channel " + String(channelNumber), message)) return false;
+            }
+            if (colorOrder >= 4 && pin4Source != 0) {
+                uint8_t pin4Addr = output["pin4_addr"] | defaultAddrForSource(pin4Source);
+                if (!validateSourceAddress(pin4Source, pin4Addr, "Analog RGB/RGBW White I2C source on channel " + String(channelNumber), message)) return false;
             }
             if ((source == 1 && (int)(output["pca_channel"] | 255) == 255) ||
                 (pin2Source == 1 && (int)(output["pin2_channel"] | 255) == 255) ||
@@ -790,9 +923,29 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 message = "Unsupported smoke shooter hybrid pin source on channel " + String(channelNumber);
                 return false;
             }
+            if (pin2Source != 0) {
+                uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
+                if (!validateSourceAddress(pin2Source, pin2Addr, "Smoke Shooter shoot I2C source on channel " + String(channelNumber), message)) return false;
+            }
             if (pin2Source != 0 && (int)(output["pin2_channel"] | 255) == 255) {
                 message = "Smoke Shooter shoot expander channel is missing on channel " + String(channelNumber);
                 return false;
+            }
+        }
+        if (type == 6) {
+            uint8_t pin2Source = output["pin2_source"] | 0;
+            uint8_t pin3Source = output["pin3_source"] | 0;
+            if (pin2Source > 4 || pin3Source > 4) {
+                message = "Unsupported motor hybrid pin source on channel " + String(channelNumber);
+                return false;
+            }
+            if (pin2Source != 0) {
+                uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
+                if (!validateSourceAddress(pin2Source, pin2Addr, "Motor IN2/DIR I2C source on channel " + String(channelNumber), message)) return false;
+            }
+            if (pin3Source != 0) {
+                uint8_t pin3Addr = output["pin3_addr"] | defaultAddrForSource(pin3Source);
+                if (!validateSourceAddress(pin3Source, pin3Addr, "Motor EN I2C source on channel " + String(channelNumber), message)) return false;
             }
         }
         if (type == 6 && (uint8_t)(output["mc_mode"] | 0) == 2) {
@@ -803,6 +956,19 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
             if (enSource == 1 && (int)(output["pin3_channel"] | 255) == 255) {
                 message = "Motor EN PCA9685 channel is missing on channel " + String(channelNumber);
+                return false;
+            }
+        }
+        if (type == 15) {
+            int minDuty = output["pwm_dac_min"] | 0;
+            int maxDuty = output["pwm_dac_max"] | 10000;
+            int mode = output["pwm_dac_mode"] | 0;
+            if (minDuty < 0 || minDuty > 10000 || maxDuty < 0 || maxDuty > 10000) {
+                message = "PWM DAC calibration duty must be between 0.00% and 100.00% on channel " + String(channelNumber);
+                return false;
+            }
+            if (mode > 2) {
+                message = "Unsupported PWM DAC calibration mode on channel " + String(channelNumber);
                 return false;
             }
         }
@@ -1093,6 +1259,8 @@ void setupWebServer() {
             uint8_t requestedZcPin = doc["zc_pin"].is<int>() ? (uint8_t)(int)doc["zc_pin"] : sysCfg.zc_pin;
             uint8_t requestedSda = doc["i2c_sda"].is<int>() ? (uint8_t)(int)doc["i2c_sda"] : sysCfg.i2c_sda;
             uint8_t requestedScl = doc["i2c_scl"].is<int>() ? (uint8_t)(int)doc["i2c_scl"] : sysCfg.i2c_scl;
+            uint8_t requestedDisplayType = doc["display_enabled"].is<int>() ? (uint8_t)(int)doc["display_enabled"] : sysCfg.display_enabled;
+            uint8_t requestedDisplayAddr = doc["display_i2c_addr"].is<int>() ? (uint8_t)(int)doc["display_i2c_addr"] : sysCfg.display_i2c_addr;
             String validationMessage;
             if (requestedStatusPin != 255 && requestedZcPin != 255 && requestedStatusPin == requestedZcPin) {
                 validationMessage = "Status LED GPIO and Zero-Crossing GPIO cannot use the same pin";
@@ -1111,6 +1279,11 @@ void setupWebServer() {
             }
             if (requestedZcPin != 255 && (requestedZcPin == requestedSda || requestedZcPin == requestedScl)) {
                 validationMessage = "Zero-Crossing pin cannot overlap with I2C SDA or SCL";
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
+                return;
+            }
+            if (!displayAddressValid(requestedDisplayType, requestedDisplayAddr)) {
+                validationMessage = "I2C display address is invalid for the selected display type";
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
                 return;
             }

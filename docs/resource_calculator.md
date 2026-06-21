@@ -38,10 +38,10 @@ Implementation status: this is the domain rule and target behavior. When changin
 | 9 | Passive Buzzer | 1 | 0 | 1 | 0 | GPIO only |
 | 10 | DFPlayer MP3 | 2 | 0 | 0 | 1 | GPIO only; max 2 channels |
 | 11 | 7-Segment TM1637 | 2 | 0 | 0 | 0 | GPIO only |
-| 12 | 7-Segment DD 7-Pin PWM | per segment | 0 | routing-dependent | 0 | Score each segment by its GPIO, PCA9685, or expander route |
-| 13 | 7-Segment DD 8-Pin PWM | per segment | 0 | routing-dependent | 0 | Score each segment by its GPIO, PCA9685, or expander route |
+| 12 | 7-Segment DD 7-Pin PWM | per segment | 0 | routing-dependent | 0 | Direct Dim uses GPIO/PCA9685 only; No Dim/Common Dim may use digital expanders for digital segment pins |
+| 13 | 7-Segment DD 8-Pin PWM | per segment | 0 | routing-dependent | 0 | Direct Dim uses GPIO/PCA9685 only; No Dim/Common Dim may use digital expanders for digital segment pins |
 | 14 | DAC | 1 | 0 | 0 | 0 | GPIO DAC is unavailable on WT32-ETH01; MCP4725 source recommended |
-| 15 | PWM DAC | 1 | 0 | 1 | 0 | GPIO+LEDC or PCA9685 |
+| 15 | PWM DAC | 1 | 0 | 1 | 0 | GPIO+LEDC or PCA9685; duty calibration supports external 0-10V / 4-20mA interface circuits |
 | 16 | Function Generator | 1 | 0 | 1 | 0 | GPIO only; uses timer/compute budget |
 | 17 | Solenoid Trigger | 1 | 0 | 0 | 0 | GPIO, PCA9685, or digital expander |
 | 18 | Sequential Smoke Shooter | 2 | 0 | 0 | 0 | GPIO, PCA9685, or digital expander |
@@ -92,7 +92,7 @@ The WT32-ETH01 is highly integrated. Many ESP32 GPIOs are wired internally to th
 
 Because only a small number of general output pins are available, I2C expanders are strongly recommended for installations with many relays, solenoids, indicators, or 7-segment segments.
 
-## 5. I2C Expander Device Specifications
+## 5. I2C Device Specifications
 
 ### 5.1 PCA9685 PWM/Servo Expander
 
@@ -105,22 +105,31 @@ Because only a small number of general output pins are available, I2C expanders 
 ### 5.2 MCP23017 / TCA9555 Digital GPIO Expander
 
 * **Interface:** I2C.
-* **Address range:** usually `0x20..0x27`.
-* **Best for:** Relays, solenoids, smoke shooter valves, and digital segment routing.
-* **Key constraint:** Digital only; do not use for PWM-only pins such as motor EN.
+* **Address range:** `0x20..0x27`.
+* **Best for:** Relays, solenoids, smoke shooter valves, and digital-only segment routing.
+* **Key constraint:** Digital only; do not use for PWM-only pins such as motor EN or 7-segment Direct Dim segments.
 
 ### 5.3 PCF857x Digital GPIO Expander
 
 * **Interface:** I2C.
+* **Address range:** `0x20..0x27` for PCF8574, `0x38..0x3F` for PCF8574A.
 * **Best for:** Simple relay modules and low-speed digital outputs.
 * **Key constraint:** Quasi-bidirectional pins have weak pull-ups; active-low wiring is often easier.
 
-### 5.4 MCP4725 DAC
+### 5.4 I2C DACs
 
 * **Interface:** I2C.
-* **Address range:** `0x60..0x67`.
 * **Resolution:** 12-bit.
 * **Best for:** Analog output when ESP32 DAC pins are unavailable.
+* **MCP4725 (`dac_model=0`) address range:** `0x60` or `0x61`.
+* **DAC7571 (`dac_model=1`) address range:** `0x4C` or `0x4D`.
+* **DAC7573 (`dac_model=2`) address range:** `0x4C..0x5B`; `pca_channel` selects channel A-D.
+
+### 5.5 I2C Displays
+
+* **SSD1306/SH1106 OLED address range:** `0x3C` or `0x3D`.
+* **PCF8574 LCD backpack address range:** `0x27` or `0x3F`.
+* **Key constraint:** Display addresses are validated against the selected display type and are not treated as output sources.
 
 ## 6. Hard Validation Rules
 
@@ -129,12 +138,15 @@ The score calculator is not the only gate. Firmware and Web UI validation also e
 * GPIO pins cannot duplicate another output pin.
 * Output pins cannot overlap Status LED, Zero-Crossing, I2C SDA, or I2C SCL.
 * I2C SDA and SCL cannot be the same pin.
+* I2C output addresses must match the selected source/model: PCA9685 `0x40..0x47`, MCP23017/TCA9555 `0x20..0x27`, PCF857x `0x20..0x27` or `0x38..0x3F`, MCP4725 `0x60/0x61`, DAC7571 `0x4C/0x4D`, DAC7573 `0x4C..0x5B`.
+* I2C display addresses must match the selected display type: OLED `0x3C/0x3D`, PCF8574 LCD `0x27/0x3F`.
 * DFPlayer channels cannot exceed 2.
 * DFPlayer allocates UART before DMX; DMX uses remaining UARTs and then RMT fallback.
 * RMT usage from LED strips plus DMX fallback cannot exceed 8.
 * Source must be compatible with output type.
 * Stepper STEP must be ESP32 GPIO.
 * Motor EN in `IN1+IN2+EN` mode must use ESP32 GPIO or PCA9685.
+* 7-segment Direct Dim modes must use ESP32 GPIO or PCA9685 for segment outputs; digital GPIO expanders are allowed only for digital segment modes.
 * PCA9685 frequency conflicts must be handled per chip.
 
 ## 7. Capacity & Network Load Guidelines
@@ -148,7 +160,8 @@ The score calculator is not the only gate. Firmware and Web UI validation also e
 
 3. **7-Segment Display Limits**
     * TM1637 modules are GPIO-only and consume two signal pins each.
-    * Direct-drive 7-segment displays should use expanders or PCA9685 when possible to preserve ESP32 GPIO.
+    * Direct-drive 7-segment No Dim/Common Dim segment outputs can use digital expanders to preserve ESP32 GPIO.
+    * Direct Dim segment outputs need PWM and should use PCA9685 when there are not enough ESP32 GPIO/LEDC channels.
 
 4. **Mixed-Mode Optimization**
     * Fast timing pins such as Stepper STEP must stay on direct ESP32 GPIO.
@@ -159,3 +172,11 @@ The score calculator is not the only gate. Firmware and Web UI validation also e
     * Use separate load power and connect grounds together.
     * Use flyback protection for relay, solenoid, and motor coils.
     * All GPIO outputs should have pull-down resistors when connected to interface boards.
+
+6. **ESP-NOW Airtime Planning**
+    * ESP-NOW forwarding is not part of the hardware resource score, but it can become a wireless airtime bottleneck.
+    * Current DMX forwarding is chunked into 200-byte payloads plus a 12-byte firmware header, so a full 512-channel universe uses up to 3 ESP-NOW packets.
+    * If a peer's DMX range is larger than the chunk size, the master sends multiple packets with increasing `offset`; the slave applies each packet by `universe` and `offset`.
+    * Future Web UI/system settings should allow user-configurable ESP-NOW chunk size because RF reliability and airtime overhead vary by installation.
+    * Configure per-peer universe/channel ranges instead of broadcasting all data to every slave.
+    * Slave boards keep their setup AP available for field configuration; avoid unnecessary clients/AP traffic during show-critical wireless operation.

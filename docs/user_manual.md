@@ -24,7 +24,7 @@ The board receives Art-Net/sACN from the network and forwards DMX universes wire
 
 ### ESP-NOW Slave
 
-The board receives DMX data from an ESP-NOW master and drives its local outputs. In slave mode, the board can open a temporary setup AP; if no client connects, the AP is disabled after the timeout to reduce RF noise.
+The board receives DMX data from an ESP-NOW master and drives its local outputs. In slave mode, the board keeps the setup AP active so it can be configured in the field without Ethernet.
 
 ## 3. IP, Wi-Fi, and mDNS
 
@@ -53,10 +53,20 @@ ESP-NOW Slave mode always keeps the setup AP active so the slave can be configur
 
 Configured output channels are score-limited, not fixed-count limited. Practical capacity depends on resource score and hard peripheral limits. Each output has:
 - Type (0-18)
-- Source (GPIO, PCA9685, MCP23017, TCA9555, PCF857x, MCP4725)
+- Source (GPIO, PCA9685, MCP23017, TCA9555, PCF857x, I2C DAC)
 - Start Universe
 - Start Address
 - Type-specific settings
+
+I2C address ranges are validated by device type:
+- PCA9685: `0x40..0x47`
+- MCP23017/TCA9555: `0x20..0x27`
+- PCF857x: `0x20..0x27` or `0x38..0x3F`
+- MCP4725 DAC: `0x60` or `0x61`
+- DAC7571 DAC: `0x4C` or `0x4D`
+- DAC7573 DAC: `0x4C..0x5B`, channel A-D selectable
+- SSD1306/SH1106 OLED display: `0x3C` or `0x3D`
+- PCF8574 LCD display backpack: `0x27` or `0x3F`
 
 For protocol data:
 - `start_universe` is the Art-Net/sACN universe used by the output.
@@ -271,13 +281,17 @@ State-machine controlled smoke machine. One DMX channel triggers a sequence: Smo
 
 ### 7-Segment Display
 
-Supports TM1637 (2-wire GPIO protocol) or direct-drive (7-8 pins, optionally via expander).
+Supports TM1637 (2-wire GPIO protocol) or direct-drive (7-8 pins, optionally via expander). Direct Dim modes require ESP32 GPIO or PCA9685 for segment PWM; digital GPIO expanders are for No Dim/Common Dim segment outputs only.
 
 Modes:
 - TM1637 Numeric (2 Ch): 4-digit numeric display.
 - TM1637 ASCII (4 Ch): 4-character ASCII display.
 - Direct Drive 7-pin (A-G): 1 character, 7 segment pins.
 - Direct Drive 8-pin (A-G+DP): 1 character, 8 segment pins.
+
+### PWM DAC Calibration
+
+PWM DAC outputs can be calibrated for external analog interface circuits such as 0-10V or 4-20mA modules. Set the PWM duty at DMX 0 and at full-scale DMX; the firmware linearly maps incoming DMX values between those two duty points.
 
 ## 8. Art-Net and sACN
 
@@ -311,7 +325,22 @@ If no peers are configured, the master falls back to broadcast. Peer entries are
 
 Each ESP-NOW peer can have its own Universe/Channel range. The master sends only overlapping chunks to that peer. This is recommended because sending every universe to every peer wastes ESP-NOW airtime.
 
-DMX universes are split into 200-byte ESP-NOW chunks and reassembled by offset on the slave. This allows full 512-channel universe forwarding when needed.
+DMX universes are split into ESP-NOW chunks and applied by offset on the slave. Current firmware uses 200 DMX bytes per chunk, which allows full 512-channel universe forwarding when needed.
+
+ESP-NOW payload and range limits:
+- Peer routes accept universes `0..32767` and DMX addresses `1..512`.
+- Current firmware sends at most 200 DMX data bytes per ESP-NOW packet.
+- Each packet also has a 12-byte firmware header, so the largest on-air firmware packet is about 212 bytes.
+- A full 512-channel universe needs up to 3 packets: channels 1-200, 201-400, and 401-512.
+- If a peer range is larger than the chunk size, the master automatically splits it into multiple packets for the same universe. Each packet carries `universe`, `offset`, `totalLength`, `length`, and the DMX bytes for that slice. The slave applies each packet at `offset`; it does not need a separate packet number.
+- Keep each peer range as small as the slave actually needs. Narrow ranges reduce airtime, packet loss risk, and latency.
+- ESP-NOW uses the ESP32 Wi-Fi radio. Keep master and slave under compatible Wi-Fi/ESP-NOW channel conditions, and avoid heavy Wi-Fi/AP traffic near show-critical wireless DMX links.
+
+Planned configuration behavior:
+- ESP-NOW DMX chunk size should become a user setting in the Web UI.
+- Smaller chunks create more packets but may be more reliable in noisy RF conditions.
+- Larger chunks reduce packet count and overhead but can increase loss impact when one ESP-NOW frame drops.
+- The packet protocol already carries `length`, so slaves can accept variable chunk sizes as long as the packet length is within the firmware maximum receive buffer.
 
 ## 10. OTA Update
 

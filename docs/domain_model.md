@@ -80,6 +80,16 @@
 - Core 1 ประมวลผล output.
 - atomic flags เช่น `networkFramePending` ต้องใช้แบบปลอดภัยกับ dual-core.
 - ESP-NOW callback ต้อง defer ผ่าน queue ไม่ทำงานหนักใน callback.
+- ESP-NOW master รับ Art-Net/sACN แล้วส่งต่อ DMX ไปยัง slave ตาม peer route ที่เก็บใน `/espnow_peers.json`.
+- ESP-NOW slave รับ packet ผ่าน callback, queue ไปประมวลผลใน `outputTask`, แล้ว map ตาม universe/offset เข้าช่อง output.
+- ESP-NOW DMX packet ใช้ header 12 bytes (`DMX`, universe, offset, totalLength, length) และ data payload ปัจจุบันสูงสุด 200 bytes (`ESPNOW_DMX_CHUNK_SIZE`).
+- ถ้า peer route ใน universe เดียวกันยาวกว่า chunk size, master แบ่งส่งหลาย packet โดยเพิ่ม `offset` ทีละ chunk size และตั้ง `length` ตามจำนวน bytes ใน packet นั้น; slave map packet ทันทีตาม `universe`/`offset` โดยไม่ต้องรอ reassemble ครบ universe ยกเว้น buffer แสดงสถานะ universe 0.
+- หนึ่ง DMX universe 512 channels ที่ chunk size 200 ถูกแบ่งเป็นสูงสุด 3 ESP-NOW frames: offset 0, 200, 400; frame ใหญ่สุดประมาณ 212 bytes รวม custom header.
+- Peer route จำกัดช่วง universe `0..32767` และ DMX address `1..512`; ถ้าไม่มี peer master จะ broadcast ไป `FF:FF:FF:FF:FF:FF`.
+- ใช้ peer route ให้แคบที่สุดเพื่อลด airtime เพราะ ESP-NOW ไม่เหมาะกับการ broadcast ทุก universe ไปทุก slave พร้อมกัน.
+- ESP-NOW ต้องเปิด Wi-Fi radio (`WIFI_AP_STA` เมื่อจำเป็น); slave คง setup AP ไว้เพื่อ config ภาคสนาม.
+- Requirement ต่อไป: ทำให้ ESP-NOW DMX chunk size เป็น system setting ที่ผู้ใช้ปรับได้จาก Web UI หน้า ESP-NOW/Network และบันทึกใน NVS; UI ต้องแสดง tradeoff ระหว่าง packet count, airtime, latency, และ reliability.
+- เมื่อทำ chunk size แบบ user-configurable ให้แยก `configured_chunk_size` สำหรับการส่งออกจาก compile-time max receive buffer; packet มี `length` อยู่แล้ว ดังนั้น slave ไม่จำเป็นต้องตั้งค่า chunk size ตรงกับ master แต่ firmware ต้อง reject packet ที่ `length` เกินขนาด buffer สูงสุดที่รองรับ.
 
 ### Validation And Interlock Context
 
@@ -168,7 +178,21 @@ Invariant:
 | 2 | MCP23017 | digital-only I2C GPIO expander |
 | 3 | TCA9555 | digital-only I2C GPIO expander |
 | 4 | PCF857x | digital-only I2C GPIO expander |
-| 5 | MCP4725 DAC | I2C DAC source ใช้ได้เฉพาะ output type 14 |
+| 5 | I2C DAC | I2C DAC source ใช้ได้เฉพาะ output type 14; model selected by `dac_model` |
+
+### I2C Address Contract
+
+| Device/source | Valid addresses | Notes |
+| --- | --- | --- |
+| PCA9685 (`source=1`) | `0x40..0x47` | PWM/servo expander, 16 channels per chip |
+| MCP23017 (`source=2`) | `0x20..0x27` | Digital GPIO expander |
+| TCA9555 (`source=3`) | `0x20..0x27` | Digital GPIO expander |
+| PCF857x (`source=4`) | `0x20..0x27`, `0x38..0x3F` | PCF8574 and PCF8574A address families |
+| MCP4725 (`source=5`, `dac_model=0`) | `0x60`, `0x61` | Single-channel 12-bit I2C DAC |
+| DAC7571 (`source=5`, `dac_model=1`) | `0x4C`, `0x4D` | Single-channel 12-bit I2C DAC; TI lists address support for up to two devices |
+| DAC7573 (`source=5`, `dac_model=2`) | `0x4C..0x5B` | Quad 12-bit I2C DAC; `pca_channel` selects channel A-D (`0..3`) |
+| SSD1306/SH1106 display | `0x3C`, `0x3D` | System display setting, not an output source |
+| PCF8574 LCD display backpack | `0x27`, `0x3F` | System display setting, not an output source |
 
 ### Output Type Source Contract
 
@@ -186,10 +210,10 @@ Invariant:
 | 9 | Passive Buzzer | GPIO only | none | uses LEDC tone/PWM timing |
 | 10 | DFPlayer MP3 | GPIO only | TX/RX GPIO pins | max 2 channels because UART1/2 only |
 | 11 | 7-Segment TM1637 | GPIO only | CLK/DIO GPIO pins | TM1637 is not expander-routed; direct-drive displays use type 12/13 |
-| 12 | 7-Segment DD 7-Pin PWM | GPIO, PCA9685, or digital expander per segment | segment-level routing via `seg_*` or base routing | scoring must count each segment route, not always 7 GPIO/LEDC |
-| 13 | 7-Segment DD 8-Pin PWM | GPIO, PCA9685, or digital expander per segment | segment-level routing via `seg_*` or base routing | scoring must count each segment route, not always 8 GPIO/LEDC |
-| 14 | DAC | MCP4725 preferred; ESP32 DAC GPIO path is legacy/unsafe on WT32-ETH01 | none | GPIO25/26 are occupied by Ethernet; MCP4725 source is the practical safe path |
-| 15 | PWM DAC | GPIO or PCA9685 | none | GPIO path uses LEDC |
+| 12 | 7-Segment DD 7-Pin PWM | GPIO or PCA9685 for Direct Dim; GPIO, PCA9685, or digital expander for No Dim/Common Dim segments | segment-level routing via `seg_*` or base routing | Direct Dim modes need PWM per segment, so MCP23017/TCA9555/PCF857x are invalid there |
+| 13 | 7-Segment DD 8-Pin PWM | GPIO or PCA9685 for Direct Dim; GPIO, PCA9685, or digital expander for No Dim/Common Dim segments | segment-level routing via `seg_*` or base routing | Direct Dim modes need PWM per segment, so MCP23017/TCA9555/PCF857x are invalid there |
+| 14 | DAC | I2C DAC preferred; ESP32 DAC GPIO path is legacy/unsafe on WT32-ETH01 | MCP4725/DAC7571 single-channel, DAC7573 channel A-D via `pca_channel` | GPIO25/26 are occupied by Ethernet; supported I2C DAC models are MCP4725, DAC7571, and DAC7573 |
+| 15 | PWM DAC | GPIO or PCA9685 | none | GPIO path uses LEDC; supports duty calibration for external 0-10V or 4-20mA interface circuits |
 | 16 | Function Generator | GPIO only | none | uses LEDC/timer-like runtime load |
 | 17 | Solenoid | GPIO, PCA9685, digital expander | none | trigger/pulse state machine |
 | 18 | Smoke Shooter | GPIO, PCA9685, digital expander | smoke and shoot pins route together or by pin fields | two digital outputs controlled by sequence state machine |
@@ -199,11 +223,13 @@ Invariant:
 Fields expected to be persisted in `/outputs.json`:
 - identity by array index, not by stable ID.
 - `type`, `source`, `start_universe`, `start_address`.
+- DAC model selection for I2C DAC outputs: `dac_model`; DAC7573 channel uses `pca_channel` (`0..3`).
 - primary routing: `pin`, `pca_addr`, `pca_channel`.
 - multi-pin routing: `pin2`, `pin3`, `pin4`, `pin2_source`, `pin3_source`, `pin4_source`, `pin2_addr`, `pin3_addr`, `pin4_addr`, `pin2_channel`, `pin3_channel`, `pin4_channel`.
 - PCA contiguous/legacy routing fields: `pca_channel2`, `pca_channel3`, `pca_channel4`.
 - LED fields: `led_count`, `color_order`, `led_protocol`.
 - motor/servo/stepper/function/PWM fields: `mc_mode`, `mc_resolution`, `mc_freq`, `mc_deadband`, `mc_invert`, `mc_brake`, `mc_min_us`, `mc_max_us`, `mc_steps_per_rev`, `mc_homing_*`, `mc_scale_factor`, `mc_unit_type`, `mc_enable_active_high`, `mc_dir_invert`, `mc_step_invert`.
+- PWM DAC calibration fields: `pwm_dac_mode` (`0=Custom`, `1=0-10V`, `2=4-20mA`), `pwm_dac_min`, `pwm_dac_max` as duty percent times 100 (`0..10000`).
 - inversion fields: `pin_invert`, `pin2_invert`, `pin3_invert`, `pin4_invert`, `seg_inverts`.
 - 7-segment direct-drive routing: `seg_pins`, `seg_sources`, `seg_addrs`, `seg_channels`.
 - solenoid/smoke fields: `solenoid_mode`, `solenoid_threshold`, `solenoid_pulse_ms`, `solenoid_pre_delay`, `solenoid_post_delay`, `smoke_duration_ms`, `settle_delay_ms`, `shoot_duration_ms`, `smoke_lockout_ms`; Smoke Shooter reuses `solenoid_threshold` as its trigger threshold.
@@ -223,9 +249,12 @@ Configuration must pass these gates before save/apply:
 - any output GPIO, including hybrid GPIO pins and segment GPIO pins, must not overlap global pins.
 - output GPIO pins must not duplicate across outputs.
 - expander channels must not duplicate for the same source/address/channel.
+- every I2C-routed output address must be inside the valid range for that device/source/model.
+- display I2C address must match the selected display type: OLED `0x3C/0x3D`, PCF8574 LCD `0x27/0x3F`.
 - DFPlayer count must be `<= 2`.
 - RMT use from LED strips plus DMX fallback must be `<= 8`.
 - LEDC use must be `<= 16`.
+- 7-segment Type 12/13 Direct Dim modes (`mc_mode` 4/5) must route segments to ESP32 GPIO or PCA9685, not digital expanders.
 - PCA9685 shared frequency conflicts must be surfaced; servo forces 50 Hz per chip.
 - combined score must be `<= SCORE_LIMIT`.
 
@@ -238,7 +267,7 @@ Resource Score must be routing-accurate:
 - Count UART after DFPlayer priority allocation; DFPlayer consumes UART before DMX.
 - Count PCA9685 channels for actual PCA-routed channels.
 - Count digital expander channels for actual digital expander-routed channels.
-- Count Type 12/13 per segment using `seg_sources`, `seg_pins`, `seg_channels`, or base routing rules.
+- Count Type 12/13 per segment using `seg_sources`, `seg_pins`, `seg_channels`, or base routing rules; Direct Dim modes can only score GPIO/LEDC or PCA segment routes because digital expanders are invalid.
 - Compute Score is separate from Resource Score and includes per-type runtime cost plus `output_fps` factor.
 
 Known implementation drift to fix later:
