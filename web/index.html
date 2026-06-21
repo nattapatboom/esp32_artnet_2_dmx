@@ -1862,6 +1862,10 @@ function cpuBlocked(cpu,fps){
 function ramBlocked(ram){
   return ram>RAM_LIMIT;
 }
+function espnowMasterCost(peerCount, universeCount, chunkSize=200){
+  const cpusPerUni = Math.ceil(512/chunkSize);
+  return {cpu: 1 + peerCount*0.2*cpusPerUni + universeCount*0.3, ram: 512 + peerCount*(chunkSize+44)};
+}
 function updateScoreBar(){
   const bar=document.getElementById('score-fill');
   const txt=document.getElementById('score-text');

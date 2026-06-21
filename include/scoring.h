@@ -182,11 +182,15 @@ inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     return c;
 }
 
-// ESP-NOW Master overhead
-inline PerChannelCost espnowMasterCost(uint8_t peerCount, uint8_t universeCount) {
+// ESP-NOW Master overhead. chunkSize = DMX data bytes per packet (not including 12-byte header).
+// Default 200 = current ESPNOW_DMX_CHUNK_SIZE. Smaller chunk → more packets/overhead.
+inline PerChannelCost espnowMasterCost(uint8_t peerCount, uint8_t universeCount, uint16_t chunkSize = 200) {
     PerChannelCost c;
-    c.cpuWeight = 1.0f + peerCount * 0.2f + universeCount * 0.3f;
-    c.ramBytes  = 512 + peerCount * 256;
+    // chunksPerUniverse = ceil(512 / chunkSize); base CPU scales with packet count
+    uint8_t chunksPerUni = (511 + chunkSize) / chunkSize;  // ceil division
+    c.cpuWeight = 1.0f + peerCount * 0.2f * chunksPerUni + universeCount * 0.3f;
+    // Each peer needs a send buffer per chunk (data + 12 header + ~32 housekeeping)
+    c.ramBytes  = 512 + peerCount * (chunkSize + 44);
     return c;
 }
 

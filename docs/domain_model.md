@@ -271,11 +271,14 @@ Per-type CPU weight estimates (at 40 FPS reference). Every channel also costs a 
 
 #### ESP-NOW Master Overhead
 
-ESP-NOW Master mode has additional CPU and RAM independent of output channels:
+ESP-NOW Master mode has additional CPU and RAM independent of output channels.
+Costs depend on `chunkSize` (default 200 bytes data per packet, not including 12-byte header):
 
 | Source | CPU weight | RAM bytes |
 |:---|:---:|---:|
-| ESP-NOW Master | `1.0 + peers×0.2 + universes×0.3` | `512 + peers×256` |
+| ESP-NOW Master | `1.0 + peers×0.2 × ceil(512/chunkSize) + universes×0.3` | `512 + peers × (chunkSize + 44)` |
+
+With default chunkSize=200: `cpu = 1.0 + peers×0.6 + universes×0.3`, `ram = 512 + peers×244`
 
 #### Offline Load Calculator
 

@@ -90,8 +90,10 @@ Base limit at 40 FPS: `25.0`. Scales inversely with FPS: `limit(fps) = 25.0 × (
 | **I2C overhead** | **+0.30** | Any channel using I2C source |
 
 ESP-NOW Master overhead (independent of output channels):
+Costs depend on `chunkSize` (default 200 bytes data per packet):
 ```
-cpuWeight = 1.0 + peerCount×0.2 + universeCount×0.3
+cpuWeight = 1.0 + peerCount×0.2 × ceil(512/chunkSize) + universeCount×0.3
+ramBytes  = 512 + peerCount × (chunkSize + 44)
 ```
 
 ### 3C. RamBudget — Static Buffer Estimate
@@ -120,9 +122,9 @@ Every channel costs 128 bytes for the `OutputChannel` struct itself, plus type-s
 | Solenoid (17) | 128 | struct only |
 | Smoke Shooter (18) | 128 | struct only |
 
-ESP-NOW Master overhead:
+ESP-NOW Master overhead (chunkSize = 200 by default):
 ```
-ramBytes = 512 + peerCount×256
+ramBytes = 512 + peerCount × (chunkSize + 44)
 ```
 
 **Limit:** `65535` bytes (64 KB).
