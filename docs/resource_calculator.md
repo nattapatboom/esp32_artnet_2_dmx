@@ -195,8 +195,10 @@ Compare weight constants to physical limitations to confirm that single-resource
 - **LEDC PWM limit (16 channels):** `16 * W_LEDC (2.5) = 40.0` points
 - **RMT channel limit (8 channels):** `8 * W_RMT (3.0) = 24.0` points
 - **UART port limit (2 usable):** `2 * W_UART (8.0) = 16.0` points
-- **Resource limit sum:** `4.0 + 40.0 + 24.0 + 16.0 = 84.0` (matching `resourceScoreLimit()`).
+- **DAC channel limit (unlimited via I2C, but address-limited):** `N * W_DAC (2.0)` — each MCP4725/DAC7571 uses 1 channel (address-limited to a few), DAC7573 uses up to 4 channels per chip.
+- **Resource limit sum (physical pins only):** `4.0 + 40.0 + 24.0 + 16.0 = 84.0` (matching `resourceScoreLimit()`, which excludes DAC/PCA/EXP because they use I2C bus, not ESP32 native peripherals).
 - This mathematically guarantees that if any single physical resource is exhausted, the score reflects it.
+- **Note:** I2C resources (DAC weight 2.0, PCA weight 0.25, EXP weight 0.125) are additive on top of the 84.0 base; their effective limit is governed by I2C bus bandwidth, not ESP32 pin count.
 
 ### 8.2 Runtime Benchmarking (Performance & Latency Profiling)
 Measure real-time indicators on physical boards to calibrate compute score values (e.g. Stepper: `2.0`, Function Gen: `2.0`):

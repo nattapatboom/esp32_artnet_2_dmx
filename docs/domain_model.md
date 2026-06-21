@@ -398,7 +398,7 @@ Uses the atomic flag `networkFramePending` to avoid heavy mutex locks during fra
 
 ### DMX Frame Timeout Constraint
 
-DMX Frame Cycle must not exceed 50ms (minimum 20Hz) to prevent lighting fixtures from entering safe-state; initial FPS is forced to 30-40 FPS
+DMX Frame Cycle must not exceed 50ms (minimum 20Hz) to prevent lighting fixtures from entering safe-state; initial FPS is forced to 30-40 FPS (default `output_fps = 40`, range `1..44`)
 
 ---
 
@@ -484,6 +484,7 @@ Configuration must pass these gates before save/apply:
 - source must match the output type source contract above.
 - global pins must not overlap each other: Status LED, Zero-Crossing, I2C SDA, I2C SCL.
 - any output GPIO, including hybrid GPIO pins and segment GPIO pins, must not overlap global pins.
+- Ethernet RMII pins (GPIO0, GPIO18, GPIO19, GPIO21, GPIO22, GPIO23, GPIO25, GPIO26, GPIO27) and PHY power (GPIO16) are system-reserved; must not be assigned as outputs.
 - output GPIO pins must not duplicate across outputs.
 - GPIO34, GPIO35, GPIO36, GPIO39 are input-only on ESP32; must not be assigned as output pins.
 - expander channels must not duplicate for the same source/address/channel.
