@@ -1139,6 +1139,15 @@ void onWiFiEvent(WiFiEvent_t event) {
 void startAP() {
     if (apActive) return;
 
+    if (strcmp(sysCfg.ap_ssid, "ESP32-ArtNet-Setup") == 0) {
+        String mac = WiFi.macAddress();
+        mac.replace(":", "");
+        String suffix = mac.substring(mac.length() - 4);
+        String newSsid = String("ESP32-ArtNet-Setup-") + suffix;
+        strncpy(sysCfg.ap_ssid, newSsid.c_str(), sizeof(sysCfg.ap_ssid) - 1);
+        sysCfg.ap_ssid[sizeof(sysCfg.ap_ssid) - 1] = '\0';
+    }
+
     bool keepSta = wifiClientConfigured() || WiFi.isConnected();
     WiFi.mode(keepSta ? WIFI_AP_STA : WIFI_AP);
     configureWiFiRadioForBoot();
@@ -1232,14 +1241,6 @@ void setupNetwork() {
 
     // Determine whether to launch wireless services immediately or stay wired-only.
     if (sysCfg.device_mode == MODE_ESPNOW_SLAVE) {
-        if (strcmp(sysCfg.ap_ssid, "ESP32-ArtNet-Setup") == 0) {
-            String mac = WiFi.macAddress();
-            mac.replace(":", "");
-            String suffix = mac.substring(mac.length() - 4);
-            String newSsid = String("ESP32-ArtNet-Setup-") + suffix;
-            strncpy(sysCfg.ap_ssid, newSsid.c_str(), sizeof(sysCfg.ap_ssid) - 1);
-            sysCfg.ap_ssid[sizeof(sysCfg.ap_ssid) - 1] = '\0';
-        }
         startAP();
     } else {
         if (hasLink) {
@@ -2321,8 +2322,18 @@ void setup() {
     }
 
     // Configure mDNS Responder
-    if (MDNS.begin(sysCfg.mdns_name)) {
-        Serial.printf("mDNS responder started: http://%s.local\n", sysCfg.mdns_name);
+    String mdnsHost = String(sysCfg.mdns_name);
+    if (isRecoveryMode) {
+        mdnsHost = mdnsHost + "-recovery";
+    } else {
+        String mac = WiFi.macAddress();
+        mac.replace(":", "");
+        String suffix = mac.substring(mac.length() - 4);
+        suffix.toLowerCase();
+        mdnsHost = mdnsHost + "-" + suffix;
+    }
+    if (MDNS.begin(mdnsHost.c_str())) {
+        Serial.printf("mDNS responder started: http://%s.local\n", mdnsHost.c_str());
         MDNS.addService("http", "tcp", 80);
     }
 

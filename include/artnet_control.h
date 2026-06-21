@@ -139,8 +139,16 @@ private:
         reply.oem = 0x00FF; // Generic development board OEM code
         reply.status1 = 0xD2; // Indicator state
 
-        strncpy(reply.shortName, "CHAL Art-Net Node", sizeof(reply.shortName));
-        strncpy(reply.longName, "CHAL WT32-ETH01 DMX & Pixel LED Converter", sizeof(reply.longName));
+        String macStr = WiFi.macAddress();
+        macStr.replace(":", "");
+        String suffix = macStr.substring(macStr.length() - 4);
+        String shortName = String("CHAL Node-") + suffix;
+        String longName = String("CHAL WT32-ETH01 Converter - ") + suffix;
+
+        strncpy(reply.shortName, shortName.c_str(), sizeof(reply.shortName) - 1);
+        reply.shortName[sizeof(reply.shortName) - 1] = '\0';
+        strncpy(reply.longName, longName.c_str(), sizeof(reply.longName) - 1);
+        reply.longName[sizeof(reply.longName) - 1] = '\0';
         strncpy(reply.nodeReport, "#0001 [OK] System healthy and ready.", sizeof(reply.nodeReport));
 
         // Build unique active universes list from dynamic channels
