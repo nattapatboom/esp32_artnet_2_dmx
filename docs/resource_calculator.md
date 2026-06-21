@@ -78,7 +78,8 @@ The WT32-ETH01 is highly integrated. Many ESP32 GPIOs are wired internally to th
 
 ### Internal Reserved Pins
 
-* **Ethernet RMII interface:** GPIO0, GPIO16, GPIO18, GPIO19, GPIO21, GPIO22, GPIO23, GPIO25, GPIO26, GPIO27
+* **Ethernet RMII interface:** GPIO0 (REF_CLK), GPIO18 (MDIO), GPIO19 (TXD0), GPIO21 (TX_EN), GPIO22 (TXD1), GPIO23 (MDC), GPIO25 (RXD0), GPIO26 (RXD1), GPIO27 (CRS_DV)
+* **Ethernet PHY power control:** GPIO16 (ETH_PHY_POWER) — drives LAN8720 nRST/nEN; not a data signal
 * **Debug UART0:** GPIO1 (TX0), GPIO3 (RX0)
 * **ESP32 DAC pins:** GPIO25/GPIO26 are occupied by Ethernet on WT32-ETH01, so MCP4725 is the practical DAC path.
 
