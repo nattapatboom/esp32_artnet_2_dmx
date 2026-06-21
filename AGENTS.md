@@ -41,8 +41,12 @@ pio run
 # Automated Web UI smoke test
 node tools/web_ui_smoke_test.mjs
 
-# OTA upload
-curl.exe -F "update=@.pio\build\wt32-eth01\firmware.bin" http://192.168.1.93/update
+# OTA upload (The device IP is stored in test_device_ip.txt as 'IP=192.168.1.93')
+# Read IP and upload via PowerShell:
+$ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { $_.Line.Split('=')[1] }).Trim(); curl.exe -F "update=@.pio\build\wt32-eth01\firmware.bin" "http://$ip/update"
+
+# Or use the helper batch script:
+.\flash_firmware_ota_by_ip.bat
 ```
 
 ## Project Structure
