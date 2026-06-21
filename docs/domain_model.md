@@ -78,9 +78,8 @@ All `SystemConfig` fields are exposed via the Web UI settings page at `/settings
 Output channel layout (`/outputs.json`) is configurable via the Web UI outputs page at `/outputs`.
 
 **Not exposed in Web UI** (compile-time only):
-- Hardware pin reservations: ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC/MDIO, ETH_CLK_MODE
 - ESP-NOW chunk size (`ESPNOW_DMX_CHUNK_SIZE`), FreeRTOS queue depth, score limits
-- Default pin values (status_led=5, i2c_sda=14, i2c_scl=15, etc.) — these are code defaults, not hidden settings
+- Hardware pin reservations (board-specific, wired to LAN8720 — non-configurable)
 
 #### Storage Strategy
 
