@@ -79,6 +79,7 @@ The WT32-ETH01 is highly integrated. Many ESP32 GPIOs are wired internally to th
 ### Internal Reserved Pins
 
 * **Ethernet RMII interface:** GPIO0 (REF_CLK), GPIO18 (MDIO), GPIO19 (TXD0), GPIO21 (TX_EN), GPIO22 (TXD1), GPIO23 (MDC), GPIO25 (RXD0), GPIO26 (RXD1), GPIO27 (CRS_DV)
+  - **GPIO0 note:** This pin receives 50MHz RMII reference clock from LAN8720 AND is the BOOT button. Pressing BOOT during active Ethernet may distort the clock signal and cause link drop. Avoid pressing BOOT while Ethernet is active.
 * **Ethernet PHY power control:** GPIO16 (ETH_PHY_POWER) — drives LAN8720 nRST/nEN; not a data signal
 * **Triple-purpose GPIO5:** Status LED (default), UART2_RX (DMX RX), and LAN8720 nRST — all on the same pin. LED blink pattern serves as PHY reset indicator at boot.
 * **Debug UART0:** GPIO1 (TX0), GPIO3 (RX0)

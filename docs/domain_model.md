@@ -89,6 +89,7 @@ The system stores configuration in two parts:
 
 - Triggered by 5 consecutive resets (boot counter) or pressing the BOOT button (GPIO0) during power-on
 - Enables Dual Network: Ethernet and Wi-Fi AP simultaneously; AP SSID is `ESP32-ArtNet-Recovery-XXXX` as an open AP (no password)
+  - **Wi-Fi channel note:** Recovery AP uses default ESP32 channel. If the board was in ESP-NOW mode before entering recovery, slaves on a different channel will disconnect. Normal ESP-NOW channel is restored after reboot.
 - Disables all output functions and lighting stream tasks
 - Async Web Server stays active for config and `/update` page for OTA firmware recovery
 - **Consecutive Reset Counter:** Uses `bootCount` in RTC Fast Memory; incremented on each boot; `resetBootCountTask` delays 15 seconds then clears the counter; if counter reaches `>= 5` before clearing, the system enters Recovery Mode on the next boot
@@ -380,6 +381,7 @@ When the web UI sends POST `/api/outputs`:
 1. Validate the output data
 2. Save to LittleFS
 3. Tear down and release old output resources → start new tasks on Core 1 gracefully
+   - **LEDC hot-reload risk:** ESP32 LEDC API has no `ledcDetach` or bulk-deallocate call. Re-assigning channels without a full reboot may exhaust the 16-channel pool. If a hot-reload cycle leaves orphaned LEDC channels, subsequent configs may report "no free LEDC" even though the total hardware count is within limits. Consider a flag requiring reboot after certain output type changes.
 
 ### Atomic Frame Notification & Sync
 
