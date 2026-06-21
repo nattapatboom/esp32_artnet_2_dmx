@@ -180,3 +180,30 @@ The score calculator is not the only gate. Firmware and Web UI validation also e
     * Future Web UI/system settings should allow user-configurable ESP-NOW chunk size because RF reliability and airtime overhead vary by installation.
     * Configure per-peer universe/channel ranges instead of broadcasting all data to every slave.
     * Slave boards keep their setup AP available for field configuration; avoid unnecessary clients/AP traffic during show-critical wireless operation.
+
+## 8. Scoring System Verification & Calibration
+
+To ensure the scoring system aligns with the actual physical limits of the WT32-ETH01 / ESP32 hardware and does not cause task crashes or output stutter, follow these verification methodologies:
+
+### 8.1 Hardware Parity Verification (Mathematical Alignment)
+Compare weight constants to physical limitations to confirm that single-resource exhaustion triggers a score overload:
+- **GPIO limit (8 pins):** `8 * W_GPIO (0.5) = 4.0` points
+- **LEDC PWM limit (16 channels):** `16 * W_LEDC (2.5) = 40.0` points
+- **RMT channel limit (8 channels):** `8 * W_RMT (3.0) = 24.0` points
+- **UART port limit (2 usable):** `2 * W_UART (8.0) = 16.0` points
+- **Resource limit sum:** `4.0 + 40.0 + 24.0 + 16.0 = 84.0` (matching `resourceScoreLimit()`).
+- This mathematically guarantees that if any single physical resource is exhausted, the score reflects it.
+
+### 8.2 Runtime Benchmarking (Performance & Latency Profiling)
+Measure real-time indicators on physical boards to calibrate compute score values (e.g. Stepper: `2.0`, Function Gen: `2.0`):
+1. **Output Jitter & Frame Latency:** Load a configuration close to `SCORE_LIMIT` (e.g., combined score of 100-109), send Art-Net packets at 40 FPS, and capture physical DMX/LED output lines using an oscilloscope or logic analyzer. If frame drops or jitter occur, the `SCORE_LIMIT` is too high or the compute weights are too low.
+2. **Heap Memory Audit:** Monitor free RAM (`ESP.getFreeHeap()`) under active DMX load. If heap falls below **30-40 KB**, lower the `SCORE_LIMIT` or increase the weights of memory-heavy channels (like WS2812B strips).
+3. **Task Execution Time:** Check if the output loop task (Core 1) triggers the FreeRTOS watchdog or experiences scheduling delays.
+
+### 8.3 I2C Bus Contention Stress Testing
+Since all PCA9685 and digital expanders share a single I2C bus (`Wire`), high FPS updates can saturate the bus:
+- **Test:** Measure transaction duration for all expander updates inside the output loop.
+- **Calibration:** If I2C transactions take longer than **15-20 ms** (leaving too little time for the remaining 25 ms cycle at 40 FPS), increase the expander weights (`0.125` / `0.25`) to limit the count of allowed expander channels.
+
+### 8.4 Simulation & Mock Validation
+Run the Python offline calculator `tools/load_calculator.py` against boundary/extreme mock configurations to check if the interlock validation matches the C++ firmware and JavaScript Web UI scoring engine logic.
