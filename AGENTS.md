@@ -85,32 +85,17 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 11=7-Seg TM1637, 12=7-Seg DD 7-Pin PWM, 13=7-Seg DD 8-Pin PWM,
 14=DAC, 15=PWM DAC, 16=Func Gen, 17=Solenoid, 18=Smoke Shooter
 
-## Resource Scoring
+## Resource Scoring & Hard Hardware Limits
 
-Score = GPIO*0.5 + LEDC*2.5 + RMT*3.0 + UART*8.0 + DAC*2.0 + PCA*0.25 + EXP*0.125
-
-- C++: `include/scoring.h` -> `estimateResources()`, `resourceScore()`, `channelComputeScore()`, `totalCombinedScore()`
-- JS: `web/index.html` -> matching score functions
-- Limit: `SCORE_LIMIT = resourceScoreLimit() + MAX_COMPUTE_SCORE`, currently about 109
-- Weight constants and compute rules must match between C++ and JS
-
-## Hard Resource Limits
-
-- LEDC: 16 channels max
-- RMT: 8 channels max
-- UART: UART0 is console; UART1/2 are usable by DFPlayer and DMX
-- DFPlayer has UART priority; DMX falls back to RMT when UARTs are exhausted
-- I2C: one shared `Wire` bus for expanders, MCP4725, and display
-- DAC type 14 cannot use ESP32 GPIO25/26 on WT32-ETH01 because LAN8720 uses those pins; prefer MCP4725
-
-## Interlocks To Preserve
-
-- GPIO cannot duplicate another output pin
-- Output pins cannot overlap Status LED, Zero-Crossing, I2C SDA, or I2C SCL
-- PCA9685 has one shared frequency per chip; Servo forces 50 Hz
-- Stepper STEP must be ESP32 GPIO
-- Motor EN in `IN1+IN2+EN` mode must be ESP32 GPIO or PCA9685, not digital expander
-- Validate every config rule in both C++ API and Web UI when user input is involved
+The single source of truth for resource scoring, hard peripheral limits, physical pin allocations, safety guidelines, and validation/interlock rules is:
+- **Source of Truth:** [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md)
+- **Scoring Formula:** `resourceScore = GPIO*0.5 + LEDC*2.5 + RMT*3.0 + UART*8.0 + DAC*2.0 + PCA*0.25 + EXP*0.125`
+- **Verification Parity:** Weight constants and compute rules must match between:
+  - C++ Firmware: `include/scoring.h` -> `estimateResources()`, `resourceScore()`, `channelComputeScore()`, `totalCombinedScore()`
+  - Web UI: `web/index.html` -> matching JS scoring functions
+  - Limit: `SCORE_LIMIT = resourceScoreLimit() + MAX_COMPUTE_SCORE`, currently about 109
+- **Hard Resource Limits:** Refer to [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#1-peripheral-limits) for LEDC (16 max), RMT (8 max), UART (2 usable), and shared I2C bus constraints.
+- **Interlocks To Preserve:** Validate every config rule in both the C++ API and Web UI. You must prevent duplicate GPIOs, pin overlaps (Status LED, I2C, ZC), PCA9685 frequency conflicts, and incorrect expander usage. See [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#6-hard-validation-rules) for details.
 
 ## Coding Rules
 
