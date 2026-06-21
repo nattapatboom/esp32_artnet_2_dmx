@@ -102,6 +102,18 @@ The single source of truth for resource scoring, hard peripheral limits, physica
 - **Hard Resource Limits:** Refer to [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#1-peripheral-limits) for LEDC (16 max), RMT (8 max), UART (2 usable), timer (4 max), and shared I2C bus constraints.
 - **Interlocks To Preserve:** Validate every config rule in both the C++ API and Web UI. You must prevent duplicate GPIOs, pin overlaps (Status LED, I2C, ZC), PCA9685 frequency conflicts, and incorrect expander usage. See [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#6-hard-validation-rules) for details.
 
+## Documentation as Source of Truth
+
+The documentation files under `docs/` serve as the **canonical design map** of this firmware. They describe the intended concepts, contracts, and invariants — which code should implement. Code may drift, but the docs are the reference to correct it.
+
+When working on this project:
+- **Docs first** — Understand the relevant `docs/` section before writing or modifying code. The domain model, scoring rules, validation gates, and hardware constraints are all captured there.
+- **Code is more likely wrong** — AI-generated code has a higher error rate than manually curated docs. If code and docs disagree, treat the doc as the assumed truth and fix the code to match, unless the doc is explicitly marked as drift.
+- **Fix docs when you fix code** — Any behavioral change must be reflected in the docs. Stale docs cause the next iteration to reintroduce bugs.
+- **Keep docs concise and current** — Remove or strike through resolved items, update packet structures, and sync scoring tables after refactoring.
+
+> This principle exists because a well-maintained `docs/` directory is the most reliable long-term asset for AI-assisted development. Without it, each session starts from scratch and error patterns repeat.
+
 ## Coding Rules
 
 - Keep changes minimal and follow neighboring patterns
