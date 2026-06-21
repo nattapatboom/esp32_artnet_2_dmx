@@ -84,11 +84,12 @@ The WT32-ETH01 is highly integrated. Many ESP32 GPIOs are wired internally to th
 
 ### Exposed Header Pins
 
-* **Common safe outputs:** GPIO2, GPIO4, GPIO12, GPIO14, GPIO15, GPIO17, GPIO32, GPIO33
+* **Common safe outputs:** GPIO2, GPIO4, GPIO14, GPIO15, GPIO17, GPIO32, GPIO33
 * **Input-only pins:** GPIO34, GPIO35, GPIO36, GPIO39
 * **Default status LED pin:** GPIO5
 * **Default I2C pins:** GPIO14 SDA, GPIO15 SCL
 * **Zero-crossing pin:** User-configured; input-only GPIO is recommended.
+* **Forbidden pins:** GPIO12 (MTDI bootstrap pin — see ADR006); any use can cause boot loop.
 
 Because only a small number of general output pins are available, I2C expanders are strongly recommended for installations with many relays, solenoids, indicators, or 7-segment segments.
 
