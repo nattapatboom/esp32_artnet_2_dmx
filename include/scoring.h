@@ -5,16 +5,17 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include "output_control.h"
+#include "scoring_defs.h"
 
 // ═══════════════════════════════════════
 //  HARDWARE RESOURCE COUNTS
 // ═══════════════════════════════════════
 
-constexpr uint8_t MAX_LEDC_RESOURCE = 16;
-constexpr uint8_t MAX_RMT_RESOURCE = 8;
-constexpr uint8_t MAX_UART_RESOURCE = 2;
-constexpr uint8_t MAX_DAC_RESOURCE = 2;  // internal DAC (GPIO 25/26; both are Ethernet on WT32-ETH01)
-constexpr uint8_t MAX_TIMER_RESOURCE = 4;
+constexpr uint8_t MAX_LEDC_RESOURCE = ScoringDefs::MAX_LEDC_RESOURCE;
+constexpr uint8_t MAX_RMT_RESOURCE = ScoringDefs::MAX_RMT_RESOURCE;
+constexpr uint8_t MAX_UART_RESOURCE = ScoringDefs::MAX_UART_RESOURCE;
+constexpr uint8_t MAX_DAC_RESOURCE = ScoringDefs::MAX_DAC_RESOURCE;
+constexpr uint8_t MAX_TIMER_RESOURCE = ScoringDefs::MAX_TIMER_RESOURCE;
 
 // GPIO is NOT counted — expanders can substitute.
 // PCA9685, digital expander channels are NOT counted as hardware — they use I2C
@@ -54,8 +55,8 @@ inline bool hardwareWithinLimit(const HardwareResource& h) {
 // Budget = frame_time_us - safety reserve; total starts with base loop overhead.
 // RAM is static buffer estimate in bytes.
 struct CpuBudget {
-    static constexpr uint32_t BASE_OVERHEAD_US = 500;
-    static constexpr uint32_t SAFETY_RESERVE_US = 1500;
+    static constexpr uint32_t BASE_OVERHEAD_US = ScoringDefs::CPU_BASE_OVERHEAD_US;
+    static constexpr uint32_t SAFETY_RESERVE_US = ScoringDefs::CPU_SAFETY_RESERVE_US;
     uint32_t usPerFrame = BASE_OVERHEAD_US;  // starts with base overhead
 
     CpuBudget operator+(const CpuBudget& o) const {
@@ -82,11 +83,10 @@ struct RamBudget {
 
     static uint32_t limit() {
         // Keep at least 150 KB free for system/network/runtime; use the rest for output buffers, capped at 64 KB.
-        constexpr uint32_t KEEP_FREE = 150 * 1024;
         int32_t freeHeap = ESP.getFreeHeap();
-        int32_t available = freeHeap - KEEP_FREE;
+        int32_t available = freeHeap - ScoringDefs::RAM_KEEP_FREE;
         if (available < 0) available = 0;
-        if (available > 65535) available = 65535;
+        if (available > ScoringDefs::RAM_LIMIT_CAP) available = ScoringDefs::RAM_LIMIT_CAP;
         return (uint32_t)available;
     }
 };
@@ -166,8 +166,6 @@ inline bool usesI2C(const OutputChannel& ch) {
     return false;
 }
 
-constexpr uint16_t I2C_WRITE_US = 180;
-
 inline uint32_t ledStripServiceUs(uint16_t ledCount, uint8_t colorOrder) {
     uint8_t bytesPerPixel = colorOrder >= 4 ? 4 : 3;
     return 80 + ledCount * (bytesPerPixel == 4 ? 4 : 3);  // CPU prep + Show enqueue; RMT wire time can be skipped
@@ -178,6 +176,8 @@ inline uint8_t sevenSegCount(uint8_t type, uint8_t mode) {
     if (type == 12) return 7;
     return 0;
 }
+
+constexpr uint16_t I2C_WRITE_US = ScoringDefs::I2C_WRITE_US;
 
 inline uint8_t i2cWritesForChannel(const OutputChannel& ch) {
     uint8_t writes = 0;
@@ -234,15 +234,15 @@ inline uint8_t i2cWritesForChannel(const OutputChannel& ch) {
 }
 
 // Service time & RAM per channel (independent of FPS)
-constexpr uint32_t BASE_CHANNEL_RAM = 224;  // OutputChannel vector slot + allocator/header slack estimate
-constexpr uint32_t DMX_BUFFER_RAM = 512;
-constexpr uint32_t PIXEL_STRIP_OBJECT_RAM = 256;
-constexpr uint32_t DFPLAYER_OBJECT_RAM = 160;
-constexpr uint32_t STEPPER_RUNTIME_RAM = 512;
-constexpr uint32_t FUNCGEN_OBJECT_RAM = 1120;  // 4 waveform tables + esp_timer handle/object slack
+constexpr uint32_t BASE_CHANNEL_RAM = ScoringDefs::BASE_CHANNEL_RAM;
+constexpr uint32_t DMX_BUFFER_RAM = ScoringDefs::DMX_BUFFER_RAM;
+constexpr uint32_t PIXEL_STRIP_OBJECT_RAM = ScoringDefs::PIXEL_STRIP_OBJECT_RAM;
+constexpr uint32_t DFPLAYER_OBJECT_RAM = ScoringDefs::DFPLAYER_OBJECT_RAM;
+constexpr uint32_t STEPPER_RUNTIME_RAM = ScoringDefs::STEPPER_RUNTIME_RAM;
+constexpr uint32_t FUNCGEN_OBJECT_RAM = ScoringDefs::FUNCGEN_OBJECT_RAM;
 constexpr uint32_t RMT_DMX_DRIVER_RAM = 5150UL * sizeof(rmt_item32_t) + 32;
-constexpr uint32_t I2C_ROUTE_RAM = 32;
-constexpr uint32_t DMX_OUTPUT_SERVICE_US = 250;  // UART/RMT enqueue CPU time; wire transfer runs in peripheral/driver.
+constexpr uint32_t I2C_ROUTE_RAM = ScoringDefs::I2C_ROUTE_RAM;
+constexpr uint32_t DMX_OUTPUT_SERVICE_US = ScoringDefs::DMX_OUTPUT_SERVICE_US;
 
 inline uint32_t frameTimeUs(uint8_t outputFps) {
     if (outputFps < 1) outputFps = 40;
