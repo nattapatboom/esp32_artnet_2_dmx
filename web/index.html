@@ -2924,6 +2924,18 @@ function addOrUpdateOutput(){
         alert('7-Segment segment '+(s+1)+' expander channel is required.');
         return;
       }
+      if((ch.seg_sources[s]||0)>=1 && (ch.seg_sources[s]||0)<=4 && ch.seg_channels[s]!==255 && ch.seg_channels[s]>15){
+        alert('7-Segment segment '+(s+1)+' expander channel must be 0-15.');
+        return;
+      }
+    }
+  }
+  if((type===12||type===13) && ch.pin2_source>=1 && ch.pin2_source<=4){
+    const numSeg = type===13 ? 8 : 7;
+    const baseCh = parseInt(ch.pin2_channel);
+    if(!isNaN(baseCh) && baseCh!==255 && baseCh+numSeg-1>15){
+      alert('7-Segment base channel '+baseCh+' with '+numSeg+' segments exceeds channel 15.');
+      return;
     }
   }
   const validateOutputI2cAddresses=()=>{
@@ -2965,6 +2977,11 @@ function addOrUpdateOutput(){
     return true;
   };
   if(!validateOutputI2cAddresses()) return;
+  const checkChan15=(src,ch,label)=>{src=parseInt(src||0);ch=parseInt(ch);if(src>=1&&src<=4&&ch!==255&&(ch<0||ch>15)){alert(label+' channel must be 0-15.');return false;}return true;};
+  if(!checkChan15(ch.source,ch.pca_channel,'Primary source')) return;
+  if(!checkChan15(ch.pin2_source,ch.pin2_channel,'Pin 2')) return;
+  if(!checkChan15(ch.pin3_source,ch.pin3_channel,'Pin 3')) return;
+  if(!checkChan15(ch.pin4_source,ch.pin4_channel,'Pin 4')) return;
   if(type===6 && ch.mc_mode===2){
     if(ch.pin3_source>=2){
       alert('Motor EN pin needs PWM. Use ESP32 GPIO or PCA9685 for EN, not a digital expander.');
@@ -3019,6 +3036,7 @@ function addOrUpdateOutput(){
     const addUsedExpander=(src,addr,chn,i)=>{
       src=parseInt(src||0); chn=parseInt(chn);
       if(src===0||isNaN(chn)||chn===255) return false;
+      if(chn>15){alert('Expander channel '+chn+' must be 0-15.');return true;}
       const key = `${src}_${addr}_${chn}`;
       if (usedExpander[key] !== undefined) {
         const srcName=SOURCES[src]||'Expander';

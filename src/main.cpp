@@ -571,7 +571,7 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
     uint8_t usedCount = 0;
 
     auto addChannel = [&](uint8_t source, uint8_t address, int rawChannel, uint8_t outputIndex) -> bool {
-        if (source == 0 || rawChannel == 255 || rawChannel < 0) return false;
+        if (source == 0 || rawChannel == 255 || rawChannel < 0 || rawChannel > 15) return false;
         uint8_t channel = (uint8_t)rawChannel;
         for (uint8_t i = 0; i < usedCount; i++) {
             if (used[i].source == source && used[i].address == address && used[i].channel == channel) {
@@ -879,7 +879,26 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         if (source != 0 && !(source >= 5 && source <= 7)) {
             uint8_t addr = output["pca_addr"] | defaultAddrForSource(source);
             if (!validateSourceAddress(source, addr, "Primary I2C source on channel " + String(channelNumber), message)) return false;
+            uint8_t pcaChan = output["pca_channel"] | 255;
+            if (pcaChan != 255 && pcaChan > 15) {
+                message = "Primary I2C channel must be 0-15 on channel " + String(channelNumber);
+                return false;
+            }
         }
+        auto checkHybridChan = [&](const String& label, const char* srcKey, const char* chanKey) -> bool {
+            uint8_t src = output[srcKey] | 0;
+            if (src >= 1 && src <= 4) {
+                uint8_t ch = output[chanKey] | 255;
+                if (ch != 255 && ch > 15) {
+                    message = label + " channel must be 0-15 on channel " + String(channelNumber);
+                    return false;
+                }
+            }
+            return true;
+        };
+        if (!checkHybridChan("Pin 2", "pin2_source", "pin2_channel")) return false;
+        if (!checkHybridChan("Pin 3", "pin3_source", "pin3_channel")) return false;
+        if (!checkHybridChan("Pin 4", "pin4_source", "pin4_channel")) return false;
         if (type == 14 && source >= 5 && source <= 7) {
             uint8_t addr = output["pca_addr"] | defaultAddrForSource(source);
             uint8_t dacChannel = output["pca_channel"] | 0;
@@ -914,6 +933,14 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 message = "Segment expander base channel is missing on channel " + String(channelNumber);
                 return false;
             }
+            if (pin2Source >= 1 && pin2Source <= 4) {
+                uint8_t baseCh = output["pin2_channel"] | 255;
+                uint8_t numSeg = (type == 13) ? 8 : 7;
+                if (baseCh != 255 && (uint8_t)(baseCh + numSeg - 1) > 15) {
+                    message = "7-Segment base channel " + String(baseCh) + " with " + String(numSeg) + " segments exceeds channel 15 on channel " + String(channelNumber);
+                    return false;
+                }
+            }
             if (output.containsKey("seg_sources")) {
                 JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
                 JsonArrayConst segAddrs = output["seg_addrs"].as<JsonArrayConst>();
@@ -935,6 +962,10 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                     }
                     if (s < numSeg && sSrc != 0 && (s >= segChannels.size() || (int)(segChannels[s] | 255) == 255)) {
                         message = "Segment expander channel is missing on channel " + String(channelNumber);
+                        return false;
+                    }
+                    if (s < numSeg && sSrc != 0 && (int)(segChannels[s] | 255) != 255 && ((int)(segChannels[s] | 0) > 15)) {
+                        message = "Segment expander channel must be 0-15 on channel " + String(channelNumber);
                         return false;
                     }
                 }
