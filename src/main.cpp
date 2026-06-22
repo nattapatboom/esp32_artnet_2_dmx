@@ -402,14 +402,13 @@ bool outputsUseReservedPin(JsonArray outputs, uint8_t reservedPin, const char* l
     return false;
 }
 
-// Check for GPIO34-39 (input-only) and Ethernet/system reserved pins.
+// Check for GPIO34,35,36,39 (input-only) and Ethernet/system reserved pins.
 // GPIO12 (MTDI bootstrap) is warning-only in the Web UI because existing field hardware may use it.
-// GPIO34-39 are allowed only on pins used as inputs (e.g. stepper HOME switch on pin4).
 bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
     auto isForbiddenOutput = [](int rawPin) -> int8_t {
         if (rawPin == 255 || rawPin < 0) return -1;
         uint8_t p = (uint8_t)rawPin;
-        if (p >= 34 && p <= 39) return (int8_t)p; // input-only on ESP32
+        if (p == 34 || p == 35 || p == 36 || p == 39) return (int8_t)p; // input-only on ESP32
         // Ethernet RMII and PHY power pins (GPIO0, 16, 18, 19, 21, 22, 23, 25, 26, 27)
         if (p == 0 || p == 16 || p == 18 || p == 19 || p == 21 || p == 22 || p == 23 || p == 25 || p == 26 || p == 27) {
             return (int8_t)p;

@@ -1084,7 +1084,7 @@ async function saveSettings(e){
     alert('Status LED GPIO and Zero-Crossing GPIO cannot use the same pin.');
     return;
   }
-  const forbiddenSettingsPins=[['Status LED GPIO',obj.status_led_pin],['I2C SDA GPIO',obj.i2c_sda],['I2C SCL GPIO',obj.i2c_scl]];
+  const forbiddenSettingsPins=[['Status LED GPIO',obj.status_led_pin],['Zero-Crossing GPIO',obj.zc_pin],['I2C SDA GPIO',obj.i2c_sda],['I2C SCL GPIO',obj.i2c_scl]];
   for(const [label,pin] of forbiddenSettingsPins){
     if(pin!==255&&FORBIDDEN_OUTPUT_GPIOS[pin]){
       alert(label+' '+pin+' is not allowed on WT32-ETH01 ('+FORBIDDEN_OUTPUT_GPIOS[pin]+'). Select another pin.');
@@ -2855,6 +2855,10 @@ function addOrUpdateOutput(){
   for(const gp of gpios){
     if(FORBIDDEN_OUTPUT_GPIOS[gp]){
       alert('GPIO '+gp+' is not allowed on WT32-ETH01 ('+FORBIDDEN_OUTPUT_GPIOS[gp]+'). Select another pin.');
+      return;
+    }
+    if(INPUT_ONLY_GPIOS.includes(gp)){
+      alert('GPIO '+gp+' is input-only on ESP32 and cannot be used as an output pin.');
       return;
     }
   }
