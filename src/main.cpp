@@ -138,10 +138,11 @@ void blinkStatusLed(uint8_t times, uint16_t onMs, uint16_t offMs) {
 
 void clearOutputTest() {
     for (auto& ch : outputCtrl.getChannels()) {
-        if (ch.dmxBuffer != nullptr && ch.bufferSize > 0) {
-            memset(ch.dmxBuffer, 0, ch.bufferSize);
+        if (ch.shadowBuffer != nullptr && ch.bufferSize > 0) {
+            memset(ch.shadowBuffer, 0, ch.bufferSize);
         }
     }
+    outputCtrl.swapBuffers();
     outputTestActive = false;
     outputTestClearRequested = false;
     outputTestIndex = -1;
@@ -1692,20 +1693,22 @@ void setupWebServer() {
             }
 
             OutputChannel& ch = channels[channelIndex];
-            if (ch.dmxBuffer == nullptr || ch.bufferSize == 0) {
+            if (ch.shadowBuffer == nullptr || ch.bufferSize == 0) {
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Output channel is not initialized\"}");
                 return;
             }
 
-            memset(ch.dmxBuffer, 0, ch.bufferSize);
+            memset(ch.shadowBuffer, 0, ch.bufferSize);
 
             JsonArray values = doc["values"].as<JsonArray>();
             uint16_t pos = 0;
             for (JsonVariant value : values) {
                 if (pos >= ch.bufferSize) break;
                 int v = value.as<int>();
-                ch.dmxBuffer[pos++] = constrain(v, 0, 255);
+                ch.shadowBuffer[pos++] = constrain(v, 0, 255);
             }
+
+            outputCtrl.swapBuffers();
 
             uint32_t durationMs = doc["duration_ms"] | 30000;
             if (durationMs < 1000) durationMs = 1000;
@@ -2231,6 +2234,9 @@ void outputTask(void* pvParameters) {
                     EspNowControl::lastRxTime = millis();
                     EspNowControl::newRxData = true;
                 }
+            }
+            if (EspNowControl::newRxData) {
+                outputCtrl.swapBuffers();
             }
         }
 

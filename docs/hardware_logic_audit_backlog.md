@@ -35,9 +35,10 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
    - Fix direction: persist hybrid source/address/channel fields for types 5, 6, 7, 18 and any other type using those fields.
 
 6. **Core 0/Core 1 DMX buffer race**
-   - Files: `include/artnet_control.h`, `include/sacn_control.h`, `include/output_control.h`, `src/main.cpp`
+   - Files: `include/artnet_control.h`, `include/sacn_control.h`, `include/output_control.h`, `include/dimmer_control.h`, `src/main.cpp`
+   - Status: ✅ Completed (`fix: shadow buffer + atomic swap + dimmer indirection`)
    - Issue: Art-Net/sACN map directly into `OutputChannel::dmxBuffer` on Core 0 while Core 1 reads the same buffers for LEDs, DMX output, relays, motion, solenoids, and smoke.
-   - Fix direction: use a queue/double-buffer handoff similar to ESP-NOW, or protect buffer swaps with a short critical section. Avoid long locks around pixel mapping.
+   - Fix direction: shadow buffer — Core 0 writes to `shadowBuffer`, then `swapBuffers()` atomically swaps pointers for all channels. Dimmer ISR uses `uint8_t**` indirection to re-read current `dmxBuffer` pointer after swap.
 
 7. **sACN property count can exceed packet bytes**
    - Files: `include/sacn_control.h`

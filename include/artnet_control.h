@@ -103,6 +103,7 @@ private:
         if (size < ARTNET_HEADER_SIZE + length) return;
 
         bool matched = outputCtrl.mapDmxDataToChannels(universe, buf + ARTNET_HEADER_SIZE, length);
+        if (matched) outputCtrl.swapBuffers();
 
         if (matched) {
             lastDmxUpdateTime = millis();

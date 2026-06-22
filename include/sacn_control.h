@@ -230,6 +230,7 @@ public:
         if (dmxLen > 512) dmxLen = 512;
 
         if (outputCtrl.mapDmxDataToChannels(universe, dmxData, dmxLen)) {
+            outputCtrl.swapBuffers();
             systemActive = true;
             lastDmxUpdateTime = millis();
             networkFramePending = true;

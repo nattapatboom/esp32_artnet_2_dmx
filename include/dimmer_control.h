@@ -17,7 +17,7 @@ extern volatile uint32_t dimmer_tick;
 #define MAX_DIMMER_CHANNELS 8
 struct DimmerCh {
     uint8_t pin;
-    volatile uint8_t* dmxVal;
+    uint8_t** dmxVal;
 };
 
 extern DimmerCh dimmerChannels[MAX_DIMMER_CHANNELS];
@@ -31,7 +31,7 @@ void IRAM_ATTR onDimmerTimer() {
     
     // Check all registered dimmer channels
     for (uint8_t i = 0; i < numDimmerChannels; i++) {
-        uint8_t val = *(dimmerChannels[i].dmxVal);
+        uint8_t val = *(*(dimmerChannels[i].dmxVal));
         if (val > 0) {
             uint32_t targetTick = 255 - val;
             if (dimmer_tick == targetTick) {
@@ -60,7 +60,7 @@ void IRAM_ATTR onZeroCross() {
         gpio_set_level((gpio_num_t)dimmerChannels[i].pin, LOW);
         
         // If 100% full brightness, turn it back on immediately
-        if (*(dimmerChannels[i].dmxVal) == 255) {
+        if (*(*(dimmerChannels[i].dmxVal)) == 255) {
             gpio_set_level((gpio_num_t)dimmerChannels[i].pin, HIGH);
         }
     }
@@ -85,7 +85,7 @@ public:
             if (ch.type == 0 && ch.dmxBuffer != nullptr) { // CHAN_TYPE_DIMMER
                 if (numDimmerChannels < MAX_DIMMER_CHANNELS) {
                     dimmerChannels[numDimmerChannels].pin = ch.pin;
-                    dimmerChannels[numDimmerChannels].dmxVal = &ch.dmxBuffer[0];
+                    dimmerChannels[numDimmerChannels].dmxVal = &ch.dmxBuffer;
                     pinMode(ch.pin, OUTPUT);
                     digitalWrite(ch.pin, LOW);
                     numDimmerChannels++;

@@ -186,6 +186,7 @@ struct OutputChannel {
     uint8_t seg_inverts = 0;
     
     uint8_t* dmxBuffer = nullptr;
+    uint8_t* shadowBuffer = nullptr;
     uint16_t bufferSize = 0;
     PixelStripWrapper* pixelStrip = nullptr;
     uint8_t dmxPort = 255;
@@ -484,7 +485,7 @@ public:
         uint16_t copyLen = length > maxLen ? maxLen : length;
 
         for (auto& ch : channels) {
-            if (ch.dmxBuffer == nullptr) continue;
+            if (ch.shadowBuffer == nullptr) continue;
 
             if (ch.type == 3) { // RGB LED strip (v3)
                 uint16_t numUniverses = getUniverseCount(ch);
@@ -494,7 +495,7 @@ public:
                     if (bufferOffset < ch.bufferSize) {
                         uint32_t available = (uint32_t)ch.bufferSize - bufferOffset;
                         uint32_t lenToCopy = min((uint32_t)copyLen, available);
-                        memcpy(ch.dmxBuffer + bufferOffset, data, lenToCopy);
+                        memcpy(ch.shadowBuffer + bufferOffset, data, lenToCopy);
                         matched = true;
                     }
                 }
@@ -502,7 +503,7 @@ public:
                 if (dataOffset < ch.bufferSize) {
                     uint32_t available = (uint32_t)ch.bufferSize - dataOffset;
                     uint32_t lenToCopy = min((uint32_t)copyLen, available);
-                    memcpy(ch.dmxBuffer + dataOffset, data, lenToCopy);
+                    memcpy(ch.shadowBuffer + dataOffset, data, lenToCopy);
                     matched = true;
                 }
             } else if (ch.start_universe == universe) {
@@ -518,7 +519,7 @@ public:
                     uint16_t srcOffset = overlapStart - chunkStart;
                     uint16_t dstOffset = overlapStart - sourceStart;
                     uint16_t lenToCopy = overlapEnd - overlapStart;
-                    memcpy(ch.dmxBuffer + dstOffset, data + srcOffset, lenToCopy);
+                    memcpy(ch.shadowBuffer + dstOffset, data + srcOffset, lenToCopy);
                     matched = true;
                 }
             }
@@ -529,6 +530,16 @@ public:
         }
 
         return matched;
+    }
+
+    void swapBuffers() {
+        for (auto& ch : channels) {
+            if (ch.shadowBuffer != nullptr && ch.dmxBuffer != nullptr) {
+                uint8_t* tmp = ch.dmxBuffer;
+                ch.dmxBuffer = ch.shadowBuffer;
+                ch.shadowBuffer = tmp;
+            }
+        }
     }
 
     void begin() {
@@ -555,6 +566,11 @@ public:
             defCh.dmxBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);
             if (defCh.dmxBuffer == nullptr) {
                 Serial.println("OOM error allocating default channel DMX buffer!");
+                return;
+            }
+            defCh.shadowBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);
+            if (defCh.shadowBuffer == nullptr) {
+                Serial.println("OOM error allocating default channel shadow buffer!");
                 return;
             }
             defCh.pixelStrip = nullptr;
@@ -736,6 +752,11 @@ public:
                 Serial.printf("OOM error allocating DMX buffer for channel type %d!\n", ch.type);
                 continue;
             }
+            ch.shadowBuffer = (uint8_t*)calloc(ch.bufferSize, 1);
+            if (ch.shadowBuffer == nullptr) {
+                Serial.printf("OOM error allocating shadow buffer for channel type %d!\n", ch.type);
+                continue;
+            }
             channels.push_back(ch);
         }
         if (layoutVersion < 3) {
@@ -879,6 +900,10 @@ public:
             if (ch.dmxBuffer != nullptr) {
                 free(ch.dmxBuffer);
                 ch.dmxBuffer = nullptr;
+            }
+            if (ch.shadowBuffer != nullptr) {
+                free(ch.shadowBuffer);
+                ch.shadowBuffer = nullptr;
             }
             if (ch.dfPlayer != nullptr) {
                 ch.dfPlayer->stop();
