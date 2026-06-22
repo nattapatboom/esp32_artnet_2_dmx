@@ -42,6 +42,7 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 
 7. **sACN property count can exceed packet bytes**
    - Files: `include/sacn_control.h`
+   - Status: ✅ Completed (`fix: validate SACN_DMP_DATA + propertyCount > len`)
    - Issue: `dmxLen` from `SACN_DMP_PROP_COUNT` is clamped to 512 but not checked against actual received packet length/DMP PDU length, allowing stale bytes from `rxBuf`.
    - Fix direction: reject packets where `SACN_DMP_DATA + propertyCount > len`; account for the start-code byte.
 

@@ -226,7 +226,11 @@ public:
 
         const uint8_t* dmxData = rxBuf + SACN_DMP_DATA + 1;
         uint16_t dmxLen = readUint16BE(rxBuf, SACN_DMP_PROP_COUNT);
-        if (dmxLen > 0) dmxLen -= 1;
+        if (dmxLen == 0 || SACN_DMP_DATA + dmxLen > len) {
+            errorCount++;
+            return;
+        }
+        dmxLen -= 1;
         if (dmxLen > 512) dmxLen = 512;
 
         if (outputCtrl.mapDmxDataToChannels(universe, dmxData, dmxLen)) {
