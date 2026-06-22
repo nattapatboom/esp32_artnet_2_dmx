@@ -249,7 +249,7 @@ public:
         engine.init();
 
         for (auto& ch : outputCtrl.getChannels()) {
-            if (ch.source != 0 && ch.type != 7 && ch.type != CHAN_TYPE_ANALOG_RGB && ch.type != 11 && ch.type != 12 && ch.type != 13) continue; // Stepper, Analog RGB, and 7-segment may be hybrid/independent.
+            if (ch.source != 0 && ch.type != 7 && ch.type != CHAN_TYPE_ANALOG_RGB && ch.type != 6 && ch.type != 11 && ch.type != 12 && ch.type != 13) continue; // Stepper, Motor, Analog RGB, and 7-segment may be hybrid/independent.
             if (ch.type == 4) { // CHAN_TYPE_PWM
                 uint8_t pwmChan = allocateLedc();
                 if (pwmChan != 255) {
@@ -283,34 +283,56 @@ public:
             }
             else if (ch.type == 6) { // CHAN_TYPE_MOTOR_DC (v3)
                 if (ch.mc_mode == 0) { // PWM + PWM
-                    uint8_t pwmFwd = allocateLedc();
-                    uint8_t pwmRev = allocateLedc();
-                    if (pwmFwd != 255 && pwmRev != 255) {
-                        ledcSetup(pwmFwd, ch.mc_freq, ledcResolution(ch));
-                        ledcSetup(pwmRev, ch.mc_freq, ledcResolution(ch));
-                        ledcAttachPin(ch.pin, pwmFwd);
-                        ledcAttachPin(ch.pin2, pwmRev);
-                        ledcWrite(pwmFwd, 0);
-                        ledcWrite(pwmRev, 0);
-                        ch.dmxPort = pwmFwd;
-                        ch.ledc_chan2 = pwmRev; // Store 2nd LEDC channel for reverse PWM
-                        Serial.printf("Motor (PWM+PWM) on GPIO %d, %d\n", ch.pin, ch.pin2);
+                    if (ch.source == 0) {
+                        uint8_t pwmFwd = allocateLedc();
+                        uint8_t pwmRev = allocateLedc();
+                        if (pwmFwd != 255 && pwmRev != 255) {
+                            ledcSetup(pwmFwd, ch.mc_freq, ledcResolution(ch));
+                            ledcSetup(pwmRev, ch.mc_freq, ledcResolution(ch));
+                            ledcAttachPin(ch.pin, pwmFwd);
+                            ledcAttachPin(ch.pin2, pwmRev);
+                            ledcWrite(pwmFwd, 0);
+                            ledcWrite(pwmRev, 0);
+                            ch.dmxPort = pwmFwd;
+                            ch.ledc_chan2 = pwmRev;
+                            Serial.printf("Motor (PWM+PWM) on GPIO %d, %d\n", ch.pin, ch.pin2);
+                        }
+                    } else {
+                        ch.dmxPort = 255;
+                        ch.ledc_chan2 = 255;
+                        pcaManager.getOrCreateDriver(ch.pca_addr);
+                        pcaManager.setFrequency(ch.pca_addr, ch.mc_freq ? ch.mc_freq : 1000);
+                        Serial.printf("Motor (PWM+PWM) PCA addr=0x%02X ch=%d\n", ch.pca_addr, ch.pca_channel);
                     }
-                } 
+                }
                 else if (ch.mc_mode == 1) { // PWM + DIR (v3)
-                    uint8_t pwmChan = allocateLedc();
-                    if (pwmChan != 255) {
-                        ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
-                        ledcAttachPin(ch.pin, pwmChan);
+                    if (ch.source == 0) {
+                        uint8_t pwmChan = allocateLedc();
+                        if (pwmChan != 255) {
+                            ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
+                            ledcAttachPin(ch.pin, pwmChan);
+                            if (ch.pin2_source == 0) {
+                                pinMode(ch.pin2, OUTPUT);
+                                digitalWrite(ch.pin2, ch.pin2_invert ? HIGH : LOW);
+                            } else {
+                                writeOutputPin(ch, 2, false);
+                            }
+                            ledcWrite(pwmChan, 0);
+                            ch.dmxPort = pwmChan;
+                            Serial.printf("Motor (PWM+DIR) src=%d GPIO=%d DIR src=%d\n", ch.source, ch.pin, ch.pin2_source);
+                        }
+                    } else {
+                        ch.dmxPort = 255;
                         if (ch.pin2_source == 0) {
                             pinMode(ch.pin2, OUTPUT);
                             digitalWrite(ch.pin2, ch.pin2_invert ? HIGH : LOW);
                         } else {
                             writeOutputPin(ch, 2, false);
                         }
-                        ledcWrite(pwmChan, 0);
-                        ch.dmxPort = pwmChan;
-                        Serial.printf("Motor (PWM+DIR) src=%d GPIO=%d DIR src=%d\n", ch.source, ch.pin, ch.pin2_source);
+                        pcaManager.getOrCreateDriver(ch.pca_addr);
+                        pcaManager.setFrequency(ch.pca_addr, ch.mc_freq ? ch.mc_freq : 1000);
+                        pcaManager.write(ch.pca_addr, ch.pca_channel, 0);
+                        Serial.printf("Motor (PWM+DIR) PCA addr=0x%02X ch=%d DIR src=%d\n", ch.pca_addr, ch.pca_channel, ch.pin2_source);
                     }
                 }
                 else if (ch.mc_mode == 2) { // IN1 + IN2 + EN (v3)
@@ -322,14 +344,18 @@ public:
                             if (ch.pin3_channel != 255) pcaManager.write(ch.pin3_addr, ch.pin3_channel, 0);
                         } else {
                             ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
-                            ledcAttachPin(ch.pin3, pwmChan); // EN pin
+                            ledcAttachPin(ch.pin3, pwmChan);
                             ledcWrite(pwmChan, 0);
                             ch.dmxPort = pwmChan;
                         }
-                        pinMode(ch.pin, OUTPUT);  // IN1
-                        digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
+                        if (ch.source == 1) {
+                            writeOutputPin(ch, 1, false);
+                        } else {
+                            pinMode(ch.pin, OUTPUT);
+                            digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
+                        }
                         if (ch.pin2_source == 0) {
-                            pinMode(ch.pin2, OUTPUT); // IN2
+                            pinMode(ch.pin2, OUTPUT);
                             digitalWrite(ch.pin2, ch.pin2_invert ? HIGH : LOW);
                         } else {
                             writeOutputPin(ch, 2, false);
@@ -613,35 +639,61 @@ public:
                         // STOP
                         if (ch.mc_mode == 0) { // PWM+PWM
                             pcaManager.write(ch.pca_addr, ch.pca_channel, ch.mc_brake ? 4095 : 0);
-                            if (ch.pca_channel2 != 255) {
+                            if (ch.pin2_source == 1 && ch.pin2_channel != 255) {
+                                pcaManager.write(ch.pin2_addr, ch.pin2_channel, ch.mc_brake ? 4095 : 0);
+                            } else if (ch.pin2_source == 0 && ch.pca_channel2 != 255) {
                                 pcaManager.write(ch.pca_addr, ch.pca_channel2, ch.mc_brake ? 4095 : 0);
+                            } else {
+                                writeOutputPin(ch, 2, ch.mc_brake);
                             }
                         } else if (ch.mc_mode == 1) { // PWM+DIR
                             pcaManager.write(ch.pca_addr, ch.pca_channel, 0);
                         } else if (ch.mc_mode == 2) { // IN1+IN2+EN
-                            pcaManager.write(ch.pca_addr, ch.pca_channel, ch.mc_brake ? 4095 : 0);
-                            if (ch.pca_channel2 != 255) pcaManager.write(ch.pca_addr, ch.pca_channel2, ch.mc_brake ? 4095 : 0);
-                            if (ch.pca_channel3 != 255) pcaManager.write(ch.pca_addr, ch.pca_channel3, ch.mc_brake ? 4095 : 0);
+                            writeOutputPin(ch, 1, ch.mc_brake);
+                            writeOutputPin(ch, 2, ch.mc_brake);
+                            if (ch.pin3_source == 1 && ch.pin3_channel != 255) {
+                                pcaManager.write(ch.pin3_addr, ch.pin3_channel, ch.mc_brake ? 4095 : 0);
+                            } else if (ch.pin3_source == 0 && ch.pca_channel3 != 255) {
+                                pcaManager.write(ch.pca_addr, ch.pca_channel3, ch.mc_brake ? 4095 : 0);
+                            } else {
+                                writeOutputPin(ch, 3, ch.mc_brake);
+                            }
                         }
                     } else {
                         // MOVE
                         if (ch.mc_mode == 0) { // PWM+PWM
                             if (is_forward) {
                                 pcaManager.write(ch.pca_addr, ch.pca_channel, duty);
-                                if (ch.pca_channel2 != 255) pcaManager.write(ch.pca_addr, ch.pca_channel2, 0);
+                                if (ch.pin2_source == 1 && ch.pin2_channel != 255) {
+                                    pcaManager.write(ch.pin2_addr, ch.pin2_channel, 0);
+                                } else if (ch.pin2_source == 0 && ch.pca_channel2 != 255) {
+                                    pcaManager.write(ch.pca_addr, ch.pca_channel2, 0);
+                                } else {
+                                    writeOutputPin(ch, 2, false);
+                                }
                             } else {
                                 pcaManager.write(ch.pca_addr, ch.pca_channel, 0);
-                                if (ch.pca_channel2 != 255) pcaManager.write(ch.pca_addr, ch.pca_channel2, duty);
+                                if (ch.pin2_source == 1 && ch.pin2_channel != 255) {
+                                    pcaManager.write(ch.pin2_addr, ch.pin2_channel, duty);
+                                } else if (ch.pin2_source == 0 && ch.pca_channel2 != 255) {
+                                    pcaManager.write(ch.pca_addr, ch.pca_channel2, duty);
+                                } else {
+                                    writeOutputPin(ch, 2, true);
+                                }
                             }
                         } else if (ch.mc_mode == 1) { // PWM+DIR
-                            if (ch.pca_channel2 != 255) {
-                                pcaManager.write(ch.pca_addr, ch.pca_channel2, is_forward ? 4095 : 0);
-                            }
+                            writeOutputPin(ch, 2, is_forward);
                             pcaManager.write(ch.pca_addr, ch.pca_channel, duty);
                         } else if (ch.mc_mode == 2) { // IN1+IN2+EN
-                            pcaManager.write(ch.pca_addr, ch.pca_channel, is_forward ? 4095 : 0);
-                            if (ch.pca_channel2 != 255) pcaManager.write(ch.pca_addr, ch.pca_channel2, is_forward ? 0 : 4095);
-                            if (ch.pca_channel3 != 255) pcaManager.write(ch.pca_addr, ch.pca_channel3, duty);
+                            writeOutputPin(ch, 1, is_forward);
+                            writeOutputPin(ch, 2, !is_forward);
+                            if (ch.pin3_source == 1 && ch.pin3_channel != 255) {
+                                pcaManager.write(ch.pin3_addr, ch.pin3_channel, duty);
+                            } else if (ch.pin3_source == 0 && ch.pca_channel3 != 255) {
+                                pcaManager.write(ch.pca_addr, ch.pca_channel3, duty);
+                            } else {
+                                writeOutputPin(ch, 3, duty > 2048);
+                            }
                         }
                     }
                 }

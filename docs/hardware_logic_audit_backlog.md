@@ -24,6 +24,7 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 
 4. **DC Motor hybrid routing ignored when primary source is PCA9685**
    - Files: `include/motion_control.h`
+   - Status: ✅ Completed (`fix: route-aware motor pin write in PCA update() + begin()`)
    - Issue: `ch.source == 1` motor update uses only `pca_channel2/3`, ignoring `pin2_source`, `pin3_source`, `pin2_addr`, `pin3_addr`, and `pinN_channel`.
    - Fix direction: use `writeOutputPin(ch, n, state/duty)` helpers or route-aware helper functions for DIR/IN2/EN; preserve PWM semantics for EN.
 
