@@ -53,6 +53,10 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 ## Project Structure
 
 - `include/` — C++ headers and most firmware subsystems
+- `include/i2c_devices/` — one file per I2C device type:
+  - `i2c_dac.h` — MCP4725, DAC7571, DAC7573 inline write functions
+  - `i2c_gpio_expander.h` — DigitalExpanderManager (MCP23017, TCA9555, PCF857x)
+  - `pca9685.h` — PCA9685Driver/PCA9685Manager (16-ch PWM)
 - `src/main.cpp` — setup, HTTP API, validation, network/display tasks
 - `web/index.html` — Web UI source; edit this file, then run `tools/build_web.py`
 - `include/web_pages.h` — generated embedded Web UI; do not edit directly
