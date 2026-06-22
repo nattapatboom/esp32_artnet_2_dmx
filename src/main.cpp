@@ -23,6 +23,7 @@
 #include "display_driver.h"
 #include "scoring.h"
 #include "config_rules.h"
+#include "network_protocol.h"
 
 const char* getFirmwareVersion() {
     static char version[32] = {0};
@@ -659,10 +660,12 @@ void applySettingsFromJson(JsonObjectConst doc) {
 }
 
 bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, String& message) {
-    if (settings.containsKey("output_fps")) {
-        int fps = settings["output_fps"] | 0;
-        if (fps <= 0 || fps > 44) {
-            message = "Global Output FPS must be between 1 and 44";
+    if (settings.containsKey(NetworkProtocol::KEY_OUTPUT_FPS)) {
+        int fps = settings[NetworkProtocol::KEY_OUTPUT_FPS] | 0;
+        if (!NetworkProtocol::outputFpsValid((uint8_t)fps)) {
+            message = "Global Output FPS must be between " +
+                      String(NetworkProtocol::OUTPUT_FPS_MIN) + " and " +
+                      String(NetworkProtocol::OUTPUT_FPS_MAX);
             return false;
         }
     }
@@ -675,20 +678,20 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
         }
         return true;
     };
-    if (!validateIpField("eth_ip")) return false;
-    if (!validateIpField("eth_netmask")) return false;
-    if (!validateIpField("eth_gateway")) return false;
-    if (!validateIpField("eth_dns")) return false;
-    if (!validateIpField("wifi_ip")) return false;
-    if (!validateIpField("wifi_netmask")) return false;
-    if (!validateIpField("wifi_gateway")) return false;
-    if (!validateIpField("wifi_dns")) return false;
-    uint8_t statusPin = settings["status_led_pin"].is<int>() ? (uint8_t)(int)settings["status_led_pin"] : sysCfg.status_led_pin;
-    uint8_t zcPin = settings["zc_pin"].is<int>() ? (uint8_t)(int)settings["zc_pin"] : sysCfg.zc_pin;
-    uint8_t sdaPin = settings["i2c_sda"].is<int>() ? (uint8_t)(int)settings["i2c_sda"] : sysCfg.i2c_sda;
-    uint8_t sclPin = settings["i2c_scl"].is<int>() ? (uint8_t)(int)settings["i2c_scl"] : sysCfg.i2c_scl;
-    uint8_t displayType = settings["display_enabled"].is<int>() ? (uint8_t)(int)settings["display_enabled"] : sysCfg.display_enabled;
-    uint8_t displayAddr = settings["display_i2c_addr"].is<int>() ? (uint8_t)(int)settings["display_i2c_addr"] : sysCfg.display_i2c_addr;
+    if (!validateIpField(NetworkProtocol::KEY_ETH_IP)) return false;
+    if (!validateIpField(NetworkProtocol::KEY_ETH_NETMASK)) return false;
+    if (!validateIpField(NetworkProtocol::KEY_ETH_GATEWAY)) return false;
+    if (!validateIpField(NetworkProtocol::KEY_ETH_DNS)) return false;
+    if (!validateIpField(NetworkProtocol::KEY_WIFI_IP)) return false;
+    if (!validateIpField(NetworkProtocol::KEY_WIFI_NETMASK)) return false;
+    if (!validateIpField(NetworkProtocol::KEY_WIFI_GATEWAY)) return false;
+    if (!validateIpField(NetworkProtocol::KEY_WIFI_DNS)) return false;
+    uint8_t statusPin = settings[NetworkProtocol::KEY_STATUS_LED_PIN].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_STATUS_LED_PIN] : sysCfg.status_led_pin;
+    uint8_t zcPin = settings[NetworkProtocol::KEY_ZC_PIN].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_ZC_PIN] : sysCfg.zc_pin;
+    uint8_t sdaPin = settings[NetworkProtocol::KEY_I2C_SDA].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_I2C_SDA] : sysCfg.i2c_sda;
+    uint8_t sclPin = settings[NetworkProtocol::KEY_I2C_SCL].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_I2C_SCL] : sysCfg.i2c_scl;
+    uint8_t displayType = settings[NetworkProtocol::KEY_DISPLAY_ENABLED].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_DISPLAY_ENABLED] : sysCfg.display_enabled;
+    uint8_t displayAddr = settings[NetworkProtocol::KEY_DISPLAY_I2C_ADDR].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_DISPLAY_I2C_ADDR] : sysCfg.display_i2c_addr;
 
     if (statusPin != 255 && zcPin != 255 && statusPin == zcPin) {
         message = "Status LED GPIO and Zero-Crossing GPIO cannot use the same pin";
@@ -727,14 +730,14 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
 }
 
 bool validateScoresForSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, String& message) {
-    uint8_t fps = settings["output_fps"].is<int>() ? (uint8_t)(int)settings["output_fps"] : sysCfg.output_fps;
+    uint8_t fps = settings[NetworkProtocol::KEY_OUTPUT_FPS].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_OUTPUT_FPS] : sysCfg.output_fps;
     uint8_t oldMode = sysCfg.device_mode;
     uint16_t oldChunkSize = sysCfg.espnow_chunk_size;
 
-    if (settings["device_mode"].is<int>()) sysCfg.device_mode = settings["device_mode"];
-    if (settings["espnow_chunk_size"].is<int>()) {
-        int chunkSize = settings["espnow_chunk_size"];
-        sysCfg.espnow_chunk_size = (chunkSize >= 16 && chunkSize <= 230) ? chunkSize : 200;
+    if (settings[NetworkProtocol::KEY_DEVICE_MODE].is<int>()) sysCfg.device_mode = settings[NetworkProtocol::KEY_DEVICE_MODE];
+    if (settings[NetworkProtocol::KEY_ESPNOW_CHUNK_SIZE].is<int>()) {
+        int chunkSize = settings[NetworkProtocol::KEY_ESPNOW_CHUNK_SIZE];
+        sysCfg.espnow_chunk_size = NetworkProtocol::espnowChunkSizeValid((uint16_t)chunkSize) ? (uint16_t)chunkSize : NetworkProtocol::ESPNOW_CHUNK_SIZE_DEFAULT;
     }
 
     ScoreBlocker blocker = checkScoresFromJson(outputs, fps);
@@ -1347,24 +1350,24 @@ void setupWebServer() {
                 return;
             }
 
-            uint8_t requestedStatusPin = doc["status_led_pin"].is<int>() ? (uint8_t)(int)doc["status_led_pin"] : sysCfg.status_led_pin;
-            uint8_t requestedZcPin = doc["zc_pin"].is<int>() ? (uint8_t)(int)doc["zc_pin"] : sysCfg.zc_pin;
-            uint8_t requestedSda = doc["i2c_sda"].is<int>() ? (uint8_t)(int)doc["i2c_sda"] : sysCfg.i2c_sda;
-            uint8_t requestedScl = doc["i2c_scl"].is<int>() ? (uint8_t)(int)doc["i2c_scl"] : sysCfg.i2c_scl;
-            uint8_t requestedDisplayType = doc["display_enabled"].is<int>() ? (uint8_t)(int)doc["display_enabled"] : sysCfg.display_enabled;
-            uint8_t requestedDisplayAddr = doc["display_i2c_addr"].is<int>() ? (uint8_t)(int)doc["display_i2c_addr"] : sysCfg.display_i2c_addr;
+            uint8_t requestedStatusPin = doc[NetworkProtocol::KEY_STATUS_LED_PIN].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_STATUS_LED_PIN] : sysCfg.status_led_pin;
+            uint8_t requestedZcPin = doc[NetworkProtocol::KEY_ZC_PIN].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_ZC_PIN] : sysCfg.zc_pin;
+            uint8_t requestedSda = doc[NetworkProtocol::KEY_I2C_SDA].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_I2C_SDA] : sysCfg.i2c_sda;
+            uint8_t requestedScl = doc[NetworkProtocol::KEY_I2C_SCL].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_I2C_SCL] : sysCfg.i2c_scl;
+            uint8_t requestedDisplayType = doc[NetworkProtocol::KEY_DISPLAY_ENABLED].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_DISPLAY_ENABLED] : sysCfg.display_enabled;
+            uint8_t requestedDisplayAddr = doc[NetworkProtocol::KEY_DISPLAY_I2C_ADDR].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_DISPLAY_I2C_ADDR] : sysCfg.display_i2c_addr;
             String validationMessage;
 
-            uint8_t requestedMode = doc["device_mode"].is<int>() ? (uint8_t)(int)doc["device_mode"] : sysCfg.device_mode;
-            uint8_t requestedChan = doc["espnow_channel"].is<int>() ? (uint8_t)(int)doc["espnow_channel"] : sysCfg.espnow_channel;
-            if (requestedMode == MODE_ESPNOW_MASTER && requestedChan == 0) {
+            uint8_t requestedMode = doc[NetworkProtocol::KEY_DEVICE_MODE].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_DEVICE_MODE] : sysCfg.device_mode;
+            uint8_t requestedChan = doc[NetworkProtocol::KEY_ESPNOW_CHANNEL].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_ESPNOW_CHANNEL] : sysCfg.espnow_channel;
+            if (requestedMode == NetworkProtocol::MODE_ESPNOW_MASTER && requestedChan == 0) {
                 validationMessage = "ESP-NOW Master cannot use Auto-Scan channel mode";
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
                 return;
             }
 
-            bool nextArtnetEnabled = doc.containsKey("artnet_enabled") ? doc["artnet_enabled"].as<bool>() : sysCfg.artnet_enabled;
-            bool nextSacnEnabled = doc.containsKey("sacn_enabled") ? doc["sacn_enabled"].as<bool>() : sysCfg.sacn_enabled;
+            bool nextArtnetEnabled = doc.containsKey(NetworkProtocol::KEY_ARTNET_ENABLED) ? doc[NetworkProtocol::KEY_ARTNET_ENABLED].as<bool>() : sysCfg.artnet_enabled;
+            bool nextSacnEnabled = doc.containsKey(NetworkProtocol::KEY_SACN_ENABLED) ? doc[NetworkProtocol::KEY_SACN_ENABLED].as<bool>() : sysCfg.sacn_enabled;
             if (!nextArtnetEnabled && !nextSacnEnabled) {
                 validationMessage = "Cannot disable both Art-Net and sACN protocols";
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");

@@ -6,6 +6,22 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 PORT = 8000
 HTML_FILE = "web/index.html"
+JS_DIR = "web/js"
+PARTS_DIR = "web/parts"
+OUTPUT_CONFIG_DIR = "web/parts/output-config"
+OUTPUT_TEST_DIR = "web/parts/output-test"
+JS_CONFIG_DIR = "web/js/output-config"
+JS_TEST_DIR = "web/js/output-test"
+
+JS_ORDER = ["_gpio.js", "network_protocol.js", "scoring.js", "espnow.js", "app.js", "outputs.js"]
+
+PANE_MARKERS = {
+    "<!-- PANE_NET -->":    "pane-network.html",
+    "<!-- PANE_OUT -->":    "pane-outputs.html",
+    "<!-- PANE_ESPNOW -->": "pane-espnow.html",
+    "<!-- PANE_OTA -->":    "pane-ota.html",
+    "<!-- PANE_DIAG -->":   "pane-diag.html",
+}
 
 DEV_RELOAD_SCRIPT = b"""
 <script>
@@ -110,26 +126,73 @@ class MockRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        # Serve the HTML page
+        # Serve the HTML page (with panes + JS inlined)
         if self.path in ("/", "/index.html"):
             if not os.path.exists(HTML_FILE):
                 self.send_response(404)
                 self.end_headers()
-                self.wfile.write(b"Error: web/index.html not found. Run extract_web.py first!")
+                self.wfile.write(b"Error: web/index.html not found!")
                 return
-            
+
+            # Read shell
+            with open(HTML_FILE, "r", encoding="utf-8") as f:
+                html = f.read()
+
+            # Replace pane markers
+            for marker, filename in PANE_MARKERS.items():
+                pane_path = os.path.join(PARTS_DIR, filename)
+                if os.path.exists(pane_path):
+                    with open(pane_path, "r", encoding="utf-8") as pf:
+                        html = html.replace(marker, pf.read())
+
+            # Collect per-type config/test HTML
+            for marker_name, src_dir in [("CONFIG_TYPE_FIELDS", OUTPUT_CONFIG_DIR),
+                                          ("TEST_TYPE_FIELDS", OUTPUT_TEST_DIR)]:
+                marker = f"<!-- {marker_name} -->"
+                combined = ""
+                if os.path.isdir(src_dir):
+                    for fn in sorted(os.listdir(src_dir)):
+                        fp = os.path.join(src_dir, fn)
+                        if os.path.isfile(fp):
+                            with open(fp, "r", encoding="utf-8") as sf:
+                                combined += sf.read() + "\n"
+                if marker in html:
+                    html = html.replace(marker, combined)
+                elif combined:
+                    # Insert before </div><!-- /w --> if marker absent
+                    html = html.replace("</div><!-- /w -->", f"{combined}\n</div><!-- /w -->")
+
+            # Inline JS files
+            js_parts = []
+            for js_file in JS_ORDER:
+                js_path = os.path.join(JS_DIR, js_file)
+                if os.path.exists(js_path):
+                    with open(js_path, "r", encoding="utf-8") as jf:
+                        js_parts.append(jf.read())
+
+            for dir_path in [JS_CONFIG_DIR, JS_TEST_DIR]:
+                if os.path.isdir(dir_path):
+                    for fn in sorted(os.listdir(dir_path)):
+                        fp = os.path.join(dir_path, fn)
+                        if os.path.isfile(fp):
+                            with open(fp, "r", encoding="utf-8") as sf:
+                                js_parts.append(sf.read())
+
+            combined_js = "\n".join(js_parts)
+            html = html.replace("<script>", f"<script>\n{combined_js}\n</script>")
+
+            # Send response
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             self.send_cors_headers()
             self.end_headers()
-            with open(HTML_FILE, "rb") as f:
-                html = f.read()
-            if b"</body>" in html:
-                html = html.replace(b"</body>", DEV_RELOAD_SCRIPT + b"</body>", 1)
+            html_bytes = html.encode("utf-8")
+            if b"</body>" in html_bytes:
+                html_bytes = html_bytes.replace(b"</body>", DEV_RELOAD_SCRIPT + b"</body>", 1)
             else:
-                html += DEV_RELOAD_SCRIPT
-            self.wfile.write(html)
+                html_bytes += DEV_RELOAD_SCRIPT
+            self.wfile.write(html_bytes)
             return
 
         # Serve mockup API endpoints

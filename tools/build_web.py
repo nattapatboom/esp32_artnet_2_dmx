@@ -27,7 +27,7 @@ PANE_MARKERS = {
     "<!-- PANE_DIAG -->":   "pane-diag.html",
 }
 
-JS_ORDER = ["_gpio.js", "scoring.js", "espnow.js", "app.js", "outputs.js"]
+JS_ORDER = ["_gpio.js", "network_protocol.js", "scoring.js", "espnow.js", "app.js", "outputs.js"]
 
 
 def collect_type_files(directory, sort_key=lambda f: f):

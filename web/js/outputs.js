@@ -235,6 +235,8 @@ function testMp3(idx,action){
 function toggleOutFields(){
   const t=parseInt(document.getElementById('no_type').value);
   const mcMode = parseInt(document.getElementById('mc_mode')?.value||0);
+  // Helper: safe style access; no-op if element missing
+  const _st=(id,v)=>{const e=document.getElementById(id);if(e)e.style.display=v;};
   if(!document.getElementById('no_source')) renderPinRows();
   const srcSelect=document.getElementById('no_source');
   
@@ -290,84 +292,83 @@ function toggleOutFields(){
     if(src>=2 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=32;
   }
   
-  document.getElementById('no_addr_grp').style.display=(isDmx||t===3)?'none':'';
-  document.getElementById('no_cnt_grp').style.display=(isDmx||isRelay||isDimmer||isMc||isSolenoid||isAnalogRgb||isBuzzer||isSmoke||is7Seg||isDfPlayer||isPwmDac||isDac||isFuncGen)?'none':'';
-  document.getElementById('no_ord_grp').style.display=(t===3||t===5)?'':'none';
-  document.getElementById('no_led_proto_grp').style.display=(t===3)?'':'none';
+  _st('no_addr_grp',(isDmx||t===3)?'none':'');
+  _st('no_cnt_grp',(isDmx||isRelay||isDimmer||isMc||isSolenoid||isAnalogRgb||isBuzzer||isSmoke||is7Seg||isDfPlayer||isPwmDac||isDac||isFuncGen)?'none':'');
+  _st('no_ord_grp',(t===3||t===5)?'':'none');
+  _st('no_led_proto_grp',(t===3)?'':'none');
   
   setModeOptions(is7Seg?'7seg':'motor', t);
-  document.getElementById('no_mc_grp').style.display=(isMc||is7Seg||isFuncGen||isPwmDac)?'':'none';
-  document.getElementById('no_sol_grp').style.display=isSolenoid?'':'none';
-  document.getElementById('no_smoke_grp').style.display=isSmoke?'':'none';
+  _st('no_mc_grp',(isMc||is7Seg||isFuncGen||isPwmDac)?'':'none');
+  _st('no_sol_grp',isSolenoid?'':'none');
+  _st('no_smoke_grp',isSmoke?'':'none');
   if(isDfPlayer) renderPinRows();
   if(isMc || is7Seg) setResolutionOptions(isStepper, is7Seg);
   
   const hMode = parseInt(document.getElementById('mc_homing_mode').value);
   const colorOrder = parseInt(document.getElementById('no_ord').value||0);
-  document.getElementById('no_pca_channel2_grp').style.display='none';
-  document.getElementById('no_pca_channel3_grp').style.display='none';
-  document.getElementById('no_pca_channel4_grp').style.display='none';
+  _st('no_pca_channel2_grp','none');
+  _st('no_pca_channel3_grp','none');
+  _st('no_pca_channel4_grp','none');
 
   if (isMc || is7Seg || isFuncGen || isPwmDac) {
-    document.getElementById('mc_mode_grp').style.display = (is7Seg || isMotor) ? '' : 'none';
-    document.getElementById('mc_res_grp').style.display = (isMc || isPwmDac || is7Seg) ? '' : 'none';
+    _st('mc_mode_grp',(is7Seg || isMotor) ? '' : 'none');
+    _st('mc_res_grp',(isMc || isPwmDac || is7Seg) ? '' : 'none');
     const resLbl = document.getElementById('mc_resolution_lbl');
     if(resLbl) resLbl.textContent = is7Seg ? 'Decode Mode' : 'Resolution';
     const freqGrp = document.getElementById('mc_freq_grp');
     const freqLbl = document.getElementById('mc_freq_lbl');
     const pwmDacCalGrp = document.getElementById('pwm_dac_cal_grp');
     if (isFuncGen || isPwmDac) {
-      freqGrp.style.display = '';
-      freqLbl.textContent = "PWM Carrier Frequency (Hz)";
-      document.getElementById('rc_filter_grp').style.display = '';
+      if(freqGrp) freqGrp.style.display = '';
+      if(freqLbl) freqLbl.textContent = "PWM Carrier Frequency (Hz)";
+      _st('rc_filter_grp','');
       if(pwmDacCalGrp) pwmDacCalGrp.style.display = isPwmDac ? '' : 'none';
       calcRcCutoff();
     } else if (is7Seg) {
-      freqGrp.style.display = (t >= 12) ? '' : 'none';
-      freqLbl.textContent = "PWM Frequency (Hz)";
-      document.getElementById('rc_filter_grp').style.display = 'none';
+      if(freqGrp) freqGrp.style.display = (t >= 12) ? '' : 'none';
+      if(freqLbl) freqLbl.textContent = "PWM Frequency (Hz)";
+      _st('rc_filter_grp','none');
       if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
     } else if (isPwmDimmer || isMotor) {
-      freqGrp.style.display = '';
-      freqLbl.textContent = "Frequency (Hz)";
-      document.getElementById('rc_filter_grp').style.display = 'none';
+      if(freqGrp) freqGrp.style.display = '';
+      if(freqLbl) freqLbl.textContent = "Frequency (Hz)";
+      _st('rc_filter_grp','none');
       if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
     } else if (isStepper) {
-      freqGrp.style.display = '';
-      freqLbl.textContent = "Speed (Hz)";
-      document.getElementById('rc_filter_grp').style.display = 'none';
+      if(freqGrp) freqGrp.style.display = '';
+      if(freqLbl) freqLbl.textContent = "Speed (Hz)";
+      _st('rc_filter_grp','none');
       if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
     } else if (isAnalogRgb) {
-      freqGrp.style.display = '';
-      freqLbl.textContent = "Frequency (Hz)";
-      document.getElementById('rc_filter_grp').style.display = 'none';
+      if(freqGrp) freqGrp.style.display = '';
+      if(freqLbl) freqLbl.textContent = "Frequency (Hz)";
+      _st('rc_filter_grp','none');
       if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
     } else {
-      freqGrp.style.display = 'none';
-      document.getElementById('rc_filter_grp').style.display = 'none';
+      if(freqGrp) freqGrp.style.display = 'none';
+      _st('rc_filter_grp','none');
       if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
     }
     
-    document.getElementById('mc_deadband_grp').style.display = isMotor ? '' : 'none';
-    document.getElementById('mc_min_us_grp').style.display = isServo ? '' : 'none';
-    document.getElementById('mc_max_us_grp').style.display = isServo ? '' : 'none';
-    document.getElementById('mc_stepper_scale_grp').style.display = isStepper ? '' : 'none';
-    document.getElementById('mc_steps_grp').style.display = isStepper ? '' : 'none';
-    document.getElementById('mc_unit_type_grp').style.display = isStepper ? '' : 'none';
-    document.getElementById('mc_scale_factor_grp').style.display = isStepper ? '' : 'none';
-    document.getElementById('mc_stepper_homing_grp').style.display = isStepper ? '' : 'none';
-    document.getElementById('mc_homing_mode_grp').style.display = isStepper ? '' : 'none';
-    document.getElementById('mc_homing_dir_grp').style.display = isStepper ? '' : 'none';
-    document.getElementById('mc_homing_speed_grp').style.display = isStepper ? '' : 'none';
-    document.getElementById('mc_homing_timeout_grp').style.display = (isStepper && hMode === 1) ? '' : 'none';
-    document.getElementById('mc_invert_grp').style.display = (isMotor || isStepper) ? '' : 'none';
-    document.getElementById('mc_brake_grp').style.display = (isMotor && (mcMode === 0 || mcMode === 2)) ? '' : 'none';
+    _st('mc_deadband_grp',isMotor ? '' : 'none');
+    _st('mc_min_us_grp',isServo ? '' : 'none');
+    _st('mc_max_us_grp',isServo ? '' : 'none');
+    _st('mc_stepper_scale_grp',isStepper ? '' : 'none');
+    _st('mc_steps_grp',isStepper ? '' : 'none');
+    _st('mc_unit_type_grp',isStepper ? '' : 'none');
+    _st('mc_scale_factor_grp',isStepper ? '' : 'none');
+    _st('mc_stepper_homing_grp',isStepper ? '' : 'none');
+    _st('mc_homing_mode_grp',isStepper ? '' : 'none');
+    _st('mc_homing_dir_grp',isStepper ? '' : 'none');
+    _st('mc_homing_speed_grp',isStepper ? '' : 'none');
+    _st('mc_homing_timeout_grp',(isStepper && hMode === 1) ? '' : 'none');
+    _st('mc_invert_grp',(isMotor || isStepper) ? '' : 'none');
+    _st('mc_brake_grp',(isMotor && (mcMode === 0 || mcMode === 2)) ? '' : 'none');
   }
   renderPinRows();
   autoAssignOutputPins();
   const pinMapContainer = document.getElementById('pin-mapping-container');
   if(pinMapContainer) pinMapContainer.style.display = '';
-  var t = parseInt(document.getElementById('no_type').value);
   showTypeConfig(t);
   getConfigModule(t).toggleFields();
 }

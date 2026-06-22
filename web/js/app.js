@@ -236,81 +236,84 @@ async function saveSettings(e){
   const fd=new FormData(e.target||document.getElementById('cfgForm'));
   const obj={};
   fd.forEach((v,k)=>{
-    if(['eth_dhcp','wifi_dhcp','artnet_enabled','sacn_enabled','sacn_multicast','wifi_enable_in_eth_mode','ap_enable_in_eth_mode'].includes(k)) obj[k]=true;
-    else if(['device_mode','espnow_channel','espnow_chunk_size','status_led_pin','zc_pin','eth_dhcp','wifi_dhcp',
-             'artnet_port','sacn_port',
-             'output_fps','i2c_sda','i2c_scl','i2c_speed',
-             'display_enabled','display_i2c_addr','display_brightness'].includes(k))
+    const boolKeys=[NET_PROTO.KEY_ETH_DHCP,NET_PROTO.KEY_WIFI_DHCP,NET_PROTO.KEY_ARTNET_ENABLED,NET_PROTO.KEY_SACN_ENABLED,NET_PROTO.KEY_SACN_MULTICAST,NET_PROTO.KEY_WIFI_IN_ETH_MODE,NET_PROTO.KEY_AP_IN_ETH_MODE];
+    const intKeys=[NET_PROTO.KEY_DEVICE_MODE,NET_PROTO.KEY_ESPNOW_CHANNEL,NET_PROTO.KEY_ESPNOW_CHUNK_SIZE,NET_PROTO.KEY_STATUS_LED_PIN,NET_PROTO.KEY_ZC_PIN,NET_PROTO.KEY_ETH_DHCP,NET_PROTO.KEY_WIFI_DHCP,
+                   NET_PROTO.KEY_ARTNET_PORT,NET_PROTO.KEY_SACN_PORT,
+                   NET_PROTO.KEY_OUTPUT_FPS,NET_PROTO.KEY_I2C_SDA,NET_PROTO.KEY_I2C_SCL,NET_PROTO.KEY_I2C_SPEED,
+                   NET_PROTO.KEY_DISPLAY_ENABLED,NET_PROTO.KEY_DISPLAY_I2C_ADDR,NET_PROTO.KEY_DISPLAY_BRIGHTNESS];
+    if(boolKeys.includes(k)) obj[k]=true;
+    else if(intKeys.includes(k))
       obj[k]=parseInt(v,10);
     else obj[k]=v;
   });
-  if(!document.getElementById('i2c_enabled').checked){ obj.i2c_sda=255; obj.i2c_scl=255; }
-  if(!document.getElementById('disp_enable_ck').checked) obj.display_enabled=0;
-  ['eth_dhcp','wifi_dhcp','artnet_enabled','sacn_enabled','sacn_multicast','wifi_enable_in_eth_mode','ap_enable_in_eth_mode'].forEach(k=>{
+  if(!document.getElementById('i2c_enabled').checked){ obj[NET_PROTO.KEY_I2C_SDA]=NET_PROTO.ZC_PIN_DISABLED; obj[NET_PROTO.KEY_I2C_SCL]=NET_PROTO.ZC_PIN_DISABLED; }
+  if(!document.getElementById('disp_enable_ck').checked) obj[NET_PROTO.KEY_DISPLAY_ENABLED]=0;
+  [NET_PROTO.KEY_ETH_DHCP,NET_PROTO.KEY_WIFI_DHCP,NET_PROTO.KEY_ARTNET_ENABLED,NET_PROTO.KEY_SACN_ENABLED,NET_PROTO.KEY_SACN_MULTICAST,NET_PROTO.KEY_WIFI_IN_ETH_MODE,NET_PROTO.KEY_AP_IN_ETH_MODE].forEach(k=>{
     if (e.target.querySelector('#' + k)) {
       if (!obj.hasOwnProperty(k)) obj[k] = false;
     }
   });
-  if(!obj.artnet_enabled && !obj.sacn_enabled){
+  if(!obj[NET_PROTO.KEY_ARTNET_ENABLED] && !obj[NET_PROTO.KEY_SACN_ENABLED]){
     alert('Cannot disable both Art-Net and sACN protocols.');
     return;
   }
-  if(obj.device_mode === 1 && obj.espnow_channel === 0){
+  if(obj[NET_PROTO.KEY_DEVICE_MODE] === NET_PROTO.MODE_ESPNOW_MASTER && obj[NET_PROTO.KEY_ESPNOW_CHANNEL] === 0){
     alert('ESP-NOW Master cannot use Auto-Scan channel mode. Please select a fixed channel (1-13).');
     return;
   }
-  if(obj.espnow_chunk_size < 16 || obj.espnow_chunk_size > 230){
-    alert('ESP-NOW Chunk Size must be between 16 and 230 bytes.');
+  if(!NET_PROTO.espnowChunkSizeValid(obj[NET_PROTO.KEY_ESPNOW_CHUNK_SIZE])){
+    alert('ESP-NOW Chunk Size must be between ' + NET_PROTO.ESPNOW_CHUNK_SIZE_MIN + ' and ' + NET_PROTO.ESPNOW_CHUNK_SIZE_MAX + ' bytes.');
     return;
   }
-  if(obj.status_led_pin!==255&&obj.zc_pin!==255&&obj.status_led_pin===obj.zc_pin){
+  if(obj[NET_PROTO.KEY_STATUS_LED_PIN]!==NET_PROTO.ZC_PIN_DISABLED&&obj[NET_PROTO.KEY_ZC_PIN]!==NET_PROTO.ZC_PIN_DISABLED&&obj[NET_PROTO.KEY_STATUS_LED_PIN]===obj[NET_PROTO.KEY_ZC_PIN]){
     alert('Status LED GPIO and Zero-Crossing GPIO cannot use the same pin.');
     return;
   }
-  const forbiddenSettingsPins=[['Status LED GPIO',obj.status_led_pin],['Zero-Crossing GPIO',obj.zc_pin],['I2C SDA GPIO',obj.i2c_sda],['I2C SCL GPIO',obj.i2c_scl]];
+  const forbiddenSettingsPins=[['Status LED GPIO',obj[NET_PROTO.KEY_STATUS_LED_PIN]],['Zero-Crossing GPIO',obj[NET_PROTO.KEY_ZC_PIN]],['I2C SDA GPIO',obj[NET_PROTO.KEY_I2C_SDA]],['I2C SCL GPIO',obj[NET_PROTO.KEY_I2C_SCL]]];
   for(const [label,pin] of forbiddenSettingsPins){
-    if(pin!==255&&FORBIDDEN_OUTPUT_GPIOS[pin]){
+    if(pin!==NET_PROTO.ZC_PIN_DISABLED&&FORBIDDEN_OUTPUT_GPIOS[pin]){
       alert(label+' '+pin+' is not allowed on WT32-ETH01 ('+FORBIDDEN_OUTPUT_GPIOS[pin]+'). Select another pin.');
       return;
     }
   }
-  if(obj.i2c_sda!==255&&obj.i2c_scl!==255&&obj.i2c_sda===obj.i2c_scl){
+  if(obj[NET_PROTO.KEY_I2C_SDA]!==NET_PROTO.ZC_PIN_DISABLED&&obj[NET_PROTO.KEY_I2C_SCL]!==NET_PROTO.ZC_PIN_DISABLED&&obj[NET_PROTO.KEY_I2C_SDA]===obj[NET_PROTO.KEY_I2C_SCL]){
     alert('I2C SDA and SCL pins cannot be the same.');
     return;
   }
-  if(obj.status_led_pin!==255&&(obj.status_led_pin===obj.i2c_sda||obj.status_led_pin===obj.i2c_scl)){
+  if(obj[NET_PROTO.KEY_STATUS_LED_PIN]!==NET_PROTO.ZC_PIN_DISABLED&&(obj[NET_PROTO.KEY_STATUS_LED_PIN]===obj[NET_PROTO.KEY_I2C_SDA]||obj[NET_PROTO.KEY_STATUS_LED_PIN]===obj[NET_PROTO.KEY_I2C_SCL])){
     alert('Status LED GPIO cannot overlap with I2C SDA or SCL.');
     return;
   }
-  if(obj.zc_pin!==255&&(obj.zc_pin===obj.i2c_sda||obj.zc_pin===obj.i2c_scl)){
+  if(obj[NET_PROTO.KEY_ZC_PIN]!==NET_PROTO.ZC_PIN_DISABLED&&(obj[NET_PROTO.KEY_ZC_PIN]===obj[NET_PROTO.KEY_I2C_SDA]||obj[NET_PROTO.KEY_ZC_PIN]===obj[NET_PROTO.KEY_I2C_SCL])){
     alert('Zero-Crossing GPIO cannot overlap with I2C SDA or SCL.');
     return;
   }
-  if(!displayAddressValid(obj.display_enabled, obj.display_i2c_addr)){
+  if(!displayAddressValid(obj[NET_PROTO.KEY_DISPLAY_ENABLED], obj[NET_PROTO.KEY_DISPLAY_I2C_ADDR])){
     alert('I2C display address is invalid for the selected display type. OLED uses 0x3C/0x3D; PCF8574 LCD uses 0x27/0x3F.');
     return;
   }
-  const conflict=outputReservedPinConflict(outputs,obj.status_led_pin);
+  const conflict=outputReservedPinConflict(outputs,obj[NET_PROTO.KEY_STATUS_LED_PIN]);
   if(conflict>=0){
-    alert('Status LED GPIO '+obj.status_led_pin+' is already used by output channel '+(conflict+1)+'. Disable Status LED or select another GPIO.');
+    alert('Status LED GPIO '+obj[NET_PROTO.KEY_STATUS_LED_PIN]+' is already used by output channel '+(conflict+1)+'. Disable Status LED or select another GPIO.');
     return;
   }
-  const zcConflict=outputReservedPinConflict(outputs,obj.zc_pin);
+  const zcConflict=outputReservedPinConflict(outputs,obj[NET_PROTO.KEY_ZC_PIN]);
   if(zcConflict>=0){
-    alert('Zero-Crossing GPIO '+obj.zc_pin+' is already used by output channel '+(zcConflict+1)+'. Disable Zero-Crossing or select another GPIO.');
+    alert('Zero-Crossing GPIO '+obj[NET_PROTO.KEY_ZC_PIN]+' is already used by output channel '+(zcConflict+1)+'. Disable Zero-Crossing or select another GPIO.');
     return;
   }
-  const sdaConflict=outputReservedPinConflict(outputs,obj.i2c_sda);
+  const sdaConflict=outputReservedPinConflict(outputs,obj[NET_PROTO.KEY_I2C_SDA]);
   if(sdaConflict>=0){
-    alert('I2C SDA GPIO '+obj.i2c_sda+' is already used by output channel '+(sdaConflict+1)+'. Select another GPIO.');
+    alert('I2C SDA GPIO '+obj[NET_PROTO.KEY_I2C_SDA]+' is already used by output channel '+(sdaConflict+1)+'. Select another GPIO.');
     return;
   }
-  const sclConflict=outputReservedPinConflict(outputs,obj.i2c_scl);
+  const sclConflict=outputReservedPinConflict(outputs,obj[NET_PROTO.KEY_I2C_SCL]);
   if(sclConflict>=0){
-    alert('I2C SCL GPIO '+obj.i2c_scl+' is already used by output channel '+(sclConflict+1)+'. Select another GPIO.');
+    alert('I2C SCL GPIO '+obj[NET_PROTO.KEY_I2C_SCL]+' is already used by output channel '+(sclConflict+1)+'. Select another GPIO.');
     return;
   }
-  for(const field of ['eth_ip','eth_netmask','eth_gateway','eth_dns','wifi_ip','wifi_netmask','wifi_gateway','wifi_dns']){
+  const ipFields=[NET_PROTO.KEY_ETH_IP,NET_PROTO.KEY_ETH_NETMASK,NET_PROTO.KEY_ETH_GATEWAY,NET_PROTO.KEY_ETH_DNS,NET_PROTO.KEY_WIFI_IP,NET_PROTO.KEY_WIFI_NETMASK,NET_PROTO.KEY_WIFI_GATEWAY,NET_PROTO.KEY_WIFI_DNS];
+  for(const field of ipFields){
     if(!validateIp4(obj[field])){
       alert('Invalid IP address in '+field+'. Each octet must be 0-255.');
       return;

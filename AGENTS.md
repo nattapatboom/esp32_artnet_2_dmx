@@ -62,7 +62,9 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - `include/source_rules.h` — I2C source address validation rules (`SourceRules::addressValid()`, etc.)
 - `include/display_protocol.h` — display type IDs and I2C address validation
 - `include/scoring_limits.h` — hardware limits (`MAX_LEDC`, `MAX_RMT`), CPU/RAM budget constants
+- `include/network_protocol.h` — network/system config field keys, limits, defaults, validation helpers; single source of truth for `/api/settings` JSON contract
 - `docs/domain_model.md` — project/domain context, device modes, thread safety, ADRs
+- `web/js/network_protocol.js` — JS mirror of `network_protocol.h`; single source of truth for network config field keys, limits, and validation
 - `docs/resource_calculator.md` — hardware scoring and constraints
 - `docs/hardware_guidelines.md` — ESD protection, flyback diode, datasheet checklist
 - `docs/user_manual/` — Typst user manual source (English-first, modular chapters, CeTZ/Fletcher diagrams)
