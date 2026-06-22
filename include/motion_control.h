@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include "output_control.h"
+#include "i2c_devices/i2c_dac.h"
 #include <FastAccelStepper.h>
 
 class TM1637Driver {
@@ -155,40 +156,6 @@ private:
         uint32_t maxDuty = ((uint64_t)outputMax * maxPct) / 10000;
         if (maxDuty >= minDuty) return minDuty + ((uint64_t)value * (maxDuty - minDuty)) / inputMax;
         return minDuty - ((uint64_t)value * (minDuty - maxDuty)) / inputMax;
-    }
-
-    void writeMcp4725(uint8_t addr, uint8_t value) {
-        uint16_t dac = ((uint16_t)value << 4) | (value >> 4);
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
-        Wire.beginTransmission(addr);
-        Wire.write(0x40);
-        Wire.write((dac >> 4) & 0xFF);
-        Wire.write((dac & 0x0F) << 4);
-        Wire.endTransmission();
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
-    }
-
-    void writeDac7571(uint8_t addr, uint8_t value) {
-        uint16_t dac = ((uint16_t)value << 4) | (value >> 4);
-        uint8_t ctrl = (dac >> 8) & 0x0F; // PD1=0, PD0=0, D11-D8
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
-        Wire.beginTransmission(addr);
-        Wire.write(ctrl);
-        Wire.write(dac & 0xFF);
-        Wire.endTransmission();
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
-    }
-
-    void writeDac7573(uint8_t addr, uint8_t channel, uint8_t value) {
-        uint16_t dac = ((uint16_t)value << 4) | (value >> 4);
-        uint8_t cmd = (channel & 0x03) << 1; // ch bits at pos 1-2, A3=A2=0, PD0=0
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
-        Wire.beginTransmission(addr);
-        Wire.write(cmd);
-        Wire.write((dac >> 4) & 0xFF);
-        Wire.write((dac & 0x0F) << 4);
-        Wire.endTransmission();
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
     }
 
     uint8_t segmentGpio(OutputChannel& ch, uint8_t idx) {
@@ -700,13 +667,13 @@ public:
 
                 if (ch.type != OutputDefs::TYPE_TM1637 && ch.type != OutputDefs::TYPE_7SEG_7PIN && ch.type != OutputDefs::TYPE_7SEG_8PIN) continue; // Skip ESP32 direct hardware update; 7-segment handled below
             } else if (ch.source == 5) { // MCP4725 I2C DAC
-                if (ch.type == OutputDefs::TYPE_DAC) writeMcp4725(ch.pca_addr, ch.dmxBuffer[0]);
+                if (ch.type == OutputDefs::TYPE_DAC) I2cDac::writeMcp4725(ch.pca_addr, ch.dmxBuffer[0]);
                 continue;
             } else if (ch.source == 6) { // DAC7571 I2C DAC (single-channel)
-                if (ch.type == OutputDefs::TYPE_DAC) writeDac7571(ch.pca_addr, ch.dmxBuffer[0]);
+                if (ch.type == OutputDefs::TYPE_DAC) I2cDac::writeDac7571(ch.pca_addr, ch.dmxBuffer[0]);
                 continue;
             } else if (ch.source == 7) { // DAC7573 I2C DAC (quad-channel)
-                if (ch.type == OutputDefs::TYPE_DAC) writeDac7573(ch.pca_addr, ch.pca_channel, ch.dmxBuffer[0]);
+                if (ch.type == OutputDefs::TYPE_DAC) I2cDac::writeDac7573(ch.pca_addr, ch.pca_channel, ch.dmxBuffer[0]);
                 continue;
             } else if (ch.source != 0) {
                 if (ch.type != OutputDefs::TYPE_TM1637 && ch.type != OutputDefs::TYPE_7SEG_7PIN && ch.type != OutputDefs::TYPE_7SEG_8PIN) continue; // Digital expanders are handled by OutputControl for on/off modes; 7-segment handled below

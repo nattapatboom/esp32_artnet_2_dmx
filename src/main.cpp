@@ -12,8 +12,8 @@
 
 #include "config.h"
 #include "web_pages.h"
-#include "pca9685_control.h"
-#include "i2c_gpio_expander.h"
+#include "i2c_devices/pca9685.h"
+#include "i2c_devices/i2c_gpio_expander.h"
 #include "output_control.h"
 #include "dimmer_control.h"
 #include "motion_control.h"

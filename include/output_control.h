@@ -12,8 +12,8 @@
 #include <ArduinoJson.h>
 #include "config.h"
 #include "dfplayer_control.h"
-#include "pca9685_control.h"
-#include "i2c_gpio_expander.h"
+#include "i2c_devices/pca9685.h"
+#include "i2c_devices/i2c_gpio_expander.h"
 #include "funcgen_control.h"
 #include "output_defs.h"
 
