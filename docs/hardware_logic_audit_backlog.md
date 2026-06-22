@@ -6,6 +6,7 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 
 1. **PCA9685 register writes may be broken**
    - Files: `include/pca9685_control.h`
+   - Status: ✅ Completed (`fix(pca9685): enable AI + safe _lastDuty update`)
    - Issue: `writeChannel()` writes four LEDn registers in one I2C transaction, but MODE1 Auto-Increment (`0x20`) is not enabled. `_lastDuty[channel]` is also updated before mutex/I2C success, suppressing retries after NACK or mutex timeout.
    - Fix direction: enable Auto-Increment in `begin()`/`setFrequency()`, and only update `_lastDuty` after successful `Wire.endTransmission() == 0`.
 

@@ -40,8 +40,8 @@ public:
     uint8_t getAddress() const { return _address; }
 
     void begin() {
-        // Wake up PCA9685
-        writeRegister(0x00, 0x00); // MODE1
+        // Wake PCA9685, enable register Auto-Increment for multi-byte writes
+        writeRegister(0x00, 0x20); // MODE1 with AI bit set
         delay(5);
     }
 
@@ -72,7 +72,6 @@ public:
         if (!force && _lastDuty[channel] == duty) {
             return;
         }
-        _lastDuty[channel] = duty;
 
         if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
         Wire.beginTransmission(_address);
@@ -97,8 +96,10 @@ public:
             Wire.write(duty & 0xFF); // OFF_L
             Wire.write((duty >> 8) & 0x0F); // OFF_H
         }
-        Wire.endTransmission();
+        uint8_t err = Wire.endTransmission();
         if (i2cMutex) xSemaphoreGive(i2cMutex);
+
+        if (err == 0) _lastDuty[channel] = duty;
     }
 };
 
