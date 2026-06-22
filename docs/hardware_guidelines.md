@@ -82,13 +82,63 @@ graph LR
 
 GPIO12 is the ESP32 MTDI bootstrap pin. It is exposed on WT32-ETH01 headers and may be used by existing field hardware, but it is a boot-risk pin, not a normal safe default output.
 
-Rules for GPIO12:
+GPIO12 policy:
 
 - GPIO12 is **allowed with warning only** in the Web UI; it is not hard-blocked so existing installations can keep working.
-- Do not connect circuits that pull GPIO12 HIGH during reset or power-up. A HIGH level during boot can select the wrong flash voltage and prevent the ESP32 from starting.
-- Prefer GPIO2, GPIO4, GPIO14, GPIO15, GPIO17, GPIO32, or GPIO33 for new output wiring.
-- If GPIO12 must be used, add a defined external pull-down or ensure the connected driver input is high-impedance/LOW during boot.
-- Avoid active-high relay boards, optocouplers, or level shifters on GPIO12 unless their input is guaranteed LOW at startup.
+- New wiring should prefer GPIO2, GPIO4, GPIO14, GPIO15, GPIO17, GPIO32, or GPIO33.
+- GPIO12 must read **LOW or high-impedance** during reset and power-up. Do not add a pull-up to GPIO12.
+- A HIGH level on GPIO12 during boot can select the wrong flash voltage and prevent the ESP32 from starting.
+
+Required wiring rules when GPIO12 is used:
+
+- Add an external pull-down near the WT32-ETH01 side. Start with **10 kOhm to GND**; use **4.7 kOhm** if the connected module has leakage or a weak pull-up.
+- Keep the driven device input high-impedance during board reset. If the external module powers up before the ESP32, its input must still not source current into GPIO12.
+- Add a **220 Ohm to 1 kOhm series resistor** between GPIO12 and the external driver input to limit current during reset, ESD events, or accidental contention.
+- Never connect GPIO12 directly to a module input that has a fixed pull-up to 3.3V/5V, an optocoupler LED tied to VCC, or an active-high relay input that defaults HIGH.
+- If the external circuit needs active-high logic, use a buffer/driver stage whose input is held LOW at startup and whose output side drives the load after boot.
+
+Recommended buffer patterns:
+
+```text
+Safe direct logic input:
+
+GPIO12 -- 220R..1k -- Driver Input
+   |
+  10k
+   |
+  GND
+```
+
+```text
+Safer active-high load driver:
+
+GPIO12 -- 1k -- N-MOSFET / NPN input stage -- Load driver input
+   |
+  10k
+   |
+  GND
+
+Load power and ESP32 GND must be common. Add flyback diode for coils.
+```
+
+Mode-specific guidance:
+
+| Use case | GPIO12 suitability | Required notes |
+| --- | --- | --- |
+| Relay / solenoid / smoke digital output | Acceptable with caution | Prefer low-side transistor/MOSFET driver. Add pull-down on GPIO12 and flyback diode on coils. Avoid relay modules whose input is pulled HIGH at boot. |
+| Single LED / PWM DAC / analog PWM | Acceptable with caution | Use pull-down plus series resistor. External RC/filter input must not pull GPIO12 HIGH. Prefer another GPIO for precision analog/PWM if available. |
+| Servo signal | Not recommended | Many servo/level-shifter boards can inject noise or pull the signal line. Use another GPIO or PCA9685 where possible. |
+| Stepper STEP / high-speed timing | Not recommended | Bootstrap risk plus timing sensitivity. Use another GPIO for STEP. DIR/ENABLE can be moved to expanders if needed. |
+| I2C SDA/SCL | Not recommended | I2C pull-ups intentionally pull the line HIGH, which is unsafe for GPIO12 at boot unless isolated. Use GPIO14/GPIO15 defaults instead. |
+| Status LED | Acceptable only if LOW at boot | LED circuit must not pull GPIO12 HIGH. Use GPIO5 default or GPIO17 if possible. |
+| Zero-cross input / input-only sensing | Avoid unless verified | Sensor output must be open-drain/open-collector or high-impedance at boot with pull-down keeping GPIO12 LOW. |
+
+Validation checklist before deploying GPIO12 wiring:
+
+- Power-cycle the board with the external module connected at least 10 times and confirm it always boots.
+- Measure GPIO12 during reset with a multimeter or oscilloscope; it must stay below logic HIGH threshold until boot completes.
+- Test both power orders: ESP32 first, external module first, and simultaneous power-up.
+- Confirm failure behavior: if the external module is unplugged, GPIO12 should still be pulled LOW by the local pull-down.
 
 ---
 
