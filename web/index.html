@@ -1307,8 +1307,8 @@ const OUTPUT_DEFS={
   9:{name:'Passive Buzzer',modes:{default:{cost:COST.buzzer,pins:{pin1:{label:'Tone PWM',sources:SRC_GPIO,dir:'out',invert:true}}}}},
   10:{name:'DFPlayer MP3',modes:{default:{cost:COST.dfPlayer,pins:{pin1:{label:'TX',sources:SRC_GPIO,dir:'out',invert:false},pin2:{label:'RX',sources:SRC_GPIO,dir:'in',invert:false}}}}},
   11:{name:'7-Segment 2-Pin',modes:{default:{cost:COST.tm1637,pins:{pin1:{label:'CLK',sources:SRC_GPIO,dir:'out',invert:true},pin2:{label:'DIO',sources:SRC_GPIO,dir:'out',invert:true}}}}},
-  12:{name:'7-Segment DD 7-Pin PWM',modes:{default:{cost:COST.sevenSeg7,pins:{pin1:{label:'Segment A',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},segments:{label:'Segments',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}},directDim:{cost:COST.sevenSeg7,pins:{segments:{label:'Dimmed Segments',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}},commonDim:{cost:COST.sevenSegCommon7,pins:{pin1:{label:'Common PWM',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},segments:{label:'Segments',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}}}},
-  13:{name:'7-Segment DD 8-Pin PWM',modes:{default:{cost:COST.sevenSeg8,pins:{pin1:{label:'Segment A',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},segments:{label:'Segments',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}},directDim:{cost:COST.sevenSeg8,pins:{segments:{label:'Dimmed Segments',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}},commonDim:{cost:COST.sevenSegCommon8,pins:{pin1:{label:'Common PWM',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},segments:{label:'Segments',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}}}},
+  12:{name:'7-Segment DD 7-Pin PWM',modes:{default:{cost:COST.sevenSeg7,pins:{pin1:{label:'Segment A',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment B',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin3:{label:'Segment C',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin4:{label:'Segment D',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin5:{label:'Segment E',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin6:{label:'Segment F',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin7:{label:'Segment G',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}},directDim:{cost:COST.sevenSeg7,pins:{pin1:{label:'Segment A',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment B',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin3:{label:'Segment C',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin4:{label:'Segment D',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin5:{label:'Segment E',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin6:{label:'Segment F',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin7:{label:'Segment G',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}},commonDim:{cost:COST.sevenSegCommon7,pins:{pin1:{label:'Common PWM',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment A',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin3:{label:'Segment B',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin4:{label:'Segment C',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin5:{label:'Segment D',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin6:{label:'Segment E',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin7:{label:'Segment F',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin8:{label:'Segment G',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}}}},
+  13:{name:'7-Segment DD 8-Pin PWM',modes:{default:{cost:COST.sevenSeg8,pins:{pin1:{label:'Segment A',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment B',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin3:{label:'Segment C',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin4:{label:'Segment D',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin5:{label:'Segment E',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin6:{label:'Segment F',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin7:{label:'Segment G',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin8:{label:'Segment DP',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}},directDim:{cost:COST.sevenSeg8,pins:{pin1:{label:'Segment A',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment B',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin3:{label:'Segment C',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin4:{label:'Segment D',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin5:{label:'Segment E',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin6:{label:'Segment F',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin7:{label:'Segment G',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin8:{label:'Segment DP',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}},commonDim:{cost:COST.sevenSegCommon8,pins:{pin1:{label:'Common PWM',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment A',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin3:{label:'Segment B',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin4:{label:'Segment C',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin5:{label:'Segment D',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin6:{label:'Segment E',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin7:{label:'Segment F',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin8:{label:'Segment G',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin9:{label:'Segment DP',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}}}},
   14:{name:'DAC',modes:{default:{cost:COST.dac,pins:{pin1:{label:'I2C DAC',sources:SRC_DAC,dir:'out',invert:false}}}}},
   15:{name:'PWM DAC',modes:{default:{cost:COST.pwmDac,pins:{pin1:{label:'PWM Out',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}}}},
   16:{name:'Function Gen',modes:{default:{cost:COST.funcGen,pins:{pin1:{label:'Wave Out',sources:SRC_GPIO,dir:'out',invert:true}}}}},
@@ -1329,6 +1329,10 @@ function outputModeDef(type,mode){
   return def.modes[outputModeKey(type,mode)]||def.modes.default||null;
 }
 function outputPinRule(type,mode,slot){ return outputModeDef(type,mode)?.pins?.[slot]||null; }
+function outputSegmentPinRule(type,mode,segmentIndex){
+  const slot='pin'+(parseInt(segmentIndex)+(((parseInt(type)===12||parseInt(type)===13)&&parseInt(mode||0)>=6&&parseInt(mode||0)<=9)?2:1));
+  return outputPinRule(type,mode,slot);
+}
 function ruleAllows(rule,sourceFlag,fallback=false){ return rule?!!(rule.sources&sourceFlag):fallback; }
 function outputModeCpuUs(type,mode){ return outputModeDef(type,mode)?.cost?.cpuUs||0; }
 
@@ -1474,8 +1478,12 @@ function renderPinRows(){
   const isCommonDim=is7Seg&&(mcMode>=6&&mcMode<=9);
   const is7SegDD=is7Seg&&(mcMode>=2&&mcMode<=9);
   const is7SegDirectDim=is7Seg&&(mcMode===4||mcMode===5);
-  const canUsePca=(t===2||t===4||t===6||t===8||t===5||t===15||t===17||t===18||is7SegDD);
-  const canUseDig=(t===2||t===17||t===18||(is7SegDD&&!isCommonDim&&!is7SegDirectDim));
+  const pin1Rule=outputPinRule(t,mcMode,'pin1');
+  const pin2Rule=outputPinRule(t,mcMode,'pin2');
+  const pin3Rule=outputPinRule(t,mcMode,'pin3');
+  const pin4Rule=outputPinRule(t,mcMode,'pin4');
+  const canUsePca=ruleAllows(pin1Rule,SRC_PCA,(t===2||t===4||t===6||t===8||t===5||t===15||t===17||t===18||is7SegDD));
+  const canUseDig=ruleAllows(pin1Rule,SRC_DIG,(t===2||t===17||t===18||(is7SegDD&&!isCommonDim&&!is7SegDirectDim)));
   const mainExpander=src!==0;
   const usePin2=isMotor||isAnalog||t===18||is7Seg||isDfPlayer||(isStepper&&(pin2Src===0||pin2Src!==0));
   const usePin3=isAnalog||(isMotor&&mcMode===2)||isStepper||(is7Seg&&mcMode===1);
@@ -1546,17 +1554,18 @@ const srcOpts=(allowPca,allowDig,allowDac=false,allowGpio=true)=>{
       const startSeg = isCommonDim ? 0 : 1;
       for (let s = startSeg; s < numSeg; s++) {
         const segSrc = parseInt(saved['no_seg_source_'+s]||0);
+        const segRule = outputSegmentPinRule(t,mcMode,s);
         pinDefs.push({
           label: segLabels[s],
           desc: 'Segment ' + segLabels[s].split(' ')[1],
-          srcHtml: (s === startSeg ? '<input type="hidden" id="no_pin2_source" value="0">' : '') + mkSel('no_seg_source_' + s, srcOpts(true,!is7SegDirectDim)),
+          srcHtml: (s === startSeg ? '<input type="hidden" id="no_pin2_source" value="0">' : '') + mkSel('no_seg_source_' + s, srcOpts(ruleAllows(segRule,SRC_PCA,true),ruleAllows(segRule,SRC_DIG,!is7SegDirectDim))),
           addrHtml: segSrc===0 ? localBadge('GPIO Only') : mkSel('no_seg_addr_' + s, addrOpts(segSrc)),
           pinHtml: segSrc===0 ? mkSel('no_seg_pin_' + s, `<option value="255">None</option>` + PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')) : mkSel('no_seg_channel_' + s, `<option value="255">None</option>${chOpts}`),
           invId: 'no_seg_pin_invert_' + s
         });
       }
     } else {
-      const srcSel=mkSel('no_pin2_source',srcOpts(isStepper||isMotor||isAnalog||t===18||is7SegDD,isStepper||isMotor||(is7SegDD&&!is7SegDirectDim)||t===18));
+      const srcSel=mkSel('no_pin2_source',srcOpts(ruleAllows(pin2Rule,SRC_PCA,isStepper||isMotor||isAnalog||t===18||is7SegDD),ruleAllows(pin2Rule,SRC_DIG,isStepper||isMotor||(is7SegDD&&!is7SegDirectDim)||t===18)));
       const addrEl=showAddr?mkSel('no_pin2_addr',addrOpts(p2Src)):localBadge('ESP32 GPIO');
       let pinOpts;
       if(showAddr){
@@ -1574,7 +1583,7 @@ const srcOpts=(allowPca,allowDig,allowDac=false,allowGpio=true)=>{
   // Pin 3
   if(usePin3){
     let p3Src=pin3Src;
-    const srcSel=mkSel('no_pin3_source',srcOpts((isMotor&&mcMode===2)||isAnalog,isStepper));
+    const srcSel=mkSel('no_pin3_source',srcOpts(ruleAllows(pin3Rule,SRC_PCA,(isMotor&&mcMode===2)||isAnalog),ruleAllows(pin3Rule,SRC_DIG,isStepper)));
     const addrEl=p3Src!==0?mkSel('no_pin3_addr',addrOpts(p3Src)):localBadge('ESP32 GPIO');
     let pinOpts;
     if(p3Src!==0){
@@ -1588,7 +1597,7 @@ const srcOpts=(allowPca,allowDig,allowDac=false,allowGpio=true)=>{
   // Pin 4
   if(showPin4){
     let p4Src=pin4Src;
-    const srcSel=isStepper ? mkSel('no_pin4_source',srcOpts(false,true)) : (isAnalog ? mkSel('no_pin4_source',srcOpts(true,false)) : mkSel('no_pin4_source',srcOpts(false,false)));
+    const srcSel=mkSel('no_pin4_source',srcOpts(ruleAllows(pin4Rule,SRC_PCA,isAnalog),ruleAllows(pin4Rule,SRC_DIG,isStepper)));
     const addrEl=p4Src!==0?mkSel('no_pin4_addr',addrOpts(p4Src)):localBadge('ESP32 GPIO');
     let pinOpts;
     if(p4Src!==0){

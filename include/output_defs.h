@@ -94,14 +94,34 @@ constexpr PinRule PINS_TM1637[] = {
 };
 constexpr PinRule PINS_7SEG_DIRECT[] = {
     {"pin1", "Segment A", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"segments", "Segments", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
+    {"pin2", "Segment B", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin3", "Segment C", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin4", "Segment D", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin5", "Segment E", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin6", "Segment F", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin7", "Segment G", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin8", "Segment DP", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
 };
 constexpr PinRule PINS_7SEG_DIMMED[] = {
-    {"segments", "Dimmed Segments", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true}
+    {"pin1", "Segment A", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
+    {"pin2", "Segment B", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
+    {"pin3", "Segment C", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
+    {"pin4", "Segment D", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
+    {"pin5", "Segment E", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
+    {"pin6", "Segment F", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
+    {"pin7", "Segment G", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
+    {"pin8", "Segment DP", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true}
 };
 constexpr PinRule PINS_7SEG_COMMON_DIM[] = {
     {"pin1", "Common PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"segments", "Segments", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
+    {"pin2", "Segment A", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin3", "Segment B", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin4", "Segment C", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin5", "Segment D", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin6", "Segment E", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin7", "Segment F", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin8", "Segment G", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
+    {"pin9", "Segment DP", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
 };
 constexpr PinRule PINS_DAC[] = {
     {"pin1", "I2C DAC", SRC_I2C_DAC, PIN_OUTPUT, false}
@@ -168,8 +188,16 @@ constexpr OutputModeDef OUTPUT_MODES[] = {
     {9, -1, "Passive buzzer", COST_BUZZER, PINS_GPIO_MAIN, 1},
     {10, -1, "DFPlayer", COST_DFPLAYER, PINS_DFPLAYER, 2},
     {11, -1, "TM1637", COST_TM1637, PINS_TM1637, 2},
-    {12, -1, "7-seg 7-pin", COST_7SEG_7PIN, PINS_7SEG_DIRECT, 2},
-    {13, -1, "7-seg 8-pin", COST_7SEG_8PIN, PINS_7SEG_DIRECT, 2},
+    {12, -1, "7-seg 7-pin", COST_7SEG_7PIN, PINS_7SEG_DIRECT, 7},
+    {12, 4, "7-seg 7-pin direct dim CA", COST_7SEG_7PIN, PINS_7SEG_DIMMED, 7},
+    {12, 5, "7-seg 7-pin direct dim CC", COST_7SEG_7PIN, PINS_7SEG_DIMMED, 7},
+    {12, 6, "7-seg 7-pin common anode dim", COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
+    {12, 7, "7-seg 7-pin common cathode dim", COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
+    {13, -1, "7-seg 8-pin", COST_7SEG_8PIN, PINS_7SEG_DIRECT, 8},
+    {13, 4, "7-seg 8-pin direct dim CA", COST_7SEG_8PIN, PINS_7SEG_DIMMED, 8},
+    {13, 5, "7-seg 8-pin direct dim CC", COST_7SEG_8PIN, PINS_7SEG_DIMMED, 8},
+    {13, 8, "7-seg 8-pin common anode dim", COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
+    {13, 9, "7-seg 8-pin common cathode dim", COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
     {14, -1, "I2C DAC", COST_DAC, PINS_DAC, 1},
     {15, -1, "PWM DAC", COST_PWM_DAC, PINS_PWM, 1},
     {16, -1, "Function generator", COST_FUNC_GEN, PINS_GPIO_MAIN, 1},
