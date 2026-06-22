@@ -52,10 +52,10 @@ constexpr RamRuntimeDef RAM_RUNTIME = {
     65535,      // output allocation scoring cap
     224,        // OutputChannel vector slot + allocator/header slack
     512,        // DMX universe buffer
-    256,        // NeoPixel wrapper/object overhead
-    160,        // DFPlayer object overhead
-    512,        // Stepper runtime object/slack
-    1120,       // Function generator waveform tables + esp_timer slack
+    0,          // (moved to OutputDefs::ModeCost::extraRamBytes)
+    0,          // (moved to OutputDefs::ModeCost::extraRamBytes)
+    0,          // (moved to OutputDefs::ModeCost::extraRamBytes)
+    0,          // (moved to OutputDefs::ModeCost::extraRamBytes)
     32          // I2C route bookkeeping estimate
 };
 
@@ -77,10 +77,6 @@ constexpr uint32_t RAM_LIMIT_CAP = RAM_RUNTIME.limitCap;
 constexpr uint16_t I2C_WRITE_US = CPU_RUNTIME.i2cWriteUs;
 constexpr uint32_t BASE_CHANNEL_RAM = RAM_RUNTIME.baseChannel;
 constexpr uint32_t DMX_BUFFER_RAM = RAM_RUNTIME.dmxBuffer;
-constexpr uint32_t PIXEL_STRIP_OBJECT_RAM = RAM_RUNTIME.pixelStripObject;
-constexpr uint32_t DFPLAYER_OBJECT_RAM = RAM_RUNTIME.dfPlayerObject;
-constexpr uint32_t STEPPER_RUNTIME_RAM = RAM_RUNTIME.stepperRuntime;
-constexpr uint32_t FUNCGEN_OBJECT_RAM = RAM_RUNTIME.funcGenObject;
 constexpr uint32_t I2C_ROUTE_RAM = RAM_RUNTIME.i2cRoute;
 constexpr uint32_t DMX_OUTPUT_SERVICE_US = CPU_RUNTIME.dmxOutputServiceUs;
 }

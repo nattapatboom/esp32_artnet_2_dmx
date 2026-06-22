@@ -236,10 +236,6 @@ inline uint8_t i2cWritesForChannel(const OutputChannel& ch) {
 // Service time & RAM per channel (independent of FPS)
 constexpr uint32_t BASE_CHANNEL_RAM = ScoringDefs::BASE_CHANNEL_RAM;
 constexpr uint32_t DMX_BUFFER_RAM = ScoringDefs::DMX_BUFFER_RAM;
-constexpr uint32_t PIXEL_STRIP_OBJECT_RAM = ScoringDefs::PIXEL_STRIP_OBJECT_RAM;
-constexpr uint32_t DFPLAYER_OBJECT_RAM = ScoringDefs::DFPLAYER_OBJECT_RAM;
-constexpr uint32_t STEPPER_RUNTIME_RAM = ScoringDefs::STEPPER_RUNTIME_RAM;
-constexpr uint32_t FUNCGEN_OBJECT_RAM = ScoringDefs::FUNCGEN_OBJECT_RAM;
 constexpr uint32_t RMT_DMX_DRIVER_RAM = 5150UL * sizeof(rmt_item32_t) + 32;
 constexpr uint32_t I2C_ROUTE_RAM = ScoringDefs::I2C_ROUTE_RAM;
 constexpr uint32_t DMX_OUTPUT_SERVICE_US = ScoringDefs::DMX_OUTPUT_SERVICE_US;
@@ -311,11 +307,10 @@ inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     PerChannelCost c;
     c.cpuUs = ScoringDefs::channelCpuUs(ch.type, ch.mc_mode);
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(ch.type, ch.led_count, ch.color_order, ch.mc_resolution, ch.mc_mode);
+    auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
+    if (def) c.ramBytes += def->cost.extraRamBytes;
     if (ch.type == OutputDefs::TYPE_LED_STRIP) c.cpuUs = ledStripServiceUs(ch.led_count, ch.color_order);
-    if (ch.type == OutputDefs::TYPE_LED_STRIP) c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order) + PIXEL_STRIP_OBJECT_RAM;
-    if (ch.type == OutputDefs::TYPE_STEPPER) c.ramBytes += STEPPER_RUNTIME_RAM;
-    if (ch.type == OutputDefs::TYPE_DFPLAYER) c.ramBytes += DFPLAYER_OBJECT_RAM + 100;
-    if (ch.type == OutputDefs::TYPE_FUNC_GEN) c.ramBytes += FUNCGEN_OBJECT_RAM;
+    if (ch.type == OutputDefs::TYPE_LED_STRIP) c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order);
     c.cpuUs += (uint16_t)i2cWritesForChannel(ch) * I2C_WRITE_US;
     c.ramBytes += (uint32_t)i2cWritesForChannel(ch) * I2C_ROUTE_RAM;
     return c;
@@ -574,15 +569,15 @@ inline uint8_t i2cWritesFromJson(JsonObjectConst j) {
 inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
     PerChannelCost c;
     uint8_t t = j["type"] | 0;
+    uint8_t mode = j["mc_mode"] | 0;
     uint16_t ledCount = j["led_count"] | 0;
     uint8_t colorOrder = j["color_order"] | 0;
-    c.cpuUs = ScoringDefs::channelCpuUs(t, j["mc_mode"] | 0);
-    c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(t, ledCount, colorOrder, j["mc_resolution"] | 8, j["mc_mode"] | 0);
+    c.cpuUs = ScoringDefs::channelCpuUs(t, mode);
+    c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(t, ledCount, colorOrder, j["mc_resolution"] | 8, mode);
+    auto* def = OutputDefs::modeDef(t, mode);
+    if (def) c.ramBytes += def->cost.extraRamBytes;
     if (t == OutputDefs::TYPE_LED_STRIP) c.cpuUs = ledStripServiceUs(ledCount, colorOrder);
-    if (t == OutputDefs::TYPE_LED_STRIP) c.ramBytes += pixelBufferRam(ledCount, colorOrder) + PIXEL_STRIP_OBJECT_RAM;
-    if (t == OutputDefs::TYPE_STEPPER) c.ramBytes += STEPPER_RUNTIME_RAM;
-    if (t == OutputDefs::TYPE_DFPLAYER) c.ramBytes += DFPLAYER_OBJECT_RAM + 100;
-    if (t == OutputDefs::TYPE_FUNC_GEN) c.ramBytes += FUNCGEN_OBJECT_RAM;
+    if (t == OutputDefs::TYPE_LED_STRIP) c.ramBytes += pixelBufferRam(ledCount, colorOrder);
     c.cpuUs += (uint16_t)i2cWritesFromJson(j) * I2C_WRITE_US;
     c.ramBytes += (uint32_t)i2cWritesFromJson(j) * I2C_ROUTE_RAM;
     return c;
