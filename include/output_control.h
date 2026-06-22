@@ -781,24 +781,26 @@ public:
              item["shoot_duration_ms"] = ch.shoot_duration_ms;
              item["smoke_lockout_ms"] = ch.smoke_lockout_ms;
 
-            if (ch.type >= 4 && ch.type <= 8) {
-                item["pin2"] = ch.pin2;
-                item["pin3"] = ch.pin3;
-                item["pin4"] = ch.pin4;
-                if (ch.type == 7) {
-                    item["pin4_source"] = ch.pin4_source;
-                    item["pin4_addr"] = ch.pin4_addr;
-                    item["pin4_channel"] = ch.pin4_channel;
-                    item["pin2_source"] = ch.pin2_source;
-                    item["pin2_addr"] = ch.pin2_addr;
-                    item["pin2_channel"] = ch.pin2_channel;
-                    item["pin3_source"] = ch.pin3_source;
-                    item["pin3_addr"] = ch.pin3_addr;
-                    item["pin3_channel"] = ch.pin3_channel;
-                    item["mc_enable_active_high"] = ch.mc_enable_active_high;
-                    item["mc_dir_invert"] = ch.mc_dir_invert;
-                    item["mc_step_invert"] = ch.mc_step_invert;
-                }
+                if (ch.type >= 4 && ch.type <= 8) {
+                    item["pin2"] = ch.pin2;
+                    item["pin3"] = ch.pin3;
+                    item["pin4"] = ch.pin4;
+                    if (ch.type >= 5 && ch.type <= 7) {
+                        item["pin4_source"] = ch.pin4_source;
+                        item["pin4_addr"] = ch.pin4_addr;
+                        item["pin4_channel"] = ch.pin4_channel;
+                        item["pin2_source"] = ch.pin2_source;
+                        item["pin2_addr"] = ch.pin2_addr;
+                        item["pin2_channel"] = ch.pin2_channel;
+                        item["pin3_source"] = ch.pin3_source;
+                        item["pin3_addr"] = ch.pin3_addr;
+                        item["pin3_channel"] = ch.pin3_channel;
+                    }
+                    if (ch.type == 7) {
+                        item["mc_enable_active_high"] = ch.mc_enable_active_high;
+                        item["mc_dir_invert"] = ch.mc_dir_invert;
+                        item["mc_step_invert"] = ch.mc_step_invert;
+                    }
                 item["mc_resolution"] = ch.mc_resolution;
                 item["mc_freq"] = ch.mc_freq;
                 item["mc_mode"] = ch.mc_mode;

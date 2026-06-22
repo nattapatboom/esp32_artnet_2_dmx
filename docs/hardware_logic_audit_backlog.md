@@ -30,6 +30,7 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 
 5. **Hybrid route persistence missing for Analog RGB and Motor**
    - Files: `include/output_control.h`
+   - Status: ✅ Completed (`fix: save pin2/3/4_source/addr/channel for types 5-7`)
    - Issue: `pin2_source`, `pin3_source`, `pin4_source`, addresses, and channels are saved only for stepper type 7, so analog RGB/motor hybrid routes can be lost after reboot.
    - Fix direction: persist hybrid source/address/channel fields for types 5, 6, 7, 18 and any other type using those fields.
 
