@@ -49,10 +49,10 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
    - Issue: queue depth is 16 but `espnow_chunk_size=16` requires 32 packets for one full universe; `xQueueSend()` return value is ignored.
    - Fix direction: either raise minimum chunk size or queue depth, check/drop-count on send failure, and expose a diagnostic counter.
 
-10. **Web UI exposes Ethernet/strap GPIOs as output choices**
+10. **Web UI exposes Ethernet RMII pins as output choices**
     - Files: `web/index.html`
-    - Issue: PWM DAC and Function Generator dropdowns expose GPIO25/26/27 even though they are WT32-ETH01 Ethernet RMII pins; `OUTPUT_GPIOS`/`PIN_GPIOS` include GPIO12, so auto-assign can choose MTDI despite ADR006.
-    - Fix direction: remove GPIO25/26/27 from Web UI output dropdowns for WT32-ETH01; remove GPIO12 from auto-assign pools and normal output/status choices, or hard-block it before add/save.
+    - Issue: PWM DAC and Function Generator dropdowns expose GPIO25/26/27 even though they are WT32-ETH01 Ethernet RMII pins.
+    - Fix direction: remove GPIO25/26/27 from Web UI output dropdowns for WT32-ETH01 and block RMII/PHY pins in add/edit validation. Keep GPIO12 selectable with warning-only behavior because existing hardware may still use it.
 
 11. **Web UI 7-segment common-dim resource scoring overcounts LEDC**
     - Files: `web/index.html`, `include/scoring.h`

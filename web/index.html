@@ -1084,6 +1084,13 @@ async function saveSettings(e){
     alert('Status LED GPIO and Zero-Crossing GPIO cannot use the same pin.');
     return;
   }
+  const forbiddenSettingsPins=[['Status LED GPIO',obj.status_led_pin],['I2C SDA GPIO',obj.i2c_sda],['I2C SCL GPIO',obj.i2c_scl]];
+  for(const [label,pin] of forbiddenSettingsPins){
+    if(pin!==255&&FORBIDDEN_OUTPUT_GPIOS[pin]){
+      alert(label+' '+pin+' is not allowed on WT32-ETH01 ('+FORBIDDEN_OUTPUT_GPIOS[pin]+'). Select another pin.');
+      return;
+    }
+  }
   if(obj.i2c_sda!==255&&obj.i2c_scl!==255&&obj.i2c_sda===obj.i2c_scl){
     alert('I2C SDA and SCL pins cannot be the same.');
     return;
@@ -1226,6 +1233,7 @@ const SOURCES={0:'ESP32',1:'PCA9685',2:'MCP23017',3:'TCA9555',4:'PCF857x',5:'MCP
 const OUTPUT_GPIOS=[4,12,14,15,2,17,32,33];
 const INPUT_GPIOS=[36,39,34,35,32,33];
 const INPUT_ONLY_GPIOS=[36,39,34,35];
+const FORBIDDEN_OUTPUT_GPIOS={0:'Ethernet RMII clock / BOOT',16:'Ethernet PHY power',18:'Ethernet RMII MDIO',19:'Ethernet RMII TXD0',21:'Ethernet RMII TX_EN',22:'Ethernet RMII TXD1',23:'Ethernet RMII MDC',25:'Ethernet RMII RXD0',26:'Ethernet RMII RXD1',27:'Ethernet RMII CRS_DV'};
 
 function typeId(o){
   const t=parseInt(o.type);
@@ -1419,9 +1427,9 @@ const srcOpts=(allowPca,allowDig,allowDac=false,allowGpio=true)=>{
       pinDefs.push({label:'DAC IC',desc:dacLabel,srcHtml:localBadge('I2C DAC'),addrHtml:localBadge(dacLabel),pinHtml:p1Src===7?mkSel('no_pca_channel',chOptsDac):localBadge('CH A'),invId:''});
     }
   } else if (t===15) { // PWM DAC
-    pinDefs.push({label:'Pin 1',desc:'PWM Out',srcHtml:mkSel('no_source',srcOpts(true,false)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.concat(['25','26','27']).map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
+    pinDefs.push({label:'Pin 1',desc:'PWM Out',srcHtml:mkSel('no_source',srcOpts(true,false)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
   } else if (isFuncGen) {
-    pinDefs.push({label:'Pin 1',desc:p1Desc,srcHtml:mkSel('no_source',srcOpts(false,false)),addrHtml:localBadge('GPIO only'),pinHtml:mkSel('no_pin',PIN_GPIOS.concat(['25','26','27']).map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')),invId:'no_pin_invert'});
+    pinDefs.push({label:'Pin 1',desc:p1Desc,srcHtml:mkSel('no_source',srcOpts(false,false)),addrHtml:localBadge('GPIO only'),pinHtml:mkSel('no_pin',PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')),invId:'no_pin_invert'});
   } else {
     pinDefs.push({label:p1Label,desc:p1DescText,srcHtml:mkSel('no_source',srcOpts(canUsePca,canUseDig)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
   }
@@ -1670,7 +1678,7 @@ function autoAssignOutputPins(){
     return;
   }
 
-  if (t !== 14) setSelectIfOption('no_pin',takeOutput()); // DAC requires manual pin selection (GPIO 25/26 only)
+  if (t !== 14) setSelectIfOption('no_pin',takeOutput()); // WT32-ETH01 DAC uses I2C DAC sources, not GPIO25/26.
   if(t===6||t===5||t===18||(t>=11&&t<=13)||t===10||(t===7&&pin2Source===0)) setSelectIfOption('no_pin2',takeOutput());
   if(t===5||(t===6&&mcMode===2)||(t===7&&pin3Source===0)) setSelectIfOption('no_pin3',takeOutput());
   if((t===7&&hMode===0)||(t===5&&colorOrder>=4)) setSelectIfOption('no_pin4',takeOutput());
@@ -2822,6 +2830,12 @@ function addOrUpdateOutput(){
     return;
   }
   const gpios = outputGpios(ch);
+  for(const gp of gpios){
+    if(FORBIDDEN_OUTPUT_GPIOS[gp]){
+      alert('GPIO '+gp+' is not allowed on WT32-ETH01 ('+FORBIDDEN_OUTPUT_GPIOS[gp]+'). Select another pin.');
+      return;
+    }
+  }
   if(gpios.includes(statusPin) && statusPin!==255){
     alert('GPIO '+statusPin+' is reserved for Status LED. Disable Status LED or select another output GPIO.');
     return;
