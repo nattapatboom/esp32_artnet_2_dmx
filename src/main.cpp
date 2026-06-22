@@ -157,8 +157,6 @@ void refreshTestOutputNow() {
     lastDmxUpdateTime = millis();
     systemActive = true;
     networkFramePending = true;
-    outputCtrl.updateLeds();
-    motionCtrl.update();
 }
 
 void updateStatusLedPattern() {
