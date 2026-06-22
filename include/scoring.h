@@ -404,10 +404,20 @@ inline uint8_t countUniqueUniversesFromJson(JsonArrayConst arr) {
 inline HardwareResource totalHardware(const std::vector<OutputChannel>& chs) {
     HardwareResource t;
     bool hasDimmer = false;
+    uint8_t dmxCount = 0;
+    uint8_t dfPlayerCount = 0;
     for (auto& ch : chs) {
         t = t + estimateHardware(ch);
         if (ch.type == 0) hasDimmer = true;
+        if (ch.type == 1 && ch.source == 0) dmxCount++;
+        else if (ch.type == 10) dfPlayerCount++;
     }
+    // DFPlayer has UART priority; DMX falls back to RMT when UARTs exhausted
+    uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
+    uint8_t dmxUartUse = dmxCount < freeUarts ? dmxCount : freeUarts;
+    uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
+    t.uart = dfPlayerCount + dmxUartUse;
+    t.rmt += dmxRmtUse;
     if (hasDimmer) t.timer += 1;
     return t;
 }
@@ -611,10 +621,22 @@ inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
 inline HardwareResource totalHardwareFromJson(JsonArrayConst arr) {
     HardwareResource t;
     bool hasDimmer = false;
+    uint8_t dmxCount = 0;
+    uint8_t dfPlayerCount = 0;
     for (JsonObjectConst j : arr) {
         t = t + estimateHardwareFromJson(j);
-        if ((uint8_t)(j["type"] | 0) == 0) hasDimmer = true;
+        uint8_t type = j["type"] | 0;
+        uint8_t source = j["source"] | 0;
+        if (type == 1 && source == 0) dmxCount++;
+        else if (type == 10) dfPlayerCount++;
+        if (type == 0) hasDimmer = true;
     }
+    // DFPlayer has UART priority; DMX falls back to RMT when UARTs exhausted
+    uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
+    uint8_t dmxUartUse = dmxCount < freeUarts ? dmxCount : freeUarts;
+    uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
+    t.uart = dfPlayerCount + dmxUartUse;
+    t.rmt += dmxRmtUse;
     if (hasDimmer) t.timer += 1;
     return t;
 }

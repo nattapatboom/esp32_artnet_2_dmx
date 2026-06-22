@@ -1986,12 +1986,21 @@ function cpuLimit(fps){
 }
 function totalHardware(arr){
   const t={ledc:0,rmt:0,uart:0,dac:0,timer:0};
-  let hasDimmer=false;
+  let hasDimmer=false, dmxCount=0, dfPlayerCount=0;
   arr.forEach(o=>{
     const h=channelHardware(o);
     t.ledc+=h.ledc;t.rmt+=h.rmt;t.uart+=h.uart;t.dac+=h.dac;t.timer+=h.timer;
-    if(typeId(o)===0) hasDimmer=true;
+    const typ=typeId(o);
+    if(typ===0) hasDimmer=true;
+    if(typ===1&&parseInt(o.source||0)===0) dmxCount++;
+    else if(typ===10) dfPlayerCount++;
   });
+  // DFPlayer has UART priority; DMX falls back to RMT when UARTs exhausted
+  const freeUarts=Math.max(0,2-dfPlayerCount);
+  const dmxUartUse=Math.min(dmxCount,freeUarts);
+  const dmxRmtUse=Math.max(0,dmxCount-freeUarts);
+  t.uart=dfPlayerCount+dmxUartUse;
+  t.rmt+=dmxRmtUse;
   if(hasDimmer) t.timer+=1;
   return t;
 }
