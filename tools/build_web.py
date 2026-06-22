@@ -12,6 +12,10 @@ import os
 WEB_DIR = "web"
 PARTS_DIR = os.path.join(WEB_DIR, "parts")
 JS_DIR = os.path.join(WEB_DIR, "js")
+OUTPUT_CONFIG_DIR = os.path.join(PARTS_DIR, "output-config")
+OUTPUT_TEST_DIR = os.path.join(PARTS_DIR, "output-test")
+JS_CONFIG_DIR = os.path.join(JS_DIR, "output-config")
+JS_TEST_DIR = os.path.join(JS_DIR, "output-test")
 HEADER_PATH = "include/web_pages.h"
 SHELL_PATH = os.path.join(WEB_DIR, "index.html")
 
@@ -24,6 +28,15 @@ PANE_MARKERS = {
 }
 
 JS_ORDER = ["_gpio.js", "scoring.js", "espnow.js", "app.js", "outputs.js"]
+
+
+def collect_type_files(directory, sort_key=lambda f: f):
+    """Collect files from directory sorted by type number."""
+    if not os.path.isdir(directory):
+        return []
+    files = [f for f in os.listdir(directory) if f.endswith(".html") or f.endswith(".js")]
+    files.sort(key=sort_key)
+    return files
 
 
 def minify_html(html):
@@ -65,7 +78,19 @@ def main():
             continue
         html = html.replace(marker, pane_html)
 
-    # Embed JS files into <script> tag
+    # Replace per-type config/test markers with all type-N.html files
+    for marker_name, src_dir in [("CONFIG_TYPE_FIELDS", OUTPUT_CONFIG_DIR),
+                                   ("TEST_TYPE_FIELDS", OUTPUT_TEST_DIR)]:
+        marker = f"<!-- {marker_name} -->"
+        if marker not in html:
+            print(f"Warning: marker {marker} not found in shell, skipping")
+            continue
+        type_files = collect_type_files(src_dir)
+        combined = "\n".join(read_file(os.path.join(src_dir, f)) for f in type_files
+                             if os.path.isfile(os.path.join(src_dir, f)))
+        html = html.replace(marker, combined)
+
+    # Embed JS files into <script> tag (main JS, then per-type config, then per-type test)
     js_parts = []
     for js_file in JS_ORDER:
         js_path = os.path.join(JS_DIR, js_file)
@@ -73,6 +98,11 @@ def main():
             print(f"Warning: {js_path} not found, skipping")
             continue
         js_parts.append(read_file(js_path))
+
+    for dir_path in [JS_CONFIG_DIR, JS_TEST_DIR]:
+        for js_file in collect_type_files(dir_path):
+            js_path = os.path.join(dir_path, js_file)
+            js_parts.append(read_file(js_path))
 
     combined_js = "\n".join(js_parts)
     html = html.replace("<script>", f"<script>\n{combined_js}\n</script>")

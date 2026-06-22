@@ -6,6 +6,26 @@ let editOutIdx = -1;
 let outputsDirty = false;
 let savedOutputsJson = '';
 let currentTestIdx = -1;
+var OUTPUT_IDX = null;
+
+function getConfigModule(t) {
+  const name = 'CONFIG_TYPE_' + parseInt(t);
+  return window[name] || { toggleFields: function(){}, loadFields: function(o){}, saveFields: function(ch){ return ch; } };
+}
+function getTestModule(t) {
+  const name = 'TEST_TYPE_' + parseInt(t);
+  return window[name] || { showTest: function(idx){} };
+}
+function showTypeConfig(t) {
+  document.querySelectorAll('.type-config').forEach(function(el) { el.style.display = 'none'; });
+  var el = document.getElementById('type-config-' + parseInt(t));
+  if (el) el.style.display = '';
+}
+function showTypeTest(t) {
+  document.querySelectorAll('.type-test').forEach(function(el) { el.style.display = 'none'; });
+  var el = document.getElementById('type-test-' + parseInt(t));
+  if (el) el.style.display = '';
+}
 
 function setSaveState(label,kind='ok'){
   const el=document.getElementById('out-save-state');
@@ -111,95 +131,14 @@ async function stopOutputTest(){
 function showOutputTest(idx){
   const o=outputs[idx];
   const p=document.getElementById('out-test-panel');
-  const c=document.getElementById('test-controls');
-  document.getElementById('test-title').textContent=`#${idx+1} ${deviceLabel(o)}`;
+  document.getElementById('test-title').textContent='#'+(idx+1)+' '+deviceLabel(o);
+  OUTPUT_IDX = idx;
+  showTypeTest(o.type);
   p.style.display='block';
-  const dur=`<div class="f"><label for="test_duration">Duration (seconds)</label><input type="number" id="test_duration" value="30" min="1" max="300"></div>`;
-  const runBtn=(label,js,cls='bp')=>`<button type="button" class="btn ${cls}" onclick="${js}">${label}</button>`;
-  let html='';
-  if(o.type===3||o.type===5){
-    const rgbw=(o.color_order||0)>=4;
-    const isLed = o.type===3;
-    html=`<div class="fg">${dur}<div class="f"><label for="test_color">Custom Color</label><input type="color" id="test_color" value="#ff0000"></div>
-      <div class="f" style="display:${rgbw?'':'none'}"><label for="test_white">White</label><input type="number" id="test_white" value="0" min="0" max="255"></div>
-      ${isLed ? `<div class="f"><label for="test_pixel">Single Pixel Number</label><input type="number" id="test_pixel" value="1" min="1" max="${o.led_count||170}"><div class="hint">Use one lit pixel to count LEDs. Pixel numbering starts at 1.</div></div>` : ''}</div>
-      <div class="btns">${runBtn(isLed ? 'All Custom' : 'Apply Color',isLed ? `testLed(${idx},'all')` : `testLed(${idx})`)}
-      ${runBtn(isLed ? 'All Red' : 'Red',isLed ? `testLedPreset(${idx},255,0,0,'all')` : `testLedPreset(${idx},255,0,0)`,'bd')}
-      ${runBtn(isLed ? 'All Green' : 'Green',isLed ? `testLedPreset(${idx},0,255,0,'all')` : `testLedPreset(${idx},0,255,0)`,'bg')}
-      ${runBtn(isLed ? 'All Blue' : 'Blue',isLed ? `testLedPreset(${idx},0,0,255,'all')` : `testLedPreset(${idx},0,0,255)`,'bp')}
-      ${isLed ? `${runBtn('Pixel Custom',`testLed(${idx},'pixel')`)}${runBtn('Pixel Red',`testLedPreset(${idx},255,0,0,'pixel')`,'bd')}${runBtn('Pixel Green',`testLedPreset(${idx},0,255,0,'pixel')`,'bg')}${runBtn('Pixel Blue',`testLedPreset(${idx},0,0,255,'pixel')`,'bp')}` : ''}
-      ${runBtn(isLed ? 'Blackout' : 'Off',`sendOutputTest(${idx},[],1000)`,'bd')}</div>`;
-  } else if(o.type===1){
-    html=`<div class="fg">${dur}<div class="f"><label for="test_dmx_ch">DMX Channel</label><input type="number" id="test_dmx_ch" value="1" min="1" max="512"></div><div class="f"><label for="test_level">Value</label><input type="range" id="test_level" min="0" max="255" value="255" oninput="test_level_num.value=this.value"></div><div class="f"><label for="test_level_num">Value Number</label><input type="number" id="test_level_num" value="255" min="0" max="255" oninput="test_level.value=this.value"></div></div>
-      <div class="btns">${runBtn('Send Channel',`testDmx(${idx})`)}${runBtn('Blackout DMX',`sendOutputTest(${idx},[],1000)`,'bd')}</div>`;
-  } else if(o.type===2){
-    html=`<div class="fg">${dur}</div><div class="btns">${runBtn('Relay ON',`sendOutputTest(${idx},[255],testDur())`)}${runBtn('Relay OFF',`sendOutputTest(${idx},[0],1000)`,'bd')}</div>`;
-  } else if(o.type===0||o.type===4||o.type===8){
-    const label=o.type===8?'Servo Position':'Level';
-    const res=parseInt(o.mc_resolution||8);
-    const max=maxDmxFor(o);
-    if(res>8){
-      html=`<div class="fg">${dur}<div class="f"><label for="test_level_num">${label} (0-${max})</label><input type="number" id="test_level_num" value="${Math.floor(max/2)}" min="0" max="${max}"><div class="hint">${valueByteCount(res)} bytes resolution.</div></div></div>
-        <div class="btns">${runBtn('Apply',`testSingleValue(${idx})`)}${runBtn('Min/Off',`testSinglePreset(${idx},0)`,'bs')}${runBtn('Max',`testSinglePreset(${idx},${max})`,'bg')}</div>`;
-    }else{
-      html=`<div class="fg">${dur}<div class="f"><label for="test_level">${label}</label><input type="range" id="test_level" min="0" max="255" value="128" oninput="test_level_num.value=this.value"></div><div class="f"><label for="test_level_num">Value Number</label><input type="number" id="test_level_num" value="128" min="0" max="255" oninput="test_level.value=this.value"></div></div>
-        <div class="btns">${runBtn('Apply',`testSingleValue(${idx})`)}${runBtn('Min/Off',`testSinglePreset(${idx},0)`,'bs')}${runBtn('Max',`testSinglePreset(${idx},255)`,'bg')}</div>`;
-    }
-  } else if(o.type===6){
-    html=`<div class="fg">${dur}<div class="f"><label for="test_level_num">Speed (0-255)</label><input type="number" id="test_level_num" value="200" min="0" max="255"></div></div>
-      <div class="btns">${runBtn('Forward',`testMotor(${idx},1)`,'bg')}${runBtn('Stop',`testMotor(${idx},0)`,'bs')}${runBtn('Reverse',`testMotor(${idx},-1)`,'bd')}</div>`;
-  } else if(o.type===7){
-    const max=maxDmxFor(o);
-    const unitLabel=o.mc_unit_type===1?'\u00B0':(o.mc_unit_type===2?' mm':' Steps');
-    html=`<div class="fg">${dur}<div class="f"><label for="test_step_pos">Position (0-${max}${unitLabel})</label><input type="number" id="test_step_pos" value="${Math.floor(max/2)}" min="0" max="${max}"><div class="hint">${valueByteCount(o.mc_resolution)} position byte(s), then Speed, then Cmd.</div></div><div class="f"><label for="test_step_speed">Speed</label><input type="number" id="test_step_speed" value="180" min="0" max="255"></div></div>
-      <div class="btns">${runBtn('Move',`testStepper(${idx},0)`)}${runBtn('Stop Cmd',`testStepper(${idx},120)`,'bs')}${runBtn('Home Cmd',`testStepper(${idx},220)`,'bd')}</div>`;
-  } else if(o.type===17){
-    html=`<div class="fg"><div class="f"><label for="test_duration">Duration (seconds)</label><input type="number" id="test_duration" value="1" min="1" max="10"></div></div>
-      <div class="btns">${runBtn('Trigger Pulse',`sendOutputTest(${idx},[255],testDur())`,'bp')}${runBtn('Stop',`sendOutputTest(${idx},[0],1000)`,'bd')}</div>`;
-  } else if(o.type>=11&&o.type<=13){
-    const m=parseInt(o.mc_mode||0);
-    if(o.type>=12){
-      html=`<div class="fg">${dur}<div class="f"><label for="test_7seg_char">Character</label><input type="text" id="test_7seg_char" value="8" maxlength="1"><div class="hint">Sends 1 byte to direct-drive 7-segment.</div></div></div>
-        <div class="btns">${runBtn('Show',`sendOutputTest(${idx},[document.getElementById('test_7seg_char').value.charCodeAt(0)&255],testDur())`)}${runBtn('Blank',`sendOutputTest(${idx},[32],1000)`,'bd')}</div>`;
-    } else if(m===1){
-      html=`<div class="fg">${dur}<div class="f"><label for="test_7seg_text">Text (4 chars)</label><input type="text" id="test_7seg_text" value="TEST" maxlength="4"><div class="hint">Sends ASCII bytes to the TM1637 display.</div></div></div>
-        <div class="btns">${runBtn('Show Text',`test7Seg(${idx})`)}${runBtn('Blank',`sendOutputTest(${idx},[32,32,32,32],1000)`,'bd')}</div>`;
-    } else {
-      html=`<div class="fg">${dur}<div class="f"><label for="test_7seg_num">Number (0-9999)</label><input type="number" id="test_7seg_num" value="1234" min="0" max="9999"></div></div>
-        <div class="btns">${runBtn('Show Number',`test7Seg(${idx})`)}${runBtn('Zero',`sendOutputTest(${idx},[0,0],1000)`,'bd')}</div>`;
-    }
-  } else if(o.type===10){
-    html=`<div class="fg">${dur}<div class="f"><label for="test_mp3_track">Track (1-255)</label><input type="number" id="test_mp3_track" value="1" min="0" max="255"></div>
-      <div class="f"><label for="test_mp3_vol">Volume (0-255)</label><input type="range" id="test_mp3_vol" min="0" max="255" value="200" oninput="test_mp3_vol_num.value=this.value"></div>
-      <div class="f"><label for="test_mp3_vol_num">Volume Number</label><input type="number" id="test_mp3_vol_num" value="200" min="0" max="255" oninput="test_mp3_vol.value=this.value"></div></div>
-      <div class="btns">${runBtn('Play Track',`testMp3(${idx},'play')`,'bg')}${runBtn('Stop',`testMp3(${idx},'stop')`,'bd')}${runBtn('Pause',`testMp3(${idx},'pause')`,'bs')}${runBtn('Next',`testMp3(${idx},'next')`)}${runBtn('Prev',`testMp3(${idx},'prev')`)}</div>`;
-  } else if(o.type===14){
-    html=`<div class="fg">${dur}<div class="f"><label for="test_dac_val">Value (0-255)</label><input type="range" id="test_dac_val" min="0" max="255" value="128" oninput="test_dac_val_num.value=this.value"></div>
-      <div class="f"><label for="test_dac_val_num">Value Number</label><input type="number" id="test_dac_val_num" value="128" min="0" max="255" oninput="test_dac_val.value=this.value"></div></div>
-      <div class="btns">${runBtn('Set',`sendOutputTest(${idx},[parseInt(document.getElementById('test_dac_val').value)],testDur())`,'bg')}${runBtn('Zero',`sendOutputTest(${idx},[0],1000)`,'bd')}${runBtn('Full',`sendOutputTest(${idx},[255],1000)`,'bs')}</div>`;
-  } else if(o.type===15){
-    html=`<div class="fg">${dur}<div class="f"><label for="test_level">PWM Level (0-255)</label><input type="range" id="test_level" min="0" max="255" value="128" oninput="test_level_num.value=this.value"></div>
-      <div class="f"><label for="test_level_num">Value Number</label><input type="number" id="test_level_num" value="128" min="0" max="255" oninput="test_level.value=this.value"></div></div>
-      <div class="btns">${runBtn('Set',`testSingleValue(${idx})`,'bg')}${runBtn('Min',`testSinglePreset(${idx},0)`,'bs')}${runBtn('Max',`testSinglePreset(${idx},255)`,'bd')}</div>`;
-  } else if(o.type===9){
-    html=`<div class="fg">${dur}<div class="f"><label for="test_buz_freq">Frequency</label><input type="range" id="test_buz_freq" min="0" max="255" value="128" oninput="test_buz_freq_num.value=this.value"></div>
-      <div class="f"><label for="test_buz_freq_num">Frequency Value (1-255 \u2192 100-5000Hz)</label><input type="number" id="test_buz_freq_num" value="128" min="0" max="255" oninput="test_buz_freq.value=this.value"></div>
-      <div class="f"><label for="test_buz_vol">Volume</label><input type="range" id="test_buz_vol" min="0" max="255" value="200" oninput="test_buz_vol_num.value=this.value"></div>
-      <div class="f"><label for="test_buz_vol_num">Volume Number</label><input type="number" id="test_buz_vol_num" value="200" min="0" max="255" oninput="test_buz_vol.value=this.value"></div></div>
-      <div class="btns">${runBtn('Play',`sendOutputTest(${idx},[parseInt(document.getElementById('test_buz_freq').value),parseInt(document.getElementById('test_buz_vol').value)],testDur())`,'bg')}${runBtn('Stop',`sendOutputTest(${idx},[0,0],1000)`,'bd')}</div>`;
-  } else if(o.type===18){
-    html=`<div class="fg">${dur}</div><div class="btns">${runBtn('Trigger Smoke+Shoot',`sendOutputTest(${idx},[255],testDur())`,'bp')}${runBtn('Off',`sendOutputTest(${idx},[0],1000)`,'bd')}</div>`;
-  } else if(o.type===16){
-    html=`<div class="fg">${dur}<div class="f"><label for="test_fg_freq">Frequency (1-10000 Hz)</label><input type="number" id="test_fg_freq" value="100" min="1" max="10000"></div>
-      <div class="f"><label for="test_fg_type">Waveform</label><select id="test_fg_type"><option value="0">Sine</option><option value="1">Triangle</option><option value="2">Sawtooth</option><option value="3">Square</option><option value="4">PWM</option></select></div>
-      <div class="f"><label for="test_fg_amp">Amplitude (0-255)</label><input type="range" id="test_fg_amp" min="0" max="255" value="128" oninput="test_fg_amp_num.value=this.value"></div>
-      <div class="f"><label for="test_fg_amp_num">Amplitude Number</label><input type="number" id="test_fg_amp_num" value="128" min="0" max="255" oninput="test_fg_amp.value=this.value"></div>
-      <div class="f"><label for="test_fg_off">Offset (0-255)</label><input type="range" id="test_fg_off" min="0" max="255" value="128" oninput="test_fg_off_num.value=this.value"></div>
-      <div class="f"><label for="test_fg_off_num">Offset Number</label><input type="number" id="test_fg_off_num" value="128" min="0" max="255" oninput="test_fg_off.value=this.value"></div></div>
-      <div class="btns">${runBtn('Apply',`sendOutputTest(${idx},[parseInt(document.getElementById('test_fg_freq').value)&255,(parseInt(document.getElementById('test_fg_freq').value)>>8)&255,parseInt(document.getElementById('test_fg_type').value),parseInt(document.getElementById('test_fg_amp').value),parseInt(document.getElementById('test_fg_off').value)],testDur())`,'bg')}${runBtn('Stop',`sendOutputTest(${idx},[0,0,0,0,0],1000)`,'bd')}</div>`;
-  }
-  c.innerHTML=html;
   p.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function anyStopTest(idx){
+  sendOutputTest(parseInt(idx), [], 1000);
 }
 function calcRcCutoff(){
   const r=parseFloat(document.getElementById('rc_r')?.value);
@@ -428,6 +367,9 @@ function toggleOutFields(){
   autoAssignOutputPins();
   const pinMapContainer = document.getElementById('pin-mapping-container');
   if(pinMapContainer) pinMapContainer.style.display = '';
+  var t = parseInt(document.getElementById('no_type').value);
+  showTypeConfig(t);
+  getConfigModule(t).toggleFields();
 }
 
 document.getElementById('mc_mode').addEventListener('change', toggleOutFields);
@@ -535,6 +477,7 @@ function editOutput(idx){
     if(invEl) invEl.checked = !!((sinvs >> s) & 1);
   }
   
+  getConfigModule(o.type).loadFields(o);
   document.getElementById('out-add-btn').textContent='Update Channel';
   document.getElementById('out-cancel-btn').style.display='';
   document.getElementById('edit-idx-label').textContent=idx+1;
@@ -683,6 +626,8 @@ function addOrUpdateOutput(){
       return acc | (isInv ? (1 << s) : 0);
     }, 0) : 0
   };
+
+  getConfigModule(type).saveFields(ch);
 
   const statusPin=parseInt(document.getElementById('status_led_pin').value);
   const zcPin=parseInt(document.getElementById('zc_pin').value);

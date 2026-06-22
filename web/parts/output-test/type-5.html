@@ -1,0 +1,23 @@
+<div id="type-test-5" style="display:none" class="type-test">
+  <div class="fg">
+    <div class="f">
+      <label for="test_duration">Duration (seconds)</label>
+      <input type="number" id="test_duration" value="30" min="1" max="300">
+    </div>
+    <div class="f">
+      <label for="test_color">Custom Color</label>
+      <input type="color" id="test_color" value="#ff0000">
+    </div>
+    <div class="f" id="test_white_group" style="display:none">
+      <label for="test_white">White</label>
+      <input type="number" id="test_white" value="0" min="0" max="255">
+    </div>
+  </div>
+  <div class="btns">
+    <button type="button" class="btn bp" onclick="testLed(OUTPUT_IDX)">Apply Color</button>
+    <button type="button" class="btn bd" onclick="testLedPreset(OUTPUT_IDX,255,0,0)">Red</button>
+    <button type="button" class="btn bg" onclick="testLedPreset(OUTPUT_IDX,0,255,0)">Green</button>
+    <button type="button" class="btn bp" onclick="testLedPreset(OUTPUT_IDX,0,0,255)">Blue</button>
+    <button type="button" class="btn bd" onclick="sendOutputTest(OUTPUT_IDX,[],1000)">Off</button>
+  </div>
+</div>

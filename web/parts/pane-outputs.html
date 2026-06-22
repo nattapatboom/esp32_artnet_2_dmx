@@ -85,7 +85,7 @@
       <div class="section-head"><h3>Test Tool</h3><span id="test-mode-pill" class="pill">Idle</span></div>
       <div id="out-test-panel" class="ib ib-green" style="display:none;margin-top:0">
         <h3 style="margin-top:0">Output Test: <span id="test-title">--</span></h3>
-        <div id="test-controls"></div>
+        <div id="test-controls"><!-- TEST_TYPE_FIELDS --></div>
         <div class="hint" style="margin-top:6px">Test values are applied directly to the selected output buffer. Test auto-stops after the selected duration.</div>
       </div>
     </div>
@@ -171,80 +171,7 @@
           </optgroup>
         </select>
       </div>
-      <div class="f" id="no_mc_grp" style="display:none; flex-basis: 100%;">
-        <div class="ib ib-green" style="margin-top:8px">
-          <strong>Motion Control Parameters</strong>
-        </div>
-        <div class="fg">
-          <div class="f" id="mc_mode_grp"><label for="mc_mode" id="mc_mode_lbl">Motor Sub-Mode</label>
-            <select id="mc_mode">
-              <option value="0">PWM + PWM (2 pins)</option>
-              <option value="1">PWM + DIR (2 pins)</option>
-              <option value="2">IN1 + IN2 + EN (3 pins)</option>
-            </select>
-          </div>
-          <div class="f" id="mc_res_grp"><label for="mc_resolution" id="mc_resolution_lbl">Resolution</label>
-            <select id="mc_resolution">
-              <option value="8">8-bit (1 DMX Ch)</option>
-              <option value="10">10-bit (2 DMX Ch)</option>
-              <option value="12">12-bit (2 DMX Ch)</option>
-              <option value="16">16-bit (2 DMX Ch)</option>
-            </select>
-          </div>
-          <div class="f" id="mc_freq_grp"><label for="mc_freq" id="mc_freq_lbl">Frequency (Hz) / Max Speed</label><input type="number" id="mc_freq" value="1000" min="1" max="40000"></div>
-          <div id="rc_filter_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:8px 0 2px">RC Low-Pass Filter Reference</div><div style="display:flex;flex-wrap:wrap;gap:8px"><div class="f" style="flex:1"><label for="rc_r">R (&Omega;)</label><input type="number" id="rc_r" value="1000" min="1" max="10000000" oninput="calcRcCutoff()"></div><div class="f" style="flex:1"><label for="rc_c">C (nF)</label><input type="number" id="rc_c" value="10" min="1" max="1000000" oninput="calcRcCutoff()"></div><div class="f" style="flex:1"><label>fc ≈ <span id="rc_fc">15915</span> Hz</label><div class="hint">Set PWM Carrier Freq above to 3-5x fc</div></div></div></div>
-          <div id="pwm_dac_cal_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:8px 0 2px">PWM DAC Calibration</div><div style="display:flex;flex-wrap:wrap;gap:8px"><div class="f" style="flex:1"><label for="pwm_dac_mode">Output Use</label><select id="pwm_dac_mode"><option value="0">Custom</option><option value="1">0-10V interface</option><option value="2">4-20mA interface</option></select><div class="hint">Label only; duty calibration below controls output.</div></div><div class="f" style="flex:1"><label for="pwm_dac_min">DMX 0 Duty (%)</label><input type="number" id="pwm_dac_min" value="0" min="0" max="100" step="0.01"></div><div class="f" style="flex:1"><label for="pwm_dac_max">DMX Full Duty (%)</label><input type="number" id="pwm_dac_max" value="100" min="0" max="100" step="0.01"><div class="hint">Use trim values matching your 0-10V / 4-20mA module.</div></div></div></div>
-          <div class="f" id="mc_deadband_grp"><label for="mc_deadband">Center Deadband</label><input type="number" id="mc_deadband" value="10" min="0" max="255"></div>
-          <div class="f" id="mc_min_us_grp"><label for="mc_min_us">Servo Min &micro;s</label><input type="number" id="mc_min_us" value="1000" min="500" max="1500"></div>
-          <div class="f" id="mc_max_us_grp"><label for="mc_max_us">Servo Max &micro;s</label><input type="number" id="mc_max_us" value="2000" min="1500" max="2500"></div>
-          <div id="mc_stepper_scale_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:4px 0 2px">Position &amp; Scaling</div></div>
-          <div class="f" id="mc_steps_grp"><label for="mc_steps_per_rev">Steps / Rev</label><input type="number" id="mc_steps_per_rev" value="200" min="1" max="10000"></div>
-          <div class="f" id="mc_unit_type_grp" style="display:none"><label for="mc_unit_type">Unit Type</label><select id="mc_unit_type"><option value="0">Steps</option><option value="1">Degrees (&deg;)</option><option value="2">Millimeters (mm)</option></select></div>
-          <div class="f" id="mc_scale_factor_grp" style="display:none"><label for="mc_scale_factor">Scale Factor</label><input type="number" id="mc_scale_factor" value="0.0" step="any" min="0" max="10000"><div class="hint">Steps = DMX * Scale (0 = use Steps/Rev)</div></div>
-          <div id="mc_stepper_homing_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:4px 0 2px">Homing Settings</div></div>
-          <div class="f" id="mc_homing_mode_grp" style="display:none"><label for="mc_homing_mode">Homing Mode</label>
-            <select id="mc_homing_mode">
-              <option value="0">Sensor Mode (Pin 4)</option>
-              <option value="1">Time / Stall Mode</option>
-            </select>
-          </div>
-          <div class="f" id="mc_homing_dir_grp" style="display:none"><label for="mc_homing_dir">Homing Direction</label>
-            <select id="mc_homing_dir">
-              <option value="0">Normal / Forward</option>
-              <option value="1">Reverse</option>
-            </select>
-          </div>
-          <div class="f" id="mc_homing_speed_grp" style="display:none"><label for="mc_homing_speed">Homing Speed (Hz)</label><input type="number" id="mc_homing_speed" value="500" min="1" max="40000"></div>
-          <div class="f" id="mc_homing_timeout_grp" style="display:none"><label for="mc_homing_timeout">Homing Timeout (s)</label><input type="number" id="mc_homing_timeout" value="5" min="1" max="100"></div>
-          <div class="f" id="mc_invert_grp" style="flex:0 0 auto"><div class="cb"><input type="checkbox" id="mc_invert"><label for="mc_invert">Invert Direction</label></div></div>
-          <div class="f" id="mc_brake_grp" style="flex:0 0 auto"><div class="cb"><input type="checkbox" id="mc_brake" checked><label for="mc_brake">Brake when stopped</label></div></div>
-        </div>
-      </div>
-      <div class="f" id="no_sol_grp" style="display:none; flex-basis: 100%;">
-        <div class="ib ib-orange" style="margin-top:8px">
-          <strong>Solenoid Trigger Parameters</strong>
-        </div>
-        <div class="fg">
-          <div class="f"><label for="sol_threshold">Threshold Value (0-255)</label><input type="number" id="sol_threshold" value="127" min="0" max="255"></div>
-          <div class="f"><label for="sol_pulse_ms">Pulse Width (ms)</label><input type="number" id="sol_pulse_ms" value="50" min="1" max="500"></div>
-          <div class="f"><label for="sol_pre_delay">Pre-Delay (ms)</label><input type="number" id="sol_pre_delay" value="0" min="0" max="1000"></div>
-          <div class="f"><label for="sol_post_delay">Post-Delay / Cooldown (ms)</label><input type="number" id="sol_post_delay" value="100" min="0" max="5000"></div>
-          <div class="hint">Solenoid triggers pulse for precise frame-accurate control. Pre-Delay is hold time before pulse. Post-Delay prevents rapid re-triggering.</div>
-        </div>
-      </div>
-      <div class="f" id="no_smoke_grp" style="display:none; flex-basis: 100%;">
-        <div class="ib ib-blue" style="margin-top:8px">
-          <strong>Sequential Smoke Shooter Parameters</strong>
-        </div>
-        <div class="fg">
-          <div class="f"><label for="smoke_threshold">Threshold Value (0-255)</label><input type="number" id="smoke_threshold" value="127" min="0" max="255"></div>
-          <div class="f"><label for="smoke_dur">Smoke Duration (ms)</label><input type="number" id="smoke_dur" value="1000" min="0" max="10000"></div>
-          <div class="f"><label for="smoke_settle">Settle Delay (ms)</label><input type="number" id="smoke_settle" value="500" min="0" max="10000"></div>
-          <div class="f"><label for="smoke_shoot">Shoot Duration (ms)</label><input type="number" id="smoke_shoot" value="1000" min="0" max="10000"></div>
-          <div class="f"><label for="smoke_lockout">Cooldown Lockout (ms)</label><input type="number" id="smoke_lockout" value="2000" min="0" max="30000"></div>
-          <div class="hint">Sequence: Smoke ON -> delay (Settle) -> Shoot ON -> both OFF -> Cooldown. Pin 1 is Smoke, Pin 2 is Shoot. Triggered when DMX > threshold.</div>
-        </div>
-      </div>
+      <!-- CONFIG_TYPE_FIELDS -->
     </div>
     <div class="btns">
       <button type="button" class="btn bp" id="out-add-btn" onclick="addOrUpdateOutput()">Add Channel</button>

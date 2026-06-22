@@ -1,0 +1,17 @@
+<div id="type-test-13" style="display:none" class="type-test">
+  <div class="fg">
+    <div class="f">
+      <label for="test_duration">Duration (seconds)</label>
+      <input type="number" id="test_duration" value="30" min="1" max="300">
+    </div>
+    <div class="f">
+      <label for="test_7seg_char">Character</label>
+      <input type="text" id="test_7seg_char" value="8" maxlength="1">
+      <div class="hint">Sends 1 byte to direct-drive 7-segment.</div>
+    </div>
+  </div>
+  <div class="btns">
+    <button type="button" class="btn bp" onclick="sendOutputTest(OUTPUT_IDX,[document.getElementById('test_7seg_char').value.charCodeAt(0)&255],testDur())">Show</button>
+    <button type="button" class="btn bd" onclick="sendOutputTest(OUTPUT_IDX,[32],1000)">Blank</button>
+  </div>
+</div>

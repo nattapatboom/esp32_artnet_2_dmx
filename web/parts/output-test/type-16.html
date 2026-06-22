@@ -1,0 +1,42 @@
+<div id="type-test-16" style="display:none" class="type-test">
+  <div class="fg">
+    <div class="f">
+      <label for="test_duration">Duration (seconds)</label>
+      <input type="number" id="test_duration" value="30" min="1" max="300">
+    </div>
+    <div class="f">
+      <label for="test_fg_freq">Frequency (1-10000 Hz)</label>
+      <input type="number" id="test_fg_freq" value="100" min="1" max="10000">
+    </div>
+    <div class="f">
+      <label for="test_fg_type">Waveform</label>
+      <select id="test_fg_type">
+        <option value="0">Sine</option>
+        <option value="1">Triangle</option>
+        <option value="2">Sawtooth</option>
+        <option value="3">Square</option>
+        <option value="4">PWM</option>
+      </select>
+    </div>
+    <div class="f">
+      <label for="test_fg_amp">Amplitude (0-255)</label>
+      <input type="range" id="test_fg_amp" min="0" max="255" value="128" oninput="test_fg_amp_num.value=this.value">
+    </div>
+    <div class="f">
+      <label for="test_fg_amp_num">Amplitude Number</label>
+      <input type="number" id="test_fg_amp_num" value="128" min="0" max="255" oninput="test_fg_amp.value=this.value">
+    </div>
+    <div class="f">
+      <label for="test_fg_off">Offset (0-255)</label>
+      <input type="range" id="test_fg_off" min="0" max="255" value="128" oninput="test_fg_off_num.value=this.value">
+    </div>
+    <div class="f">
+      <label for="test_fg_off_num">Offset Number</label>
+      <input type="number" id="test_fg_off_num" value="128" min="0" max="255" oninput="test_fg_off.value=this.value">
+    </div>
+  </div>
+  <div class="btns">
+    <button type="button" class="btn bg" onclick="sendOutputTest(OUTPUT_IDX,[parseInt(document.getElementById('test_fg_freq').value)&255,(parseInt(document.getElementById('test_fg_freq').value)>>8)&255,parseInt(document.getElementById('test_fg_type').value),parseInt(document.getElementById('test_fg_amp').value),parseInt(document.getElementById('test_fg_off').value)],testDur())">Apply</button>
+    <button type="button" class="btn bd" onclick="sendOutputTest(OUTPUT_IDX,[0,0,0,0,0],1000)">Stop</button>
+  </div>
+</div>
