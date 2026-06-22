@@ -278,18 +278,16 @@ bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
     uint8_t source = output["source"] | 0;
     uint8_t type = output["type"] | 0;
     uint8_t mcMode = output["mc_mode"] | 0;
-    uint8_t homingMode = output["mc_homing_mode"] | 0;
     uint8_t pin2Source = output["pin2_source"] | 0;
     uint8_t pin3Source = output["pin3_source"] | 0;
     uint8_t pin4Source = output["pin4_source"] | 0;
-    uint8_t colorOrder = output["color_order"] | 0;
 
     if (source == 0 && jsonPinMatches(output["pin"], reservedPin)) return true;
 
-    if (type == 12 || type == 13) {
+    if (OutputDefs::isSevenSegType(type)) {
         if (pin2Source == 0) {
-            uint8_t nSeg = OutputDefs::numSegPins(type);
-            uint8_t startIdx = OutputDefs::isSegCommonDim(mcMode) ? 0 : 1;
+            uint8_t nSeg = OutputDefs::sevenSegSegmentCount(type, mcMode);
+            uint8_t startIdx = OutputDefs::sevenSegFirstAuxSegment(type, mcMode);
             if (output.containsKey("seg_pins")) {
                 JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
                 JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
@@ -312,9 +310,9 @@ bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
             }
         }
     } else {
-        if (OutputDefs::isPin2GpioRouting(type, source, pin2Source) && jsonPinMatches(output["pin2"], reservedPin)) return true;
-        if (OutputDefs::isPin3GpioRouting(type, pin3Source, mcMode) && jsonPinMatches(output["pin3"], reservedPin)) return true;
-        if (OutputDefs::isPin4GpioRouting(type, pin4Source, colorOrder, homingMode) && jsonPinMatches(output["pin4"], reservedPin)) return true;
+        if (OutputDefs::pinSlotUsesGpio(type, mcMode, 1, pin2Source) && jsonPinMatches(output["pin2"], reservedPin)) return true;
+        if (OutputDefs::pinSlotUsesGpio(type, mcMode, 2, pin3Source) && jsonPinMatches(output["pin3"], reservedPin)) return true;
+        if (OutputDefs::pinSlotUsesGpio(type, mcMode, 3, pin4Source) && jsonPinMatches(output["pin4"], reservedPin)) return true;
     }
     return false;
 }
@@ -350,8 +348,6 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
         uint8_t source = output["source"] | 0;
         uint8_t type = output["type"] | 0;
         uint8_t mcMode = output["mc_mode"] | 0;
-        uint8_t homingMode = output["mc_homing_mode"] | 0;
-        uint8_t colorOrder = output["color_order"] | 0;
         uint8_t pin2Source = output["pin2_source"] | 0;
         uint8_t pin3Source = output["pin3_source"] | 0;
         uint8_t pin4Source = output["pin4_source"] | 0;
@@ -371,10 +367,10 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
             if (forbid(output["pin"] | 255, "")) return true;
         }
 
-        if (type == 12 || type == 13) {
+        if (OutputDefs::isSevenSegType(type)) {
             if (pin2Source == 0) {
-                uint8_t nSeg = OutputDefs::numSegPins(type);
-                uint8_t startIdx = OutputDefs::isSegCommonDim(mcMode) ? 0 : 1;
+                uint8_t nSeg = OutputDefs::sevenSegSegmentCount(type, mcMode);
+                uint8_t startIdx = OutputDefs::sevenSegFirstAuxSegment(type, mcMode);
                 if (output.containsKey("seg_pins")) {
                     JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
                     JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
@@ -396,11 +392,11 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
                 }
             }
         } else {
-            if (OutputDefs::isPin2GpioRouting(type, source, pin2Source) && forbid(output["pin2"] | 255, " pin2")) return true;
-            if (OutputDefs::isPin3GpioRouting(type, pin3Source, mcMode) && forbid(output["pin3"] | 255, " pin3")) return true;
+            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 1, pin2Source) && forbid(output["pin2"] | 255, " pin2")) return true;
+            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 2, pin3Source) && forbid(output["pin3"] | 255, " pin3")) return true;
 
             int p4Pin = output["pin4"] | 255;
-            if (OutputDefs::isPin4GpioRouting(type, pin4Source, colorOrder, homingMode)) {
+            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 3, pin4Source)) {
                 if (forbid(p4Pin, " pin4")) return true;
             }
         }
@@ -438,8 +434,6 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
         uint8_t source = output["source"] | 0;
         uint8_t type = output["type"] | 0;
         uint8_t mcMode = output["mc_mode"] | 0;
-        uint8_t homingMode = output["mc_homing_mode"] | 0;
-        uint8_t colorOrder = output["color_order"] | 0;
         uint8_t pin2Source = output["pin2_source"] | 0;
         uint8_t pin3Source = output["pin3_source"] | 0;
         uint8_t pin4Source = output["pin4_source"] | 0;
@@ -448,10 +442,10 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
             if (addPin(output["pin"] | 255, channel)) return true;
         }
 
-        if (type == 12 || type == 13) {
+        if (OutputDefs::isSevenSegType(type)) {
             if (pin2Source == 0) {
-                uint8_t nSeg = OutputDefs::numSegPins(type);
-                uint8_t startIdx = OutputDefs::isSegCommonDim(mcMode) ? 0 : 1;
+                uint8_t nSeg = OutputDefs::sevenSegSegmentCount(type, mcMode);
+                uint8_t startIdx = OutputDefs::sevenSegFirstAuxSegment(type, mcMode);
                 if (output.containsKey("seg_pins")) {
                     JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
                     JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
@@ -478,9 +472,9 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
                 }
             }
         } else {
-            if (OutputDefs::isPin2GpioRouting(type, source, pin2Source) && addPin(output["pin2"] | 255, channel)) return true;
-            if (OutputDefs::isPin3GpioRouting(type, pin3Source, mcMode) && addPin(output["pin3"] | 255, channel)) return true;
-            if (OutputDefs::isPin4GpioRouting(type, pin4Source, colorOrder, homingMode) && addPin(output["pin4"] | 255, channel)) return true;
+            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 1, pin2Source) && addPin(output["pin2"] | 255, channel)) return true;
+            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 2, pin3Source) && addPin(output["pin3"] | 255, channel)) return true;
+            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 3, pin4Source) && addPin(output["pin4"] | 255, channel)) return true;
         }
         channel++;
     }
