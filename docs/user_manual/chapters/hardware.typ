@@ -248,6 +248,162 @@ Inductive loads (solenoid valves, relay coils, DC motors) generate a high revers
 ]
 #v(0.8em)
 
+== PWM DAC & Function Generator Low-Pass Filter
+
+To convert high-frequency PWM outputs into smooth analog DC voltages (for PWM DAC mode) or analog waveforms (for Function Generator mode), an external Resistor-Capacitor (RC) Low-Pass Filter (LPF) is required.
+
+=== Passive 1st-Order RC Filter
+
+The simplest way to filter a PWM signal is using a passive RC filter.
+
+#v(0.8em)
+#align(center)[
+#canvas(length: 1cm, {
+  import draw: *
+
+  let wire-color = rgb("#1a5fb4")
+  let s-wire = (stroke: 1.2pt + wire-color)
+  let s-comp = (stroke: 1.2pt + rgb("#333333"))
+
+  // Input pin
+  circle((-4.0, 0.6), radius: 0.1, fill: rgb("#333333"), stroke: none)
+  content((-4.0, 0.9), [#text(8pt, weight: "bold")[PWM Input]])
+
+  // Resistor R
+  rect((-1.5, 0.8), (-0.3, 0.4), ..s-comp, name: "r")
+  content("r", [#text(8pt)[Resistor R]])
+
+  // Output pin
+  circle((2.0, 0.6), radius: 0.1, fill: rgb("#333333"), stroke: none)
+  content((2.0, 0.9), [#text(8pt, weight: "bold")[Analog Out]])
+
+  // Capacitor C (Two parallel lines)
+  line((0.5, -0.1), (1.1, -0.1), ..(stroke: 1.8pt + rgb("#333333")))
+  line((0.5, -0.3), (1.1, -0.3), ..(stroke: 1.8pt + rgb("#333333")))
+  content((1.8, -0.2), [#text(8pt)[Capacitor C]])
+
+  // GND Symbol
+  line((0.4, -0.9), (1.2, -0.9), ..s-comp)
+  line((0.55, -1.05), (1.05, -1.05), ..s-comp)
+  line((0.7, -1.2), (0.9, -1.2), ..s-comp)
+  content((0.8, -1.5), [#text(7pt)[GND]])
+
+  // Wires
+  line((-3.9, 0.6), (-1.5, 0.6), ..s-wire) // Input to R
+  line((-0.3, 0.6), (1.9, 0.6), ..s-wire)  // R to Out
+  
+  line((0.8, 0.6), (0.8, -0.1), ..s-wire)  // Tap to top plate
+  line((0.8, -0.3), (0.8, -0.9), ..s-wire) // Bottom plate to GND
+})
+]
+#v(0.8em)
+
+The cutoff frequency ($f_("cutoff")$) is determined by the formula:
+$ f_("cutoff") = 1 / (2 pi R C) $
+
+==== Component Selection by Mode:
+- *PWM DAC Mode (Mode 15 - DC Voltage):* Recommended cutoff is $1.6"Hz" - 16"Hz"$ to minimize voltage ripple. Use $R = 10"k"Omega$ and $C = 1mu"F"$ ($f_("cutoff") approx 16"Hz"$) or $C = 10mu"F"$ ($f_("cutoff") approx 1.6"Hz"$).
+- *Function Generator Mode (Mode 16 - Waveforms up to 5 kHz):* Recommended cutoff is $7"kHz" - 10"kHz"$ to pass the 5 kHz signal while filtering the 50 kHz carrier. Use $R = 2.2"k"Omega$ and $C = 10"nF"$ ($f_("cutoff") approx 7.2"kHz"$).
+
+=== Active 0-10V Buffer/Amplifier (LM358)
+
+Passive RC filters have high output impedance and cannot drive significant loads directly. To output an industrial 0-10V signal from the ESP32's 3.3V PWM output, an active non-inverting amplifier using an op-amp (e.g., LM358) is recommended.
+
+#v(0.8em)
+#align(center)[
+#canvas(length: 1cm, {
+  import draw: *
+
+  let wire-color = rgb("#1a5fb4")
+  let s-wire = (stroke: 1.2pt + wire-color)
+  let s-comp = (stroke: 1.2pt + rgb("#333333"))
+
+  // Input pin
+  circle((-7.0, 0.6), radius: 0.1, fill: rgb("#333333"), stroke: none)
+  content((-7.0, 0.9), [#text(8pt, weight: "bold")[PWM Input]])
+
+  // Resistor R
+  rect((-5.0, 0.8), (-3.8, 0.4), ..s-comp, name: "r")
+  content("r", [#text(8pt)[R]])
+
+  // Capacitor C
+  line((-3.1, -0.1), (-2.5, -0.1), ..(stroke: 1.8pt + rgb("#333333")))
+  line((-3.1, -0.3), (-2.5, -0.3), ..(stroke: 1.8pt + rgb("#333333")))
+  content((-2.1, -0.2), [#text(8pt)[C]])
+
+  // GND for Cap
+  line((-3.2, -0.9), (-2.4, -0.9), ..s-comp)
+  line((-3.05, -1.05), (-2.55, -1.05), ..s-comp)
+  line((-2.9, -1.2), (-2.7, -1.2), ..s-comp)
+
+  // Op-Amp Triangle Symbol
+  line((-1.0, 1.3), (-1.0, -0.3), ..s-comp)
+  line((-1.0, 1.3), (0.8, 0.5), ..s-comp)
+  line((-1.0, -0.3), (0.8, 0.5), ..s-comp)
+  content((-0.4, 0.5), [#text(9pt)[LM358]])
+
+  // Op-Amp Pins (+) and (-)
+  content((-0.8, 0.9), [#text(8pt)[+]])
+  content((-0.8, 0.1), [#text(8pt)[-]])
+
+  // Output pin
+  circle((3.0, 0.5), radius: 0.1, fill: rgb("#333333"), stroke: none)
+  content((3.0, 0.8), [#text(8pt, weight: "bold")[0-10V Out]])
+
+  // Feedback resistors
+  // Rf (Feedback resistor)
+  rect((0.2, -1.2), (1.4, -1.6), ..s-comp, name: "rf")
+  content("rf", [#text(8pt)[Rf: 20k]])
+
+  // Rg (Gain resistor to GND)
+  rect((-1.8, -1.2), (-0.6, -1.6), ..s-comp, name: "rg")
+  content("rg", [#text(8pt)[Rg: 10k]])
+
+  // GND for Rg
+  line((-1.6, -2.3), (-0.8, -2.3), ..s-comp)
+  line((-1.45, -2.45), (-0.95, -2.45), ..s-comp)
+  line((-1.3, -2.6), (-1.1, -2.6), ..s-comp)
+
+  // Connections
+  line((-6.9, 0.6), (-5.0, 0.6), ..s-wire) // Input to R
+  
+  // R to Op-Amp (+) input:
+  // Tap for Capacitor is at x=-2.8, y=0.6
+  line((-3.8, 0.6), (-1.8, 0.6), ..s-wire)
+  line((-1.8, 0.6), (-1.8, 0.9), ..s-wire)
+  line((-1.8, 0.9), (-1.0, 0.9), ..s-wire)
+
+  line((-2.8, 0.6), (-2.8, -0.1), ..s-wire)  // Tap to top plate of cap
+  line((-2.8, -0.3), (-2.8, -0.9), ..s-wire) // Bottom plate to GND
+
+  // Op-amp output is at (0.8, 0.5)
+  line((0.8, 0.5), (2.9, 0.5), ..s-wire) // Output wire to pin
+
+  // Feedback loop:
+  // Tap from output to Rf:
+  line((1.8, 0.5), (1.8, -1.4), ..s-wire)
+  line((1.8, -1.4), (1.4, -1.4), ..s-wire) // connect to Rf
+
+  // Rf to (-) input:
+  // (-) is at (-1.0, 0.1)
+  // Connect Rf other side (0.2, -1.4) to Rg (at -0.6, -1.4)
+  line((0.2, -1.4), (-0.6, -1.4), ..s-wire)
+  
+  // Tap between Rf and Rg at x=-0.2, go down to -1.9, left to -2.2, up to 0.1, right to (-)
+  line((-0.2, -1.4), (-0.2, -1.9), ..s-wire)
+  line((-0.2, -1.9), (-2.2, -1.9), ..s-wire)
+  line((-2.2, -1.9), (-2.2, 0.1), ..s-wire)
+  line((-2.2, 0.1), (-1.0, 0.1), ..s-wire) // Connect to (-)
+
+  // Rg to GND:
+  line((-1.2, -1.6), (-1.2, -2.3), ..s-wire)
+})
+]
+#v(0.8em)
+
+- *Gain Calculation:* $ "Gain" = 1 + R_f / R_g = 1 + 20"k"Omega / 10"k"Omega = 3.0 $ (Input $3.3"V" times 3.0 = 9.9"V"$ max output). For exactly $10.0"V"$, replace $R_f$ with a $20"k"Omega$ multi-turn potentiometer.
+- *Op-Amp VCC:* Must be powered by $+12"V"$ to $+24"V"$ for adequate headroom to reach $+10"V"$.
+
 == Device Reference
 
 All external peripheral devices must have reference datasheets for driver code verification.

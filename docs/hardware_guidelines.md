@@ -78,7 +78,91 @@ graph LR
     end
 ```
 
-### 1.4 GPIO12 / MTDI Bootstrap Pin Field Use
+### 1.4 PWM DAC & Function Generator Low-Pass Filter
+
+To convert high-frequency PWM outputs into smooth analog DC voltages (for PWM DAC mode) or analog waveforms (for Function Generator mode), an external Resistor-Capacitor (RC) Low-Pass Filter (LPF) is required.
+
+#### 1.4.1 Passive 1st-Order RC Filter
+
+The simplest way to filter a PWM signal is using a passive Resistor-Capacitor (RC) filter:
+
+```text
+                  R
+[ESP32 PWM] ───[Resistor]───┬─── [Filtered Analog Out]
+                            │
+                       [Capacitor C]
+                            │
+                          [GND]
+```
+
+```mermaid
+graph LR
+    subgraph PassiveLPF [Passive 1st-Order RC Filter]
+        PWM[ESP32 PWM Pin] --> R[Resistor R]
+        R --> OUT[Analog Out]
+        C[Capacitor C] --- R_OUT[Analog Out]
+        C --- GND[GND]
+    end
+```
+
+**Cutoff Frequency Formula:**
+$$f_{\text{cutoff}} = \frac{1}{2 \pi R C}$$
+
+**Component Selection Guidelines:**
+Depending on the output mode, the cutoff frequency ($f_{\text{cutoff}}$) must be chosen to balance ripple attenuation against signal responsiveness/bandwidth:
+
+1. **PWM DAC Mode (0-10V or DC Level Control):**
+   - **Goal:** Minimize voltage ripple; slow response times (tens of milliseconds) are acceptable.
+   - **Recommended Cutoff:** $1.6 \text{ Hz}$ to $16 \text{ Hz}$.
+   - **Recommended Values:** $R = 10\text{ k}\Omega$, $C = 1\mu\text{F}$ ($f_{\text{cutoff}} \approx 16 \text{ Hz}$) or $C = 10\mu\text{F}$ ($f_{\text{cutoff}} \approx 1.6 \text{ Hz}$).
+   - **Note:** This filters out the PWM carrier frequency extremely well, leaving a clean, stable DC voltage.
+
+2. **Function Generator Mode (Type 16 Waveforms up to 5 kHz):**
+   - **Goal:** Pass the maximum generated signal frequency (up to 5 kHz) with minimal attenuation, while filtering the 50 kHz carrier frequency.
+   - **Recommended Cutoff:** $7 \text{ kHz}$ to $10 \text{ kHz}$.
+   - **Recommended Values:** $R = 2.2\text{ k}\Omega$, $C = 10\text{ nF}$ ($f_{\text{cutoff}} \approx 7.2 \text{ kHz}$).
+   - **Note:** The carrier frequency ($50 \text{ kHz}$) is attenuated by $\approx 17\text{ dB}$, while signals up to $5 \text{ kHz}$ pass with minimal phase shift and amplitude drop. For a cleaner waveform, a 2nd-order RC filter can be used.
+
+#### 1.4.2 Active 0-10V Buffer/Amplifier (LM358)
+
+Because passive RC filters have high output impedance, connecting them directly to low-impedance loads will cause voltage drops. Additionally, to scale the ESP32's 3.3V logic level to a standard industrial 0-10V signal, an active Op-Amp buffer with gain is recommended.
+
+```text
+                  R
+[ESP32 PWM] ───[Resistor]───┬─── [Op-Amp (+)] ────── [ LM358 / TL072 ] ─── [ 0-10V Out ]
+                            │          │                                        │
+                       [Capacitor C]   └──── [Op-Amp (-)] ───┬─── [ Rf: 20k ] ──┘
+                            │                                │
+                          [GND]                        [ Rg: 10k ]
+                                                             │
+                                                           [GND]
+```
+
+```mermaid
+graph TD
+    PWM[ESP32 PWM Pin] --> R[Resistor R]
+    R --> C_Node[Filter Node]
+    C[Capacitor C] --- C_Node
+    C --- GND[GND]
+    C_Node --> OpAmpInP[Op-Amp Non-Inverting +]
+    
+    OpAmpOut[Op-Amp Output] --> VOUT[0-10V Out]
+    OpAmpOut --> Feedback_Node[Feedback Node]
+    Feedback_Node --> OpAmpInM[Op-Amp Inverting -]
+    
+    Feedback_Node --> Rf[Resistor Rf: 20kΩ]
+    Rf --> Rg_Node[Gain Resistor Node]
+    Rg_Node --> Rg[Resistor Rg: 10kΩ]
+    Rg --> GND2[GND]
+```
+
+- **Power Supply:** The Op-Amp must be powered by a $+12\text{V}$ (or higher) VCC rail to allow outputting a full $+10\text{V}$ (LM358 requires at least $V_{\text{out}} + 1.5\text{V}$ headroom, so $+12\text{V}$ to $+24\text{V}$ is ideal).
+- **Gain Calculation:** $\text{Gain} = 1 + \frac{R_f}{R_g} = 1 + \frac{20\text{ k}\Omega}{10\text{ k}\Omega} = 3.0$ (Input $3.3\text{V} \times 3.0 = 9.9\text{V}$ maximum output).
+  - To achieve exactly $10.0\text{V}$, replace $R_f$ with a $20\text{ k}\Omega$ multi-turn potentiometer in series with a $5\text{ k}\Omega$ resistor to calibrate the top end.
+
+---
+
+### 1.5 GPIO12 / MTDI Bootstrap Pin Field Use
 
 GPIO12 is the ESP32 MTDI bootstrap pin. It is exposed on WT32-ETH01 headers and may be used by existing field hardware, but it is a boot-risk pin, not a normal safe default output.
 
