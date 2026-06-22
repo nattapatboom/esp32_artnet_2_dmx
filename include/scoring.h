@@ -95,58 +95,46 @@ struct RamBudget {
 //  PER-TYPE ESTIMATES (OutputChannel)
 // ═══════════════════════════════════════
 
-inline HardwareResource estimateHardware(const OutputChannel& ch) {
-    HardwareResource h;
-    switch (ch.type) {
-        case 0: break;
-        case 1: h.uart = 1; break;
-        case 2: break;
-        case 3: h.rmt = 1; break;
-        case 4:
-            if (ch.source == 0) h.ledc = 1;
-            break;
-        case 5:
-            if (ch.source == 0) h.ledc++;
-            if (ch.pin2_source == 0) h.ledc++;
-            if (ch.pin3_source == 0) h.ledc++;
-            if (ch.color_order >= 4 && ch.pin4_source == 0) h.ledc++;
-            break;
-        case 6:
-            if (ch.source == 0) h.ledc++;
-            if (ch.pin2_source == 0 && ch.mc_mode == 0) h.ledc++;
-            if (ch.mc_mode == 2 && ch.pin3_source == 0) h.ledc++;
-            break;
-        case 7: h.rmt = 2; break;
-        case 8:
-            if (ch.source == 0) h.ledc = 1;
-            break;
-        case 9:
-            if (ch.source == 0) h.ledc = 1;
-            break;
-        case 10: h.uart = 1; break;
-        case 11: break;
-        case 12:
-        case 13: {
-            if (ch.mc_mode >= 6 && ch.mc_mode <= 9) {
-                if (ch.source == 0) h.ledc = 1;
-                break;
-            }
-            uint8_t segN = (ch.type == OutputDefs::TYPE_7SEG_8PIN) ? 8 : 7;
-            for (uint8_t i = 0; i < segN; i++) {
-                if (ch.seg_sources[i] == 0) h.ledc++;
-            }
-            break;
-        }
-        case 14:
-            if (!(ch.source >= 5 && ch.source <= 7)) h.dac = 1;
-            break;
-        case 15:
-            if (ch.source == 0) h.ledc = 1;
-            break;
-        case 16: h.ledc = 1; h.timer = 1; break;
-        case 17: break;
-        case 18: break;
+// Pin index → source field helper: index 0→ch.source, 1→pin2_source, etc.
+inline uint8_t getPinSource(const OutputChannel& ch, uint8_t pinIndex) {
+    switch (pinIndex) {
+        case 0: return ch.source;
+        case 1: return ch.pin2_source;
+        case 2: return ch.pin3_source;
+        case 3: return ch.pin4_source;
+        default: return (pinIndex < 12) ? ch.seg_sources[pinIndex - 4] : 0;
     }
+}
+
+inline HardwareResource estimateHardware(const OutputChannel& ch) {
+    const auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
+    if (!def) return {};
+    HardwareResource h;
+    h.ledc = 0; // recompute per-pin below
+    h.rmt = def->cost.hardware.rmt;
+    h.uart = def->cost.hardware.uart;
+    h.dac = def->cost.hardware.dac;
+    h.timer = def->cost.hardware.timer;
+
+    // Per-pin GPIO-driven hardware
+    for (uint8_t i = 0; i < def->pinCount; i++) {
+        uint8_t src = getPinSource(ch, i);
+        if (src == 0) {
+            if (def->pins[i].hwIfGpio == 1) h.ledc++;
+            if (def->pins[i].hwIfGpio == 2 && h.rmt < def->cost.hardware.rmt) h.rmt++;
+        }
+    }
+
+    // Analog RGB pin4 only counts in RGBW mode (color_order >= 4)
+    if (ch.type == OutputDefs::TYPE_ANALOG_RGB && ch.color_order < 4 && ch.pin4_source == 0 && h.ledc > 0) {
+        h.ledc--;
+    }
+
+    // DAC type 14: source 5-7 is I2C DAC (no internal DAC). Internal DAC=source 0.
+    if (ch.type == OutputDefs::TYPE_DAC && ch.source == 0) {
+        h.dac = 1;
+    }
+
     return h;
 }
 
@@ -156,12 +144,10 @@ inline bool srcOnI2C(uint8_t src) {
 }
 
 inline bool usesI2C(const OutputChannel& ch) {
-    if (srcOnI2C(ch.source)) return true;
-    if (srcOnI2C(ch.pin2_source)) return true;
-    if (srcOnI2C(ch.pin3_source)) return true;
-    if (srcOnI2C(ch.pin4_source)) return true;
-    for (auto s : ch.seg_sources) {
-        if (srcOnI2C(s)) return true;
+    const auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
+    if (!def) return false;
+    for (uint8_t i = 0; i < def->pinCount; i++) {
+        if (srcOnI2C(getPinSource(ch, i))) return true;
     }
     return false;
 }
@@ -180,62 +166,17 @@ inline uint8_t sevenSegCount(uint8_t type, uint8_t mode) {
 constexpr uint16_t I2C_WRITE_US = ScoringDefs::I2C_WRITE_US;
 
 inline uint8_t i2cWritesForChannel(const OutputChannel& ch) {
+    const auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
+    if (!def) return 0;
     uint8_t writes = 0;
-    switch (ch.type) {
-        case 2:
-        case 17:
-            if (srcOnI2C(ch.source)) writes += 1;
-            break;
-        case 4:
-        case 8:
-        case 15:
-            if (srcOnI2C(ch.source)) writes += 1;
-            break;
-        case 5:
-            if (srcOnI2C(ch.source)) writes += 1;
-            if (srcOnI2C(ch.pin2_source)) writes += 1;
-            if (srcOnI2C(ch.pin3_source)) writes += 1;
-            if (ch.color_order >= 4 && srcOnI2C(ch.pin4_source)) writes += 1;
-            break;
-        case 6:
-            if (srcOnI2C(ch.source)) {
-                writes += (ch.mc_mode == 2) ? 3 : 2;
-            } else {
-                if (srcOnI2C(ch.pin2_source)) writes += 1;
-                if (ch.mc_mode == 2 && srcOnI2C(ch.pin3_source)) writes += 1;
-            }
-            break;
-        case 7:
-            if (srcOnI2C(ch.pin2_source)) writes += 1;
-            if (srcOnI2C(ch.pin3_source)) writes += 1;
-            break;
-        case 12:
-        case 13: {
-            uint8_t n = sevenSegCount(ch.type, ch.mc_mode);
-            if (ch.mc_mode >= 2 && srcOnI2C(ch.pin2_source)) {
-                writes += n;
-            } else {
-                for (uint8_t i = 0; i < n; i++) {
-                    if (srcOnI2C(ch.seg_sources[i])) writes += 1;
-                }
-            }
-            if (ch.mc_mode >= 6 && ch.mc_mode <= 9 && srcOnI2C(ch.source)) writes += 1;
-            break;
-        }
-        case 14:
-            if (srcOnI2C(ch.source)) writes += 1;
-            break;
-        case 18:
-            if (srcOnI2C(ch.source)) writes += 1;
-            if (srcOnI2C(ch.pin2_source)) writes += 1;
-            break;
+    for (uint8_t i = 0; i < def->pinCount; i++) {
+        if (srcOnI2C(getPinSource(ch, i))) writes++;
     }
     return writes;
 }
 
 // Service time & RAM per channel (independent of FPS)
 constexpr uint32_t BASE_CHANNEL_RAM = ScoringDefs::BASE_CHANNEL_RAM;
-constexpr uint32_t DMX_BUFFER_RAM = ScoringDefs::DMX_BUFFER_RAM;
 constexpr uint32_t RMT_DMX_DRIVER_RAM = 5150UL * sizeof(rmt_item32_t) + 32;
 constexpr uint32_t I2C_ROUTE_RAM = ScoringDefs::I2C_ROUTE_RAM;
 constexpr uint32_t DMX_OUTPUT_SERVICE_US = ScoringDefs::DMX_OUTPUT_SERVICE_US;
@@ -258,38 +199,26 @@ inline uint32_t funcGenBackgroundUs(uint8_t funcGenCount, uint8_t outputFps) {
 }
 
 inline uint32_t dmxBufferRamForChannel(uint8_t type, uint16_t ledCount, uint8_t colorOrder, uint8_t resolution, uint8_t mode) {
-    switch (type) {
-        case 1:
-            return DMX_BUFFER_RAM;
-        case 3: {
-        uint8_t bytesPerPixel = colorOrder >= 4 ? 4 : 3;
-        uint16_t pixelsPerUniverse = 512 / bytesPerPixel;
-        uint16_t universes = (ledCount + pixelsPerUniverse - 1) / pixelsPerUniverse;
+    // DMX: full universe buffer
+    if (type == OutputDefs::TYPE_DMX) return 512;
+    // LED strip: universe-rounded (led_count may span multiple universes)
+    if (type == OutputDefs::TYPE_LED_STRIP) {
+        uint8_t bpp = colorOrder >= 4 ? 4 : 3;
+        uint16_t pixelsPerUni = 512 / bpp;
+        uint16_t universes = (ledCount + pixelsPerUni - 1) / pixelsPerUni;
         if (universes < 1) universes = 1;
         return (uint32_t)universes * 512;
-        }
-        case 5:
-            return colorOrder >= 4 ? 4 : 3;
-        case 7:
-            return dmxValueByteCount(resolution) + 2;
-        case 9:
-        case 11:
-            return mode == 1 ? 4 : 2;
-        case 12:
-        case 13:
-            return (mode == 4 || mode == 5 || mode >= 6) ? 2 : 1;
-        case 10:
-            return 3;
-        case 16:
-            return 5;
-        case 4:
-        case 6:
-        case 8:
-        case 15:
-            return dmxValueByteCount(resolution);
-        default:
-            return 1;
     }
+    // Types where buffer depends on mode/colorOrder (can't be static)
+    if (type == OutputDefs::TYPE_ANALOG_RGB) return colorOrder >= 4 ? 4 : 3;
+    if (type == OutputDefs::TYPE_STEPPER) return dmxValueByteCount(resolution) + 2;
+    if (type == OutputDefs::TYPE_BUZZER || type == OutputDefs::TYPE_TM1637) return mode == 1 ? 4 : 2;
+    if (type == OutputDefs::TYPE_7SEG_7PIN || type == OutputDefs::TYPE_7SEG_8PIN) return (mode == 4 || mode == 5 || mode >= 6) ? 2 : 1;
+    // Fallback: use dmxSlots from definition, or dmxValueByteCount
+    const auto* def = OutputDefs::modeDef(type, mode);
+    if (!def) return 1;
+    if (def->cost.dmxSlots > 0) return def->cost.dmxSlots;
+    return dmxValueByteCount(resolution);
 }
 
 inline uint32_t pixelBufferRam(uint16_t ledCount, uint8_t colorOrder) {
@@ -446,122 +375,71 @@ inline RamBudget totalRam(const std::vector<OutputChannel>& chs) {
 //  JSON VERSIONS (for Web API validation from raw JSON)
 // ═══════════════════════════════════════
 
-inline HardwareResource estimateHardwareFromJson(JsonObjectConst j) {
-    HardwareResource h;
-    uint8_t t  = j["type"]  | 0;
-    uint8_t src = j["source"] | 0;
-    switch (t) {
-        case 0: break;
-        case 1: h.uart = 1; break;
-        case 2: break;
-        case 3: h.rmt = 1; break;
-        case 4: if (src == 0) h.ledc = 1; break;
-        case 5:
-            if (src == 0) h.ledc++;
-            if ((j["pin2_source"] | 0) == 0) h.ledc++;
-            if ((j["pin3_source"] | 0) == 0) h.ledc++;
-            if ((j["color_order"] | 0) >= 4 && (j["pin4_source"] | 0) == 0) h.ledc++;
-            break;
-        case 6:
-            if (src == 0) h.ledc++;
-            if ((j["pin2_source"] | 0) == 0 && (j["mc_mode"] | 0) == 0) h.ledc++;
-            if ((j["mc_mode"] | 0) == 2 && (j["pin3_source"] | 0) == 0) h.ledc++;
-            break;
-        case 7: h.rmt = 2; break;
-        case 8:  if (src == 0) h.ledc = 1; break;
-        case 9:  if (src == 0) h.ledc = 1; break;
-        case 10: h.uart = 1; break;
-        case 11: break;
-        case 12:
-        case 13: {
-            uint8_t mode = j["mc_mode"] | 0;
-            if (mode >= 6 && mode <= 9) {
-                if (src == 0) h.ledc = 1;
-                break;
-            }
-            uint8_t segN = (t == 13) ? 8 : 7;
+inline uint8_t getPinSourceFromJson(JsonObjectConst j, uint8_t pinIndex) {
+    switch (pinIndex) {
+        case 0: return j["source"] | 0;
+        case 1: return j["pin2_source"] | 0;
+        case 2: return j["pin3_source"] | 0;
+        case 3: return j["pin4_source"] | 0;
+        default: {
             JsonArrayConst sa = j["seg_sources"];
-            for (uint8_t i = 0; i < segN; i++) {
-                if (!sa.isNull() && i < sa.size()) { if ((sa[i] | 0) == 0) h.ledc++; }
-                else { h.ledc++; }  // default seg_sources[i]=0 → GPIO
-            }
-            break;
+            uint8_t i = pinIndex - 4;
+            return (!sa.isNull() && i < sa.size()) ? (uint8_t)(sa[i] | 0) : 0;
         }
-        case 14: if (!(src >= 5 && src <= 7)) h.dac = 1; break;
-        case 15: if (src == 0) h.ledc = 1; break;
-        case 16: h.ledc = 1; h.timer = 1; break;
-        case 17: break;
-        case 18: break;
     }
+}
+
+inline HardwareResource estimateHardwareFromJson(JsonObjectConst j) {
+    uint8_t t = j["type"] | 0;
+    uint8_t mode = j["mc_mode"] | 0;
+    const auto* def = OutputDefs::modeDef(t, mode);
+    if (!def) return {};
+    HardwareResource h;
+    h.ledc = 0;
+    h.rmt = def->cost.hardware.rmt;
+    h.uart = def->cost.hardware.uart;
+    h.dac = def->cost.hardware.dac;
+    h.timer = def->cost.hardware.timer;
+
+    for (uint8_t i = 0; i < def->pinCount; i++) {
+        uint8_t src = getPinSourceFromJson(j, i);
+        if (src == 0) {
+            if (def->pins[i].hwIfGpio == 1) h.ledc++;
+            if (def->pins[i].hwIfGpio == 2 && h.rmt < def->cost.hardware.rmt) h.rmt++;
+        }
+    }
+
+    uint8_t colorOrder = j["color_order"] | 0;
+    if (t == OutputDefs::TYPE_ANALOG_RGB && colorOrder < 4 && getPinSourceFromJson(j, 3) == 0 && h.ledc > 0) {
+        h.ledc--;
+    }
+
+    if (t == OutputDefs::TYPE_DAC && (j["source"] | 0) == 0) {
+        h.dac = 1;
+    }
+
     return h;
 }
 
 inline bool usesI2CFromJson(JsonObjectConst j) {
-    if (srcOnI2C(j["source"] | 0)) return true;
-    if (srcOnI2C(j["pin2_source"] | 0)) return true;
-    if (srcOnI2C(j["pin3_source"] | 0)) return true;
-    if (srcOnI2C(j["pin4_source"] | 0)) return true;
-    JsonArrayConst sa = j["seg_sources"];
-    if (!sa.isNull()) {
-        for (auto s : sa) { if (srcOnI2C(s | 0)) return true; }
+    uint8_t t = j["type"] | 0;
+    uint8_t mode = j["mc_mode"] | 0;
+    const auto* def = OutputDefs::modeDef(t, mode);
+    if (!def) return false;
+    for (uint8_t i = 0; i < def->pinCount; i++) {
+        if (srcOnI2C(getPinSourceFromJson(j, i))) return true;
     }
     return false;
 }
 
 inline uint8_t i2cWritesFromJson(JsonObjectConst j) {
-    uint8_t writes = 0;
     uint8_t t = j["type"] | 0;
-    uint8_t src = j["source"] | 0;
     uint8_t mode = j["mc_mode"] | 0;
-    switch (t) {
-        case 2:
-        case 17:
-        case 4:
-        case 8:
-        case 15:
-            if (srcOnI2C(src)) writes += 1;
-            break;
-        case 5:
-            if (srcOnI2C(src)) writes += 1;
-            if (srcOnI2C(j["pin2_source"] | 0)) writes += 1;
-            if (srcOnI2C(j["pin3_source"] | 0)) writes += 1;
-            if ((j["color_order"] | 0) >= 4 && srcOnI2C(j["pin4_source"] | 0)) writes += 1;
-            break;
-        case 6:
-            if (srcOnI2C(src)) {
-                writes += (mode == 2) ? 3 : 2;
-            } else {
-                if (srcOnI2C(j["pin2_source"] | 0)) writes += 1;
-                if (mode == 2 && srcOnI2C(j["pin3_source"] | 0)) writes += 1;
-            }
-            break;
-        case 7:
-            if (srcOnI2C(j["pin2_source"] | 0)) writes += 1;
-            if (srcOnI2C(j["pin3_source"] | 0)) writes += 1;
-            break;
-        case 12:
-        case 13: {
-            uint8_t n = sevenSegCount(t, mode);
-            uint8_t pin2Source = j["pin2_source"] | 0;
-            if (mode >= 2 && srcOnI2C(pin2Source)) {
-                writes += n;
-            } else {
-                JsonArrayConst sa = j["seg_sources"];
-                for (uint8_t i = 0; i < n; i++) {
-                    uint8_t segSource = (!sa.isNull() && i < sa.size()) ? (uint8_t)(sa[i] | 0) : 0;
-                    if (srcOnI2C(segSource)) writes += 1;
-                }
-            }
-            if (mode >= 6 && mode <= 9 && srcOnI2C(src)) writes += 1;
-            break;
-        }
-        case 14:
-            if (srcOnI2C(src)) writes += 1;
-            break;
-        case 18:
-            if (srcOnI2C(src)) writes += 1;
-            if (srcOnI2C(j["pin2_source"] | 0)) writes += 1;
-            break;
+    const auto* def = OutputDefs::modeDef(t, mode);
+    if (!def) return 0;
+    uint8_t writes = 0;
+    for (uint8_t i = 0; i < def->pinCount; i++) {
+        if (srcOnI2C(getPinSourceFromJson(j, i))) writes++;
     }
     return writes;
 }

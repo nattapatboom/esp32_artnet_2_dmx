@@ -37,12 +37,18 @@ enum PinDirection : uint8_t {
     PIN_INPUT
 };
 
+// hwIfGpio: when this pin is driven by ESP32 GPIO directly,
+// what hardware does it consume?
+//   0 = none (digital output/input)
+//   1 = LEDC (PWM-capable output)
+//   2 = RMT (WS281x data, stepper STEP)
 struct PinRule {
     const char* slot;
     const char* label;
     uint8_t sources;
     PinDirection direction;
     bool invertible;
+    uint8_t hwIfGpio;
 };
 
 struct HardwareCost {
@@ -57,6 +63,9 @@ struct ModeCost {
     uint16_t cpuUs;
     uint16_t extraRamBytes;
     HardwareCost hardware;
+    uint8_t cpuPerUnit;   // µs per unit (LED = per pixel, DMX = pre-filled)
+    uint8_t ramPerUnit;   // bytes per unit (LED = per pixel, DMX = pre-filled)
+    uint16_t dmxSlots;    // 0 = use dmxValueByteCount(resolution); >0 = fixed
 };
 
 struct OutputModeDef {
@@ -69,89 +78,89 @@ struct OutputModeDef {
 };
 
 constexpr PinRule PINS_GPIO_MAIN[] = {
-    {"pin1", "Main", SRC_GPIO, PIN_OUTPUT, true}
+    {"pin1", "Main", SRC_GPIO, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_DMX[] = {
-    {"pin1", "DMX TX", SRC_GPIO, PIN_OUTPUT, true}
+    {"pin1", "DMX TX", SRC_GPIO, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_RELAY_DIGITAL[] = {
-    {"pin1", "Relay", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
+    {"pin1", "Relay", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_LED_STRIP[] = {
-    {"pin1", "Data", SRC_GPIO, PIN_OUTPUT, true}
+    {"pin1", "Data", SRC_GPIO, PIN_OUTPUT, true, 2}
 };
 constexpr PinRule PINS_PWM[] = {
-    {"pin1", "PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true}
+    {"pin1", "PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_ANALOG_RGB[] = {
-    {"pin1", "Red", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin2", "Green", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin3", "Blue", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin4", "White", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true}
+    {"pin1", "Red", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin2", "Green", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin3", "Blue", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin4", "White", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_MOTOR_PWM_DIR[] = {
-    {"pin1", "PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin2", "DIR", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
+    {"pin1", "PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin2", "DIR", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_MOTOR_IN1_IN2_EN[] = {
-    {"pin1", "IN1", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin2", "IN2", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin3", "EN PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true}
+    {"pin1", "IN1", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin2", "IN2", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin3", "EN PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_STEPPER[] = {
-    {"pin1", "STEP", SRC_GPIO, PIN_OUTPUT, true},
-    {"pin2", "DIR", SRC_GPIO | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin3", "ENABLE", SRC_GPIO | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin4", "HOME", SRC_GPIO | SRC_DIGITAL_EXPANDER, PIN_INPUT, true}
+    {"pin1", "STEP", SRC_GPIO, PIN_OUTPUT, true, 2},
+    {"pin2", "DIR", SRC_GPIO | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin3", "ENABLE", SRC_GPIO | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin4", "HOME", SRC_GPIO | SRC_DIGITAL_EXPANDER, PIN_INPUT, true, 0}
 };
 constexpr PinRule PINS_DFPLAYER[] = {
-    {"pin1", "TX", SRC_GPIO, PIN_OUTPUT, false},
-    {"pin2", "RX", SRC_GPIO, PIN_INPUT, false}
+    {"pin1", "TX", SRC_GPIO, PIN_OUTPUT, false, 0},
+    {"pin2", "RX", SRC_GPIO, PIN_INPUT, false, 0}
 };
 constexpr PinRule PINS_TM1637[] = {
-    {"pin1", "CLK", SRC_GPIO, PIN_OUTPUT, true},
-    {"pin2", "DIO", SRC_GPIO, PIN_OUTPUT, true}
+    {"pin1", "CLK", SRC_GPIO, PIN_OUTPUT, true, 0},
+    {"pin2", "DIO", SRC_GPIO, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_7SEG_DIRECT[] = {
-    {"pin1", "Segment A", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin2", "Segment B", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin3", "Segment C", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin4", "Segment D", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin5", "Segment E", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin6", "Segment F", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin7", "Segment G", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin8", "Segment DP", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
+    {"pin1", "Segment A", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin2", "Segment B", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin3", "Segment C", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin4", "Segment D", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin5", "Segment E", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin6", "Segment F", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin7", "Segment G", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin8", "Segment DP", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_7SEG_DIMMED[] = {
-    {"pin1", "Segment A", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin2", "Segment B", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin3", "Segment C", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin4", "Segment D", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin5", "Segment E", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin6", "Segment F", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin7", "Segment G", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin8", "Segment DP", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true}
+    {"pin1", "Segment A", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin2", "Segment B", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin3", "Segment C", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin4", "Segment D", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin5", "Segment E", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin6", "Segment F", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin7", "Segment G", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin8", "Segment DP", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_7SEG_COMMON_DIM[] = {
-    {"pin1", "Common PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true},
-    {"pin2", "Segment A", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin3", "Segment B", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin4", "Segment C", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin5", "Segment D", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin6", "Segment E", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin7", "Segment F", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin8", "Segment G", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin9", "Segment DP", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
+    {"pin1", "Common PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
+    {"pin2", "Segment A", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin3", "Segment B", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin4", "Segment C", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin5", "Segment D", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin6", "Segment E", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin7", "Segment F", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin8", "Segment G", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin9", "Segment DP", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_DAC[] = {
-    {"pin1", "I2C DAC", SRC_I2C_DAC, PIN_OUTPUT, false}
+    {"pin1", "I2C DAC", SRC_I2C_DAC, PIN_OUTPUT, false, 0}
 };
 constexpr PinRule PINS_SOLENOID[] = {
-    {"pin1", "Solenoid", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
+    {"pin1", "Solenoid", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_SMOKE[] = {
-    {"pin1", "Smoke Valve", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true},
-    {"pin2", "Shoot Valve", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
+    {"pin1", "Smoke Valve", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin2", "Shoot Valve", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 
 constexpr HardwareCost HW_NONE = {0, 0, 0, 0, 0};
@@ -165,14 +174,21 @@ constexpr HardwareCost HW_RMT_2 = {0, 2, 0, 0, 0};
 constexpr HardwareCost HW_UART_1 = {0, 0, 1, 0, 0};
 constexpr HardwareCost HW_LEDC_1_TIMER_1 = {1, 0, 0, 0, 1};
 
-constexpr ModeCost modeCost(uint16_t cpuUs, uint16_t extraRamBytes = 0, HardwareCost hardware = HW_NONE) {
-    return {cpuUs, extraRamBytes, hardware};
+constexpr ModeCost modeCost(
+    uint16_t cpuUs,
+    uint16_t extraRamBytes = 0,
+    HardwareCost hardware = HW_NONE,
+    uint8_t cpuPerUnit = 0,
+    uint8_t ramPerUnit = 0,
+    uint16_t dmxSlots = 0
+) {
+    return {cpuUs, extraRamBytes, hardware, cpuPerUnit, ramPerUnit, dmxSlots};
 }
 
-constexpr ModeCost COST_DIMMER = modeCost(5);
-constexpr ModeCost COST_DMX_SERIAL = modeCost(250, 0, HW_UART_1);
-constexpr ModeCost COST_RELAY = modeCost(5);
-constexpr ModeCost COST_LED_STRIP_BASE = modeCost(80, 256, HW_RMT_1);
+constexpr ModeCost COST_DIMMER = modeCost(5, 0, HW_NONE, 0, 0, 1);
+constexpr ModeCost COST_DMX_SERIAL = modeCost(250, 0, HW_UART_1, 0, 0, 512);
+constexpr ModeCost COST_RELAY = modeCost(5, 0, HW_NONE, 0, 0, 1);
+constexpr ModeCost COST_LED_STRIP_BASE = modeCost(80, 256, HW_RMT_1, 3, 3);
 constexpr ModeCost COST_SINGLE_LED = modeCost(6, 0, HW_LEDC_1);
 constexpr ModeCost COST_ANALOG_RGBW = modeCost(18, 0, HW_LEDC_4);
 constexpr ModeCost COST_MOTOR_PWM_DIR = modeCost(35, 0, HW_LEDC_2);
@@ -181,7 +197,7 @@ constexpr ModeCost COST_MOTOR_IN1_IN2_EN = modeCost(35, 0, HW_LEDC_2);
 constexpr ModeCost COST_STEPPER = modeCost(80, 512, HW_RMT_2);
 constexpr ModeCost COST_SERVO = modeCost(12, 0, HW_LEDC_1);
 constexpr ModeCost COST_BUZZER = modeCost(35, 0, HW_LEDC_1);
-constexpr ModeCost COST_DFPLAYER = modeCost(30, 260, HW_UART_1);
+constexpr ModeCost COST_DFPLAYER = modeCost(30, 260, HW_UART_1, 0, 0, 3);
 constexpr ModeCost COST_TM1637 = modeCost(900);
 constexpr ModeCost COST_7SEG_7PIN = modeCost(30, 0, HW_LEDC_7);
 constexpr ModeCost COST_7SEG_8PIN = modeCost(35, 0, HW_LEDC_8);
@@ -189,9 +205,9 @@ constexpr ModeCost COST_7SEG_COMMON_DIM_7PIN = modeCost(30, 0, HW_LEDC_1);
 constexpr ModeCost COST_7SEG_COMMON_DIM_8PIN = modeCost(35, 0, HW_LEDC_1);
 constexpr ModeCost COST_DAC = modeCost(10);
 constexpr ModeCost COST_PWM_DAC = modeCost(6, 0, HW_LEDC_1);
-constexpr ModeCost COST_FUNC_GEN = modeCost(120, 1120, HW_LEDC_1_TIMER_1);
-constexpr ModeCost COST_SOLENOID = modeCost(10);
-constexpr ModeCost COST_SMOKE = modeCost(25);
+constexpr ModeCost COST_FUNC_GEN = modeCost(120, 1120, HW_LEDC_1_TIMER_1, 0, 0, 5);
+constexpr ModeCost COST_SOLENOID = modeCost(10, 0, HW_NONE, 0, 0, 1);
+constexpr ModeCost COST_SMOKE = modeCost(25, 0, HW_NONE, 0, 0, 1);
 
 constexpr OutputModeDef OUTPUT_MODES[] = {
     {TYPE_DIMMER, -1, "Triac dimmer", COST_DIMMER, PINS_GPIO_MAIN, 1},
