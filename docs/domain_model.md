@@ -1,6 +1,6 @@
 # Domain Model: ESP32 Art-Net Firmware
 
-This document is the result of a `/grilling` domain-modeling session, extracted primarily from `include/output_control.h`, `include/scoring.h`, `include/config.h`, `src/main.cpp`, `web/index.html`, `docs/user_manual/main.typ`, `docs/resource_calculator.md`, `include/output_defs.h`, `include/type_protocol.h`, and `include/type_interfaces/*.h`.
+This document is the result of a `/grilling` domain-modeling session, extracted primarily from `include/output_control.h`, `include/scoring.h`, `include/config.h`, `src/main.cpp`, `web/index.html`, `docs/user_manual/main.typ`, `docs/resource_calculator.md`, `include/output_defs.h`, `include/type_protocol.h`, `include/type_interfaces/*.h`, and `include/gpio_control.h`.
 
 ## Core Domain
 
@@ -677,6 +677,32 @@ Field keys in `EXTRA_FIELDS` must match the JSON keys used in `/api/outputs` POS
 - `pin_invert`, `pin2_invert`, etc. — pin inversion flags
 
 Base routing fields (`source`, `pin`, `pca_addr`, `pca_channel`, `start_universe`, `start_address`, `pin2`, `pin3`, `pin4`, etc.) are shared across all types and defined in the Web UI routing pane, not in per-type `EXTRA_FIELDS`.
+
+---
+
+## GPIO Control Interface (Firmware ↔ Web UI Contract)
+
+`include/gpio_control.h` is the single source of truth for available GPIO pins, reserved pins, and simple pin validation — used by both C++ validation and Web UI GPIO config.
+
+Key data:
+- `OUTPUT_GPIO_PINS[]` — 8 available output GPIOs (4, 12, 14, 15, 2, 17, 32, 33)
+- `INPUT_ONLY_PINS[]` — GPIO34-39 (input-only on ESP32)
+- `RESERVED_ETHERNET_PINS[]` — 10 Ethernet RMII/PHY pins with reasons
+- `STRAPPING_GPIO12 = 12` — warning-only, not blocked
+
+Validation helpers:
+| Function | Purpose |
+| --- | --- |
+| `isInputOnlyPin(pin)` | True if pin 34-39 |
+| `isReservedEthernetPin(pin)` | True if Ethernet-reserved |
+| `reservedEthernetReason(pin)` | Returns human-readable reason string |
+| `isPinAvailableForOutput(pin)` | True if pin is not 255, not input-only, not Ethernet |
+| `pinsConflict(a, b)` | True if both non-255 and equal |
+| `enumerateChannelGpios(...)` | Template function that calls a callback per GPIO pin found in a channel's routing |
+
+The `enumerateChannelGpios()` template is the C++ equivalent of `outputGpios()` in `web/js/_gpio.js`. Both walk the same routing rules to collect all GPIO pins used by a channel.
+
+`outputsUseForbiddenGpio()`, `outputsHaveDuplicateGpio()`, `outputJsonUsesPin()`, and `outputsUseReservedPin()` in `src/main.cpp` use these helpers for full JSON-based validation on the `/api/outputs` and `/api/settings` endpoints.
 
 ---
 

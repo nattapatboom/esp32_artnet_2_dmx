@@ -58,6 +58,7 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - `include/web_pages.h` — generated embedded Web UI; do not edit directly
 - `include/type_protocol.h` — shared types for the firmware↔Web UI interface contract (`FieldDef`, `TestCmdDef`)
 - `include/type_interfaces/type_N.h` — per-output-type interface definitions (config fields, test commands, field validation limits)
+- `include/gpio_control.h` — GPIO pin availability, reserved pins, validation helpers (`isInputOnlyPin`, `enumerateChannelGpios`, etc.)
 - `docs/domain_model.md` — project/domain context, device modes, thread safety, ADRs
 - `docs/resource_calculator.md` — hardware scoring and constraints
 - `docs/hardware_guidelines.md` — ESD protection, flyback diode, datasheet checklist
