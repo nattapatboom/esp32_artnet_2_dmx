@@ -268,7 +268,7 @@ async function main() {
         renderPinRows();
         result.mcp4725 = document.getElementById('no_source')?.value === '5'
           && !!document.getElementById('no_pca_addr')
-          && (document.getElementById('pin-mapping-container')?.textContent || '').includes('12-bit I2C');
+          && (document.getElementById('pin-mapping-container')?.textContent || '').includes('CH A');
 
         window.alert = msg => result.alerts.push(String(msg));
         window.confirm = () => true;
