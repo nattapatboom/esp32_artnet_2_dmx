@@ -12,6 +12,26 @@ enum SourceMask : uint8_t {
     SRC_I2C_DAC = 1 << 3
 };
 
+constexpr uint8_t TYPE_DIMMER       = 0;
+constexpr uint8_t TYPE_DMX          = 1;
+constexpr uint8_t TYPE_RELAY        = 2;
+constexpr uint8_t TYPE_LED_STRIP    = 3;
+constexpr uint8_t TYPE_SINGLE_LED   = 4;
+constexpr uint8_t TYPE_ANALOG_RGB   = 5;
+constexpr uint8_t TYPE_MOTOR        = 6;
+constexpr uint8_t TYPE_STEPPER      = 7;
+constexpr uint8_t TYPE_SERVO        = 8;
+constexpr uint8_t TYPE_BUZZER       = 9;
+constexpr uint8_t TYPE_DFPLAYER     = 10;
+constexpr uint8_t TYPE_TM1637       = 11;
+constexpr uint8_t TYPE_7SEG_7PIN    = 12;
+constexpr uint8_t TYPE_7SEG_8PIN    = 13;
+constexpr uint8_t TYPE_DAC          = 14;
+constexpr uint8_t TYPE_PWM_DAC      = 15;
+constexpr uint8_t TYPE_FUNC_GEN     = 16;
+constexpr uint8_t TYPE_SOLENOID     = 17;
+constexpr uint8_t TYPE_SMOKE        = 18;
+
 enum PinDirection : uint8_t {
     PIN_OUTPUT,
     PIN_INPUT
@@ -174,35 +194,35 @@ constexpr ModeCost COST_SOLENOID = modeCost(10);
 constexpr ModeCost COST_SMOKE = modeCost(25);
 
 constexpr OutputModeDef OUTPUT_MODES[] = {
-    {0, -1, "Triac dimmer", COST_DIMMER, PINS_GPIO_MAIN, 1},
-    {1, -1, "DMX serial", COST_DMX_SERIAL, PINS_DMX, 1},
-    {2, -1, "Relay", COST_RELAY, PINS_RELAY_DIGITAL, 1},
-    {3, -1, "RGB/RGBW strip", COST_LED_STRIP_BASE, PINS_LED_STRIP, 1},
-    {4, -1, "Single-color PWM", COST_SINGLE_LED, PINS_PWM, 1},
-    {5, -1, "Analog RGB/RGBW", COST_ANALOG_RGBW, PINS_ANALOG_RGB, 4},
-    {6, 0, "PWM + DIR", COST_MOTOR_PWM_DIR, PINS_MOTOR_PWM_DIR, 2},
-    {6, 1, "IN1 + IN2", COST_MOTOR_IN1_IN2, PINS_MOTOR_PWM_DIR, 2},
-    {6, 2, "IN1 + IN2 + EN", COST_MOTOR_IN1_IN2_EN, PINS_MOTOR_IN1_IN2_EN, 3},
-    {7, -1, "Stepper", COST_STEPPER, PINS_STEPPER, 4},
-    {8, -1, "RC servo", COST_SERVO, PINS_PWM, 1},
-    {9, -1, "Passive buzzer", COST_BUZZER, PINS_GPIO_MAIN, 1},
-    {10, -1, "DFPlayer", COST_DFPLAYER, PINS_DFPLAYER, 2},
-    {11, -1, "TM1637", COST_TM1637, PINS_TM1637, 2},
-    {12, -1, "7-seg 7-pin", COST_7SEG_7PIN, PINS_7SEG_DIRECT, 7},
-    {12, 4, "7-seg 7-pin direct dim CA", COST_7SEG_7PIN, PINS_7SEG_DIMMED, 7},
-    {12, 5, "7-seg 7-pin direct dim CC", COST_7SEG_7PIN, PINS_7SEG_DIMMED, 7},
-    {12, 6, "7-seg 7-pin common anode dim", COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
-    {12, 7, "7-seg 7-pin common cathode dim", COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
-    {13, -1, "7-seg 8-pin", COST_7SEG_8PIN, PINS_7SEG_DIRECT, 8},
-    {13, 4, "7-seg 8-pin direct dim CA", COST_7SEG_8PIN, PINS_7SEG_DIMMED, 8},
-    {13, 5, "7-seg 8-pin direct dim CC", COST_7SEG_8PIN, PINS_7SEG_DIMMED, 8},
-    {13, 8, "7-seg 8-pin common anode dim", COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
-    {13, 9, "7-seg 8-pin common cathode dim", COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
-    {14, -1, "I2C DAC", COST_DAC, PINS_DAC, 1},
-    {15, -1, "PWM DAC", COST_PWM_DAC, PINS_PWM, 1},
-    {16, -1, "Function generator", COST_FUNC_GEN, PINS_GPIO_MAIN, 1},
-    {17, -1, "Solenoid", COST_SOLENOID, PINS_SOLENOID, 1},
-    {18, -1, "Smoke shooter", COST_SMOKE, PINS_SMOKE, 2}
+    {TYPE_DIMMER, -1, "Triac dimmer", COST_DIMMER, PINS_GPIO_MAIN, 1},
+    {TYPE_DMX, -1, "DMX serial", COST_DMX_SERIAL, PINS_DMX, 1},
+    {TYPE_RELAY, -1, "Relay", COST_RELAY, PINS_RELAY_DIGITAL, 1},
+    {TYPE_LED_STRIP, -1, "RGB/RGBW strip", COST_LED_STRIP_BASE, PINS_LED_STRIP, 1},
+    {TYPE_SINGLE_LED, -1, "Single-color PWM", COST_SINGLE_LED, PINS_PWM, 1},
+    {TYPE_ANALOG_RGB, -1, "Analog RGB/RGBW", COST_ANALOG_RGBW, PINS_ANALOG_RGB, 4},
+    {TYPE_MOTOR, 0, "PWM + DIR", COST_MOTOR_PWM_DIR, PINS_MOTOR_PWM_DIR, 2},
+    {TYPE_MOTOR, 1, "IN1 + IN2", COST_MOTOR_IN1_IN2, PINS_MOTOR_PWM_DIR, 2},
+    {TYPE_MOTOR, 2, "IN1 + IN2 + EN", COST_MOTOR_IN1_IN2_EN, PINS_MOTOR_IN1_IN2_EN, 3},
+    {TYPE_STEPPER, -1, "Stepper", COST_STEPPER, PINS_STEPPER, 4},
+    {TYPE_SERVO, -1, "RC servo", COST_SERVO, PINS_PWM, 1},
+    {TYPE_BUZZER, -1, "Passive buzzer", COST_BUZZER, PINS_GPIO_MAIN, 1},
+    {TYPE_DFPLAYER, -1, "DFPlayer", COST_DFPLAYER, PINS_DFPLAYER, 2},
+    {TYPE_TM1637, -1, "TM1637", COST_TM1637, PINS_TM1637, 2},
+    {TYPE_7SEG_7PIN, -1, "7-seg 7-pin", COST_7SEG_7PIN, PINS_7SEG_DIRECT, 7},
+    {TYPE_7SEG_7PIN, 4, "7-seg 7-pin direct dim CA", COST_7SEG_7PIN, PINS_7SEG_DIMMED, 7},
+    {TYPE_7SEG_7PIN, 5, "7-seg 7-pin direct dim CC", COST_7SEG_7PIN, PINS_7SEG_DIMMED, 7},
+    {TYPE_7SEG_7PIN, 6, "7-seg 7-pin common anode dim", COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
+    {TYPE_7SEG_7PIN, 7, "7-seg 7-pin common cathode dim", COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
+    {TYPE_7SEG_8PIN, -1, "7-seg 8-pin", COST_7SEG_8PIN, PINS_7SEG_DIRECT, 8},
+    {TYPE_7SEG_8PIN, 4, "7-seg 8-pin direct dim CA", COST_7SEG_8PIN, PINS_7SEG_DIMMED, 8},
+    {TYPE_7SEG_8PIN, 5, "7-seg 8-pin direct dim CC", COST_7SEG_8PIN, PINS_7SEG_DIMMED, 8},
+    {TYPE_7SEG_8PIN, 8, "7-seg 8-pin common anode dim", COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
+    {TYPE_7SEG_8PIN, 9, "7-seg 8-pin common cathode dim", COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
+    {TYPE_DAC, -1, "I2C DAC", COST_DAC, PINS_DAC, 1},
+    {TYPE_PWM_DAC, -1, "PWM DAC", COST_PWM_DAC, PINS_PWM, 1},
+    {TYPE_FUNC_GEN, -1, "Function generator", COST_FUNC_GEN, PINS_GPIO_MAIN, 1},
+    {TYPE_SOLENOID, -1, "Solenoid", COST_SOLENOID, PINS_SOLENOID, 1},
+    {TYPE_SMOKE, -1, "Smoke shooter", COST_SMOKE, PINS_SMOKE, 2}
 };
 
 inline const OutputModeDef* modeDef(uint8_t type, uint8_t mode) {

@@ -55,7 +55,6 @@ private:
 
 public:
     static unsigned long packetCount;
-    static std::atomic<bool> newRxData;
 
     void begin() {
         if (initialized) return;
@@ -108,7 +107,6 @@ private:
         if (matched) {
             lastDmxUpdateTime = millis();
             packetCount++;
-            newRxData = true;
             networkFramePending = true;
             systemActive = true; // Flag system as receiving network data
             

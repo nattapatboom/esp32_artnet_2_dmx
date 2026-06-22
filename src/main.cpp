@@ -72,7 +72,6 @@ void updateMotionControl() {
 
 // Static member definitions (out-of-class, C++14 compatible)
 unsigned long ArtNetControl::packetCount = 0;
-std::atomic<bool> ArtNetControl::newRxData(false);
 uint8_t EspNowControl::rxDmxBuffer[512] = {0};
 uint16_t EspNowControl::rxDmxLength = 0;
 unsigned long EspNowControl::lastRxTime = 0;
@@ -2252,7 +2251,6 @@ void outputTask(void* pvParameters) {
         if ((sysCfg.device_mode == MODE_ARTNET_ETHERNET || sysCfg.device_mode == MODE_ESPNOW_MASTER) && networkFramePending.exchange(false)) {
             // Render local LED strips
             outputCtrl.updateLeds();
-            ArtNetControl::newRxData = false;
         }
 
         updateStatusLedPattern();
