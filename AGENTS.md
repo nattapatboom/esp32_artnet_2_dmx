@@ -41,8 +41,13 @@ pio run
 
 # Automated Web UI smoke test
 node tools/web_ui_smoke_test.mjs
+```
 
-# OTA upload (The device IP is stored in test_device_ip.txt as 'IP=192.168.1.93')
+### OTA Upload
+
+The device IP is stored in `test_device_ip.txt` as `IP=192.168.1.93`:
+
+```powershell
 # Read IP and upload via PowerShell:
 $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { $_.Line.Split('=')[1] }).Trim(); curl.exe -F "update=@.pio\build\wt32-eth01\firmware.bin" "http://$ip/update"
 
@@ -76,7 +81,11 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
   - `i2c_dac.h` — MCP4725, DAC7571, DAC7573 inline write functions
   - `i2c_gpio_expander.h` — DigitalExpanderManager (MCP23017, TCA9555, PCF857x)
   - `pca9685.h` — PCA9685Driver/PCA9685Manager (16-ch PWM)
+  - `display_driver.h` — DisplayDriver (SSD1306, SH1106, PCF8574 LCD)
   - (old `i2c_gpio_expander.h` and `pca9685_control.h` in `include/` root removed)
+- `include/lighting_protocols/` — protocol receiver headers:
+  - `artnet_control.h` — Art-Net UDP listener
+  - `sacn_control.h` — sACN E1.31 listener
 - `src/main.cpp` — setup, HTTP API, validation, network/display tasks
 - `web/index.html` — Web UI source; edit this file, then run `tools/build_web.py`
 - `include/web_pages.h` — generated embedded Web UI; do not edit directly

@@ -18,12 +18,14 @@
 #include "output_devices/dimmer.h"
 #include "motion_control.h"
 #include "espnow_control.h"
-#include "artnet_control.h"
-#include "sacn_control.h"
-#include "display_driver.h"
+#include "lighting_protocols/artnet_control.h"
+#include "lighting_protocols/sacn_control.h"
+#include "i2c_devices/display_driver.h"
 #include "scoring.h"
 #include "config_rules.h"
 #include "network_protocol.h"
+#include "ota_control.h"
+#include "recovery_control.h"
 
 const char* getFirmwareVersion() {
     static char version[32] = {0};
@@ -106,7 +108,7 @@ void stopAP();
 void setupNetwork();
 void setupWebServer();
 void startWiFiClient(bool keepApActive = false);
-void startRecoveryEthernetOnly();
+
 
 void configureWiFiRadioForBoot() {
     WiFi.setTxPower(WIFI_POWER_8_5dBm);
@@ -1251,7 +1253,7 @@ void setupNetwork() {
     }
 }
 
-void startRecoveryEthernetOnly() {
+void startRecoveryMode() {
     WiFi.persistent(false);
     configureWiFiRadioForBoot();
     WiFi.mode(WIFI_AP_STA);
@@ -2264,9 +2266,8 @@ void outputTask(void* pvParameters) {
 }
 
 // Recovery Mode tracking
-#define RECOVERY_BUTTON_PIN 0
 RTC_DATA_ATTR uint32_t bootCount = 0;
-static bool isRecoveryMode = false;
+bool isRecoveryMode = false;
 
 void resetBootCountTask(void *pvParameters) {
     vTaskDelay(15000 / portTICK_PERIOD_MS);
@@ -2304,7 +2305,7 @@ void setup() {
     }
 
     if (isRecoveryMode) {
-        startRecoveryEthernetOnly();
+        startRecoveryMode();
         return; // Skip normal setup
     }
 

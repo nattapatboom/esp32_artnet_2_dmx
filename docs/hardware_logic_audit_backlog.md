@@ -35,13 +35,13 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
    - Fix direction: persist hybrid source/address/channel fields for types 5, 6, 7, 18 and any other type using those fields.
 
 6. **Core 0/Core 1 DMX buffer race**
-   - Files: `include/artnet_control.h`, `include/sacn_control.h`, `include/output_control.h`, `include/output_devices/dimmer.h`, `src/main.cpp`
+   - Files: `include/lighting_protocols/artnet_control.h`, `include/lighting_protocols/sacn_control.h`, `include/output_control.h`, `include/output_devices/dimmer.h`, `src/main.cpp`
    - Status: ✅ Completed (`fix: shadow buffer + atomic swap + dimmer indirection`)
    - Issue: Art-Net/sACN map directly into `OutputChannel::dmxBuffer` on Core 0 while Core 1 reads the same buffers for LEDs, DMX output, relays, motion, solenoids, and smoke.
    - Fix direction: shadow buffer — Core 0 writes to `shadowBuffer`, then `swapBuffers()` atomically swaps pointers for all channels. Dimmer ISR uses `uint8_t**` indirection to re-read current `dmxBuffer` pointer after swap.
 
 7. **sACN property count can exceed packet bytes**
-   - Files: `include/sacn_control.h`
+   - Files: `include/lighting_protocols/sacn_control.h`
    - Status: ✅ Completed (`fix: validate SACN_DMP_DATA + propertyCount > len`)
    - Issue: `dmxLen` from `SACN_DMP_PROP_COUNT` is clamped to 512 but not checked against actual received packet length/DMP PDU length, allowing stale bytes from `rxBuf`.
    - Fix direction: reject packets where `SACN_DMP_DATA + propertyCount > len`; account for the start-code byte.
@@ -109,7 +109,7 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
     - Fix direction: centralize route validation helper for source/address/channel and apply to primary, hybrid, and segment routes.
 
 18. **I2C scan/display can block output I2C timing**
-    - Files: `src/main.cpp`, `include/display_driver.h`
+     - Files: `src/main.cpp`, `include/i2c_devices/display_driver.h`
     - Issue: I2C scan holds `i2cMutex` across all addresses; display update holds mutex across full clear/print operations. Core 1 I2C outputs can wait up to 100 ms.
     - Fix direction: scan one address per mutex acquisition or use shorter time-sliced scans; reduce display critical section frequency/duration.
 

@@ -308,11 +308,11 @@ include/
   funcgen_control.h     Function Generator (Type 16, esp_timer + LEDC waveform engine)
   i2c_devices/i2c_gpio_expander.h   MCP23017, TCA9555, PCF857x drivers
   i2c_devices/pca9685.h             PCA9685 PWM driver
-  artnet_control.h      Art-Net UDP listener
-  sacn_control.h        sACN E1.31 listener
+  lighting_protocols/artnet_control.h      Art-Net UDP listener
+  lighting_protocols/sacn_control.h        sACN E1.31 listener
   espnow_control.h      ESP-NOW master/slave bridge
   rmt_dmx.h             RMT-based DMX TX fallback
-  display_driver.h      SSD1306/SH1106 OLED + PCF8574 LCD driver
+  i2c_devices/display_driver.h      SSD1306/SH1106 OLED + PCF8574 LCD driver
 src/
   main.cpp              Setup, network, web APIs, RTOS tasks, OTA, validation
 web/

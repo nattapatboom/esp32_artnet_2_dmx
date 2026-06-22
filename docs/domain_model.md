@@ -147,8 +147,8 @@ Responsibilities:
 - Expose new data to the output task in a core-safe manner.
 
 Key files:
-- `include/artnet_control.h`
-- `include/sacn_control.h`
+- `include/lighting_protocols/artnet_control.h`
+- `include/lighting_protocols/sacn_control.h`
 - `include/espnow_control.h`
 - `src/main.cpp`
 
@@ -604,7 +604,7 @@ Known implementation drift (scoring-specific):
 ### ADR004: I2C Display Recovery & Non-blocking Strategy
 - **Rationale:** I2C display may temporarily disconnect, but blocking on I2C ACK wastes output protocol time
 - **Decision:** (1) Periodically scan I2C bus for auto-reinit (2) Non-blocking/Minimum Wait I2C writes (3) Allow disabling display via Web UI
-- **Implementation:** (1) `DisplayDriver::tryRecover()` checks I2C address liveness every 5 seconds in Core 0 display loop at `display_driver.h:145` and `main.cpp:2129` (2) Display `update()` uses short I2C mutex timeout (`pdMS_TO_TICKS(100)`) and deactivates after `DISPLAY_MAX_ERRORS` (3) `display_enabled` toggle in Web UI settings
+- **Implementation:** (1) `DisplayDriver::tryRecover()` checks I2C address liveness every 5 seconds in Core 0 display loop at `i2c_devices/display_driver.h:145` and `main.cpp:2129` (2) Display `update()` uses short I2C mutex timeout (`pdMS_TO_TICKS(100)`) and deactivates after `DISPLAY_MAX_ERRORS` (3) `display_enabled` toggle in Web UI settings
 
 ### ADR005: Low Latency Direct Update & Hold Last State
 - **Rationale:** Latency is critical in stage lighting; Frame Interpolation adds buffer lag
@@ -736,13 +736,13 @@ Questions used during the grilling session and answers inferred from the existin
 | 8 | PCF8574 LCD display type enum in `SystemConfig` | ✅ Completed (defined in `config.h:88`) |
 | 9 | DAC7571 protocol fix (3-byte → correct 2-byte per TI datasheet) | ✅ Completed (`output_devices/dac.h`) |
 | 10 | DAC7573 control byte fix (removed spurious 0x10 base, corrected channel select) | ✅ Completed (`output_devices/dac.h`) |
-| 11 | Art-Net protocol version check (reject < 14) | ✅ Completed (`artnet_control.h`) |
-| 12 | sACN Flags/Length validation (PHT flag check, claimed ≤ received length) | ✅ Completed (`sacn_control.h`) |
-| 13 | sACN multicast multi-UDP per universe (prevents last-group-only join) | ✅ Completed (`sacn_control.h`) |
+| 11 | Art-Net protocol version check (reject < 14) | ✅ Completed (`lighting_protocols/artnet_control.h`) |
+| 12 | sACN Flags/Length validation (PHT flag check, claimed ≤ received length) | ✅ Completed (`lighting_protocols/sacn_control.h`) |
+| 13 | sACN multicast multi-UDP per universe (prevents last-group-only join) | ✅ Completed (`lighting_protocols/sacn_control.h`) |
 | 14 | PCA9685 frequency conflict warning (C++: Serial warning in `validateOutputJson()`) | ✅ Completed (`main.cpp`) |
 | 15 | `scoreBlockerName()` missing RamLimit case | ✅ Completed (`scoring.h`) |
 | 16 | ADR008 GPIO DAC blocking: block source=0 for Type 14 on WT32-ETH01 | ✅ Completed (`main.cpp:869`, `index.html:1416`) |
-| 17 | ADR004 I2C Display periodic auto-reinit via `tryRecover()` | ✅ Completed (`display_driver.h:145`, `main.cpp:2129`) |
+| 17 | ADR004 I2C Display periodic auto-reinit via `tryRecover()` | ✅ Completed (`i2c_devices/display_driver.h:145`, `main.cpp:2129`) |
 
 ### Future Features — planned but not started
 - Frame interpolation for mechanical outputs (ADR005, long-term)

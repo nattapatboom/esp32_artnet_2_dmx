@@ -42,7 +42,7 @@
 - **Status:** ✅ Fixed in `dec8ef2`. Added `if (dimmerTimer) { timerEnd(dimmerTimer); dimmerTimer = nullptr; }` guard in `DimmerControl::begin()`.
 
 ### A3. ArtPollReply byte-order (big-endian fields)
-- **File:** `include/artnet_control.h`
+- **File:** `include/lighting_protocols/artnet_control.h`
 - The struct `ArtPollReplyPacket` is filled field-by-field; fields like IP
   address, port, universe are stored in network byte order per Art-Net spec,
   but some assignments write host-order values directly into the struct without
@@ -164,7 +164,7 @@
 - **Fix:** Drive JS from C++ limits via API.
 
 ### D3. Hardcoded universe count in ArtPollReply
-- `include/artnet_control.h`: ArtPollReply assumes 4 universes max. This
+- `include/lighting_protocols/artnet_control.h`: ArtPollReply assumes 4 universes max. This
   aligns with current domain but is not configurable.
 - **Fix:** Derive from channel configuration at ArtPoll time.
 
