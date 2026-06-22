@@ -172,6 +172,7 @@ When working on this project:
 ## Coding Rules
 
 - Keep changes minimal and follow neighboring patterns
+- Use NASA programming rules (JPL's Power of 10 rules for safety-critical code, such as avoiding dynamic memory allocation after initialization, bounding all loops, checking parameter/return value validity, and keeping functions short)
 - No code comments unless they explain non-obvious hardware/runtime behavior
 - Use ArduinoJson 7.x patterns already present in the code
 - Use `std::vector<OutputChannel>` for channel storage
