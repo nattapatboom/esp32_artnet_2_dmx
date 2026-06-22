@@ -218,7 +218,7 @@ Key rules:
 - DFPlayer has priority on UART allocation; DMX GPIO uses remaining UARTs first, then falls back to RMT.
 - RMT usage (LED strips + DMX fallback) must not exceed 8 channels.
 - Source must match the output type.
-- **GPIO12 (MTDI) Avoidance:** GPIO 12 is a Bootstrap Pin — strictly forbidden; Web UI must show a warning if the user enters GPIO 12
+- **GPIO12 (MTDI) Caution:** GPIO 12 is a bootstrap pin. It is allowed with warning-only behavior for field compatibility, but new wiring should avoid it and any attached circuit must not pull it HIGH during reset/power-up.
 - **AC Dimmer Zero-Crossing Interlock:** If `zc_pin == 255` (disabled), AC Dimmer output is locked to 0; Web UI must show a ZC Pin Missing Warning
 - **PCA9685 Shared Frequency Conflict (Warning):** If devices with different frequency requirements (servo 50Hz + LED >200Hz) are mixed on the same PCA chip, a warning is logged via Serial (C++) and a `confirm()` dialog is shown in Web UI. Does not block saving.
 - **DMX Frame Timeout:** Core 1 loop must not perform any blocking operation that causes DMX Frame Cycle to exceed 50ms; initial FPS is forced to 30-40 FPS
@@ -611,7 +611,7 @@ Known implementation drift (scoring-specific):
 
 ### ADR006: WT32-ETH01 GPIO 12 (MTDI) Avoidance Policy
 - **Rationale:** GPIO 12 is a Bootstrap Pin; pulling it high during boot causes permanent boot loop
-- **Decision:** (1) Never use GPIO 12 under any circumstances (2) Web UI must show a warning banner if the user enters GPIO 12
+- **Decision:** (1) Prefer avoiding GPIO 12 for new wiring (2) Allow GPIO 12 as warning-only for existing field hardware (3) Web UI must show a warning banner if the user enters GPIO 12 (4) Hardware guidelines must require LOW/high-impedance startup behavior for any GPIO12-connected circuit
 
 ### ADR007: PCA9685 Shared Frequency Compromise Policy
 - **Rationale:** PCA9685 shares PWM frequency across all 16 channels; servo (50Hz) and LED (>200Hz) have different requirements
@@ -662,7 +662,7 @@ Questions used during the grilling session and answers inferred from the existin
 |---|------|--------|
 | 1 | Boot count threshold: code `>= 3` → spec `>= 5` | ✅ Completed (`bootCount >= 5` at `main.cpp:2252`) |
 | 2 | DAC (source=5) scored as EXP (0.125) instead of DAC (2.0) in `resourceScore()` | ✅ Fixed: sources 5-7 are I2C DAC, counted correctly |
-| 3 | GPIO12 rejection in `validateOutputJson()` | ✅ Completed (`outputsUseForbiddenGpio` checks GPIO12) |
+| 3 | GPIO12 warning-only policy in Web UI and docs | ✅ Completed (`outputsUseForbiddenGpio` no longer blocks GPIO12; Web UI warning remains) |
 | 4 | AC Dimmer ZC pin check in `validateOutputJson()` | ✅ Completed (check at `main.cpp:1066`) |
 | 5 | GPIO34-39 input-only rejection in `validateOutputJson()` | ✅ Completed (`outputsUseForbiddenGpio` checks GPIO34-39) |
 | 6 | Call `validateSettingsAndOutputs()` in `/api/outputs` POST | ✅ Completed (called at `main.cpp:1536`) |

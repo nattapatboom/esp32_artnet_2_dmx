@@ -78,6 +78,18 @@ graph LR
     end
 ```
 
+### 1.4 GPIO12 / MTDI Bootstrap Pin Field Use
+
+GPIO12 is the ESP32 MTDI bootstrap pin. It is exposed on WT32-ETH01 headers and may be used by existing field hardware, but it is a boot-risk pin, not a normal safe default output.
+
+Rules for GPIO12:
+
+- GPIO12 is **allowed with warning only** in the Web UI; it is not hard-blocked so existing installations can keep working.
+- Do not connect circuits that pull GPIO12 HIGH during reset or power-up. A HIGH level during boot can select the wrong flash voltage and prevent the ESP32 from starting.
+- Prefer GPIO2, GPIO4, GPIO14, GPIO15, GPIO17, GPIO32, or GPIO33 for new output wiring.
+- If GPIO12 must be used, add a defined external pull-down or ensure the connected driver input is high-impedance/LOW during boot.
+- Avoid active-high relay boards, optocouplers, or level shifters on GPIO12 unless their input is guaranteed LOW at startup.
+
 ---
 
 ## 2. Target Device Specs

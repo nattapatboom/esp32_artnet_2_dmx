@@ -403,13 +403,13 @@ bool outputsUseReservedPin(JsonArray outputs, uint8_t reservedPin, const char* l
     return false;
 }
 
-// Check for GPIO12 (MTDI bootstrap), GPIO34-39 (input-only), and Ethernet/system reserved pins.
+// Check for GPIO34-39 (input-only) and Ethernet/system reserved pins.
+// GPIO12 (MTDI bootstrap) is warning-only in the Web UI because existing field hardware may use it.
 // GPIO34-39 are allowed only on pins used as inputs (e.g. stepper HOME switch on pin4).
 bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
     auto isForbiddenOutput = [](int rawPin) -> int8_t {
         if (rawPin == 255 || rawPin < 0) return -1;
         uint8_t p = (uint8_t)rawPin;
-        if (p == 12) return 12;          // bootstrap — never allowed
         if (p >= 34 && p <= 39) return (int8_t)p; // input-only on ESP32
         // Ethernet RMII and PHY power pins (GPIO0, 16, 18, 19, 21, 22, 23, 25, 26, 27)
         if (p == 0 || p == 16 || p == 18 || p == 19 || p == 21 || p == 22 || p == 23 || p == 25 || p == 26 || p == 27) {
@@ -431,9 +431,7 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
         auto forbid = [&](int rawPin, const char* label) -> bool {
             int8_t p = isForbiddenOutput(rawPin);
             if (p < 0) return false;
-            if (p == 12) {
-                message = "GPIO 12 (MTDI bootstrap) is forbidden as an output on channel " + String(channel) + label;
-            } else if (p == 0 || p == 16 || p == 18 || p == 19 || p == 21 || p == 22 || p == 23 || p == 25 || p == 26 || p == 27) {
+            if (p == 0 || p == 16 || p == 18 || p == 19 || p == 21 || p == 22 || p == 23 || p == 25 || p == 26 || p == 27) {
                 message = "GPIO " + String(p) + " is reserved for Ethernet and cannot be used as an output on channel " + String(channel) + label;
             } else {
                 message = "GPIO " + String(p) + " is input-only and cannot be used as an output on channel " + String(channel) + label;
@@ -476,9 +474,6 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
             int p4Pin = output["pin4"] | 255;
             if (isPin4GpioRouting(type, pin4Source, colorOrder, homingMode)) {
                 if (forbid(p4Pin, " pin4")) return true;
-            } else if (isPin4Input(type, homingMode) && pin4Source == 0 && p4Pin == 12) {
-                message = "GPIO 12 (MTDI bootstrap) is forbidden on channel " + String(channel) + " pin4";
-                return true;
             }
         }
         channel++;
@@ -756,10 +751,6 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
 
     if (statusPin != 255 && zcPin != 255 && statusPin == zcPin) {
         message = "Status LED GPIO and Zero-Crossing GPIO cannot use the same pin";
-        return false;
-    }
-    if (statusPin == 12 || zcPin == 12 || sdaPin == 12 || sclPin == 12) {
-        message = "GPIO 12 (MTDI bootstrap) cannot be used as Status LED, Zero-Crossing, I2C SDA, or I2C SCL";
         return false;
     }
     if (sdaPin != 255 && sclPin != 255 && sdaPin == sclPin) {

@@ -196,7 +196,7 @@ The WT32-ETH01 is highly integrated. Many ESP32 GPIOs are wired internally to th
 * **Default status LED pin:** GPIO5 (see triple-purpose note above)
 * **Default I2C pins:** GPIO14 SDA, GPIO15 SCL
 * **Zero-crossing pin:** User-configured; input-only GPIO is recommended.
-* **Forbidden pins:** GPIO12 (MTDI bootstrap pin — see ADR006); any use can cause boot loop.
+* **Bootstrap caution pin:** GPIO12 (MTDI bootstrap pin — see ADR006) is allowed with a warning for field compatibility, but must not be pulled HIGH during reset or power-up.
 
 Because only a small number of general output pins are available, I2C expanders are strongly recommended for installations with many relays, solenoids, indicators, or 7-segment segments.
 
@@ -252,6 +252,7 @@ The score calculator is not the only gate. Firmware and Web UI validation also e
 * DFPlayer allocates UART before DMX; DMX uses remaining UARTs and then RMT fallback.
 * RMT usage from LED strips plus DMX fallback cannot exceed 8.
 * Source must be compatible with output type.
+* GPIO12 is warning-only, not a save blocker. New wiring should prefer non-bootstrap GPIOs, and GPIO12-connected circuits must hold LOW/high-impedance during boot.
 * Stepper STEP must be ESP32 GPIO.
 * Motor EN in `IN1+IN2+EN` mode must use ESP32 GPIO or PCA9685.
 * 7-segment Direct Dim modes must use ESP32 GPIO or PCA9685 for segment outputs; digital GPIO expanders are allowed only for digital segment modes.
