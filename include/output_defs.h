@@ -276,6 +276,31 @@ inline uint16_t baseCpuUs(uint8_t type, uint8_t mode = 0) {
     return def ? def->cost.cpuUs : 0;
 }
 
+inline bool isPin2GpioRouting(uint8_t type, uint8_t source, uint8_t pin2Source) {
+    if (type == TYPE_MOTOR || type == TYPE_ANALOG_RGB || type == TYPE_SMOKE || (type == TYPE_STEPPER && pin2Source == 0)) return pin2Source == 0;
+    if (type == TYPE_TM1637 || type == TYPE_DFPLAYER) return source == 0;
+    return false;
+}
+
+inline bool isPin3GpioRouting(uint8_t type, uint8_t pin3Source, uint8_t mcMode) {
+    if (type == TYPE_ANALOG_RGB || (type == TYPE_MOTOR && mcMode == 2) || type == TYPE_STEPPER) return pin3Source == 0;
+    return false;
+}
+
+inline bool isPin4GpioRouting(uint8_t type, uint8_t pin4Source, uint8_t colorOrder, uint8_t homingMode) {
+    if (type == TYPE_ANALOG_RGB && colorOrder >= 4) return pin4Source == 0;
+    if (type == TYPE_STEPPER && homingMode == 0) return pin4Source == 0;
+    return false;
+}
+
+inline uint8_t numSegPins(uint8_t type) {
+    return (type == TYPE_7SEG_8PIN) ? 8 : 7;
+}
+
+inline bool isSegCommonDim(uint8_t mcMode) {
+    return mcMode >= 6 && mcMode <= 9;
+}
+
 // ─────────────────────────────────────
 //  Type interface (Web UI contract) lookup
 // ─────────────────────────────────────

@@ -59,7 +59,6 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 
 - `include/` — C++ headers and most firmware subsystems
 - `include/config.h` — SystemConfig, NVS load/save
-- `include/config_rules.h` — config/IP/routing validation helpers
 - `include/espnow_control.h` — ESP-NOW master/slave bridge
 - `include/motion_control.h` — thin coordinator delegating motion/PWM/audio output types to `output_devices/`
 - `include/ota_control.h` — OTA update state/task declarations

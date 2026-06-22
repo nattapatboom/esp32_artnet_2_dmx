@@ -697,7 +697,7 @@ Validation helpers:
 | `isInputOnlyPin(pin)` | True if pin 34-39 |
 | `isReservedEthernetPin(pin)` | True if Ethernet-reserved |
 
-`outputsUseForbiddenGpio()`, `outputsHaveDuplicateGpio()`, `outputJsonUsesPin()`, and `outputsUseReservedPin()` in `src/main.cpp` combine these pin helpers with routing helpers in `include/config_rules.h` for full JSON-based validation on the `/api/outputs` and `/api/settings` endpoints.
+`outputsUseForbiddenGpio()`, `outputsHaveDuplicateGpio()`, `outputJsonUsesPin()`, and `outputsUseReservedPin()` in `src/main.cpp` combine these pin helpers with routing helpers in `include/output_defs.h` for full JSON-based validation on the `/api/outputs` and `/api/settings` endpoints.
 
 ---
 

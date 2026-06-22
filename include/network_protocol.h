@@ -175,6 +175,30 @@ inline bool deviceModeValid(uint8_t mode) {
     return mode == MODE_ARTNET_ETHERNET || mode == MODE_ESPNOW_MASTER || mode == MODE_ESPNOW_SLAVE;
 }
 
+inline bool ip4Valid(const char* s) {
+    if (s == nullptr || s[0] == '\0') return true;
+    uint8_t part = 0;
+    uint16_t value = 0;
+    bool hasDigit = false;
+    for (const char* p = s; ; ++p) {
+        char c = *p;
+        if (c >= '0' && c <= '9') {
+            hasDigit = true;
+            value = value * 10 + (uint16_t)(c - '0');
+            if (value > 255) return false;
+        } else if (c == '.' || c == '\0') {
+            if (!hasDigit) return false;
+            part++;
+            if (c == '\0') return part == 4;
+            if (part >= 4) return false;
+            value = 0;
+            hasDigit = false;
+        } else {
+            return false;
+        }
+    }
+}
+
 inline const char* deviceModeName(uint8_t mode) {
     if (mode <= MODE_ESPNOW_SLAVE) return MODE_NAMES[mode];
     return "Unknown";

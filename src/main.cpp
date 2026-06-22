@@ -22,7 +22,6 @@
 #include "lighting_protocols/sacn_control.h"
 #include "i2c_devices/display_driver.h"
 #include "scoring.h"
-#include "config_rules.h"
 #include "source_rules.h"
 #include "display_protocol.h"
 #include "network_protocol.h"
@@ -289,8 +288,8 @@ bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
 
     if (type == 12 || type == 13) {
         if (pin2Source == 0) {
-            uint8_t nSeg = numSegPins(type);
-            uint8_t startIdx = isSegCommonDim(mcMode) ? 0 : 1;
+            uint8_t nSeg = OutputDefs::numSegPins(type);
+            uint8_t startIdx = OutputDefs::isSegCommonDim(mcMode) ? 0 : 1;
             if (output.containsKey("seg_pins")) {
                 JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
                 JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
@@ -313,9 +312,9 @@ bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
             }
         }
     } else {
-        if (isPin2GpioRouting(type, source, pin2Source) && jsonPinMatches(output["pin2"], reservedPin)) return true;
-        if (isPin3GpioRouting(type, pin3Source, mcMode) && jsonPinMatches(output["pin3"], reservedPin)) return true;
-        if (isPin4GpioRouting(type, pin4Source, colorOrder, homingMode) && jsonPinMatches(output["pin4"], reservedPin)) return true;
+        if (OutputDefs::isPin2GpioRouting(type, source, pin2Source) && jsonPinMatches(output["pin2"], reservedPin)) return true;
+        if (OutputDefs::isPin3GpioRouting(type, pin3Source, mcMode) && jsonPinMatches(output["pin3"], reservedPin)) return true;
+        if (OutputDefs::isPin4GpioRouting(type, pin4Source, colorOrder, homingMode) && jsonPinMatches(output["pin4"], reservedPin)) return true;
     }
     return false;
 }
@@ -374,8 +373,8 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
 
         if (type == 12 || type == 13) {
             if (pin2Source == 0) {
-                uint8_t nSeg = numSegPins(type);
-                uint8_t startIdx = isSegCommonDim(mcMode) ? 0 : 1;
+                uint8_t nSeg = OutputDefs::numSegPins(type);
+                uint8_t startIdx = OutputDefs::isSegCommonDim(mcMode) ? 0 : 1;
                 if (output.containsKey("seg_pins")) {
                     JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
                     JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
@@ -397,11 +396,11 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
                 }
             }
         } else {
-            if (isPin2GpioRouting(type, source, pin2Source) && forbid(output["pin2"] | 255, " pin2")) return true;
-            if (isPin3GpioRouting(type, pin3Source, mcMode) && forbid(output["pin3"] | 255, " pin3")) return true;
+            if (OutputDefs::isPin2GpioRouting(type, source, pin2Source) && forbid(output["pin2"] | 255, " pin2")) return true;
+            if (OutputDefs::isPin3GpioRouting(type, pin3Source, mcMode) && forbid(output["pin3"] | 255, " pin3")) return true;
 
             int p4Pin = output["pin4"] | 255;
-            if (isPin4GpioRouting(type, pin4Source, colorOrder, homingMode)) {
+            if (OutputDefs::isPin4GpioRouting(type, pin4Source, colorOrder, homingMode)) {
                 if (forbid(p4Pin, " pin4")) return true;
             }
         }
@@ -451,8 +450,8 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
 
         if (type == 12 || type == 13) {
             if (pin2Source == 0) {
-                uint8_t nSeg = numSegPins(type);
-                uint8_t startIdx = isSegCommonDim(mcMode) ? 0 : 1;
+                uint8_t nSeg = OutputDefs::numSegPins(type);
+                uint8_t startIdx = OutputDefs::isSegCommonDim(mcMode) ? 0 : 1;
                 if (output.containsKey("seg_pins")) {
                     JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
                     JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
@@ -479,9 +478,9 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
                 }
             }
         } else {
-            if (isPin2GpioRouting(type, source, pin2Source) && addPin(output["pin2"] | 255, channel)) return true;
-            if (isPin3GpioRouting(type, pin3Source, mcMode) && addPin(output["pin3"] | 255, channel)) return true;
-            if (isPin4GpioRouting(type, pin4Source, colorOrder, homingMode) && addPin(output["pin4"] | 255, channel)) return true;
+            if (OutputDefs::isPin2GpioRouting(type, source, pin2Source) && addPin(output["pin2"] | 255, channel)) return true;
+            if (OutputDefs::isPin3GpioRouting(type, pin3Source, mcMode) && addPin(output["pin3"] | 255, channel)) return true;
+            if (OutputDefs::isPin4GpioRouting(type, pin4Source, colorOrder, homingMode) && addPin(output["pin4"] | 255, channel)) return true;
         }
         channel++;
     }
@@ -675,7 +674,7 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
     }
     auto validateIpField = [&](const char* key) -> bool {
         if (settings[key].is<const char*>()) {
-            if (!validateIp4(settings[key] | "")) {
+            if (!NetworkProtocol::ip4Valid(settings[key] | "")) {
                 message = String(key) + " is not a valid IPv4 address";
                 return false;
             }
