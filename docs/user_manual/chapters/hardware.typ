@@ -147,10 +147,35 @@ When using a 5V buffer IC (e.g., 74HCT245), use a 5.1V Zener diode on the buffer
   stroke: 0.5pt + gray,
   [*Component*], [*Value*], [*Purpose*],
   [Zener Diode (ESD Clamp)], [3.3V (GPIO) / 5.1V (Buffered)], [Clamp excess voltage; protect against ESD or reverse voltage],
-  [Series Resistor], [220 Ω], [Limit maximum current on signal line],
-  [PPTC Resettable Fuse], [< 100 mA], [Resettable overcurrent protection on output line],
+  [Series Resistor], [47 Ω to 220 Ω (see below)], [Limit maximum current on signal line],
+  [PPTC Resettable Fuse], [30 mA to 100 mA (see below)], [Resettable overcurrent protection on output line],
 )
 ]
+
+=== Component Selection for 12V/24V Fault Tolerance
+
+If the board operates alongside 12VDC lighting or 24VDC motor power supplies, accidental short-circuits can inject these higher voltages back into the signal lines. To prevent damage, the series resistor ($R$) and PPTC fuse must be selected so that the fault current ($I_("fault")$) exceeds the PPTC trip current ($I_("trip")$) to trigger a shutdown, while limiting the transient power dissipation on the Zener diode.
+
+The fault current is calculated as:
+$ I_("fault") = (V_("fault") - V_("Zener")) / (R + R_("PPTC")) $
+
+==== Recommended Configurations for 12V and 24V Coexistence
+
+1. *50 mA Hold / 100 mA Trip PPTC (Recommended for general use & pixel strips):*
+  - *Resistor Value ($R$):* *47 $Omega$ to 82 $Omega$* (Use a 0.5W or 1W pulse-withstanding resistor, e.g. size 1206 or 1210).
+  - *At 12V Fault ($V_("fault") = 12"V"$):* $I_("fault") approx 82"mA" - 146"mA"$, which successfully trips the 100 mA fuse.
+  - *At 24V Fault ($V_("fault") = 24"V"$):* $I_("fault") approx 220"mA" - 350"mA"$, causing an instantaneous trip.
+  - *Note:* Low series resistance maintains high rise/fall times for WS2812B pixels (800 kHz) and DMX512 (250 kbps).
+
+2. *30 mA Hold / 60 mA Trip PPTC (Recommended for slow signal lines & relays):*
+  - *Resistor Value ($R$):* *100 $Omega$ to 120 $Omega$*.
+  - *At 12V Fault:* $I_("fault") approx 60"mA" - 85"mA"$, which trips the 60 mA fuse.
+  - *At 24V Fault:* $I_("fault") approx 150"mA" - 200"mA"$, causing a rapid trip.
+
+3. *20 mA Hold / 40 mA Trip PPTC (For high-impedance inputs only):*
+  - *Resistor Value ($R$):* *150 $Omega$ to 220 $Omega$*.
+  - *Note:* Not recommended for high-speed pixel strips due to signal rounding from higher RC time constants.
+
 
 == Inductive Load Protection (Flyback Diode)
 
