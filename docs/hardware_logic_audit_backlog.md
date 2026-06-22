@@ -98,9 +98,10 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 ## P2 / Follow-Up
 
 16. **PCF857x 8-bit vs 16-bit handling**
-    - Files: `include/i2c_gpio_expander.h`, validation in `src/main.cpp`/`web/index.html`
-    - Issue: PCF857x write path sends two bytes, but PCF8574/PCF8574A are 8-bit devices. Channel 8-15 can be accepted for 8-bit addresses.
-    - Fix direction: distinguish PCF8574/PCF8574A (8-bit) from PCF8575 (16-bit) or restrict channels by model/address contract.
+   - Files: `include/i2c_gpio_expander.h`, validation in `src/main.cpp`/`web/index.html`
+   - Status: ✅ Completed (`fix: writePcf sends 1 byte when value ≤ 0xFF`)
+   - Issue: PCF857x write path sends two bytes, but PCF8574/PCF8574A are 8-bit devices. Channel 8-15 can be accepted for 8-bit addresses.
+   - Fix direction: distinguish PCF8574/PCF8574A (8-bit) from PCF8575 (16-bit) or restrict channels by model/address contract.
 
 17. **PCA/expander channel upper-bound validation incomplete**
     - Files: `src/main.cpp`, `web/index.html`

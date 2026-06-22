@@ -40,7 +40,7 @@ private:
         if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
         Wire.beginTransmission(_address);
         Wire.write(value & 0xFF);
-        Wire.write((value >> 8) & 0xFF);
+        if (value > 0xFF) Wire.write((value >> 8) & 0xFF);
         Wire.endTransmission();
         if (i2cMutex) xSemaphoreGive(i2cMutex);
     }
