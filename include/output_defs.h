@@ -25,14 +25,18 @@ struct PinRule {
     bool invertible;
 };
 
-struct ModeCost {
-    uint16_t cpuUs;
-    uint16_t extraRamBytes;
+struct HardwareCost {
     uint8_t ledc;
     uint8_t rmt;
     uint8_t uart;
     uint8_t dac;
     uint8_t timer;
+};
+
+struct ModeCost {
+    uint16_t cpuUs;
+    uint16_t extraRamBytes;
+    HardwareCost hardware;
 };
 
 struct OutputModeDef {
@@ -110,28 +114,67 @@ constexpr PinRule PINS_SMOKE[] = {
     {"pin2", "Shoot Valve", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true}
 };
 
+constexpr HardwareCost HW_NONE = {0, 0, 0, 0, 0};
+constexpr HardwareCost HW_LEDC_1 = {1, 0, 0, 0, 0};
+constexpr HardwareCost HW_LEDC_2 = {2, 0, 0, 0, 0};
+constexpr HardwareCost HW_LEDC_4 = {4, 0, 0, 0, 0};
+constexpr HardwareCost HW_LEDC_7 = {7, 0, 0, 0, 0};
+constexpr HardwareCost HW_LEDC_8 = {8, 0, 0, 0, 0};
+constexpr HardwareCost HW_RMT_1 = {0, 1, 0, 0, 0};
+constexpr HardwareCost HW_RMT_2 = {0, 2, 0, 0, 0};
+constexpr HardwareCost HW_UART_1 = {0, 0, 1, 0, 0};
+constexpr HardwareCost HW_LEDC_1_TIMER_1 = {1, 0, 0, 0, 1};
+
+constexpr ModeCost modeCost(uint16_t cpuUs, uint16_t extraRamBytes = 0, HardwareCost hardware = HW_NONE) {
+    return {cpuUs, extraRamBytes, hardware};
+}
+
+constexpr ModeCost COST_DIMMER = modeCost(5);
+constexpr ModeCost COST_DMX_SERIAL = modeCost(250, 0, HW_UART_1);
+constexpr ModeCost COST_RELAY = modeCost(5);
+constexpr ModeCost COST_LED_STRIP_BASE = modeCost(80, 0, HW_RMT_1);
+constexpr ModeCost COST_SINGLE_LED = modeCost(6, 0, HW_LEDC_1);
+constexpr ModeCost COST_ANALOG_RGBW = modeCost(18, 0, HW_LEDC_4);
+constexpr ModeCost COST_MOTOR_PWM_DIR = modeCost(35, 0, HW_LEDC_2);
+constexpr ModeCost COST_MOTOR_IN1_IN2 = modeCost(35, 0, HW_LEDC_1);
+constexpr ModeCost COST_MOTOR_IN1_IN2_EN = modeCost(35, 0, HW_LEDC_2);
+constexpr ModeCost COST_STEPPER = modeCost(80, 512, HW_RMT_2);
+constexpr ModeCost COST_SERVO = modeCost(12, 0, HW_LEDC_1);
+constexpr ModeCost COST_BUZZER = modeCost(35, 0, HW_LEDC_1);
+constexpr ModeCost COST_DFPLAYER = modeCost(30, 260, HW_UART_1);
+constexpr ModeCost COST_TM1637 = modeCost(900);
+constexpr ModeCost COST_7SEG_7PIN = modeCost(30, 0, HW_LEDC_7);
+constexpr ModeCost COST_7SEG_8PIN = modeCost(35, 0, HW_LEDC_8);
+constexpr ModeCost COST_7SEG_COMMON_DIM_7PIN = modeCost(30, 0, HW_LEDC_1);
+constexpr ModeCost COST_7SEG_COMMON_DIM_8PIN = modeCost(35, 0, HW_LEDC_1);
+constexpr ModeCost COST_DAC = modeCost(10);
+constexpr ModeCost COST_PWM_DAC = modeCost(6, 0, HW_LEDC_1);
+constexpr ModeCost COST_FUNC_GEN = modeCost(120, 1120, HW_LEDC_1_TIMER_1);
+constexpr ModeCost COST_SOLENOID = modeCost(10);
+constexpr ModeCost COST_SMOKE = modeCost(25);
+
 constexpr OutputModeDef OUTPUT_MODES[] = {
-    {0, -1, "Triac dimmer", {5, 0, 0, 0, 0, 0, 0}, PINS_GPIO_MAIN, 1},
-    {1, -1, "DMX serial", {250, 0, 0, 0, 1, 0, 0}, PINS_DMX, 1},
-    {2, -1, "Relay", {5, 0, 0, 0, 0, 0, 0}, PINS_RELAY_DIGITAL, 1},
-    {3, -1, "RGB/RGBW strip", {80, 0, 0, 1, 0, 0, 0}, PINS_LED_STRIP, 1},
-    {4, -1, "Single-color PWM", {6, 0, 1, 0, 0, 0, 0}, PINS_PWM, 1},
-    {5, -1, "Analog RGB/RGBW", {18, 0, 4, 0, 0, 0, 0}, PINS_ANALOG_RGB, 4},
-    {6, 0, "PWM + DIR", {35, 0, 2, 0, 0, 0, 0}, PINS_MOTOR_PWM_DIR, 2},
-    {6, 1, "IN1 + IN2", {35, 0, 1, 0, 0, 0, 0}, PINS_MOTOR_PWM_DIR, 2},
-    {6, 2, "IN1 + IN2 + EN", {35, 0, 2, 0, 0, 0, 0}, PINS_MOTOR_IN1_IN2_EN, 3},
-    {7, -1, "Stepper", {80, 512, 0, 2, 0, 0, 0}, PINS_STEPPER, 4},
-    {8, -1, "RC servo", {12, 0, 1, 0, 0, 0, 0}, PINS_PWM, 1},
-    {9, -1, "Passive buzzer", {35, 0, 1, 0, 0, 0, 0}, PINS_GPIO_MAIN, 1},
-    {10, -1, "DFPlayer", {30, 260, 0, 0, 1, 0, 0}, PINS_DFPLAYER, 2},
-    {11, -1, "TM1637", {900, 0, 0, 0, 0, 0, 0}, PINS_TM1637, 2},
-    {12, -1, "7-seg 7-pin", {30, 0, 7, 0, 0, 0, 0}, PINS_7SEG_DIRECT, 2},
-    {13, -1, "7-seg 8-pin", {35, 0, 8, 0, 0, 0, 0}, PINS_7SEG_DIRECT, 2},
-    {14, -1, "I2C DAC", {10, 0, 0, 0, 0, 0, 0}, PINS_DAC, 1},
-    {15, -1, "PWM DAC", {6, 0, 1, 0, 0, 0, 0}, PINS_PWM, 1},
-    {16, -1, "Function generator", {120, 1120, 1, 0, 0, 0, 1}, PINS_GPIO_MAIN, 1},
-    {17, -1, "Solenoid", {10, 0, 0, 0, 0, 0, 0}, PINS_SOLENOID, 1},
-    {18, -1, "Smoke shooter", {25, 0, 0, 0, 0, 0, 0}, PINS_SMOKE, 2}
+    {0, -1, "Triac dimmer", COST_DIMMER, PINS_GPIO_MAIN, 1},
+    {1, -1, "DMX serial", COST_DMX_SERIAL, PINS_DMX, 1},
+    {2, -1, "Relay", COST_RELAY, PINS_RELAY_DIGITAL, 1},
+    {3, -1, "RGB/RGBW strip", COST_LED_STRIP_BASE, PINS_LED_STRIP, 1},
+    {4, -1, "Single-color PWM", COST_SINGLE_LED, PINS_PWM, 1},
+    {5, -1, "Analog RGB/RGBW", COST_ANALOG_RGBW, PINS_ANALOG_RGB, 4},
+    {6, 0, "PWM + DIR", COST_MOTOR_PWM_DIR, PINS_MOTOR_PWM_DIR, 2},
+    {6, 1, "IN1 + IN2", COST_MOTOR_IN1_IN2, PINS_MOTOR_PWM_DIR, 2},
+    {6, 2, "IN1 + IN2 + EN", COST_MOTOR_IN1_IN2_EN, PINS_MOTOR_IN1_IN2_EN, 3},
+    {7, -1, "Stepper", COST_STEPPER, PINS_STEPPER, 4},
+    {8, -1, "RC servo", COST_SERVO, PINS_PWM, 1},
+    {9, -1, "Passive buzzer", COST_BUZZER, PINS_GPIO_MAIN, 1},
+    {10, -1, "DFPlayer", COST_DFPLAYER, PINS_DFPLAYER, 2},
+    {11, -1, "TM1637", COST_TM1637, PINS_TM1637, 2},
+    {12, -1, "7-seg 7-pin", COST_7SEG_7PIN, PINS_7SEG_DIRECT, 2},
+    {13, -1, "7-seg 8-pin", COST_7SEG_8PIN, PINS_7SEG_DIRECT, 2},
+    {14, -1, "I2C DAC", COST_DAC, PINS_DAC, 1},
+    {15, -1, "PWM DAC", COST_PWM_DAC, PINS_PWM, 1},
+    {16, -1, "Function generator", COST_FUNC_GEN, PINS_GPIO_MAIN, 1},
+    {17, -1, "Solenoid", COST_SOLENOID, PINS_SOLENOID, 1},
+    {18, -1, "Smoke shooter", COST_SMOKE, PINS_SMOKE, 2}
 };
 
 inline const OutputModeDef* modeDef(uint8_t type, uint8_t mode) {
