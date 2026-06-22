@@ -1,0 +1,254 @@
+<!-- ===== OUTPUTS ===== -->
+<div id="pane-out" class="pane">
+    <h2>Output Drivers</h2>
+    <div class="ib ib-blue" style="font-size:0.72rem">No hard channel limit — constrained by resource scoring + hardware limits | LED Strip: max 8 (RMT limit) | DFPlayer reserves UARTs first; DMX uses remaining UARTs, then RMT fallback | Reboot required after changes.</div>
+    <div id="out-test-state" class="ib ib-blue" style="font-size:0.78rem">Normal output mode. Test tools are idle.</div>
+    <div id="zc-warning" class="ib ib-red" style="display:none;font-size:0.72rem">Warning: AC Dimmer output(s) configured but Zero-Crossing pin is set to Disabled. AC Dimmer will NOT function. Set ZC pin in Network tab.</div>
+    <div id="strapping-warning" class="ib ib-yellow" style="display:none;font-size:0.72rem;border:2px solid #eab308"><strong>Warning:</strong> GPIO 12 is configured as an active pin. GPIO 12 is a Bootstrapping pin (MTDI). If pulled HIGH during controller startup, the board will fail to boot due to flash voltage selection conflict (VDD_SDIO 1.8V vs 3.3V). Ensure your connected device does not drive this pin HIGH on power-up.</div>
+
+    <div class="section">
+      <div class="section-head">
+        <h3>Configured Channels</h3>
+        <div>
+          <span id="out-count" class="pill">0 channels</span>
+          <span id="out-save-state" class="pill pill-ok">Saved</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+        <div id="cpu-score-bar" style="display:flex;align-items:center;gap:8px;font-size:0.78rem">
+          <span style="font-weight:600;white-space:nowrap;width:95px">CPU Load:</span>
+          <div style="flex:1;height:16px;background:#e2e8f0;border-radius:8px;overflow:hidden;position:relative">
+            <div id="cpu-score-fill" style="height:100%;width:0%;border-radius:8px;transition:width .3s"></div>
+            <span id="cpu-score-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:600;color:#1e293b">0% (0 / 100 µs)</span>
+          </div>
+        </div>
+        <div id="ram-score-bar" style="display:flex;align-items:center;gap:8px;font-size:0.78rem">
+          <span style="font-weight:600;white-space:nowrap;width:95px">RAM Load:</span>
+          <div style="flex:1;height:16px;background:#e2e8f0;border-radius:8px;overflow:hidden;position:relative">
+            <div id="ram-score-fill" style="height:100%;width:0%;border-radius:8px;transition:width .3s"></div>
+            <span id="ram-score-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:600;color:#1e293b">0% (0 / 48000 KB)</span>
+          </div>
+        </div>
+      </div>
+      <div id="hw-monitor" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;font-size:0.75rem">
+        <div class="sc" style="padding:6px;border-color:#cbd5e1">
+          <small style="font-weight:600;color:#475569">RMT Channels</small>
+          <strong id="hw-rmt-val" style="font-size:1.1rem;color:#1e3a8a">0 / 8</strong>
+          <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:4px;overflow:hidden">
+            <div id="hw-rmt-bar" style="height:100%;width:0%;background:#22c55e;transition:width .2s"></div>
+          </div>
+        </div>
+        <div class="sc" style="padding:6px;border-color:#cbd5e1">
+          <small style="font-weight:600;color:#475569">UART Ports</small>
+          <strong id="hw-uart-val" style="font-size:1.1rem;color:#1e3a8a">0 / 2</strong>
+          <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:4px;overflow:hidden">
+            <div id="hw-uart-bar" style="height:100%;width:0%;background:#22c55e;transition:width .2s"></div>
+          </div>
+        </div>
+        <div class="sc" style="padding:6px;border-color:#cbd5e1">
+          <small style="font-weight:600;color:#475569">LEDC Channels</small>
+          <strong id="hw-ledc-val" style="font-size:1.1rem;color:#1e3a8a">0 / 16</strong>
+          <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:4px;overflow:hidden">
+            <div id="hw-ledc-bar" style="height:100%;width:0%;background:#22c55e;transition:width .2s"></div>
+          </div>
+        </div>
+        <div class="sc" style="padding:6px;border-color:#cbd5e1">
+          <small style="font-weight:600;color:#475569">DAC (Internal)</small>
+          <strong id="hw-dac-val" style="font-size:1.1rem;color:#1e3a8a">0 / 2</strong>
+          <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:4px;overflow:hidden">
+            <div id="hw-dac-bar" style="height:100%;width:0%;background:#22c55e;transition:width .2s"></div>
+          </div>
+        </div>
+        <div class="sc" style="padding:6px;border-color:#cbd5e1">
+          <small style="font-weight:600;color:#475569">Timers</small>
+          <strong id="hw-timer-val" style="font-size:1.1rem;color:#1e3a8a">0 / 4</strong>
+          <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:4px;overflow:hidden">
+            <div id="hw-timer-bar" style="height:100%;width:0%;background:#22c55e;transition:width .2s"></div>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="out-table">
+          <thead><tr><th>#</th><th>Device</th><th>GPIOs</th><th>Address</th><th>Size</th><th>Score</th><th>Actions</th></tr></thead>
+          <tbody id="out-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="toolbar">
+        <button type="button" class="btn bs" onclick="loadOutputs()">Refresh</button>
+        <button type="button" class="btn bp" id="out-save-btn" onclick="saveOutputs()">Save Channels &amp; Restart</button>
+        <button type="button" class="btn bd" onclick="stopOutputTest()">Stop Test</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h3>Test Tool</h3><span id="test-mode-pill" class="pill">Idle</span></div>
+      <div id="out-test-panel" class="ib ib-green" style="display:none;margin-top:0">
+        <h3 style="margin-top:0">Output Test: <span id="test-title">--</span></h3>
+        <div id="test-controls"></div>
+        <div class="hint" style="margin-top:6px">Test values are applied directly to the selected output buffer. Test auto-stops after the selected duration.</div>
+      </div>
+    </div>
+
+    <div class="section">
+    <div class="section-head"><h3>Add / Edit Channel</h3><span class="pill">Hardware setup</span></div>
+    <div id="edit-banner" style="display:none" class="ib ib-yellow">Editing channel <span id="edit-idx-label"></span> - click <strong>Update</strong> to apply or <strong>Cancel</strong> to discard.</div>
+    <div class="fg">
+      <div class="f">
+        <label for="no_type">Type</label>
+        <select id="no_type" onchange="toggleOutFields()">
+          <optgroup label="Lighting">
+            <option value="0">AC Dimmer (TRIAC)</option>
+            <option value="1">DMX Serial Output</option>
+            <option value="2">Relay (On/Off)</option>
+            <option value="3">RGB LED (NeoPixel)</option>
+            <option value="4">Single Color LED (PWM)</option>
+            <option value="5">Analog RGB / RGBW Strip</option>
+          </optgroup>
+          <optgroup label="Motion">
+            <option value="6">DC Motor (H-Bridge)</option>
+            <option value="7">Stepper Motor</option>
+            <option value="8">RC Servo</option>
+          </optgroup>
+          <optgroup label="Audio">
+            <option value="9">Passive Buzzer</option>
+            <option value="10">DFPlayer MP3 Module</option>
+          </optgroup>
+          <optgroup label="Display">
+            <option value="11">7-Segment 2-Pin (TM1637)</option>
+            <option value="12">7-Segment DD 7-Pin PWM</option>
+            <option value="13">7-Segment DD 8-Pin PWM</option>
+          </optgroup>
+          <optgroup label="Analog / Signal">
+            <option value="14">DAC (0-3.3V)</option>
+            <option value="15">PWM DAC (RC Filter)</option>
+            <option value="16">Function Generator</option>
+          </optgroup>
+          <optgroup label="Trigger">
+            <option value="17">Solenoid Trigger (Pulse)</option>
+            <option value="18">Sequential Smoke Shooter</option>
+          </optgroup>
+        </select>
+      </div>
+      <div id="pin-mapping-container"></div>
+      <div class="f" id="no_pca_channel2_grp" style="display:none"><label for="no_pca_channel2">Addl Channel 2</label><select id="no_pca_channel2"><option value="255">None</option><option value="0">CH 0</option><option value="1">CH 1</option><option value="2">CH 2</option><option value="3">CH 3</option><option value="4">CH 4</option><option value="5">CH 5</option><option value="6">CH 6</option><option value="7">CH 7</option><option value="8">CH 8</option><option value="9">CH 9</option><option value="10">CH 10</option><option value="11">CH 11</option><option value="12">CH 12</option><option value="13">CH 13</option><option value="14">CH 14</option><option value="15">CH 15</option></select></div>
+      <div class="f" id="no_pca_channel3_grp" style="display:none"><label for="no_pca_channel3">Addl Channel 3</label><select id="no_pca_channel3"><option value="255">None</option><option value="0">CH 0</option><option value="1">CH 1</option><option value="2">CH 2</option><option value="3">CH 3</option><option value="4">CH 4</option><option value="5">CH 5</option><option value="6">CH 6</option><option value="7">CH 7</option><option value="8">CH 8</option><option value="9">CH 9</option><option value="10">CH 10</option><option value="11">CH 11</option><option value="12">CH 12</option><option value="13">CH 13</option><option value="14">CH 14</option><option value="15">CH 15</option></select></div>
+      <div class="f" id="no_pca_channel4_grp" style="display:none"><label for="no_pca_channel4">Addl Channel 4</label><select id="no_pca_channel4"><option value="255">None</option><option value="0">CH 0</option><option value="1">CH 1</option><option value="2">CH 2</option><option value="3">CH 3</option><option value="4">CH 4</option><option value="5">CH 5</option><option value="6">CH 6</option><option value="7">CH 7</option><option value="8">CH 8</option><option value="9">CH 9</option><option value="10">CH 10</option><option value="11">CH 11</option><option value="12">CH 12</option><option value="13">CH 13</option><option value="14">CH 14</option><option value="15">CH 15</option></select></div>
+      <div class="f" id="no_led_proto_grp">
+        <label for="no_led_proto">LED Protocol</label>
+        <select id="no_led_proto">
+          <option value="0">WS2812 / WS2812B / SK6812 (800kHz)</option>
+          <option value="1">WS2811 Low-Speed (400kHz)</option>
+        </select>
+      </div>
+      <div class="f">
+        <label for="no_uni">Start Universe</label>
+        <input type="number" id="no_uni" value="0" min="0" max="32767">
+      </div>
+      <div class="f" id="no_addr_grp">
+        <label for="no_addr">Start Address</label>
+        <input type="number" id="no_addr" value="1" min="1" max="512">
+        <div class="hint">DMX channel inside the universe for relay, dimmer, motion, and solenoid outputs.</div>
+      </div>
+      <div class="f" id="no_cnt_grp">
+        <label for="no_cnt">LED Count</label>
+        <input type="number" id="no_cnt" value="170" min="1" max="1360">
+      </div>
+      <div class="f" id="no_ord_grp">
+        <label for="no_ord">Color Order</label>
+        <select id="no_ord">
+          <optgroup label="RGB Strips (3-channel)">
+            <option value="0">GRB</option>
+            <option value="1">RGB</option>
+            <option value="2">BRG</option>
+            <option value="3">RBG</option>
+          </optgroup>
+          <optgroup label="RGBW Strips (4-channel)">
+            <option value="4">RGBW</option>
+            <option value="5">GRBW</option>
+            <option value="6">BRGW</option>
+            <option value="7">WRGB</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="f" id="no_mc_grp" style="display:none; flex-basis: 100%;">
+        <div class="ib ib-green" style="margin-top:8px">
+          <strong>Motion Control Parameters</strong>
+        </div>
+        <div class="fg">
+          <div class="f" id="mc_mode_grp"><label for="mc_mode" id="mc_mode_lbl">Motor Sub-Mode</label>
+            <select id="mc_mode">
+              <option value="0">PWM + PWM (2 pins)</option>
+              <option value="1">PWM + DIR (2 pins)</option>
+              <option value="2">IN1 + IN2 + EN (3 pins)</option>
+            </select>
+          </div>
+          <div class="f" id="mc_res_grp"><label for="mc_resolution" id="mc_resolution_lbl">Resolution</label>
+            <select id="mc_resolution">
+              <option value="8">8-bit (1 DMX Ch)</option>
+              <option value="10">10-bit (2 DMX Ch)</option>
+              <option value="12">12-bit (2 DMX Ch)</option>
+              <option value="16">16-bit (2 DMX Ch)</option>
+            </select>
+          </div>
+          <div class="f" id="mc_freq_grp"><label for="mc_freq" id="mc_freq_lbl">Frequency (Hz) / Max Speed</label><input type="number" id="mc_freq" value="1000" min="1" max="40000"></div>
+          <div id="rc_filter_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:8px 0 2px">RC Low-Pass Filter Reference</div><div style="display:flex;flex-wrap:wrap;gap:8px"><div class="f" style="flex:1"><label for="rc_r">R (&Omega;)</label><input type="number" id="rc_r" value="1000" min="1" max="10000000" oninput="calcRcCutoff()"></div><div class="f" style="flex:1"><label for="rc_c">C (nF)</label><input type="number" id="rc_c" value="10" min="1" max="1000000" oninput="calcRcCutoff()"></div><div class="f" style="flex:1"><label>fc ≈ <span id="rc_fc">15915</span> Hz</label><div class="hint">Set PWM Carrier Freq above to 3-5x fc</div></div></div></div>
+          <div id="pwm_dac_cal_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:8px 0 2px">PWM DAC Calibration</div><div style="display:flex;flex-wrap:wrap;gap:8px"><div class="f" style="flex:1"><label for="pwm_dac_mode">Output Use</label><select id="pwm_dac_mode"><option value="0">Custom</option><option value="1">0-10V interface</option><option value="2">4-20mA interface</option></select><div class="hint">Label only; duty calibration below controls output.</div></div><div class="f" style="flex:1"><label for="pwm_dac_min">DMX 0 Duty (%)</label><input type="number" id="pwm_dac_min" value="0" min="0" max="100" step="0.01"></div><div class="f" style="flex:1"><label for="pwm_dac_max">DMX Full Duty (%)</label><input type="number" id="pwm_dac_max" value="100" min="0" max="100" step="0.01"><div class="hint">Use trim values matching your 0-10V / 4-20mA module.</div></div></div></div>
+          <div class="f" id="mc_deadband_grp"><label for="mc_deadband">Center Deadband</label><input type="number" id="mc_deadband" value="10" min="0" max="255"></div>
+          <div class="f" id="mc_min_us_grp"><label for="mc_min_us">Servo Min &micro;s</label><input type="number" id="mc_min_us" value="1000" min="500" max="1500"></div>
+          <div class="f" id="mc_max_us_grp"><label for="mc_max_us">Servo Max &micro;s</label><input type="number" id="mc_max_us" value="2000" min="1500" max="2500"></div>
+          <div id="mc_stepper_scale_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:4px 0 2px">Position &amp; Scaling</div></div>
+          <div class="f" id="mc_steps_grp"><label for="mc_steps_per_rev">Steps / Rev</label><input type="number" id="mc_steps_per_rev" value="200" min="1" max="10000"></div>
+          <div class="f" id="mc_unit_type_grp" style="display:none"><label for="mc_unit_type">Unit Type</label><select id="mc_unit_type"><option value="0">Steps</option><option value="1">Degrees (&deg;)</option><option value="2">Millimeters (mm)</option></select></div>
+          <div class="f" id="mc_scale_factor_grp" style="display:none"><label for="mc_scale_factor">Scale Factor</label><input type="number" id="mc_scale_factor" value="0.0" step="any" min="0" max="10000"><div class="hint">Steps = DMX * Scale (0 = use Steps/Rev)</div></div>
+          <div id="mc_stepper_homing_grp" style="display:none;flex-basis:100%"><div class="ib ib-purple" style="font-size:0.78rem;margin:4px 0 2px">Homing Settings</div></div>
+          <div class="f" id="mc_homing_mode_grp" style="display:none"><label for="mc_homing_mode">Homing Mode</label>
+            <select id="mc_homing_mode">
+              <option value="0">Sensor Mode (Pin 4)</option>
+              <option value="1">Time / Stall Mode</option>
+            </select>
+          </div>
+          <div class="f" id="mc_homing_dir_grp" style="display:none"><label for="mc_homing_dir">Homing Direction</label>
+            <select id="mc_homing_dir">
+              <option value="0">Normal / Forward</option>
+              <option value="1">Reverse</option>
+            </select>
+          </div>
+          <div class="f" id="mc_homing_speed_grp" style="display:none"><label for="mc_homing_speed">Homing Speed (Hz)</label><input type="number" id="mc_homing_speed" value="500" min="1" max="40000"></div>
+          <div class="f" id="mc_homing_timeout_grp" style="display:none"><label for="mc_homing_timeout">Homing Timeout (s)</label><input type="number" id="mc_homing_timeout" value="5" min="1" max="100"></div>
+          <div class="f" id="mc_invert_grp" style="flex:0 0 auto"><div class="cb"><input type="checkbox" id="mc_invert"><label for="mc_invert">Invert Direction</label></div></div>
+          <div class="f" id="mc_brake_grp" style="flex:0 0 auto"><div class="cb"><input type="checkbox" id="mc_brake" checked><label for="mc_brake">Brake when stopped</label></div></div>
+        </div>
+      </div>
+      <div class="f" id="no_sol_grp" style="display:none; flex-basis: 100%;">
+        <div class="ib ib-orange" style="margin-top:8px">
+          <strong>Solenoid Trigger Parameters</strong>
+        </div>
+        <div class="fg">
+          <div class="f"><label for="sol_threshold">Threshold Value (0-255)</label><input type="number" id="sol_threshold" value="127" min="0" max="255"></div>
+          <div class="f"><label for="sol_pulse_ms">Pulse Width (ms)</label><input type="number" id="sol_pulse_ms" value="50" min="1" max="500"></div>
+          <div class="f"><label for="sol_pre_delay">Pre-Delay (ms)</label><input type="number" id="sol_pre_delay" value="0" min="0" max="1000"></div>
+          <div class="f"><label for="sol_post_delay">Post-Delay / Cooldown (ms)</label><input type="number" id="sol_post_delay" value="100" min="0" max="5000"></div>
+          <div class="hint">Solenoid triggers pulse for precise frame-accurate control. Pre-Delay is hold time before pulse. Post-Delay prevents rapid re-triggering.</div>
+        </div>
+      </div>
+      <div class="f" id="no_smoke_grp" style="display:none; flex-basis: 100%;">
+        <div class="ib ib-blue" style="margin-top:8px">
+          <strong>Sequential Smoke Shooter Parameters</strong>
+        </div>
+        <div class="fg">
+          <div class="f"><label for="smoke_threshold">Threshold Value (0-255)</label><input type="number" id="smoke_threshold" value="127" min="0" max="255"></div>
+          <div class="f"><label for="smoke_dur">Smoke Duration (ms)</label><input type="number" id="smoke_dur" value="1000" min="0" max="10000"></div>
+          <div class="f"><label for="smoke_settle">Settle Delay (ms)</label><input type="number" id="smoke_settle" value="500" min="0" max="10000"></div>
+          <div class="f"><label for="smoke_shoot">Shoot Duration (ms)</label><input type="number" id="smoke_shoot" value="1000" min="0" max="10000"></div>
+          <div class="f"><label for="smoke_lockout">Cooldown Lockout (ms)</label><input type="number" id="smoke_lockout" value="2000" min="0" max="30000"></div>
+          <div class="hint">Sequence: Smoke ON -> delay (Settle) -> Shoot ON -> both OFF -> Cooldown. Pin 1 is Smoke, Pin 2 is Shoot. Triggered when DMX > threshold.</div>
+        </div>
+      </div>
+    </div>
+    <div class="btns">
+      <button type="button" class="btn bp" id="out-add-btn" onclick="addOrUpdateOutput()">Add Channel</button>
+      <button type="button" class="btn bs" id="out-cancel-btn" style="display:none" onclick="cancelEditOutput()">Cancel</button>
+    </div>
+    </div>
+  </div>

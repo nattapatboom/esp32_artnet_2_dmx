@@ -1,0 +1,34 @@
+<!-- ===== DIAGNOSTICS ===== -->
+<div id="pane-diag" class="pane">
+    <h2>Diagnostics</h2>
+
+    <div class="section-head"><h3>System Resource</h3><span class="pill">Live</span></div>
+    <div id="diag-sysinfo" style="margin-bottom:12px">
+      <div class="fg" style="grid-template-columns:repeat(4,1fr)">
+        <div class="f"><label>Free Heap</label><span id="diag-heap" style="font-weight:600">-</span></div>
+        <div class="f"><label>Min Heap</label><span id="diag-minheap" style="font-weight:600">-</span></div>
+        <div class="f"><label>CPU Freq</label><span id="diag-cpu" style="font-weight:600">-</span></div>
+        <div class="f"><label>Board MAC</label><span id="diag-mac" style="font-family:monospace;font-size:0.72rem">-</span></div>
+      </div>
+    </div>
+    <div class="btns" style="margin-bottom:12px">
+      <button type="button" class="btn bs" onclick="diagRefreshSysInfo()">Refresh</button>
+    </div>
+
+    <div class="section-head"><h3>Network Status</h3><span class="pill">Live</span></div>
+    <div id="diag-net" style="margin-bottom:12px">
+      <table>
+        <tr><th>Interface</th><th>Status</th><th>IP</th></tr>
+        <tr id="diag-net-eth"><td>Ethernet</td><td id="diag-eth-status">-</td><td id="diag-eth-ip">-</td></tr>
+        <tr id="diag-net-wifi"><td>Wi-Fi</td><td id="diag-wifi-status">-</td><td id="diag-wifi-ip">-</td></tr>
+        <tr id="diag-net-ap"><td>SoftAP</td><td id="diag-ap-status">-</td><td id="diag-ap-ip">-</td></tr>
+      </table>
+    </div>
+
+    <div class="section-head"><h3>I2C Bus Scan</h3><span class="pill">0x01 - 0x7F</span></div>
+    <div class="ib ib-blue" style="margin-bottom:12px">Scans the I2C bus for connected devices. Click scan while your expanders are powered and wired.</div>
+    <div class="btns" style="margin-bottom:8px">
+      <button type="button" class="btn bs" onclick="scanI2c()">Scan I2C Bus</button>
+    </div>
+    <div id="i2c-scan-result" style="margin-top:4px;font-size:0.82rem"></div>
+  </div>

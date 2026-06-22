@@ -1,0 +1,50 @@
+<!-- ===== ESP-NOW ===== -->
+<div id="pane-espnow" class="pane">
+    <h2>ESP-NOW Wireless Bridge</h2>
+
+    <div class="ib ib-blue">
+      <strong>MAC Address of this board:</strong>
+      <code id="board_mac_display" style="font-size:1rem;font-weight:700;letter-spacing:2px;margin-left:8px">--:--:--:--:--:--</code>
+      <button type="button" onclick="copyMac()" style="margin-left:8px;padding:2px 8px;font-size:0.72rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:4px;cursor:pointer;color:#1e40af">Copy</button>
+      <div class="hint" style="margin-top:4px">Copy this MAC and paste into the Master board's Peer MAC field.</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;font-size:0.78rem">
+      <div class="ib ib-blue" style="margin:0">
+        <strong>ESP-NOW Master</strong><br>
+        Receive Art-Net from LAN and forward DMX to slave boards over ESP-NOW.<br>
+        <em>Add slave board MAC addresses below.</em>
+      </div>
+      <div class="ib ib-green" style="margin:0">
+        <strong>ESP-NOW Slave</strong><br>
+        Receive DMX from the master and drive local LED/DMX outputs directly.<br>
+        <em>No LAN cable required. Power the board and set Device Mode to Slave.</em>
+      </div>
+    </div>
+
+    <h3>Registered Peer MACs (Master Mode)</h3>
+    <div class="ib ib-yellow" style="font-size:0.72rem;margin-top:0">
+      If no peers are added, Master will fallback to broadcasting all DMX data. For real installs, add peers with a limited Universe/Channel range to reduce ESP-NOW traffic.
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>MAC Address</th><th>DMX Range</th><th>Action</th></tr></thead>
+      <tbody id="peer-tbody"></tbody>
+    </table>
+    <div class="btns" style="margin-top:8px">
+      <button type="button" class="btn bs" onclick="loadPeers()">Refresh</button>
+      <button type="button" class="btn bp" onclick="savePeers()">Save Peers</button>
+    </div>
+
+    <h3>Add Peer</h3>
+    <div class="fg">
+      <div class="f"><label for="np_mac">MAC Address</label><input type="text" id="np_mac" placeholder="AA:BB:CC:DD:EE:FF"></div>
+      <div class="f"><label for="np_start_uni">Start Universe</label><input type="number" id="np_start_uni" min="0" max="32767" value="0"></div>
+      <div class="f"><label for="np_start_addr">Start Channel</label><input type="number" id="np_start_addr" min="1" max="512" value="1"></div>
+      <div class="f"><label for="np_end_uni">End Universe</label><input type="number" id="np_end_uni" min="0" max="32767" value="0"></div>
+      <div class="f"><label for="np_end_addr">End Channel</label><input type="number" id="np_end_addr" min="1" max="512" value="512"></div>
+      <div class="f" style="display:flex;align-items:flex-end;min-width:140px">
+        <button type="button" class="btn bp" onclick="addPeer()" style="width:100%">Add Peer</button>
+      </div>
+    </div>
+    <div class="hint">Example: U0:CH1 to U2:CH170 sends only that range to this slave. Use each peer's actual output range to save airtime.</div>
+  </div>

@@ -1,0 +1,33 @@
+<!-- ===== OTA UPDATE ===== -->
+<div id="pane-ota" class="pane">
+    <h2>OTA Firmware Update</h2>
+    <div class="ib ib-green" style="margin-bottom:12px">
+      <strong>Configuration is preserved after OTA</strong> - firmware OTA flashes only the application partition.<br>
+      These data remain intact: Network Settings, Output Channels, and NVS Config.<br>
+      <span style="color:#166534">The board restarts automatically after flashing completes.</span>
+    </div>
+
+    <div class="ib ib-blue" style="margin-bottom:12px">
+      <strong>Current Firmware:</strong>
+      <code id="firmware_version">Loading...</code>
+      <div class="hint">Version name is generated from the firmware build date and time.</div>
+    </div>
+
+    <div class="ib ib-yellow" style="margin-bottom:12px;font-size:0.72rem">
+      Create a firmware file: <code>build_firmware_bin.bat</code><br>
+      Output file path: <code>dist\firmware_YYYYMMDD_HHMMSS.bin</code>
+    </div>
+
+    <div class="f" style="margin-bottom:10px">
+      <label for="ota_file">Select Firmware File (.bin)</label>
+      <input type="file" id="ota_file" accept=".bin" onchange="otaFileSelected()">
+      <div class="hint" id="ota-file-info"></div>
+    </div>
+
+    <progress id="ota-prog" value="0" max="100" style="display:none"></progress>
+    <div id="ota-status" style="font-size:0.82rem;margin:6px 0;color:#475569"></div>
+
+    <div class="btns">
+      <button type="button" class="btn bp" id="ota-btn" onclick="flashOta()" disabled>Flash Firmware</button>
+    </div>
+  </div>

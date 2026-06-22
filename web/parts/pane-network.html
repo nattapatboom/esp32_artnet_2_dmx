@@ -1,0 +1,293 @@
+<!-- ===== NETWORK ===== -->
+<div id="pane-net" class="pane on">
+    <h2>Network Settings</h2>
+    <form id="cfgForm" onsubmit="saveSettings(event)">
+      <div class="section">
+      <div class="section-head"><h3>Device Identity</h3><span class="pill">Mode</span></div>
+      <div class="fg">
+        <div class="f">
+          <label for="device_mode">Device Mode</label>
+          <select id="device_mode" name="device_mode">
+            <option value="0">Art-Net (Ethernet)</option>
+            <option value="1">ESP-NOW Master</option>
+            <option value="2">ESP-NOW Slave</option>
+          </select>
+        </div>
+        <div class="f" id="espnow_channel_grp">
+          <label for="espnow_channel">ESP-NOW Wi-Fi Channel</label>
+          <select id="espnow_channel" name="espnow_channel">
+            <option value="0">Auto-Scan (Slave Only)</option>
+            <option value="1">Channel 1</option>
+            <option value="2">Channel 2</option>
+            <option value="3">Channel 3</option>
+            <option value="4">Channel 4</option>
+            <option value="5">Channel 5</option>
+            <option value="6">Channel 6</option>
+            <option value="7">Channel 7</option>
+            <option value="8">Channel 8</option>
+            <option value="9">Channel 9</option>
+            <option value="10">Channel 10</option>
+            <option value="11">Channel 11</option>
+            <option value="12">Channel 12</option>
+            <option value="13">Channel 13</option>
+          </select>
+          <div class="hint">Master must be on a fixed channel. Slaves can auto-scan or use a fixed channel.</div>
+        </div>
+        <div class="f" id="espnow_chunk_size_grp">
+          <label for="espnow_chunk_size">ESP-NOW Chunk Size (bytes)</label>
+          <input type="number" id="espnow_chunk_size" name="espnow_chunk_size" value="200" min="16" max="230" oninput="updateScoreBar()">
+          <div class="hint">Payload size per wireless packet (16 to 230 bytes). Default is 200.</div>
+        </div>
+        <div class="f">
+          <label for="mdns_name">mDNS Hostname</label>
+          <input type="text" id="mdns_name" name="mdns_name" placeholder="artnet">
+          <div class="hint">Access via http://<span id="mdns_preview">artnet</span>.local (requires reboot)</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Protocol Settings</h3><span class="pill">Art-Net / sACN</span></div>
+      <div class="proto-grid">
+        <div class="proto-box">
+          <h4>Art-Net</h4>
+          <div class="fg">
+            <div class="f" style="flex-basis:100%">
+              <div class="cb"><input type="checkbox" id="artnet_enabled" name="artnet_enabled"><label for="artnet_enabled">Enable Art-Net input</label></div>
+              <div class="hint">Allows receiving DMX data over Art-Net. Enable for Art-Net senders.</div>
+            </div>
+            <div class="f">
+              <label for="artnet_port">UDP Port</label>
+              <input type="number" id="artnet_port" name="artnet_port" value="6454" min="1" max="65535">
+              <div class="hint">Standard Art-Net port is 6454. Change only if the sender uses a custom port. Reboot required.</div>
+            </div>
+          </div>
+        </div>
+        <div class="proto-box">
+          <h4>sACN / E1.31</h4>
+          <div class="fg">
+            <div class="f" style="flex-basis:100%">
+              <div class="cb"><input type="checkbox" id="sacn_enabled" name="sacn_enabled"><label for="sacn_enabled">Enable sACN input</label></div>
+              <div class="hint">Art-Net remains available. Enable only when an sACN sender is used.</div>
+            </div>
+            <div class="f" style="flex-basis:100%">
+              <div class="cb"><input type="checkbox" id="sacn_multicast" name="sacn_multicast"><label for="sacn_multicast">Join sACN multicast groups</label></div>
+              <div class="hint">Joins multicast groups for configured output universes. Disable for unicast-only senders.</div>
+            </div>
+            <div class="f">
+              <label for="sacn_port">UDP Port</label>
+              <input type="number" id="sacn_port" name="sacn_port" value="5568" min="1" max="65535">
+              <div class="hint">Standard sACN port is 5568. Match your sender. Reboot required.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Ethernet (LAN)</h3><span class="pill">Wired</span></div>
+      <div class="fg">
+        <div class="f" style="flex:0 0 auto">
+          <div class="cb"><input type="checkbox" id="eth_dhcp" name="eth_dhcp" onchange="toggleEth()"><label for="eth_dhcp">Enable DHCP</label></div>
+        </div>
+      </div>
+      <div id="eth-static" class="fg">
+        <div class="f"><label for="eth_ip">IP Address</label><input type="text" id="eth_ip" name="eth_ip" placeholder="192.168.1.200"></div>
+        <div class="f"><label for="eth_netmask">Subnet Mask</label><input type="text" id="eth_netmask" name="eth_netmask" placeholder="255.255.255.0"></div>
+        <div class="f"><label for="eth_gateway">Gateway</label><input type="text" id="eth_gateway" name="eth_gateway" placeholder="192.168.1.1"></div>
+        <div class="f"><label for="eth_dns">DNS</label><input type="text" id="eth_dns" name="eth_dns" placeholder="8.8.8.8"></div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Wi-Fi Client (STA)</h3><span class="pill">Wireless</span></div>
+      <div class="hint">Wi-Fi radio startup can brownout weak 3.3V supplies. Keep disabled in Ethernet mode until power is confirmed stable.</div>
+      <div class="fg">
+        <div class="f">
+          <label for="wifi_ssid">SSID</label>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="wifi_ssid" name="wifi_ssid" placeholder="Leave blank to disable" style="flex:1">
+            <button type="button" class="btn bs" onclick="startScan()" style="white-space:nowrap">Scan</button>
+          </div>
+          <select id="scan_results" style="margin-top:4px;display:none" onchange="pickSsid()">
+            <option value="">-- Select network --</option>
+          </select>
+        </div>
+        <div class="f"><label for="wifi_pass">Password</label><input type="password" id="wifi_pass" name="wifi_pass"></div>
+      </div>
+      <div class="fg">
+        <div class="f" style="flex:0 0 auto">
+          <div class="cb"><input type="checkbox" id="wifi_dhcp" name="wifi_dhcp" onchange="toggleWifiIp()"><label for="wifi_dhcp">Enable DHCP</label></div>
+        </div>
+      </div>
+      <div id="wifi-static" class="fg">
+        <div class="f"><label for="wifi_ip">IP Address</label><input type="text" id="wifi_ip" name="wifi_ip" placeholder="192.168.1.201"></div>
+        <div class="f"><label for="wifi_netmask">Subnet Mask</label><input type="text" id="wifi_netmask" name="wifi_netmask" placeholder="255.255.255.0"></div>
+        <div class="f"><label for="wifi_gateway">Gateway</label><input type="text" id="wifi_gateway" name="wifi_gateway" placeholder="192.168.1.1"></div>
+        <div class="f"><label for="wifi_dns">DNS</label><input type="text" id="wifi_dns" name="wifi_dns" placeholder="8.8.8.8"></div>
+      </div>
+      <div class="fg">
+        <div class="f" style="flex:0 0 auto">
+          <div class="cb"><input type="checkbox" id="wifi_enable_in_eth_mode" name="wifi_enable_in_eth_mode"><label for="wifi_enable_in_eth_mode">Allow Wi-Fi STA in Art-Net Ethernet mode</label></div>
+          <div class="hint">Default ON after power supply validation. Turn off if Wi-Fi radio startup causes brownout.</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Access Point (AP)</h3><span class="pill">Fallback setup</span></div>
+      <div class="fg">
+        <div class="f"><label for="ap_ssid">AP SSID</label><input type="text" id="ap_ssid" name="ap_ssid"></div>
+        <div class="f"><label for="ap_pass">AP Password (min 8 chars or leave blank)</label><input type="password" id="ap_pass" name="ap_pass"></div>
+      </div>
+      <div class="fg">
+        <div class="f" style="flex:0 0 auto">
+          <div class="cb"><input type="checkbox" id="ap_enable_in_eth_mode" name="ap_enable_in_eth_mode"><label for="ap_enable_in_eth_mode">Allow setup AP fallback in Art-Net Ethernet mode</label></div>
+          <div class="hint">Default ON after power supply validation. AP also starts the Wi-Fi radio.</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Output Timing</h3><span class="pill">Render</span></div>
+      <div class="fg">
+        <div class="f"><label for="output_fps">Global Output FPS</label><input type="number" id="output_fps" name="output_fps" min="1" max="44" oninput="updateScoreBar()"></div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Status LED &amp; Dimmer Sync</h3><span class="pill">Diagnostics</span></div>
+      <div class="fg">
+        <div class="f">
+          <label for="status_led_pin">Status LED GPIO</label>
+          <select id="status_led_pin" name="status_led_pin">
+            <option value="255">Disabled</option>
+            <option value="5">GPIO 5 (LED3 on-board)</option>
+            <option value="2">GPIO 2</option>
+            <option value="4">GPIO 4</option>
+            <option value="12">GPIO 12</option>
+            <option value="14">GPIO 14</option>
+            <option value="15">GPIO 15</option>
+            <option value="17">GPIO 17 (LED4 on-board)</option>
+            <option value="32">GPIO 32</option>
+            <option value="33">GPIO 33</option>
+          </select>
+          <div class="hint">Pattern codes: 1=Idle, 2=AP, 3=Ethernet, 4=Wi-Fi, 5=ESP-NOW RX, 6=Output Test. All modes blink with a pause gap.</div>
+        </div>
+        <div class="f">
+          <label for="zc_pin">Zero-Crossing GPIO</label>
+          <select id="zc_pin" name="zc_pin">
+            <option value="255">Disabled</option>
+            <option value="36">GPIO 36</option>
+            <option value="39">GPIO 39</option>
+            <option value="34">GPIO 34</option>
+            <option value="35">GPIO 35</option>
+            <option value="32">GPIO 32</option>
+            <option value="33">GPIO 33</option>
+          </select>
+          <div class="hint">Global ZC pin used for TRIAC AC Dimmer outputs.</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>I2C Bus Settings</h3><span class="pill">Expanders</span></div>
+      <div class="f">
+        <label class="cklbl"><input type="checkbox" id="i2c_enabled" checked onchange="toggleI2c()"> Enable I2C Bus</label>
+      </div>
+      <div id="i2c-config" class="fg">
+        <div class="f">
+          <label for="i2c_sda">I2C SDA GPIO</label>
+          <select id="i2c_sda" name="i2c_sda">
+            <option value="255">Disabled</option>
+            <option value="4">GPIO 4</option>
+            <option value="12">GPIO 12</option>
+            <option value="14">GPIO 14</option>
+            <option value="15">GPIO 15</option>
+            <option value="2">GPIO 2</option>
+            <option value="17">GPIO 17</option>
+            <option value="32">GPIO 32</option>
+            <option value="33">GPIO 33</option>
+          </select>
+          <div class="hint">Shared I2C data pin. Default is GPIO 14.</div>
+        </div>
+        <div class="f">
+          <label for="i2c_scl">I2C SCL GPIO</label>
+          <select id="i2c_scl" name="i2c_scl">
+            <option value="255">Disabled</option>
+            <option value="4">GPIO 4</option>
+            <option value="12">GPIO 12</option>
+            <option value="14">GPIO 14</option>
+            <option value="15">GPIO 15</option>
+            <option value="2">GPIO 2</option>
+            <option value="17">GPIO 17</option>
+            <option value="32">GPIO 32</option>
+            <option value="33">GPIO 33</option>
+          </select>
+          <div class="hint">Shared I2C clock pin. Default is GPIO 15.</div>
+        </div>
+        <div class="f">
+          <label for="i2c_speed">I2C Frequency (Speed)</label>
+          <select id="i2c_speed" name="i2c_speed">
+            <option value="100000">100 kHz (Standard)</option>
+            <option value="400000">400 kHz (Fast Mode)</option>
+            <option value="1000000">1000 kHz (Fast Mode Plus)</option>
+          </select>
+          <div class="hint">Standard speed is 100kHz, Fast is 400kHz. Fast Plus is 1MHz.</div>
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>I2C Display</h3><span class="pill">OLED</span></div>
+      <div class="f">
+        <label class="cklbl"><input type="checkbox" id="disp_enable_ck" onchange="toggleDisplayCfg()"> Enable Display</label>
+      </div>
+      <div id="display-config" class="fg">
+        <div class="f">
+          <label for="display_enabled">Display Type</label>
+            <select id="display_enabled" name="display_enabled" onchange="updateDisplayAddressOptions()">
+            <option value="0">Disabled</option>
+            <option value="1">SSD1306 OLED (128x64)</option>
+            <option value="2">SH1106 OLED (128x64)</option>
+            <option value="3">PCF8574 LCD (20x4 Character)</option>
+          </select>
+          <div class="hint">Shares I2C bus with expanders. PCF8574 LCD default address 0x27 or 0x3F. Reboot to apply.</div>
+        </div>
+        <div class="f">
+          <label for="display_i2c_addr">I2C Address</label>
+          <select id="display_i2c_addr" name="display_i2c_addr">
+            <option value="60">0x3C (OLED default)</option>
+            <option value="61">0x3D</option>
+          </select>
+        </div>
+        <div class="f">
+          <label for="display_brightness">Brightness (0-255)</label>
+          <input type="number" id="display_brightness" name="display_brightness" value="128" min="0" max="255">
+        </div>
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Backup &amp; Restore Configuration</h3><span class="pill">JSON</span></div>
+      <div class="ib ib-blue" id="backup_status" style="font-size:0.72rem">Export downloads current Settings and Output Channels. Import replaces both and reboots the device.</div>
+      <div class="btns">
+        <button type="button" class="btn bs" onclick="exportConfig()">Export Settings</button>
+        <button type="button" class="btn bp" onclick="document.getElementById('import_file').click()">Import Settings</button>
+        <input type="file" id="import_file" accept=".json,application/json" style="display:none" onchange="importConfigFile(this)">
+      </div>
+      </div>
+
+      <div class="section">
+      <div class="section-head"><h3>Reset Configuration</h3><span class="pill">Danger</span></div>
+      <div class="btns">
+        <button type="button" class="btn bd" onclick="resetOutputs()">Reset Outputs to Default</button>
+        <button type="button" class="btn bd" onclick="factoryReset()">Factory Reset (All Settings)</button>
+      </div>
+      </div>
+
+      <div class="btns">
+        <button type="submit" class="btn bp">Save &amp; Restart</button>
+      </div>
+    </form>
+  </div>

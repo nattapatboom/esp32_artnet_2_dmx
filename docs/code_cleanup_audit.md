@@ -116,28 +116,27 @@
 ## C. Duplication (C++ ↔ JS Drift Risk)
 
 ### C1. Hardware counting (`estimateHardware` / `channelHardware`)
-- `include/scoring.h:98-151` and `web/index.html:1834-1879`
-- Two almost-identical switch statements. Any change to one must be mirrored.
+- `include/scoring.h` (pin-loop based, no switch) and `web/js/scoring.js` (still switch-based)
+- C++ side is now table-driven via `OUTPUT_MODES` pin loop; JS side still has parallel switch statements.
 - **Future fix:** Generate JS from C++ definition, or serve via API.
 
 ### C2. I2C write counting (`i2cWritesForChannel` / `i2cWriteCount`)
-- `include/scoring.h:182-234` and `web/index.html:1954-1988`
-- Another pair of parallel switch statements.
+- `include/scoring.h` (pin-loop based) and `web/js/scoring.js` (switch-based)
+- Same pattern as C1 — C++ table-driven, JS still has parallel switch.
 
 ### C3. RAM buffer calculation (`dmxBufferRamForChannel` / `dmxBufferRam`)
-- `include/scoring.h:264-297` and `web/index.html:1927-1943`
-- Third parallel switch.
+- `include/scoring.h` (pin-loop based) and `web/js/scoring.js` (switch-based)
+- Same pattern as C1/C2.
 
 ### C4. GPIO lists in three places
-- `web/index.html:1253-1255`: `OUTPUT_GPIOS`, `INPUT_GPIOS`, `INPUT_ONLY_GPIOS`
-- `web/index.html:1382`: `PIN_GPIOS` (subset for form dropdown)
+- `web/js/_gpio.js`: `OUTPUT_GPIOS`, `INPUT_GPIOS`, `INPUT_ONLY_GPIOS`, `PIN_GPIOS`
 - `src/main.cpp` (validation): hardcoded RMII forbidden list, input-only check
 - If the board changes or a pin is reallocated, these drift.
 - **Future fix:** Single source of truth (target header) exposed via API.
 
 ### C5. `dmxValueByteCount` / `getValueByteCount`
 - `include/output_control.h` defines `dmxValueByteCount(resolution)`.
-- `web/index.html` defines `valueByteCount(resolution)` — same logic.
+- `web/js/_gpio.js` defines `valueByteCount(resolution)` — same logic.
 - **Fix:** One JS function is fine (no C++ call needed from JS), but verify
   they produce identical results.
 
@@ -255,7 +254,7 @@
 | P0 — correctness | A1 ✅, A2 ✅, A3 ❌ (false positive) |
 | P1 — high | A4 ✅, A5 ❌ (false positive), B4 ✅ (partial), D1 ✅ (constants + aggregate usage), B6 ✅ (removed proxy) |
 | P2 — medium | B1 ❌ (false positive), B2 ❌ (already gone), B3 ❌ (used 17x), B5 ❌ (already gone), B7 ❌ (false positive), C4 🔲 (needs API), E2 ✅ (all cost fields now from OutputDefs), E3 🔲 (future) |
-| P3 — low | C1 ✅ (C++ switch → pin loop, JS still parallel), C2 ✅ (same), C3 ✅ (same), C5 🔲, D2 🔲, D3 🔲, E1 🔲, E4 🔲, E5 🔲, E6 🔲, E7 🔲, F1 🔲, F2 🔲, F3 🔲, G1 🔲, G2 🔲 |
+| P3 — low | C1 ✅ (C++ switch → pin loop, JS still parallel), C2 ✅ (same), C3 ✅ (same), C5 🔲, D2 🔲, D3 🔲, E1 🔲, E4 🔲, E5 🔲, E6 🔲, E7 🔲, F1 🔲, F2 🔲, F3 🔲, G1 🔲, G2 🔲, **Web UI split ✅** (multi-file shell + parts + JS modules, build_web.py updated) |
 
 ---
 
