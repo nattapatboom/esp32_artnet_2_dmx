@@ -45,6 +45,29 @@
 
 #pagebreak()
 
+#set page(
+  background: place(
+    center + horizon,
+    {
+      let img = image("chal_logo.png", width: 10cm)
+      context {
+        let m = measure(img)
+        stack(
+          img,
+          move(
+            dy: -m.height,
+            box(
+              width: m.width,
+              height: m.height,
+              fill: white.transparentize(85%)
+            )
+          )
+        )
+      }
+    }
+  )
+)
+
 #include "chapters/quickstart.typ"
 #include "chapters/network.typ"
 #include "chapters/outputs.typ"

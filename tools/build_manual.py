@@ -55,6 +55,17 @@ def main():
     print(f"[+] Found Typst compiler: {typst_bin}")
     print("[+] Compiling document...")
 
+    # Convert the watermark logo to PNG in the manual directory if it exists at the root
+    logo_src = os.path.join(root_dir, '[CHAL]_128_64.bmp')
+    logo_dest_png = os.path.join(manual_dir, 'chal_logo.png')
+    if os.path.exists(logo_src):
+        try:
+            from PIL import Image
+            img = Image.open(logo_src)
+            img.save(logo_dest_png)
+        except Exception as e:
+            print(f"[!] Warning: Could not convert BMP to PNG: {e}")
+
     os.chdir(manual_dir)
 
     # Compile command: typst compile main.typ output.pdf
