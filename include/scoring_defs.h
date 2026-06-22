@@ -59,10 +59,6 @@ constexpr RamRuntimeDef RAM_RUNTIME = {
     32          // I2C route bookkeeping estimate
 };
 
-inline uint16_t channelCpuUs(uint8_t type, uint8_t mode = 0) {
-    return OutputDefs::baseCpuUs(type, mode);
-}
-
 constexpr uint8_t MAX_LEDC_RESOURCE = HARDWARE_LIMITS.ledc;
 constexpr uint8_t MAX_RMT_RESOURCE = HARDWARE_LIMITS.rmt;
 constexpr uint8_t MAX_UART_RESOURCE = HARDWARE_LIMITS.uart;

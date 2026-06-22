@@ -234,7 +234,7 @@ struct PerChannelCost {
 // Includes serialized DMX/TM1637 work, LED strip mapping/enqueue, and active I2C transactions.
 inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     PerChannelCost c;
-    c.cpuUs = ScoringDefs::channelCpuUs(ch.type, ch.mc_mode);
+    c.cpuUs = OutputDefs::baseCpuUs(ch.type, ch.mc_mode);
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(ch.type, ch.led_count, ch.color_order, ch.mc_resolution, ch.mc_mode);
     auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
     if (def) c.ramBytes += def->cost.extraRamBytes;
@@ -450,7 +450,7 @@ inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
     uint8_t mode = j["mc_mode"] | 0;
     uint16_t ledCount = j["led_count"] | 0;
     uint8_t colorOrder = j["color_order"] | 0;
-    c.cpuUs = ScoringDefs::channelCpuUs(t, mode);
+    c.cpuUs = OutputDefs::baseCpuUs(t, mode);
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(t, ledCount, colorOrder, j["mc_resolution"] | 8, mode);
     auto* def = OutputDefs::modeDef(t, mode);
     if (def) c.ramBytes += def->cost.extraRamBytes;
