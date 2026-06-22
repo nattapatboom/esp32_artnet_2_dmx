@@ -1838,6 +1838,10 @@ function channelHardware(o){
     case 11: break;
     case 12:
     case 13:
+      if((o.mc_mode||0)>=6&&(o.mc_mode||0)<=9){
+        if(src===0) ledc=1;
+        break;
+      }
       const numSeg = t === 13 ? 8 : 7;
       for (let s = 0; s < numSeg; s++) {
         const segSrc = parseInt(o.seg_sources?.[s] ?? 0);

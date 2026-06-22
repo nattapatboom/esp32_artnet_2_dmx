@@ -51,11 +51,13 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 
 10. **Web UI exposes Ethernet RMII pins as output choices**
     - Files: `web/index.html`
+    - Status: ✅ Completed (`fix(ui): block WT32 Ethernet GPIO choices`)
     - Issue: PWM DAC and Function Generator dropdowns expose GPIO25/26/27 even though they are WT32-ETH01 Ethernet RMII pins.
     - Fix direction: remove GPIO25/26/27 from Web UI output dropdowns for WT32-ETH01 and block RMII/PHY pins in add/edit validation. Keep GPIO12 selectable with warning-only behavior because existing hardware may still use it.
 
 11. **Web UI 7-segment common-dim resource scoring overcounts LEDC**
     - Files: `web/index.html`, `include/scoring.h`
+    - Status: ✅ Completed (common-dim modes count only the COM GPIO LEDC path)
     - Issue: type 12/13 common-dim modes (`mc_mode` 6-9) count every GPIO segment as LEDC, but only the COM pin needs PWM; segments are digital. Valid configs can be blocked by false LEDC exhaustion.
     - Fix direction: update JS `channelHardware()` and C++ scoring to count one LEDC for the COM GPIO path only in common-dim modes; keep direct-dim modes counting per PWM segment.
 

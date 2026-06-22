@@ -127,6 +127,10 @@ inline HardwareResource estimateHardware(const OutputChannel& ch) {
         case 11: break;
         case 12:
         case 13: {
+            if (ch.mc_mode >= 6 && ch.mc_mode <= 9) {
+                if (ch.source == 0) h.ledc = 1;
+                break;
+            }
             uint8_t segN = (ch.type == 13) ? 8 : 7;
             for (uint8_t i = 0; i < segN; i++) {
                 if (ch.seg_sources[i] == 0) h.ledc++;
@@ -480,6 +484,11 @@ inline HardwareResource estimateHardwareFromJson(JsonObjectConst j) {
         case 11: break;
         case 12:
         case 13: {
+            uint8_t mode = j["mc_mode"] | 0;
+            if (mode >= 6 && mode <= 9) {
+                if (src == 0) h.ledc = 1;
+                break;
+            }
             uint8_t segN = (t == 13) ? 8 : 7;
             JsonArrayConst sa = j["seg_sources"];
             for (uint8_t i = 0; i < segN; i++) {
