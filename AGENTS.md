@@ -53,6 +53,20 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 ## Project Structure
 
 - `include/` — C++ headers and most firmware subsystems
+- `include/output_devices/` — one file per output device type:
+  - `ledc_helpers.h` — shared LEDC allocation, DMX value, segment, PWM DAC calibration helpers
+  - `tm1637.h` — TM1637Driver class (bit-bang 7-segment)
+  - `single_led.h` — Type 4 Single Color LED setup/update
+  - `pwm_dac.h` — Type 15 PWM DAC setup/update
+  - `servo.h` — Type 8 RC Servo setup/update
+  - `motor.h` — Type 6 DC Motor setup/update (PWM+PWM, PWM+DIR, IN1+IN2+EN)
+  - `analog_rgb.h` — Type 5 Analog RGB LED setup/update
+  - `stepper.h` — Type 7 Stepper Motor setup/update (FastAccelStepper)
+  - `buzzer.h` — Type 9 Passive Buzzer setup/update
+  - `seven_seg.h` — Types 11/12/13 7-Segment setup/update (TM1637 + DD via GPIO/PCA/EXP)
+  - `dfplayer.h` — Type 10 DFPlayer MP3 update
+  - `dac.h` — Type 14 I2C DAC update (MCP4725, DAC7571, DAC7573)
+  - `funcgen.h` — Type 16 Function Generator setup/update
 - `include/i2c_devices/` — one file per I2C device type:
   - `i2c_dac.h` — MCP4725, DAC7571, DAC7573 inline write functions
   - `i2c_gpio_expander.h` — DigitalExpanderManager (MCP23017, TCA9555, PCF857x)

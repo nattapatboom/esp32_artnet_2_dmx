@@ -125,7 +125,8 @@ Responsibilities:
 
 Key files:
 - `include/output_control.h`
-- `include/motion_control.h`
+- `include/motion_control.h` — thin coordinator delegating to per-type files
+- `include/output_devices/` — one file per output type: `single_led.h`, `pwm_dac.h`, `servo.h`, `motor.h`, `analog_rgb.h`, `stepper.h`, `buzzer.h`, `seven_seg.h`, `dfplayer.h`, `dac.h`, `funcgen.h`
 - `include/pca9685_control.h`
 - `include/i2c_gpio_expander.h`
 - `include/funcgen_control.h`
