@@ -2,6 +2,7 @@
 #define SCORING_DEFS_H
 
 #include <Arduino.h>
+#include "output_defs.h"
 
 namespace ScoringDefs {
 struct HardwareLimits {
@@ -58,27 +59,9 @@ constexpr RamRuntimeDef RAM_RUNTIME = {
     32          // I2C route bookkeeping estimate
 };
 
-constexpr uint16_t CHANNEL_CPU_US[19] = {
-    5,   // 0 AC Dimmer
-    250, // 1 DMX Output
-    5,   // 2 Relay
-    80,  // 3 RGB LED base; led count is added dynamically
-    6,   // 4 Single LED
-    18,  // 5 Analog RGB/RGBW
-    35,  // 6 DC Motor
-    80,  // 7 Stepper
-    12,  // 8 Servo
-    35,  // 9 Buzzer
-    30,  // 10 DFPlayer
-    900, // 11 TM1637
-    30,  // 12 7-seg 7-pin DD
-    35,  // 13 7-seg 8-pin DD
-    10,  // 14 DAC
-    6,   // 15 PWM DAC
-    120, // 16 Function Generator
-    10,  // 17 Solenoid
-    25   // 18 Smoke Shooter
-};
+inline uint16_t channelCpuUs(uint8_t type, uint8_t mode = 0) {
+    return OutputDefs::baseCpuUs(type, mode);
+}
 
 constexpr uint8_t MAX_LEDC_RESOURCE = HARDWARE_LIMITS.ledc;
 constexpr uint8_t MAX_RMT_RESOURCE = HARDWARE_LIMITS.rmt;

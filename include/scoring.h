@@ -309,7 +309,7 @@ struct PerChannelCost {
 // Includes serialized DMX/TM1637 work, LED strip mapping/enqueue, and active I2C transactions.
 inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     PerChannelCost c;
-    c.cpuUs = (ch.type <= 18) ? ScoringDefs::CHANNEL_CPU_US[ch.type] : 0;
+    c.cpuUs = ScoringDefs::channelCpuUs(ch.type, ch.mc_mode);
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(ch.type, ch.led_count, ch.color_order, ch.mc_resolution, ch.mc_mode);
     if (ch.type == 3) c.cpuUs = ledStripServiceUs(ch.led_count, ch.color_order);
     if (ch.type == 3) c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order) + PIXEL_STRIP_OBJECT_RAM;
@@ -576,7 +576,7 @@ inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
     uint8_t t = j["type"] | 0;
     uint16_t ledCount = j["led_count"] | 0;
     uint8_t colorOrder = j["color_order"] | 0;
-    c.cpuUs = (t <= 18) ? ScoringDefs::CHANNEL_CPU_US[t] : 0;
+    c.cpuUs = ScoringDefs::channelCpuUs(t, j["mc_mode"] | 0);
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(t, ledCount, colorOrder, j["mc_resolution"] | 8, j["mc_mode"] | 0);
     if (t == 3) c.cpuUs = ledStripServiceUs(ledCount, colorOrder);
     if (t == 3) c.ramBytes += pixelBufferRam(ledCount, colorOrder) + PIXEL_STRIP_OBJECT_RAM;
