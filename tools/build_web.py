@@ -7,7 +7,9 @@ embeds JS files from web/js/ in order,
 minifies, gzips, writes include/web_pages.h.
 """
 import gzip
+import json
 import os
+import re
 
 WEB_DIR = "web"
 PARTS_DIR = os.path.join(WEB_DIR, "parts")
@@ -18,6 +20,7 @@ JS_CONFIG_DIR = os.path.join(JS_DIR, "output-config")
 JS_TEST_DIR = os.path.join(JS_DIR, "output-test")
 HEADER_PATH = "include/web_pages.h"
 SHELL_PATH = os.path.join(WEB_DIR, "index.html")
+OUTPUT_DEFS_PATH = os.path.join("include", "output_defs.h")
 
 PANE_MARKERS = {
     "<!-- PANE_NET -->":    "pane-network.html",
@@ -56,6 +59,112 @@ def read_file(path):
         return f.read()
 
 
+def split_cpp_args(text):
+    args = []
+    start = 0
+    depth = 0
+    for i, ch in enumerate(text):
+        if ch in "({[":
+            depth += 1
+        elif ch in ")}]":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            args.append(text[start:i].strip())
+            start = i + 1
+    args.append(text[start:].strip())
+    return args
+
+
+def parse_source_mask(expr):
+    values = {
+        "SRC_GPIO": 1,
+        "SRC_PCA": 2,
+        "SRC_DIGITAL_EXPANDER": 4,
+        "SRC_I2C_DAC": 8,
+    }
+    mask = 0
+    for part in expr.split("|"):
+        mask |= values[part.strip()]
+    return mask
+
+
+def mode_key(type_id, mode):
+    if type_id in (12, 13) and mode in (4, 5):
+        return "directDim"
+    if type_id in (12, 13) and mode >= 6:
+        return "commonDim"
+    return "default" if mode == -1 else str(mode)
+
+
+def generate_output_defs_js():
+    src = read_file(OUTPUT_DEFS_PATH)
+
+    type_ids = {
+        name: int(value)
+        for name, value in re.findall(r"constexpr\s+uint8_t\s+(TYPE_\w+)\s*=\s*(\d+)\s*;", src)
+    }
+    hardware = {
+        name: {
+            "ledc": int(ledc),
+            "rmt": int(rmt),
+            "uart": int(uart),
+            "dac": int(dac),
+            "timer": int(timer),
+        }
+        for name, ledc, rmt, uart, dac, timer in re.findall(
+            r"constexpr\s+HardwareCost\s+(HW_\w+)\s*=\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}\s*;",
+            src,
+        )
+    }
+
+    costs = {}
+    for name, args_text in re.findall(r"constexpr\s+ModeCost\s+(COST_\w+)\s*=\s*modeCost\((.*?)\)\s*;", src):
+        args = split_cpp_args(args_text)
+        costs[name] = {
+            "cpuUs": int(args[0]),
+            "extraRam": int(args[1]) if len(args) > 1 else 0,
+            "hardware": hardware[args[2]] if len(args) > 2 else hardware["HW_NONE"],
+            "cpuPerUnit": int(args[3]) if len(args) > 3 else 0,
+            "ramPerUnit": int(args[4]) if len(args) > 4 else 0,
+            "dmxSlots": int(args[5]) if len(args) > 5 else 0,
+        }
+
+    pin_sets = {}
+    pin_array_re = re.compile(r"constexpr\s+PinRule\s+(PINS_\w+)\[\]\s*=\s*\{(.*?)\}\s*;", re.DOTALL)
+    pin_re = re.compile(
+        r"\{\s*\"([^\"]+)\"\s*,\s*\"([^\"]+)\"\s*,\s*(.*?)\s*,\s*(PIN_OUTPUT|PIN_INPUT)\s*,\s*(true|false)\s*,\s*(\d+)\s*\}"
+    )
+    for name, body in pin_array_re.findall(src):
+        pin_sets[name] = []
+        for slot, label, sources, direction, invert, hw in pin_re.findall(body):
+            pin_sets[name].append({
+                "slot": slot,
+                "label": label,
+                "sources": parse_source_mask(sources),
+                "dir": "out" if direction == "PIN_OUTPUT" else "in",
+                "invert": invert == "true",
+                "hwIfGpio": int(hw),
+            })
+
+    defs = {}
+    modes_body = re.search(r"constexpr\s+OutputModeDef\s+OUTPUT_MODES\[\]\s*=\s*\{(.*?)\n\};", src, re.DOTALL).group(1)
+    mode_re = re.compile(r"\{\s*(TYPE_\w+)\s*,\s*(-?\d+)\s*,\s*\"([^\"]+)\"\s*,\s*(COST_\w+)\s*,\s*(PINS_\w+)\s*,\s*(\d+)\s*\}")
+    for type_name, mode_value, name, cost_name, pins_name, pin_count in mode_re.findall(modes_body):
+        type_id = type_ids[type_name]
+        mode = int(mode_value)
+        entry = defs.setdefault(str(type_id), {"name": name, "modes": {}})
+        pins = {}
+        for pin in pin_sets[pins_name][:int(pin_count)]:
+            pins[pin["slot"]] = {k: v for k, v in pin.items() if k != "slot"}
+        entry["modes"][mode_key(type_id, mode)] = {
+            "label": name,
+            "cost": costs[cost_name],
+            "pins": pins,
+        }
+
+    return "const OUTPUT_DEFS=" + json.dumps(defs, separators=(",", ":")) + ";\n"
+
+
 def main():
     print(f"=== Compiling {SHELL_PATH} -> {HEADER_PATH} ===")
 
@@ -90,8 +199,8 @@ def main():
                              if os.path.isfile(os.path.join(src_dir, f)))
         html = html.replace(marker, combined)
 
-    # Embed JS files into <script> tag (main JS, then per-type config, then per-type test)
-    js_parts = []
+    # Embed JS files into <script> tag (generated metadata, main JS, then per-type config/test)
+    js_parts = [generate_output_defs_js()]
     for js_file in JS_ORDER:
         js_path = os.path.join(JS_DIR, js_file)
         if not os.path.exists(js_path):

@@ -100,6 +100,9 @@ struct OutputModeDef {
 constexpr PinRule PINS_GPIO_MAIN[] = {
     {"pin1", "Main", SRC_GPIO, PIN_OUTPUT, true, 0}
 };
+constexpr PinRule PINS_DIMMER[] = {
+    {"pin1", "Gate", SRC_GPIO, PIN_OUTPUT, true, 0}
+};
 constexpr PinRule PINS_DMX[] = {
     {"pin1", "DMX TX", SRC_GPIO, PIN_OUTPUT, true, 0}
 };
@@ -111,6 +114,18 @@ constexpr PinRule PINS_LED_STRIP[] = {
 };
 constexpr PinRule PINS_PWM[] = {
     {"pin1", "PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
+};
+constexpr PinRule PINS_SERVO[] = {
+    {"pin1", "Servo PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
+};
+constexpr PinRule PINS_BUZZER[] = {
+    {"pin1", "Tone PWM", SRC_GPIO, PIN_OUTPUT, true, 1}
+};
+constexpr PinRule PINS_PWM_DAC[] = {
+    {"pin1", "PWM Out", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
+};
+constexpr PinRule PINS_FUNC_GEN[] = {
+    {"pin1", "Wave Out", SRC_GPIO, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_ANALOG_RGB[] = {
     {"pin1", "Red", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
@@ -230,7 +245,7 @@ constexpr ModeCost COST_SOLENOID = modeCost(10, 0, HW_NONE, 0, 0, 1);
 constexpr ModeCost COST_SMOKE = modeCost(25, 0, HW_NONE, 0, 0, 1);
 
 constexpr OutputModeDef OUTPUT_MODES[] = {
-    {TYPE_DIMMER, -1, "Triac dimmer", COST_DIMMER, PINS_GPIO_MAIN, 1},
+    {TYPE_DIMMER, -1, "Triac dimmer", COST_DIMMER, PINS_DIMMER, 1},
     {TYPE_DMX, -1, "DMX serial", COST_DMX_SERIAL, PINS_DMX, 1},
     {TYPE_RELAY, -1, "Relay", COST_RELAY, PINS_RELAY_DIGITAL, 1},
     {TYPE_LED_STRIP, -1, "RGB/RGBW strip", COST_LED_STRIP_BASE, PINS_LED_STRIP, 1},
@@ -240,8 +255,8 @@ constexpr OutputModeDef OUTPUT_MODES[] = {
     {TYPE_MOTOR, 1, "IN1 + IN2", COST_MOTOR_IN1_IN2, PINS_MOTOR_PWM_DIR, 2},
     {TYPE_MOTOR, 2, "IN1 + IN2 + EN", COST_MOTOR_IN1_IN2_EN, PINS_MOTOR_IN1_IN2_EN, 3},
     {TYPE_STEPPER, -1, "Stepper", COST_STEPPER, PINS_STEPPER, 4},
-    {TYPE_SERVO, -1, "RC servo", COST_SERVO, PINS_PWM, 1},
-    {TYPE_BUZZER, -1, "Passive buzzer", COST_BUZZER, PINS_GPIO_MAIN, 1},
+    {TYPE_SERVO, -1, "RC servo", COST_SERVO, PINS_SERVO, 1},
+    {TYPE_BUZZER, -1, "Passive buzzer", COST_BUZZER, PINS_BUZZER, 1},
     {TYPE_DFPLAYER, -1, "DFPlayer", COST_DFPLAYER, PINS_DFPLAYER, 2},
     {TYPE_TM1637, -1, "TM1637", COST_TM1637, PINS_TM1637, 2},
     {TYPE_7SEG_7PIN, -1, "7-seg 7-pin", COST_7SEG_7PIN, PINS_7SEG_DIRECT, 7},
@@ -255,8 +270,8 @@ constexpr OutputModeDef OUTPUT_MODES[] = {
     {TYPE_7SEG_8PIN, 8, "7-seg 8-pin common anode dim", COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
     {TYPE_7SEG_8PIN, 9, "7-seg 8-pin common cathode dim", COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
     {TYPE_DAC, -1, "I2C DAC", COST_DAC, PINS_DAC, 1},
-    {TYPE_PWM_DAC, -1, "PWM DAC", COST_PWM_DAC, PINS_PWM, 1},
-    {TYPE_FUNC_GEN, -1, "Function generator", COST_FUNC_GEN, PINS_GPIO_MAIN, 1},
+    {TYPE_PWM_DAC, -1, "PWM DAC", COST_PWM_DAC, PINS_PWM_DAC, 1},
+    {TYPE_FUNC_GEN, -1, "Function generator", COST_FUNC_GEN, PINS_FUNC_GEN, 1},
     {TYPE_SOLENOID, -1, "Solenoid", COST_SOLENOID, PINS_SOLENOID, 1},
     {TYPE_SMOKE, -1, "Smoke shooter", COST_SMOKE, PINS_SMOKE, 2}
 };

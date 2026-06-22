@@ -18,57 +18,6 @@ const SOURCE_ADDRESS_RULES={
   7:{label:'DAC7573 address must be 0x4C-0x5B',ranges:[[0x4C,0x5B]]}
 };
 const SRC_GPIO=1, SRC_PCA=2, SRC_DIG=4, SRC_DAC=8;
-const HW={
-  none:{}, ledc1:{ledc:1}, ledc2:{ledc:2}, ledc4:{ledc:4}, ledc7:{ledc:7}, ledc8:{ledc:8},
-  rmt1:{rmt:1}, rmt2:{rmt:2}, uart1:{uart:1}, funcGen:{ledc:1,timer:1}
-};
-const modeCost=(cpuUs,{extraRam=0,hardware=HW.none}={})=>({cpuUs,extraRam,hardware});
-const COST={
-  dimmer:modeCost(5),
-  dmxSerial:modeCost(250,{hardware:HW.uart1}),
-  relay:modeCost(5),
-  ledStripBase:modeCost(80,{hardware:HW.rmt1}),
-  singleLed:modeCost(6,{hardware:HW.ledc1}),
-  analogRgbw:modeCost(18,{hardware:HW.ledc4}),
-  motorPwmDir:modeCost(35,{hardware:HW.ledc2}),
-  motorIn1In2:modeCost(35,{hardware:HW.ledc1}),
-  motorIn1In2En:modeCost(35,{hardware:HW.ledc2}),
-  stepper:modeCost(80,{extraRam:512,hardware:HW.rmt2}),
-  servo:modeCost(12,{hardware:HW.ledc1}),
-  buzzer:modeCost(35,{hardware:HW.ledc1}),
-  dfPlayer:modeCost(30,{extraRam:260,hardware:HW.uart1}),
-  tm1637:modeCost(900),
-  sevenSeg7:modeCost(30,{hardware:HW.ledc7}),
-  sevenSeg8:modeCost(35,{hardware:HW.ledc8}),
-  sevenSegCommon7:modeCost(30,{hardware:HW.ledc1}),
-  sevenSegCommon8:modeCost(35,{hardware:HW.ledc1}),
-  dac:modeCost(10),
-  pwmDac:modeCost(6,{hardware:HW.ledc1}),
-  funcGen:modeCost(120,{extraRam:1120,hardware:HW.funcGen}),
-  solenoid:modeCost(10),
-  smoke:modeCost(25)
-};
-const OUTPUT_DEFS={
-  0:{name:'AC Dimmer',modes:{default:{cost:COST.dimmer,pins:{pin1:{label:'Gate',sources:SRC_GPIO,dir:'out',invert:true}}}}},
-  1:{name:'DMX Output',modes:{default:{cost:COST.dmxSerial,pins:{pin1:{label:'DMX TX',sources:SRC_GPIO,dir:'out',invert:true}}}}},
-  2:{name:'Relay',modes:{default:{cost:COST.relay,pins:{pin1:{label:'Relay',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}}}},
-  3:{name:'RGB LED',modes:{default:{cost:COST.ledStripBase,pins:{pin1:{label:'Data',sources:SRC_GPIO,dir:'out',invert:true}}}}},
-  4:{name:'Single Color LED',modes:{default:{cost:COST.singleLed,pins:{pin1:{label:'PWM',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}}}},
-  5:{name:'Analog RGB / RGBW',modes:{default:{cost:COST.analogRgbw,pins:{pin1:{label:'Red',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Green',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin3:{label:'Blue',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin4:{label:'White',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}}}},
-  6:{name:'DC Motor',modes:{0:{label:'PWM + DIR',cost:COST.motorPwmDir,pins:{pin1:{label:'PWM',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'DIR',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}},1:{label:'IN1 + IN2',cost:COST.motorIn1In2,pins:{pin1:{label:'IN1',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'IN2',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}},2:{label:'IN1 + IN2 + EN',cost:COST.motorIn1In2En,pins:{pin1:{label:'IN1',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'IN2',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin3:{label:'EN PWM',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}}}},
-  7:{name:'Stepper',modes:{default:{cost:COST.stepper,pins:{pin1:{label:'STEP',sources:SRC_GPIO,dir:'out',invert:true},pin2:{label:'DIR',sources:SRC_GPIO|SRC_DIG,dir:'out',invert:true},pin3:{label:'ENABLE',sources:SRC_GPIO|SRC_DIG,dir:'out',invert:true},pin4:{label:'HOME',sources:SRC_GPIO|SRC_DIG,dir:'in',invert:true}}}}},
-  8:{name:'RC Servo',modes:{default:{cost:COST.servo,pins:{pin1:{label:'Servo PWM',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}}}},
-  9:{name:'Passive Buzzer',modes:{default:{cost:COST.buzzer,pins:{pin1:{label:'Tone PWM',sources:SRC_GPIO,dir:'out',invert:true}}}}},
-  10:{name:'DFPlayer MP3',modes:{default:{cost:COST.dfPlayer,pins:{pin1:{label:'TX',sources:SRC_GPIO,dir:'out',invert:false},pin2:{label:'RX',sources:SRC_GPIO,dir:'in',invert:false}}}}},
-  11:{name:'7-Segment 2-Pin',modes:{default:{cost:COST.tm1637,pins:{pin1:{label:'CLK',sources:SRC_GPIO,dir:'out',invert:true},pin2:{label:'DIO',sources:SRC_GPIO,dir:'out',invert:true}}}}},
-  12:{name:'7-Segment DD 7-Pin PWM',modes:{default:{cost:COST.sevenSeg7,pins:{pin1:{label:'Segment A',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment B',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin3:{label:'Segment C',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin4:{label:'Segment D',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin5:{label:'Segment E',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin6:{label:'Segment F',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin7:{label:'Segment G',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}},directDim:{cost:COST.sevenSeg7,pins:{pin1:{label:'Segment A',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment B',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin3:{label:'Segment C',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin4:{label:'Segment D',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin5:{label:'Segment E',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin6:{label:'Segment F',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin7:{label:'Segment G',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}},commonDim:{cost:COST.sevenSegCommon7,pins:{pin1:{label:'Common PWM',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment A',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin3:{label:'Segment B',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin4:{label:'Segment C',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin5:{label:'Segment D',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin6:{label:'Segment E',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin7:{label:'Segment F',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin8:{label:'Segment G',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}}}},
-  13:{name:'7-Segment DD 8-Pin PWM',modes:{default:{cost:COST.sevenSeg8,pins:{pin1:{label:'Segment A',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment B',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin3:{label:'Segment C',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin4:{label:'Segment D',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin5:{label:'Segment E',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin6:{label:'Segment F',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin7:{label:'Segment G',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin8:{label:'Segment DP',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}},directDim:{cost:COST.sevenSeg8,pins:{pin1:{label:'Segment A',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment B',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin3:{label:'Segment C',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin4:{label:'Segment D',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin5:{label:'Segment E',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin6:{label:'Segment F',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin7:{label:'Segment G',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin8:{label:'Segment DP',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}},commonDim:{cost:COST.sevenSegCommon8,pins:{pin1:{label:'Common PWM',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true},pin2:{label:'Segment A',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin3:{label:'Segment B',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin4:{label:'Segment C',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin5:{label:'Segment D',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin6:{label:'Segment E',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin7:{label:'Segment F',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin8:{label:'Segment G',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}}}},
-  14:{name:'DAC',modes:{default:{cost:COST.dac,pins:{pin1:{label:'I2C DAC',sources:SRC_DAC,dir:'out',invert:false}}}}},
-  15:{name:'PWM DAC',modes:{default:{cost:COST.pwmDac,pins:{pin1:{label:'PWM Out',sources:SRC_GPIO|SRC_PCA,dir:'out',invert:true}}}}},
-  16:{name:'Function Gen',modes:{default:{cost:COST.funcGen,pins:{pin1:{label:'Wave Out',sources:SRC_GPIO,dir:'out',invert:true}}}}},
-  17:{name:'Solenoid Trigger',modes:{default:{cost:COST.solenoid,pins:{pin1:{label:'Solenoid',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}}}},
-  18:{name:'Smoke Shooter',modes:{default:{cost:COST.smoke,pins:{pin1:{label:'Smoke Valve',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true},pin2:{label:'Shoot Valve',sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true}}}}}
-};
 
 function outputModeKey(type,mode){
   type=parseInt(type); mode=parseInt(mode||0);

@@ -4,6 +4,8 @@ import json
 import random
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
+from build_web import generate_output_defs_js
+
 PORT = 8000
 HTML_FILE = "web/index.html"
 JS_DIR = "web/js"
@@ -162,8 +164,8 @@ class MockRequestHandler(BaseHTTPRequestHandler):
                     # Insert before </div><!-- /w --> if marker absent
                     html = html.replace("</div><!-- /w -->", f"{combined}\n</div><!-- /w -->")
 
-            # Inline JS files
-            js_parts = []
+            # Inline generated metadata and JS files
+            js_parts = [generate_output_defs_js()]
             for js_file in JS_ORDER:
                 js_path = os.path.join(JS_DIR, js_file)
                 if os.path.exists(js_path):
