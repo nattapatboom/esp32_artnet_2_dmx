@@ -131,7 +131,7 @@ inline HardwareResource estimateHardware(const OutputChannel& ch) {
                 if (ch.source == 0) h.ledc = 1;
                 break;
             }
-            uint8_t segN = (ch.type == 13) ? 8 : 7;
+            uint8_t segN = (ch.type == OutputDefs::TYPE_7SEG_8PIN) ? 8 : 7;
             for (uint8_t i = 0; i < segN; i++) {
                 if (ch.seg_sources[i] == 0) h.ledc++;
             }
@@ -172,8 +172,8 @@ inline uint32_t ledStripServiceUs(uint16_t ledCount, uint8_t colorOrder) {
 }
 
 inline uint8_t sevenSegCount(uint8_t type, uint8_t mode) {
-    if (type == 13) return 8;
-    if (type == 12) return 7;
+    if (type == OutputDefs::TYPE_7SEG_8PIN) return 8;
+    if (type == OutputDefs::TYPE_7SEG_7PIN) return 7;
     return 0;
 }
 
@@ -311,11 +311,11 @@ inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     PerChannelCost c;
     c.cpuUs = ScoringDefs::channelCpuUs(ch.type, ch.mc_mode);
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(ch.type, ch.led_count, ch.color_order, ch.mc_resolution, ch.mc_mode);
-    if (ch.type == 3) c.cpuUs = ledStripServiceUs(ch.led_count, ch.color_order);
-    if (ch.type == 3) c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order) + PIXEL_STRIP_OBJECT_RAM;
-    if (ch.type == 7) c.ramBytes += STEPPER_RUNTIME_RAM;
-    if (ch.type == 10) c.ramBytes += DFPLAYER_OBJECT_RAM + 100;
-    if (ch.type == 16) c.ramBytes += FUNCGEN_OBJECT_RAM;
+    if (ch.type == OutputDefs::TYPE_LED_STRIP) c.cpuUs = ledStripServiceUs(ch.led_count, ch.color_order);
+    if (ch.type == OutputDefs::TYPE_LED_STRIP) c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order) + PIXEL_STRIP_OBJECT_RAM;
+    if (ch.type == OutputDefs::TYPE_STEPPER) c.ramBytes += STEPPER_RUNTIME_RAM;
+    if (ch.type == OutputDefs::TYPE_DFPLAYER) c.ramBytes += DFPLAYER_OBJECT_RAM + 100;
+    if (ch.type == OutputDefs::TYPE_FUNC_GEN) c.ramBytes += FUNCGEN_OBJECT_RAM;
     c.cpuUs += (uint16_t)i2cWritesForChannel(ch) * I2C_WRITE_US;
     c.ramBytes += (uint32_t)i2cWritesForChannel(ch) * I2C_ROUTE_RAM;
     return c;
@@ -393,9 +393,9 @@ inline HardwareResource totalHardware(const std::vector<OutputChannel>& chs) {
     uint8_t dfPlayerCount = 0;
     for (auto& ch : chs) {
         t = t + estimateHardware(ch);
-        if (ch.type == 0) hasDimmer = true;
-        if (ch.type == 1 && ch.source == 0) dmxCount++;
-        else if (ch.type == 10) dfPlayerCount++;
+        if (ch.type == OutputDefs::TYPE_DIMMER) hasDimmer = true;
+        if (ch.type == OutputDefs::TYPE_DMX && ch.source == 0) dmxCount++;
+        else if (ch.type == OutputDefs::TYPE_DFPLAYER) dfPlayerCount++;
     }
     // DFPlayer has UART priority; DMX falls back to RMT when UARTs exhausted
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
@@ -413,8 +413,8 @@ inline CpuBudget totalCpu(const std::vector<OutputChannel>& chs, uint8_t fps = 4
     uint8_t funcGenCount = 0;
     for (auto& ch : chs) {
         t.usPerFrame += estimateChannelCost(ch).cpuUs;
-        if (ch.type == 0) dimmerCount++;
-        else if (ch.type == 16) funcGenCount++;
+        if (ch.type == OutputDefs::TYPE_DIMMER) dimmerCount++;
+        else if (ch.type == OutputDefs::TYPE_FUNC_GEN) funcGenCount++;
     }
     t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
     t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
@@ -433,8 +433,8 @@ inline RamBudget totalRam(const std::vector<OutputChannel>& chs) {
     uint8_t dfPlayerCount = 0;
     for (auto& ch : chs) {
         t.bytes += estimateChannelCost(ch).ramBytes;
-        if (ch.type == 1 && ch.source == 0) dmxCount++;
-        else if (ch.type == 10) dfPlayerCount++;
+        if (ch.type == OutputDefs::TYPE_DMX && ch.source == 0) dmxCount++;
+        else if (ch.type == OutputDefs::TYPE_DFPLAYER) dfPlayerCount++;
     }
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
     uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
@@ -578,11 +578,11 @@ inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
     uint8_t colorOrder = j["color_order"] | 0;
     c.cpuUs = ScoringDefs::channelCpuUs(t, j["mc_mode"] | 0);
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(t, ledCount, colorOrder, j["mc_resolution"] | 8, j["mc_mode"] | 0);
-    if (t == 3) c.cpuUs = ledStripServiceUs(ledCount, colorOrder);
-    if (t == 3) c.ramBytes += pixelBufferRam(ledCount, colorOrder) + PIXEL_STRIP_OBJECT_RAM;
-    if (t == 7) c.ramBytes += STEPPER_RUNTIME_RAM;
-    if (t == 10) c.ramBytes += DFPLAYER_OBJECT_RAM + 100;
-    if (t == 16) c.ramBytes += FUNCGEN_OBJECT_RAM;
+    if (t == OutputDefs::TYPE_LED_STRIP) c.cpuUs = ledStripServiceUs(ledCount, colorOrder);
+    if (t == OutputDefs::TYPE_LED_STRIP) c.ramBytes += pixelBufferRam(ledCount, colorOrder) + PIXEL_STRIP_OBJECT_RAM;
+    if (t == OutputDefs::TYPE_STEPPER) c.ramBytes += STEPPER_RUNTIME_RAM;
+    if (t == OutputDefs::TYPE_DFPLAYER) c.ramBytes += DFPLAYER_OBJECT_RAM + 100;
+    if (t == OutputDefs::TYPE_FUNC_GEN) c.ramBytes += FUNCGEN_OBJECT_RAM;
     c.cpuUs += (uint16_t)i2cWritesFromJson(j) * I2C_WRITE_US;
     c.ramBytes += (uint32_t)i2cWritesFromJson(j) * I2C_ROUTE_RAM;
     return c;
@@ -597,9 +597,9 @@ inline HardwareResource totalHardwareFromJson(JsonArrayConst arr) {
         t = t + estimateHardwareFromJson(j);
         uint8_t type = j["type"] | 0;
         uint8_t source = j["source"] | 0;
-        if (type == 1 && source == 0) dmxCount++;
-        else if (type == 10) dfPlayerCount++;
-        if (type == 0) hasDimmer = true;
+        if (type == OutputDefs::TYPE_DMX && source == 0) dmxCount++;
+        else if (type == OutputDefs::TYPE_DFPLAYER) dfPlayerCount++;
+        if (type == OutputDefs::TYPE_DIMMER) hasDimmer = true;
     }
     // DFPlayer has UART priority; DMX falls back to RMT when UARTs exhausted
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
@@ -618,8 +618,8 @@ inline CpuBudget totalCpuFromJson(JsonArrayConst arr, uint8_t fps = 40) {
     for (JsonObjectConst j : arr) {
         uint8_t type = j["type"] | 0;
         t.usPerFrame += estimateChannelCostFromJson(j).cpuUs;
-        if (type == 0) dimmerCount++;
-        else if (type == 16) funcGenCount++;
+        if (type == OutputDefs::TYPE_DIMMER) dimmerCount++;
+        else if (type == OutputDefs::TYPE_FUNC_GEN) funcGenCount++;
     }
     t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
     t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
@@ -640,8 +640,8 @@ inline RamBudget totalRamFromJson(JsonArrayConst arr) {
         t.bytes += estimateChannelCostFromJson(j).ramBytes;
         uint8_t type = j["type"] | 0;
         uint8_t source = j["source"] | 0;
-        if (type == 1 && source == 0) dmxCount++;
-        else if (type == 10) dfPlayerCount++;
+        if (type == OutputDefs::TYPE_DMX && source == 0) dmxCount++;
+        else if (type == OutputDefs::TYPE_DFPLAYER) dfPlayerCount++;
     }
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
     uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
@@ -697,25 +697,25 @@ inline ScoreBlocker checkScoresFromJson(JsonArrayConst arr, uint8_t fps) {
 
 inline const char* outputTypeName(uint8_t type) {
     switch (type) {
-        case 0:  return "AC Dimmer";
-        case 1:  return "DMX Output";
-        case 2:  return "Relay";
-        case 3:  return "RGB LED";
-        case 4:  return "Single Color LED";
-        case 5:  return "Analog RGB";
-        case 6:  return "Motor";
-        case 7:  return "Stepper";
-        case 8:  return "Servo";
-        case 9:  return "Buzzer";
-        case 10: return "DFPlayer MP3";
-        case 11: return "7-Segment 2-Pin";
-        case 12: return "7-Segment DD 7-Pin PWM";
-        case 13: return "7-Segment DD 8-Pin PWM";
-        case 14: return "DAC";
-        case 15: return "PWM DAC";
-        case 16: return "Function Gen";
-        case 17: return "Solenoid";
-        case 18: return "Smoke Shooter";
+        case OutputDefs::TYPE_DIMMER:  return "AC Dimmer";
+        case OutputDefs::TYPE_DMX:     return "DMX Output";
+        case OutputDefs::TYPE_RELAY:   return "Relay";
+        case OutputDefs::TYPE_LED_STRIP: return "RGB LED";
+        case OutputDefs::TYPE_SINGLE_LED: return "Single Color LED";
+        case OutputDefs::TYPE_ANALOG_RGB: return "Analog RGB";
+        case OutputDefs::TYPE_MOTOR:   return "Motor";
+        case OutputDefs::TYPE_STEPPER: return "Stepper";
+        case OutputDefs::TYPE_SERVO:   return "Servo";
+        case OutputDefs::TYPE_BUZZER:  return "Buzzer";
+        case OutputDefs::TYPE_DFPLAYER: return "DFPlayer MP3";
+        case OutputDefs::TYPE_TM1637:  return "7-Segment 2-Pin";
+        case OutputDefs::TYPE_7SEG_7PIN: return "7-Segment DD 7-Pin PWM";
+        case OutputDefs::TYPE_7SEG_8PIN: return "7-Segment DD 8-Pin PWM";
+        case OutputDefs::TYPE_DAC:     return "DAC";
+        case OutputDefs::TYPE_PWM_DAC: return "PWM DAC";
+        case OutputDefs::TYPE_FUNC_GEN: return "Function Gen";
+        case OutputDefs::TYPE_SOLENOID: return "Solenoid";
+        case OutputDefs::TYPE_SMOKE:   return "Smoke Shooter";
         default: return "Unknown";
     }
 }
