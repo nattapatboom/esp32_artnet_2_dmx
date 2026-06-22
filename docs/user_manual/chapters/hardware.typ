@@ -15,34 +15,55 @@ Use a 3.3V Zener diode to prevent the ESP32 signal pin voltage from exceeding th
 #canvas(length: 1cm, {
   import draw: *
 
-  let box = (fill: rgb("#e1f5fe"), stroke: 1pt + rgb("#0288d1"))
-  let zener = (fill: rgb("#fff9c4"), stroke: 1pt + rgb("#fbc02d"))
-  let pass = (fill: rgb("#e8f5e9"), stroke: 1pt + rgb("#388e3c"))
-  let gnd = (fill: rgb("#ffebee"), stroke: 1pt + rgb("#d32f2f"))
+  let wire-color = rgb("#1a5fb4")
+  let s-wire = (stroke: 1.2pt + wire-color)
+  let s-comp = (stroke: 1.2pt + rgb("#333333"))
 
-  rect((-6, 1), (-3.2, 0.2), ..box, name: "gpio")
-  content("gpio", align(center)[#text(8pt)[*ESP32 GPIO*]])
+  // GPIO connection terminal pin
+  circle((-5.5, 0.6), radius: 0.1, fill: rgb("#333333"), stroke: none)
+  content((-5.5, 0.9), [#text(8pt, weight: "bold")[ESP32 GPIO]])
 
-  rect((-2.8, 1), (-0.5, 0.2), ..pass, name: "r1")
-  content("r1", align(center)[#text(8pt)[220 Ω]])
+  // Resistor R1
+  rect((-3.0, 0.8), (-1.8, 0.4), ..s-comp, name: "r1")
+  content("r1", [#text(8pt)[220 Ω]])
+  
+  // PPTC Fuse
+  rect((-0.5, 0.8), (0.7, 0.4), ..s-comp, name: "pptc")
+  content("pptc", [#text(7pt)[PPTC]])
+  content((0.1, 1.0), [#text(7pt)[< 100 mA]])
 
-  rect((0, 1), (2.3, 0.2), ..pass, name: "pptc")
-  content("pptc", align(center)[#text(8pt)[PPTC < 100 mA]])
+  // Output terminal pin
+  circle((2.0, 0.6), radius: 0.1, fill: rgb("#333333"), stroke: none)
+  content((2.0, 0.9), [#text(8pt, weight: "bold")[To Device]])
 
-  rect((2.8, 1), (5.5, 0.2), ..box, name: "out")
-  content("out", align(center)[#text(8pt)[*To Device*]])
+  // Zener Diode Symbol
+  // Cathode bar
+  line((-4.55, 0.0), (-3.95, 0.0), ..s-comp)
+  // Zener bends
+  line((-4.55, 0.0), (-4.55, -0.1), ..s-comp)
+  line((-3.95, 0.0), (-3.95, 0.1), ..s-comp)
+  // Triangle pointing down
+  line((-4.55, 0.0), (-4.25, -0.4), ..s-comp)
+  line((-3.95, 0.0), (-4.25, -0.4), ..s-comp)
+  content((-3.0, -0.2), [#text(8pt)[3.3V Zener]])
 
-  rect((-4.1, -0.3), (-1.9, -1.1), ..zener, name: "zen")
-  content("zen", align(center)[#text(8pt)[3.3V Zener]])
+  // GND Symbol
+  line((-4.65, -0.9), (-3.85, -0.9), ..s-comp)
+  line((-4.5, -1.05), (-4.0, -1.05), ..s-comp)
+  line((-4.35, -1.2), (-4.15, -1.2), ..s-comp)
+  content((-4.25, -1.5), [#text(7pt)[GND]])
 
-  rect((-4.0, -1.5), (-2.0, -2.3), ..gnd, name: "gnd1")
-  content("gnd1", align(center)[#text(8pt)[GND]])
+  // Wires (connecting components)
+  line((-5.4, 0.6), (-3.0, 0.6), ..s-wire) // GPIO to R1
+  line((-1.8, 0.6), (-0.5, 0.6), ..s-wire) // R1 to PPTC
+  line((0.7, 0.6), (1.9, 0.6), ..s-wire)  // PPTC to Out
+  
+  // Fuse line through rectangle
+  line((-0.5, 0.6), (0.7, 0.6), ..s-wire)
 
-  line((-3.2, 0.6), (-2.8, 0.6), mark: (end: "stealth"))
-  line((-0.5, 0.6), (0, 0.6), mark: (end: "stealth"))
-  line((2.3, 0.6), (2.8, 0.6), mark: (end: "stealth"))
-  line((-3.0, 0.6), (-3.0, -0.3), mark: (end: "stealth"))
-  line((-3.0, -1.1), (-3.0, -1.5), mark: (end: "stealth"))
+  // Zener tap and GND connections
+  line((-4.25, 0.6), (-4.25, 0.0), ..s-wire)
+  line((-4.25, -0.4), (-4.25, -0.9), ..s-wire)
 })
 ]
 #v(0.8em)
@@ -56,39 +77,62 @@ When using a 5V buffer IC (e.g., 74HCT245), use a 5.1V Zener diode on the buffer
 #canvas(length: 1cm, {
   import draw: *
 
-  let box = (fill: rgb("#e1f5fe"), stroke: 1pt + rgb("#0288d1"))
-  let zener = (fill: rgb("#fff9c4"), stroke: 1pt + rgb("#fbc02d"))
-  let pass = (fill: rgb("#e8f5e9"), stroke: 1pt + rgb("#388e3c"))
-  let gnd = (fill: rgb("#ffebee"), stroke: 1pt + rgb("#d32f2f"))
-  let buf = (fill: rgb("#f3e5f5"), stroke: 1pt + rgb("#7b1fa2"))
+  let wire-color = rgb("#1a5fb4")
+  let s-wire = (stroke: 1.2pt + wire-color)
+  let s-comp = (stroke: 1.2pt + rgb("#333333"))
 
-  rect((-7, 1.5), (-4.2, 0.5), ..box, name: "gpio2")
-  content("gpio2", align(center)[#text(8pt)[*ESP32 GPIO*]])
+  // GPIO connection terminal pin
+  circle((-6.5, 0.6), radius: 0.1, fill: rgb("#333333"), stroke: none)
+  content((-6.5, 0.9), [#text(8pt, weight: "bold")[ESP32 GPIO]])
 
-  rect((-3.5, 1.5), (-0.5, 0.5), ..buf, name: "buf")
-  content("buf", align(center)[#text(8pt)[5V Buffer \ 74HCT245]])
+  // Buffer Gate Symbol (Triangle pointing right)
+  line((-5.0, 1.1), (-5.0, 0.1), ..s-comp)
+  line((-5.0, 1.1), (-3.8, 0.6), ..s-comp)
+  line((-5.0, 0.1), (-3.8, 0.6), ..s-comp)
+  content((-4.4, -0.2), [#text(7pt)[74HCT245]])
 
-  rect((0, 1.5), (2.3, 0.5), ..pass, name: "r2")
-  content("r2", align(center)[#text(8pt)[220 Ω]])
+  // Zener Diode Symbol (5.1V)
+  // Cathode bar
+  line((-2.8, 0.0), (-2.2, 0.0), ..s-comp)
+  // Zener bends
+  line((-2.8, 0.0), (-2.8, -0.1), ..s-comp)
+  line((-2.2, 0.0), (-2.2, 0.1), ..s-comp)
+  // Triangle pointing down
+  line((-2.8, 0.0), (-2.5, -0.4), ..s-comp)
+  line((-2.2, 0.0), (-2.5, -0.4), ..s-comp)
+  content((-1.2, -0.2), [#text(8pt)[5.1V Zener]])
 
-  rect((2.8, 1.5), (5.1, 0.5), ..pass, name: "pptc2")
-  content("pptc2", align(center)[#text(8pt)[PPTC < 100 mA]])
+  // GND Symbol
+  line((-2.9, -0.9), (-2.1, -0.9), ..s-comp)
+  line((-2.75, -1.05), (-2.25, -1.05), ..s-comp)
+  line((-2.6, -1.2), (-2.4, -1.2), ..s-comp)
+  content((-2.5, -1.5), [#text(7pt)[GND]])
 
-  rect((5.6, 1.5), (8.3, 0.5), ..box, name: "out2")
-  content("out2", align(center)[#text(8pt)[*To Device*]])
+  // Resistor R2
+  rect((-1.2, 0.8), (0.0, 0.4), ..s-comp, name: "r2")
+  content("r2", [#text(8pt)[220 Ω]])
 
-  rect((-1.35, -0.3), (0.85, -1.1), ..zener, name: "zen2")
-  content("zen2", align(center)[#text(8pt)[5.1V Zener]])
+  // PPTC Fuse 2
+  rect((1.3, 0.8), (2.5, 0.4), ..s-comp, name: "pptc2")
+  content("pptc2", [#text(7pt)[PPTC]])
+  content((1.9, 1.0), [#text(7pt)[< 100 mA]])
 
-  rect((-1.25, -1.5), (0.75, -2.3), ..gnd, name: "gnd2")
-  content("gnd2", align(center)[#text(8pt)[GND]])
+  // Output terminal pin
+  circle((3.8, 0.6), radius: 0.1, fill: rgb("#333333"), stroke: none)
+  content((3.8, 0.9), [#text(8pt, weight: "bold")[To Device]])
 
-  line((-4.2, 1), (-3.5, 1), mark: (end: "stealth"))
-  line((-0.5, 1), (0, 1), mark: (end: "stealth"))
-  line((2.3, 1), (2.8, 1), mark: (end: "stealth"))
-  line((5.1, 1), (5.6, 1), mark: (end: "stealth"))
-  line((-0.25, 1.0), (-0.25, -0.3), mark: (end: "stealth"))
-  line((-0.25, -1.1), (-0.25, -1.5), mark: (end: "stealth"))
+  // Wires (connecting components)
+  line((-6.4, 0.6), (-5.0, 0.6), ..s-wire) // GPIO to Buffer in
+  line((-3.8, 0.6), (-1.2, 0.6), ..s-wire) // Buffer out to R2
+  line((0.0, 0.6), (1.3, 0.6), ..s-wire)  // R2 to PPTC2
+  line((2.5, 0.6), (3.7, 0.6), ..s-wire)  // PPTC2 to Out
+
+  // Fuse line through rectangle
+  line((1.3, 0.6), (2.5, 0.6), ..s-wire)
+
+  // Zener tap and GND connections
+  line((-2.5, 0.6), (-2.5, 0.0), ..s-wire)
+  line((-2.5, -0.4), (-2.5, -0.9), ..s-wire)
 })
 ]
 #v(0.8em)
@@ -119,38 +163,62 @@ Inductive loads (solenoid valves, relay coils, DC motors) generate a high revers
 #canvas(length: 1cm, {
   import draw: *
 
-  let diode = (fill: rgb("#fff9c4"), stroke: 1pt + rgb("#fbc02d"))
-  let load = (fill: rgb("#e1f5fe"), stroke: 1pt + rgb("#0288d1"))
-  let driver = (fill: rgb("#e8f5e9"), stroke: 1pt + rgb("#388e3c"))
-  let gnd = (fill: rgb("#ffebee"), stroke: 1pt + rgb("#d32f2f"))
+  let wire-color = rgb("#1a5fb4")
+  let s-wire = (stroke: 1.2pt + wire-color)
+  let s-comp = (stroke: 1.2pt + rgb("#333333"))
 
-  rect((-1.5, 1.5), (0.5, 0.3), ..diode, name: "fd")
-  content("fd", align(center)[#text(7pt)[1N4007]])
+  // Inductive Load (Represented as a solenoid/relay coil box)
+  rect((1.0, 1.5), (2.5, 0.5), ..s-comp, name: "load")
+  content("load", align(center)[#text(8pt)[*Inductive Load* \ Solenoid/Motor]])
 
-  rect((1, 2), (4.5, 1), ..load, name: "load")
-  content("load", align(center)[#text(8pt)[*Inductive Load* \ Solenoid / Relay / Motor]])
+  // Transistor NPN Symbol
+  // Base lead
+  line((0.8, -0.5), (1.3, -0.5), ..s-wire)
+  // Base bar
+  line((1.3, -0.1), (1.3, -0.9), ..(stroke: 1.8pt + rgb("#333333")))
+  // Collector
+  line((1.3, -0.3), (1.75, 0.0), ..s-comp)
+  line((1.75, 0.0), (1.75, 0.5), ..s-wire)
+  // Emitter
+  line((1.3, -0.7), (1.75, -1.0), ..s-comp)
+  line((1.75, -1.0), (1.75, -1.5), ..s-wire)
+  // Emitter arrow pointing out
+  line((1.5, -0.85), (1.7, -0.95), ..s-comp)
+  line((1.65, -0.8), (1.7, -0.95), ..s-comp)
+  
+  content((0.3, -0.2), [#text(7pt)[Control Input]])
 
-  rect((1, 0), (4.5, -0.8), ..driver, name: "drv")
-  content("drv", align(center)[#text(8pt)[Switching Transistor]])
+  // GND Symbol
+  line((1.35, -1.8), (2.15, -1.8), ..s-comp)
+  line((1.5, -1.95), (2.0, -1.95), ..s-comp)
+  line((1.65, -2.1), (1.85, -2.1), ..s-comp)
+  content((1.75, -2.4), [#text(7pt)[GND]])
 
-  rect((1.5, -1.2), (4, -2), ..gnd, name: "gnd3")
-  content("gnd3", align(center)[#text(8pt)[GND]])
+  // Diode 1N4007 (pointing UP - reverse biased)
+  // Cathode bar
+  line((-0.8, 1.2), (-0.2, 1.2), ..s-comp)
+  // Triangle pointing UP
+  line((-0.8, 0.8), (-0.2, 0.8), ..s-comp)
+  line((-0.8, 0.8), (-0.5, 1.2), ..s-comp)
+  line((-0.2, 0.8), (-0.5, 1.2), ..s-comp)
+  content((-0.5, 0.4), [#text(8pt)[1N4007]])
+  content((-1.4, 1.0), [#text(7pt, fill: gray)[reverse \ biased]])
 
   // Positive Supply Rail (Node A)
-  line((-0.5, 2.5), (2.75, 2.5))
-  line((2.75, 2.5), (2.75, 2.0), mark: (end: "stealth"))
-  line((-0.5, 2.5), (-0.5, 1.5), mark: (end: "stealth"))
-  content((2.75, 2.7), [#text(8pt)[+VCC]])
+  line((-0.5, 2.0), (1.75, 2.0), ..s-wire)
+  line((1.75, 2.0), (1.75, 1.5), ..s-wire) // VCC to Load
+  line((-0.5, 2.0), (-0.5, 1.2), ..s-wire) // VCC to Cathode
+  content((1.75, 2.3), [#text(8pt)[+VCC]])
 
   // Switching Node (Node B)
-  line((2.75, 1.0), (2.75, 0.0), mark: (end: "stealth"))
-  line((-0.5, 0.3), (-0.5, 0.15))
-  line((-0.5, 0.15), (2.75, 0.15), mark: (end: "stealth"))
-
-  // Ground Node
-  line((2.75, -0.8), (2.75, -1.2), mark: (end: "stealth"))
-
-  content((-2.3, 0.9), text(7pt, fill: gray)[reverse biased])
+  // Diode anode to Collector node
+  line((-0.5, 0.8), (-0.5, 0.25), ..s-wire)
+  line((-0.5, 0.25), (1.75, 0.25), ..s-wire)
+  // Load bottom to Collector node
+  line((1.75, 0.5), (1.75, 0.0), ..s-wire)
+  
+  // Ground Node connection
+  line((1.75, -1.5), (1.75, -1.8), ..s-wire)
 })
 ]
 #v(0.8em)
