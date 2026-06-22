@@ -219,36 +219,22 @@ function renderPinRows(){
   for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_addr_'+s);if(el)saved['no_seg_addr_'+s]=el.value;}
   for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_channel_'+s);if(el)saved['no_seg_channel_'+s]=el.value;}
   for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_pin_invert_'+s);if(el)saved['no_seg_pin_invert_'+s]=el.checked;}
+
   const t=parseInt(document.getElementById('no_type').value);
-  const src=parseInt(saved.no_source||0);
   const mcMode=parseInt(document.getElementById('mc_mode')?.value||0);
   const hMode=parseInt(document.getElementById('mc_homing_mode')?.value||0);
-  const pin2Src=parseInt(saved.no_pin2_source||0);
-  const pin3Src=parseInt(saved.no_pin3_source||0);
-  const pin4Src=parseInt(saved.no_pin4_source||0);
   const colorOrder=parseInt(document.getElementById('no_ord')?.value||0);
-  const isStepper=t===7, isMotor=t===6, is7Seg=t>=11&&t<=13, isAnalog=t===5, isSmoke=t===18, isDfPlayer=t===10, isDac=t===14, isFuncGen=t===16;
-  const isCommonDim=is7Seg&&(mcMode>=6&&mcMode<=9);
-  const is7SegDD=is7Seg&&(mcMode>=2&&mcMode<=9);
-  const is7SegDirectDim=is7Seg&&(mcMode===4||mcMode===5);
-  const pin1Rule=outputPinRule(t,mcMode,'pin1');
-  const pin2Rule=outputPinRule(t,mcMode,'pin2');
-  const pin3Rule=outputPinRule(t,mcMode,'pin3');
-  const pin4Rule=outputPinRule(t,mcMode,'pin4');
-  const canUsePca=ruleAllows(pin1Rule,SRC_PCA,(t===2||t===4||t===6||t===8||t===5||t===15||t===17||t===18||is7SegDD));
-  const canUseDig=ruleAllows(pin1Rule,SRC_DIG,(t===2||t===17||t===18||(is7SegDD&&!isCommonDim&&!is7SegDirectDim)));
-  const mainExpander=src!==0;
-  const usePin2=isMotor||isAnalog||t===18||is7Seg||isDfPlayer||(isStepper&&(pin2Src===0||pin2Src!==0));
-  const usePin3=isAnalog||(isMotor&&mcMode===2)||isStepper||(is7Seg&&mcMode===1);
-  const showPin4=(isStepper&&hMode===0)||(isAnalog&&colorOrder>=4);
-  const pinDefs=[];
-const srcOpts=(allowPca,allowDig,allowDac=false,allowGpio=true)=>{
-    let h=allowGpio?`<option value="0">ESP32 GPIO</option>`:'';
-    if(allowPca) h+=`<option value="1">PCA9685</option>`;
-    if(allowDig) h+=`<option value="2">MCP23017</option><option value="3">TCA9555</option><option value="4">PCF857x</option>`;
-    if(allowDac) h+=`<option value="5">MCP4725</option><option value="6">DAC7571</option><option value="7">DAC7573</option>`;
+  const mode=outputModeDef(t,mcMode);
+  if(!mode){ container.innerHTML=''; return; }
+
+  const srcOpts=(mask)=>{
+    let h='';
+    if(mask&SRC_GPIO) h+=`<option value="0">ESP32 GPIO</option>`;
+    if(mask&SRC_PCA) h+=`<option value="1">PCA9685</option>`;
+    if(mask&SRC_DIG) h+=`<option value="2">MCP23017</option><option value="3">TCA9555</option><option value="4">PCF857x</option>`;
+    if(mask&SRC_DAC) h+=`<option value="5">MCP4725</option><option value="6">DAC7571</option><option value="7">DAC7573</option>`;
     return h;
-};
+  };
   const mkSel=(id,opts)=>`<select id="${id}" onchange="toggleOutFields()" style="width:100%">${opts}</select>`;
   const addrOpts=(f)=>{
     const gs=[
@@ -262,106 +248,55 @@ const srcOpts=(allowPca,allowDig,allowDac=false,allowGpio=true)=>{
     ];
     return gs.filter(g=>f===undefined||g.s.includes(f)).map(g=>`<optgroup label="${g.l}">${Array.from({length:g.r[1]-g.r[0]+1},(_,i)=>`<option value="${g.r[0]+i}">0x${(g.r[0]+i).toString(16).toUpperCase()}</option>`).join('')}</optgroup>`).join('');
   };
-  const chOpts=PIN_CHANS.map(v=>`<option value="${v}">CH ${v}</option>`).join('');
-
-  const p1Desc = isDac ? 'DAC Output' : isFuncGen ? 'Wave Out' : isAnalog ? 'Red Channel' : isSmoke ? 'Smoke Valve' : is7Seg ? 'CLK / Segment' : isStepper ? 'Step' : isMotor ? (mcMode===2?'IN1':'PWM') : isDfPlayer ? 'TX' : 'Main';
-  const p2Desc = isAnalog ? 'Green Channel' : isSmoke ? 'Shoot Valve' : is7SegDD ? 'Seg Base Ch' : is7Seg ? 'DIO' : isStepper ? (pin2Src===0?'DIR Pin':'DIR Ch') : isMotor ? (mcMode===1?'DIR':'IN2') : t===18?'Shoot Val':isDfPlayer?'RX':'Pin 2';
-  const p3Desc = isAnalog ? 'Blue Channel' : isStepper ? (pin3Src===0?'EN Pin':'EN Ch') : isMotor && mcMode===2?'EN PWM':'Pin 3';
-  const p4Desc = isAnalog ? 'White Channel' : isStepper ? 'Homing' : 'Pin 4';
-
-  const localBadge = (label) => `<span style="display:inline-block;width:100%;background:#f1f5f9;color:#64748b;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #e2e8f0">${label}</span>`;
-
-  // Pin 1 (Main)
-  const p1Src=src;
-  const isSegADirect = is7SegDD && pin2Src === 0;
-  const p1Label = isCommonDim ? 'COM Pin' : isSegADirect ? 'Seg A' : 'Pin 1';
-  const p1DescText = isCommonDim ? 'Common Anode/Cathode PWM Pin' : isSegADirect ? 'Segment A' : p1Desc;
-  if (isDac) {
-    const chOptsDac=[['0','A'],['1','B'],['2','C'],['3','D']].map(([v,l])=>`<option value="${v}">CH ${l}</option>`).join('');
-    const pinHtml = p1Src===0 ? localBadge('Select DAC IC') : (p1Src===7 ? mkSel('no_pca_channel', chOptsDac) : localBadge('CH A'));
-    pinDefs.push({
-      label:'DAC',
-      desc:'I2C Analog Out',
-      srcHtml: mkSel('no_source', srcOpts(false,false,true,false)),
-      addrHtml: p1Src===0 ? localBadge('Select DAC IC') : mkSel('no_pca_addr', addrOpts(p1Src)),
-      pinHtml: pinHtml,
-      invId:''
-    });
-  } else if (t===15) { // PWM DAC
-    pinDefs.push({label:'Pin 1',desc:'PWM Out',srcHtml:mkSel('no_source',srcOpts(true,false)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
-  } else if (isFuncGen) {
-    pinDefs.push({label:'Pin 1',desc:p1Desc,srcHtml:mkSel('no_source',srcOpts(false,false)),addrHtml:localBadge('GPIO only'),pinHtml:mkSel('no_pin',PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')),invId:'no_pin_invert'});
-  } else {
-    pinDefs.push({label:p1Label,desc:p1DescText,srcHtml:mkSel('no_source',srcOpts(canUsePca,canUseDig)),addrHtml:p1Src===0?localBadge('ESP32 GPIO'):mkSel('no_pca_addr',addrOpts(p1Src)),pinHtml:p1Src===0?mkSel('no_pin',PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')):mkSel('no_pca_channel',chOpts),invId:'no_pin_invert'});
-  }
-
-  // Pin 2
-  if(usePin2){
-    let p2Src=pin2Src;
-    let showAddr=p2Src!==0;
-    if(is7Seg&&!is7SegDD) p2Src=0;
-    if(isSegADirect){
-      const numSeg = (t === 13) ? 8 : 7;
-      const segLabels = ['Seg A', 'Seg B', 'Seg C', 'Seg D', 'Seg E', 'Seg F', 'Seg G', 'Seg DP'];
-      const startSeg = isCommonDim ? 0 : 1;
-      for (let s = startSeg; s < numSeg; s++) {
-        const segSrc = parseInt(saved['no_seg_source_'+s]||0);
-        const segRule = outputSegmentPinRule(t,mcMode,s);
-        pinDefs.push({
-          label: segLabels[s],
-          desc: 'Segment ' + segLabels[s].split(' ')[1],
-          srcHtml: (s === startSeg ? '<input type="hidden" id="no_pin2_source" value="0">' : '') + mkSel('no_seg_source_' + s, srcOpts(ruleAllows(segRule,SRC_PCA,true),ruleAllows(segRule,SRC_DIG,!is7SegDirectDim))),
-          addrHtml: segSrc===0 ? localBadge('GPIO Only') : mkSel('no_seg_addr_' + s, addrOpts(segSrc)),
-          pinHtml: segSrc===0 ? mkSel('no_seg_pin_' + s, `<option value="255">None</option>` + PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')) : mkSel('no_seg_channel_' + s, `<option value="255">None</option>${chOpts}`),
-          invId: 'no_seg_pin_invert_' + s
-        });
-      }
-    } else {
-      const srcSel=mkSel('no_pin2_source',srcOpts(ruleAllows(pin2Rule,SRC_PCA,isStepper||isMotor||isAnalog||t===18||is7SegDD),ruleAllows(pin2Rule,SRC_DIG,isStepper||isMotor||(is7SegDD&&!is7SegDirectDim)||t===18)));
-      const addrEl=showAddr?mkSel('no_pin2_addr',addrOpts(p2Src)):localBadge('ESP32 GPIO');
-      let pinOpts;
-      if(showAddr){
-        pinOpts=mkSel('no_pin2_channel',`<option value="255">None</option>${chOpts}`);
-      } else if(is7SegDD){
-        const pinCount = (mcMode===3||mcMode===5||mcMode===8||mcMode===9) ? 7 : 6;
-        pinOpts=`<span style="display:inline-block;width:100%;background:#fef9c3;color:#854d0e;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #fef08a">base+0..${pinCount}</span>`;
-      } else {
-        pinOpts=mkSel('no_pin2',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`);
-      }
-      pinDefs.push({label:'Pin 2',desc:p2Desc,srcHtml:srcSel,addrHtml:addrEl,pinHtml:pinOpts,invId:'no_pin2_invert'});
+  const localBadge=(label)=>`<span style="display:inline-block;width:100%;background:#f1f5f9;color:#64748b;font-size:0.72rem;padding:5px 8px;border-radius:4px;text-align:center;border:1px solid #e2e8f0">${label}</span>`;
+  const gpioOpts=(allowNone,dir)=>`${allowNone?'<option value="255">None</option>':''}${(dir==='in'?INPUT_GPIOS:PIN_GPIOS).map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`;
+  const chOpts=(allowNone)=>`${allowNone?'<option value="255">None</option>':''}${PIN_CHANS.map(v=>`<option value="${v}">CH ${v}</option>`).join('')}`;
+  const dacChOpts=[['0','A'],['1','B'],['2','C'],['3','D']].map(([v,l])=>`<option value="${v}">CH ${l}</option>`).join('');
+  const slotNumber=(slot)=>parseInt(slot.replace('pin',''));
+  const isSevenSegDD=(t===12||t===13)&&(mcMode>=2&&mcMode<=9);
+  const isCommonDim=(t===12||t===13)&&(mcMode>=6&&mcMode<=9);
+  const fieldFor=(slot)=>{
+    const n=slotNumber(slot);
+    if(isSevenSegDD&&n>1){
+      const seg=isCommonDim?n-2:n-1;
+      return {source:`no_seg_source_${seg}`,pin:`no_seg_pin_${seg}`,addr:`no_seg_addr_${seg}`,channel:`no_seg_channel_${seg}`,invert:`no_seg_pin_invert_${seg}`,seg};
     }
-  }
-
-  // Pin 3
-  if(usePin3){
-    let p3Src=pin3Src;
-    const srcSel=mkSel('no_pin3_source',srcOpts(ruleAllows(pin3Rule,SRC_PCA,(isMotor&&mcMode===2)||isAnalog),ruleAllows(pin3Rule,SRC_DIG,isStepper)));
-    const addrEl=p3Src!==0?mkSel('no_pin3_addr',addrOpts(p3Src)):localBadge('ESP32 GPIO');
-    let pinOpts;
-    if(p3Src!==0){
-      pinOpts=mkSel('no_pin3_channel',`<option value="255">None</option>${chOpts}`);
+    if(n===1) return {source:'no_source',pin:'no_pin',addr:'no_pca_addr',channel:'no_pca_channel',invert:'no_pin_invert'};
+    return {source:`no_pin${n}_source`,pin:`no_pin${n}`,addr:`no_pin${n}_addr`,channel:`no_pin${n}_channel`,invert:`no_pin${n}_invert`};
+  };
+  const slotActive=(slot)=>{
+    if(t===5&&slot==='pin4'&&colorOrder<4) return false;
+    if(t===7&&slot==='pin4'&&hMode!==0) return false;
+    return true;
+  };
+  const sourceFor=(field,rule)=>{
+    const current=parseInt(saved[field.source]??0);
+    if(rule.sources&SRC_DAC) return (current>=5&&current<=7)?current:5;
+    if(rule.sources&SRC_GPIO) return current;
+    if(rule.sources&SRC_PCA) return current===1?current:1;
+    if(rule.sources&SRC_DIG) return (current>=2&&current<=4)?current:2;
+    return current;
+  };
+  const pinDefs=Object.keys(mode.pins).sort((a,b)=>slotNumber(a)-slotNumber(b)).filter(slotActive).map((slot)=>{
+    const rule=mode.pins[slot];
+    const field=fieldFor(slot);
+    const src=sourceFor(field,rule);
+    const allowNone=slot!=='pin1'||field.seg!==undefined;
+    let addrHtml=localBadge(src===0?'ESP32 GPIO':'Select Source');
+    let pinHtml='';
+    if(rule.sources&SRC_DAC){
+      addrHtml=mkSel(field.addr,addrOpts(src));
+      pinHtml=src===7?mkSel(field.channel,dacChOpts):localBadge('CH A');
+    } else if(src===0){
+      pinHtml=mkSel(field.pin,gpioOpts(allowNone,rule.dir));
     } else {
-      pinOpts=mkSel('no_pin3',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`);
+      addrHtml=mkSel(field.addr,addrOpts(src));
+      pinHtml=mkSel(field.channel,chOpts(allowNone));
     }
-    pinDefs.push({label:'Pin 3',desc:p3Desc,srcHtml:srcSel,addrHtml:addrEl,pinHtml:pinOpts,invId:'no_pin3_invert'});
-  }
+    return {label:rule.label||slot,desc:rule.dir==='in'?'Input':'Output',srcHtml:mkSel(field.source,srcOpts(rule.sources)),addrHtml,pinHtml,invId:rule.invert?field.invert:''};
+  });
 
-  // Pin 4
-  if(showPin4){
-    let p4Src=pin4Src;
-    const srcSel=mkSel('no_pin4_source',srcOpts(ruleAllows(pin4Rule,SRC_PCA,isAnalog),ruleAllows(pin4Rule,SRC_DIG,isStepper)));
-    const addrEl=p4Src!==0?mkSel('no_pin4_addr',addrOpts(p4Src)):localBadge('ESP32 GPIO');
-    let pinOpts;
-    if(p4Src!==0){
-      pinOpts=mkSel('no_pin4_channel',`<option value="255">None</option>${chOpts}`);
-    } else {
-      pinOpts=mkSel('no_pin4',`<option value="255">None</option>${PIN_GPIOS.map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}<option value="36">GPIO 36</option><option value="39">GPIO 39</option><option value="34">GPIO 34</option><option value="35">GPIO 35</option>`);
-    }
-    pinDefs.push({label:'Pin 4',desc:p4Desc,srcHtml:srcSel,addrHtml:addrEl,pinHtml:pinOpts,invId:'no_pin4_invert'});
-  }
-
-  // Render
-  container.innerHTML=pinDefs.map((p,i)=>`
+  container.innerHTML=pinDefs.map((p)=>`
     <div class="pin-row" style="display:flex;gap:6px;align-items:end;margin-bottom:6px;flex-wrap:wrap">
       <div style="min-width:44px;padding-bottom:4px"><div style="font-weight:600;font-size:0.82rem;color:#475569">${p.label}</div><div style="font-size:0.62rem;color:#94a3b8">${p.desc}</div></div>
       <div class="f" style="flex:1;min-width:120px;margin:0">${p.srcHtml}</div>
@@ -379,9 +314,7 @@ const srcOpts=(allowPca,allowDig,allowDac=false,allowGpio=true)=>{
       el.checked=!!saved[id];
     } else if(el.tagName==='SELECT'){
       el.value=saved[id];
-      if(el.value!==saved[id]){
-        if(el.options.length) el.value=el.options[0].value;
-      }
+      if(el.value!==saved[id]&&el.options.length) el.value=el.options[0].value;
     }
   });
 }
