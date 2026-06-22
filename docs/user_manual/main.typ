@@ -59,7 +59,7 @@
             box(
               width: m.width,
               height: m.height,
-              fill: white.transparentize(85%)
+              fill: white.transparentize(4%)
             )
           )
         )
