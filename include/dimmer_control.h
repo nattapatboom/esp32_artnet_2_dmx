@@ -7,6 +7,7 @@
 
 #define ZC_PULSE_WIDTH_US 20
 #define DIMMER_TICK_US 39 // 10000us / 255 steps = 39.2us for 50Hz
+#define DIMMER_TICK_MAX 512 // safety limit: ~20ms @39µs (covers 50/60Hz half-cycles)
 
 #include <driver/gpio.h>
 
@@ -29,11 +30,19 @@ void IRAM_ATTR onDimmerTimer() {
     if (!dimmerEnabled) return;
     dimmer_tick++;
     
+    // Safety wrap: if ZC signal was lost and tick exceeds half-cycle,
+    // stop checking (wait for next ZC to reset)
+    if (dimmer_tick >= DIMMER_TICK_MAX) {
+        dimmer_tick = DIMMER_TICK_MAX;
+        return;
+    }
+    
     // Check all registered dimmer channels
     for (uint8_t i = 0; i < numDimmerChannels; i++) {
         uint8_t val = *(*(dimmerChannels[i].dmxVal));
         if (val > 0) {
             uint32_t targetTick = 255 - val;
+            // Monotonic tick: each value visited exactly once at 39µs interval
             if (dimmer_tick == targetTick) {
                 gpio_set_level((gpio_num_t)dimmerChannels[i].pin, HIGH);
             }
@@ -96,6 +105,12 @@ public:
 
         if (numDimmerChannels > 0) {
             pinMode(sysCfg.zc_pin, INPUT_PULLUP);
+            
+            // Free previous timer if re-initializing (e.g. after hot-reload)
+            if (dimmerTimer) {
+                timerEnd(dimmerTimer);
+                dimmerTimer = nullptr;
+            }
             
             // Setup Timer 0, divider 80 = 1MHz = 1 tick per us
             dimmerTimer = timerBegin(0, 80, true);
