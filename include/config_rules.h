@@ -7,21 +7,6 @@
 #include "source_rules.h"
 #include "display_protocol.h"
 
-// ── Backward-compat wrappers (delegate to new single-source-of-truth) ──
-
-inline bool sourceAddressValid(uint8_t source, uint8_t address) {
-    return SourceRules::addressValid(source, address);
-}
-inline const char* sourceAddressRangeLabel(uint8_t source) {
-    return SourceRules::addressRangeLabel(source);
-}
-inline bool validateSourceAddress(uint8_t source, uint8_t address, const String& label, String& message) {
-    return SourceRules::validateAddress(source, address, label, message);
-}
-inline bool displayAddressValid(uint8_t displayType, uint8_t address) {
-    return DisplayProtocol::addressValid(displayType, address);
-}
-
 // ── IP validation (general-purpose, not duplicated in JS) ──
 
 inline bool validateIp4(const char* s) {

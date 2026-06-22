@@ -5,25 +5,25 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 ## P0 / P1 Fix First
 
 1. **PCA9685 register writes may be broken**
-   - Files: `include/pca9685_control.h`
+   - Files: `include/i2c_devices/pca9685.h`
    - Status: ✅ Completed (`fix(pca9685): enable AI + safe _lastDuty update`)
    - Issue: `writeChannel()` writes four LEDn registers in one I2C transaction, but MODE1 Auto-Increment (`0x20`) is not enabled. `_lastDuty[channel]` is also updated before mutex/I2C success, suppressing retries after NACK or mutex timeout.
    - Fix direction: enable Auto-Increment in `begin()`/`setFrequency()`, and only update `_lastDuty` after successful `Wire.endTransmission() == 0`.
 
 2. **7-segment direct PWM LEDC allocation overlaps later outputs**
-   - Files: `include/motion_control.h`, `include/scoring.h`, `web/index.html`
+   - Files: `include/output_devices/seven_seg.h`, `include/scoring.h`, `web/index.html`
    - Status: ✅ Completed (`fix: reserve full LEDC block for 7-seg DD PWM segments`)
    - Issue: direct-drive 7-seg modes use `baseChan + s` for 7/8 segments but call `allocateLedc()` only once. Later outputs can reuse those LEDC channels.
    - Fix direction: reserve a contiguous LEDC block or allocate per segment; sync scoring and Web UI LEDC counts.
 
 3. **7-segment PCA/expander routed outputs can pass config but not update**
-   - Files: `include/motion_control.h`, `src/main.cpp`, `web/index.html`
+   - Files: `include/output_devices/seven_seg.h`, `src/main.cpp`, `web/index.html`
    - Status: ✅ Completed (`fix: let 7-segment DD bypass source==1 / !=0 gates in begin() and update()`)
    - Issue: `MotionControl::begin()` skips most `source != 0` channels, and `update()` handles `ch.source == 1` before 7-seg logic then `continue`s.
    - Fix direction: route type 12/13 through the dedicated 7-seg update path before generic PCA branches, and ensure setup runs for PCA/expander/common-dim modes.
 
 4. **DC Motor hybrid routing ignored when primary source is PCA9685**
-   - Files: `include/motion_control.h`
+   - Files: `include/output_devices/motor.h`
    - Status: ✅ Completed (`fix: route-aware motor pin write in PCA update() + begin()`)
    - Issue: `ch.source == 1` motor update uses only `pca_channel2/3`, ignoring `pin2_source`, `pin3_source`, `pin2_addr`, `pin3_addr`, and `pinN_channel`.
    - Fix direction: use `writeOutputPin(ch, n, state/duty)` helpers or route-aware helper functions for DIR/IN2/EN; preserve PWM semantics for EN.
@@ -35,7 +35,7 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
    - Fix direction: persist hybrid source/address/channel fields for types 5, 6, 7, 18 and any other type using those fields.
 
 6. **Core 0/Core 1 DMX buffer race**
-   - Files: `include/artnet_control.h`, `include/sacn_control.h`, `include/output_control.h`, `include/dimmer_control.h`, `src/main.cpp`
+   - Files: `include/artnet_control.h`, `include/sacn_control.h`, `include/output_control.h`, `include/output_devices/dimmer.h`, `src/main.cpp`
    - Status: ✅ Completed (`fix: shadow buffer + atomic swap + dimmer indirection`)
    - Issue: Art-Net/sACN map directly into `OutputChannel::dmxBuffer` on Core 0 while Core 1 reads the same buffers for LEDs, DMX output, relays, motion, solenoids, and smoke.
    - Fix direction: shadow buffer — Core 0 writes to `shadowBuffer`, then `swapBuffers()` atomically swaps pointers for all channels. Dimmer ISR uses `uint8_t**` indirection to re-read current `dmxBuffer` pointer after swap.
@@ -98,7 +98,7 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 ## P2 / Follow-Up
 
 16. **PCF857x 8-bit vs 16-bit handling**
-   - Files: `include/i2c_gpio_expander.h`, validation in `src/main.cpp`/`web/index.html`
+   - Files: `include/i2c_devices/i2c_gpio_expander.h`, validation in `src/main.cpp`/`web/index.html`
    - Status: ✅ Completed (`fix: writePcf sends 1 byte when value ≤ 0xFF`)
    - Issue: PCF857x write path sends two bytes, but PCF8574/PCF8574A are 8-bit devices. Channel 8-15 can be accepted for 8-bit addresses.
    - Fix direction: distinguish PCF8574/PCF8574A (8-bit) from PCF8575 (16-bit) or restrict channels by model/address contract.

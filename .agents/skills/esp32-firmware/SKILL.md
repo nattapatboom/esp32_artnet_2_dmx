@@ -92,11 +92,11 @@ Receives Art-Net via Ethernet (LAN) → controls multiple output types via GPIO,
 
 ### Key Files
 - `include/output_control.h` — Core: `OutputChannel` struct, `setupChannels()`, `loadChannels()`, `saveChannels()`, DMX processing
-- `include/motion_control.h` — `update()` loop for all motion/PWM/DFPlayer types
+- `include/motion_control.h` — thin coordinator delegating to `output_devices/` files
+- `include/output_devices/` — one file per output type (17 files total: 0-18)
 - `include/scoring.h` — Resource + Compute scoring (limit ~109pts)
 - `include/funcgen_control.h` — Function Generator (Type 16) waveform engine using esp_timer + LEDC
 - `include/dfplayer_control.h` — DFPlayer MP3 protocol driver
-- `include/dimmer_control.h` — AC Dimmer with ZC interrupt
 - `include/config.h` — System configuration struct
 - `src/main.cpp` — Entry point, HTTP API routes, validation, network tasks
 - `include/web_pages.h` — Embedded HTML/CSS/JS for Web UI (auto-generated from `web/index.html`)
@@ -300,12 +300,14 @@ include/
   output_control.h      Output mapping, DMX/LED rendering, save/load JSON
   scoring.h             Resource + Compute scoring (limit ~109pts)
   web_pages.h           Embedded web UI (HTML+CSS+JS, auto-generated)
-  dimmer_control.h      AC dimmer ZC + timer ISR
-  motion_control.h      Motor, stepper, servo, 7-seg (11/12/13), DAC, PWM DAC, Buzzer, FuncGen
+  motion_control.h      Thin coordinator delegating to output_devices/ files
+  output_devices/       One file per output type (17 files: 0-18)
+  i2c_devices/          I2C DAC, GPIO expander, PCA9685 drivers
+
   dfplayer_control.h    DFPlayer MP3 protocol driver (Type 10)
   funcgen_control.h     Function Generator (Type 16, esp_timer + LEDC waveform engine)
-  i2c_gpio_expander.h   MCP23017, TCA9555, PCF857x drivers
-  pca9685_control.h     PCA9685 PWM driver
+  i2c_devices/i2c_gpio_expander.h   MCP23017, TCA9555, PCF857x drivers
+  i2c_devices/pca9685.h             PCA9685 PWM driver
   artnet_control.h      Art-Net UDP listener
   sacn_control.h        sACN E1.31 listener
   espnow_control.h      ESP-NOW master/slave bridge

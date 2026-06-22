@@ -15,7 +15,7 @@
 #include "i2c_devices/pca9685.h"
 #include "i2c_devices/i2c_gpio_expander.h"
 #include "output_control.h"
-#include "dimmer_control.h"
+#include "output_devices/dimmer.h"
 #include "motion_control.h"
 #include "espnow_control.h"
 #include "artnet_control.h"
@@ -709,7 +709,7 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
         message = "Zero-Crossing pin cannot overlap with I2C SDA or SCL";
         return false;
     }
-    if (!displayAddressValid(displayType, displayAddr)) {
+    if (!DisplayProtocol::addressValid(displayType, displayAddr)) {
         message = "I2C display address is invalid for the selected display type";
         return false;
     }
@@ -821,7 +821,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         };
         if (source != 0 && !(source >= 5 && source <= 7)) {
             uint8_t addr = output["pca_addr"] | defaultAddrForSource(source);
-            if (!validateSourceAddress(source, addr, "Primary I2C source on channel " + String(channelNumber), message)) return false;
+            if (!SourceRules::validateAddress(source, addr, "Primary I2C source on channel " + String(channelNumber), message)) return false;
             uint8_t pcaChan = output["pca_channel"] | 255;
             if (pcaChan != 255 && pcaChan > 15) {
                 message = "Primary I2C channel must be 0-15 on channel " + String(channelNumber);
@@ -845,8 +845,8 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         if (type == 14 && source >= 5 && source <= 7) {
             uint8_t addr = output["pca_addr"] | defaultAddrForSource(source);
             uint8_t dacChannel = output["pca_channel"] | 0;
-            if (!sourceAddressValid(source, addr)) {
-                message = "I2C DAC source on channel " + String(channelNumber) + " has invalid address 0x" + String(addr, HEX) + ". " + sourceAddressRangeLabel(source);
+            if (!SourceRules::addressValid(source, addr)) {
+                message = "I2C DAC source on channel " + String(channelNumber) + " has invalid address 0x" + String(addr, HEX) + ". " + SourceRules::addressRangeLabel(source);
                 return false;
             }
             if (source != 7 && dacChannel != 0) {
@@ -866,7 +866,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
             if (pin2Source != 0) {
                 uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
-                if (!validateSourceAddress(pin2Source, pin2Addr, "Segment base I2C source on channel " + String(channelNumber), message)) return false;
+                if (!SourceRules::validateAddress(pin2Source, pin2Addr, "Segment base I2C source on channel " + String(channelNumber), message)) return false;
             }
             if ((mcMode == 4 || mcMode == 5) && pin2Source >= 2 && pin2Source <= 4) {
                 message = "7-Segment Direct Dim requires ESP32 GPIO or PCA9685 segment source on channel " + String(channelNumber);
@@ -897,7 +897,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                     }
                     if (sSrc != 0) {
                         uint8_t sAddr = (s < segAddrs.size()) ? (uint8_t)(segAddrs[s] | defaultAddrForSource(sSrc)) : defaultAddrForSource(sSrc);
-                        if (!validateSourceAddress(sSrc, sAddr, "Segment " + String(s + 1) + " I2C source on channel " + String(channelNumber), message)) return false;
+                        if (!SourceRules::validateAddress(sSrc, sAddr, "Segment " + String(s + 1) + " I2C source on channel " + String(channelNumber), message)) return false;
                     }
                     if ((mcMode == 4 || mcMode == 5) && sSrc >= 2 && sSrc <= 4) {
                         message = "7-Segment Direct Dim requires ESP32 GPIO or PCA9685 segment source on channel " + String(channelNumber);
@@ -929,15 +929,15 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
             if (pin2Source != 0) {
                 uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
-                if (!validateSourceAddress(pin2Source, pin2Addr, "Stepper DIR I2C source on channel " + String(channelNumber), message)) return false;
+                if (!SourceRules::validateAddress(pin2Source, pin2Addr, "Stepper DIR I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (pin3Source != 0) {
                 uint8_t pin3Addr = output["pin3_addr"] | defaultAddrForSource(pin3Source);
-                if (!validateSourceAddress(pin3Source, pin3Addr, "Stepper ENABLE I2C source on channel " + String(channelNumber), message)) return false;
+                if (!SourceRules::validateAddress(pin3Source, pin3Addr, "Stepper ENABLE I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (homingMode == 0 && pin4Source != 0) {
                 uint8_t pin4Addr = output["pin4_addr"] | defaultAddrForSource(pin4Source);
-                if (!validateSourceAddress(pin4Source, pin4Addr, "Stepper HOME I2C source on channel " + String(channelNumber), message)) return false;
+                if (!SourceRules::validateAddress(pin4Source, pin4Addr, "Stepper HOME I2C source on channel " + String(channelNumber), message)) return false;
             }
             if ((pin2Source != 0 && (int)(output["pin2_channel"] | 255) == 255) ||
                 (pin3Source != 0 && (int)(output["pin3_channel"] | 255) == 255)) {
@@ -960,15 +960,15 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
             if (pin2Source != 0) {
                 uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
-                if (!validateSourceAddress(pin2Source, pin2Addr, "Analog RGB/RGBW Green I2C source on channel " + String(channelNumber), message)) return false;
+                if (!SourceRules::validateAddress(pin2Source, pin2Addr, "Analog RGB/RGBW Green I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (pin3Source != 0) {
                 uint8_t pin3Addr = output["pin3_addr"] | defaultAddrForSource(pin3Source);
-                if (!validateSourceAddress(pin3Source, pin3Addr, "Analog RGB/RGBW Blue I2C source on channel " + String(channelNumber), message)) return false;
+                if (!SourceRules::validateAddress(pin3Source, pin3Addr, "Analog RGB/RGBW Blue I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (colorOrder >= 4 && pin4Source != 0) {
                 uint8_t pin4Addr = output["pin4_addr"] | defaultAddrForSource(pin4Source);
-                if (!validateSourceAddress(pin4Source, pin4Addr, "Analog RGB/RGBW White I2C source on channel " + String(channelNumber), message)) return false;
+                if (!SourceRules::validateAddress(pin4Source, pin4Addr, "Analog RGB/RGBW White I2C source on channel " + String(channelNumber), message)) return false;
             }
             if ((source == 1 && (int)(output["pca_channel"] | 255) == 255) ||
                 (pin2Source == 1 && (int)(output["pin2_channel"] | 255) == 255) ||
@@ -986,7 +986,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
             if (pin2Source != 0) {
                 uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
-                if (!validateSourceAddress(pin2Source, pin2Addr, "Smoke Shooter shoot I2C source on channel " + String(channelNumber), message)) return false;
+                if (!SourceRules::validateAddress(pin2Source, pin2Addr, "Smoke Shooter shoot I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (pin2Source != 0 && (int)(output["pin2_channel"] | 255) == 255) {
                 message = "Smoke Shooter shoot expander channel is missing on channel " + String(channelNumber);
@@ -1002,11 +1002,11 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
             if (pin2Source != 0) {
                 uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
-                if (!validateSourceAddress(pin2Source, pin2Addr, "Motor IN2/DIR I2C source on channel " + String(channelNumber), message)) return false;
+                if (!SourceRules::validateAddress(pin2Source, pin2Addr, "Motor IN2/DIR I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (pin3Source != 0) {
                 uint8_t pin3Addr = output["pin3_addr"] | defaultAddrForSource(pin3Source);
-                if (!validateSourceAddress(pin3Source, pin3Addr, "Motor EN I2C source on channel " + String(channelNumber), message)) return false;
+                if (!SourceRules::validateAddress(pin3Source, pin3Addr, "Motor EN I2C source on channel " + String(channelNumber), message)) return false;
             }
         }
         if (type == 6 && (uint8_t)(output["mc_mode"] | 0) == 2) {
@@ -1394,7 +1394,7 @@ void setupWebServer() {
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
                 return;
             }
-            if (!displayAddressValid(requestedDisplayType, requestedDisplayAddr)) {
+            if (!DisplayProtocol::addressValid(requestedDisplayType, requestedDisplayAddr)) {
                 validationMessage = "I2C display address is invalid for the selected display type";
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
                 return;

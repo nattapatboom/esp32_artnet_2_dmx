@@ -55,22 +55,28 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - `include/` — C++ headers and most firmware subsystems
 - `include/output_devices/` — one file per output device type:
   - `ledc_helpers.h` — shared LEDC allocation, DMX value, segment, PWM DAC calibration helpers
-  - `tm1637.h` — TM1637Driver class (bit-bang 7-segment)
+  - `dimmer.h` — Type 0 AC Dimmer setup/update (ZC + timer ISR)
+  - `dmx.h` — Type 1 DMX Output setup/update (UART/RMT)
+  - `relay.h` — Type 2 Relay setup/update
+  - `led_strip.h` — Type 3 RGB/RGBW LED Strip setup/update (NeoPixelBus/RMT)
   - `single_led.h` — Type 4 Single Color LED setup/update
-  - `pwm_dac.h` — Type 15 PWM DAC setup/update
-  - `servo.h` — Type 8 RC Servo setup/update
-  - `motor.h` — Type 6 DC Motor setup/update (PWM+PWM, PWM+DIR, IN1+IN2+EN)
   - `analog_rgb.h` — Type 5 Analog RGB LED setup/update
+  - `motor.h` — Type 6 DC Motor setup/update (PWM+PWM, PWM+DIR, IN1+IN2+EN)
   - `stepper.h` — Type 7 Stepper Motor setup/update (FastAccelStepper)
+  - `servo.h` — Type 8 RC Servo setup/update
   - `buzzer.h` — Type 9 Passive Buzzer setup/update
-  - `seven_seg.h` — Types 11/12/13 7-Segment setup/update (TM1637 + DD via GPIO/PCA/EXP)
   - `dfplayer.h` — Type 10 DFPlayer MP3 update
+  - `seven_seg.h` — Types 11/12/13 7-Segment setup/update (TM1637 + DD via GPIO/PCA/EXP)
   - `dac.h` — Type 14 I2C DAC update (MCP4725, DAC7571, DAC7573)
+  - `pwm_dac.h` — Type 15 PWM DAC setup/update
   - `funcgen.h` — Type 16 Function Generator setup/update
+  - `solenoid.h` — Type 17 Solenoid setup/update
+  - `smoke_shooter.h` — Type 18 Smoke Shooter setup/update
 - `include/i2c_devices/` — one file per I2C device type:
   - `i2c_dac.h` — MCP4725, DAC7571, DAC7573 inline write functions
   - `i2c_gpio_expander.h` — DigitalExpanderManager (MCP23017, TCA9555, PCF857x)
   - `pca9685.h` — PCA9685Driver/PCA9685Manager (16-ch PWM)
+  - (old `i2c_gpio_expander.h` and `pca9685_control.h` in `include/` root removed)
 - `src/main.cpp` — setup, HTTP API, validation, network/display tasks
 - `web/index.html` — Web UI source; edit this file, then run `tools/build_web.py`
 - `include/web_pages.h` — generated embedded Web UI; do not edit directly

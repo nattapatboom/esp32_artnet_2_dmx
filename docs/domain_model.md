@@ -126,9 +126,9 @@ Responsibilities:
 Key files:
 - `include/output_control.h`
 - `include/motion_control.h` — thin coordinator delegating to per-type files
-- `include/output_devices/` — one file per output type: `single_led.h`, `pwm_dac.h`, `servo.h`, `motor.h`, `analog_rgb.h`, `stepper.h`, `buzzer.h`, `seven_seg.h`, `dfplayer.h`, `dac.h`, `funcgen.h`
-- `include/pca9685_control.h`
-- `include/i2c_gpio_expander.h`
+- `include/output_devices/` — one file per output type: `dimmer.h`, `dmx.h`, `relay.h`, `led_strip.h`, `single_led.h`, `analog_rgb.h`, `motor.h`, `stepper.h`, `servo.h`, `buzzer.h`, `dfplayer.h`, `seven_seg.h`, `dac.h`, `pwm_dac.h`, `funcgen.h`, `solenoid.h`, `smoke_shooter.h`
+- `include/i2c_devices/pca9685.h`
+- `include/i2c_devices/i2c_gpio_expander.h`
 - `include/funcgen_control.h`
 - `include/dfplayer_control.h`
 
@@ -595,7 +595,7 @@ Known implementation drift (scoring-specific):
 ### ADR002: Motor & Motion Control Separation
 - **Rationale:** High-resolution motion devices (Micro-stepping, Camera rotation) are CPU-intensive and may cause cross-core interference
 - **Decision:** (1) Direct GPIO/PCA/PWM drive is supported for low-power DC motors (Type 6) and steppers (Type 7) with full deadband, direction, and brake logic. (2) For high-power or high-resolution applications (e.g., micro-stepping, camera rotation), use this ESP32 to send DMX to a dedicated Motor Controller Board instead.
-- **Implementation:** Direct drive via `motion_control.h` — DC motors use LEDC/PCA9685 PWM with H-bridge control; steppers use FastAccelStepper library for STEP/DIR timing. High-power separation is a deployment guideline, not enforced in firmware.
+- **Implementation:** Direct drive via `output_devices/motor.h` (DC motors — LEDC/PCA9685 PWM with H-bridge control) and `output_devices/stepper.h` (FastAccelStepper library for STEP/DIR timing). High-power separation is a deployment guideline, not enforced in firmware.
 
 ### ADR003: DMX Frame Timeout Constraint
 - **Rationale:** Some DMX Decoders enter safe-state if idle for more than 50ms
@@ -621,7 +621,7 @@ Known implementation drift (scoring-specific):
 ### ADR008: Internal GPIO DAC Blocking (WT32-ETH01)
 - **Rationale:** GPIO 25/26 (Internal DAC) conflict with LAN8720A Ethernet PHY
 - **Decision:** (1) Hide/disable Source 0 (GPIO) for DAC Type 14 on WT32-ETH01; force I2C DAC usage (2) Keep `dacWrite()` code for compatibility with other boards in the future
-- **Implementation:** (1) C++ `validateOutputJson()` block type 14 + source 0 at `main.cpp:867` (2) Web UI `srcOpts()` excludes GPIO option for DAC type 14 at `index.html:1416` (3) `dacWrite()` runtime code in `motion_control.h` preserved for legacy/other-board use
+- **Implementation:** (1) C++ `validateOutputJson()` block type 14 + source 0 at `main.cpp:867` (2) Web UI `srcOpts()` excludes GPIO option for DAC type 14 at `index.html:1416` (3) `dacWrite()` runtime code in `output_devices/dac.h` preserved for legacy/other-board use
 
 ### ADR009: ESP-NOW Slave Wi-Fi Channel Selection Policy
 - **Rationale:** ESP-NOW requires Master and Slave to be on the same Wi-Fi channel
@@ -734,8 +734,8 @@ Questions used during the grilling session and answers inferred from the existin
 | 6 | Call `validateSettingsAndOutputs()` in `/api/outputs` POST | ✅ Completed (called at `main.cpp:1536`) |
 | 7 | `resourceScoreLimit()` include PCA and EXP terms | ❌ Obsolete (scoring system replaced by 3 independent budgets) |
 | 8 | PCF8574 LCD display type enum in `SystemConfig` | ✅ Completed (defined in `config.h:88`) |
-| 9 | DAC7571 protocol fix (3-byte → correct 2-byte per TI datasheet) | ✅ Completed (`motion_control.h`) |
-| 10 | DAC7573 control byte fix (removed spurious 0x10 base, corrected channel select) | ✅ Completed (`motion_control.h`) |
+| 9 | DAC7571 protocol fix (3-byte → correct 2-byte per TI datasheet) | ✅ Completed (`output_devices/dac.h`) |
+| 10 | DAC7573 control byte fix (removed spurious 0x10 base, corrected channel select) | ✅ Completed (`output_devices/dac.h`) |
 | 11 | Art-Net protocol version check (reject < 14) | ✅ Completed (`artnet_control.h`) |
 | 12 | sACN Flags/Length validation (PHT flag check, claimed ≤ received length) | ✅ Completed (`sacn_control.h`) |
 | 13 | sACN multicast multi-UDP per universe (prevents last-group-only join) | ✅ Completed (`sacn_control.h`) |

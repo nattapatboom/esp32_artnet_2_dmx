@@ -24,7 +24,7 @@
 ## A. Hardware-Safety / Correctness Issues
 
 ### A1. `dimmer_tick` uint16 wrap without modulo
-- **File:** `include/dimmer_control.h`
+- **File:** `include/output_devices/dimmer.h`
 - `dimmer_tick` increments freely; when it wraps past 65535, all dimmer timing
   comparisons break until the counter wraps back through zero.
 - **Fix:** Add `&= (DIMMER_TICK_MAX-1)` modulo on increment, or use
@@ -145,7 +145,7 @@
 ## D. Magic Numbers (Raw Type IDs, Hardcoded Constants)
 
 ### D1. Raw `0..18` type IDs everywhere
-- `include/scoring.h`, `include/output_control.h`, `include/motion_control.h`,
+- `include/scoring.h`, `include/output_control.h`, `include/output_devices/` (all 17 per-type files),
   `web/index.html` — dozens of `case 3:`, `if(t===7)`, `type == 14`.
 - **Fix:** Add `constexpr` type constants:
   ```cpp
