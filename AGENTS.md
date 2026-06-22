@@ -146,6 +146,10 @@ When working on this project:
 
 > This principle exists because a well-maintained `docs/` directory is the most reliable long-term asset for AI-assisted development. Without it, each session starts from scratch and error patterns repeat.
 
+## Policy
+
+- **No backward-compat:** This is v1. Don't keep backward-compat wrappers or migration shims. Delete dead files and update all callers directly.
+
 ## Coding Rules
 
 - Keep changes minimal and follow neighboring patterns
