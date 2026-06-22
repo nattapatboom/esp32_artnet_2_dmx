@@ -24,26 +24,25 @@ Use a 3.3V Zener diode to prevent the ESP32 signal pin voltage from exceeding th
   content("gpio", align(center)[#text(8pt)[*ESP32 GPIO*]])
 
   rect((-2.8, 1), (-0.5, 0.2), ..pass, name: "r1")
-  content("r1", align(center)[#text(8pt)[220 &Omega;]])
+  content("r1", align(center)[#text(8pt)[220 Ω]])
 
   rect((0, 1), (2.3, 0.2), ..pass, name: "pptc")
-  content("pptc", align(center)[#text(8pt)[PPTC &lt;100 mA]])
+  content("pptc", align(center)[#text(8pt)[PPTC < 100 mA]])
 
   rect((2.8, 1), (5.5, 0.2), ..box, name: "out")
   content("out", align(center)[#text(8pt)[*To Device*]])
 
-  rect((-2, -0.3), (0.3, -1.1), ..zener, name: "zen")
+  rect((-4.1, -0.3), (-1.9, -1.1), ..zener, name: "zen")
   content("zen", align(center)[#text(8pt)[3.3V Zener]])
 
-  rect((-0.9, -1.5), (1.2, -2.3), ..gnd, name: "gnd1")
+  rect((-4.0, -1.5), (-2.0, -2.3), ..gnd, name: "gnd1")
   content("gnd1", align(center)[#text(8pt)[GND]])
 
   line((-3.2, 0.6), (-2.8, 0.6), mark: (end: "stealth"))
   line((-0.5, 0.6), (0, 0.6), mark: (end: "stealth"))
   line((2.3, 0.6), (2.8, 0.6), mark: (end: "stealth"))
-  line((-0.9, 1), (-0.9, -0.3), mark: (end: "stealth"))
-  line((0.3, -0.7), (-0.9, -0.7))
-  line((-0.9, -1.1), (-0.9, -1.5), mark: (end: "stealth"))
+  line((-3.0, 0.6), (-3.0, -0.3), mark: (end: "stealth"))
+  line((-3.0, -1.1), (-3.0, -1.5), mark: (end: "stealth"))
 })
 ]
 #v(0.8em)
@@ -70,27 +69,26 @@ When using a 5V buffer IC (e.g., 74HCT245), use a 5.1V Zener diode on the buffer
   content("buf", align(center)[#text(8pt)[5V Buffer \ 74HCT245]])
 
   rect((0, 1.5), (2.3, 0.5), ..pass, name: "r2")
-  content("r2", align(center)[#text(8pt)[220 &Omega;]])
+  content("r2", align(center)[#text(8pt)[220 Ω]])
 
   rect((2.8, 1.5), (5.1, 0.5), ..pass, name: "pptc2")
-  content("pptc2", align(center)[#text(8pt)[PPTC &lt;100 mA]])
+  content("pptc2", align(center)[#text(8pt)[PPTC < 100 mA]])
 
   rect((5.6, 1.5), (8.3, 0.5), ..box, name: "out2")
   content("out2", align(center)[#text(8pt)[*To Device*]])
 
-  rect((-2, -0.3), (0.3, -1.1), ..zener, name: "zen2")
+  rect((-1.35, -0.3), (0.85, -1.1), ..zener, name: "zen2")
   content("zen2", align(center)[#text(8pt)[5.1V Zener]])
 
-  rect((-0.9, -1.5), (1.2, -2.3), ..gnd, name: "gnd2")
+  rect((-1.25, -1.5), (0.75, -2.3), ..gnd, name: "gnd2")
   content("gnd2", align(center)[#text(8pt)[GND]])
 
   line((-4.2, 1), (-3.5, 1), mark: (end: "stealth"))
   line((-0.5, 1), (0, 1), mark: (end: "stealth"))
   line((2.3, 1), (2.8, 1), mark: (end: "stealth"))
   line((5.1, 1), (5.6, 1), mark: (end: "stealth"))
-  line((-0.9, 1.5), (-0.9, -0.3), mark: (end: "stealth"))
-  line((0.3, -0.7), (-0.9, -0.7))
-  line((-0.9, -1.1), (-0.9, -1.5), mark: (end: "stealth"))
+  line((-0.25, 1.0), (-0.25, -0.3), mark: (end: "stealth"))
+  line((-0.25, -1.1), (-0.25, -1.5), mark: (end: "stealth"))
 })
 ]
 #v(0.8em)
@@ -105,8 +103,8 @@ When using a 5V buffer IC (e.g., 74HCT245), use a 5.1V Zener diode on the buffer
   stroke: 0.5pt + gray,
   [*Component*], [*Value*], [*Purpose*],
   [Zener Diode (ESD Clamp)], [3.3V (GPIO) / 5.1V (Buffered)], [Clamp excess voltage; protect against ESD or reverse voltage],
-  [Series Resistor], [220 &Omega;], [Limit maximum current on signal line],
-  [PPTC Resettable Fuse], [&lt;100 mA], [Resettable overcurrent protection on output line],
+  [Series Resistor], [220 Ω], [Limit maximum current on signal line],
+  [PPTC Resettable Fuse], [< 100 mA], [Resettable overcurrent protection on output line],
 )
 ]
 
@@ -138,19 +136,21 @@ Inductive loads (solenoid valves, relay coils, DC motors) generate a high revers
   rect((1.5, -1.2), (4, -2), ..gnd, name: "gnd3")
   content("gnd3", align(center)[#text(8pt)[GND]])
 
-  line((-0.5, 1.5), (1, 1.5), mark: (end: "stealth"))
-  line((4.5, 2.5), (4.5, 1.5))
-  line((4.5, 1), (4.5, 0), mark: (end: "stealth"))
-  line((-0.5, 1.65), (-0.5, 2.5))
-  line((-0.5, 2.5), (4.5, 2.5))
-  line((4.5, -0.8), (3, -1.2), mark: (end: "stealth"))
-  line((4.5, -0.8), (4.5, -1.2), mark: (end: "stealth"))
+  // Positive Supply Rail (Node A)
+  line((-0.5, 2.5), (2.75, 2.5))
+  line((2.75, 2.5), (2.75, 2.0), mark: (end: "stealth"))
+  line((-0.5, 2.5), (-0.5, 1.5), mark: (end: "stealth"))
+  content((2.75, 2.7), [#text(8pt)[+VCC]])
 
-  content((-1.5, 1.7), [#text(7pt, fill: red)[--]])
+  // Switching Node (Node B)
+  line((2.75, 1.0), (2.75, 0.0), mark: (end: "stealth"))
+  line((-0.5, 0.3), (-0.5, 0.15))
+  line((-0.5, 0.15), (2.75, 0.15), mark: (end: "stealth"))
 
-  line((-1.5, 0.7), (1, 0.7), stroke: 0.5pt + gray, mark: (end: "stealth"))
+  // Ground Node
+  line((2.75, -0.8), (2.75, -1.2), mark: (end: "stealth"))
 
-  content((-0.3, 0.3), text(7pt, fill: gray)[reverse biased])
+  content((-2.3, 0.9), text(7pt, fill: gray)[reverse biased])
 })
 ]
 #v(0.8em)
