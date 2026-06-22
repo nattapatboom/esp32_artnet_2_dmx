@@ -5,6 +5,27 @@
 #include <ArduinoJson.h>
 #include "output_control.h"
 
+struct AddressRange {
+    uint8_t min;
+    uint8_t max;
+};
+
+struct SourceAddressRule {
+    uint8_t source;
+    const char* label;
+    AddressRange ranges[2];
+};
+
+constexpr SourceAddressRule SOURCE_ADDRESS_RULES[] = {
+    {1, "PCA9685 address must be 0x40-0x47", {{0x40, 0x47}, {0, 0}}},
+    {2, "MCP23017 address must be 0x20-0x27", {{0x20, 0x27}, {0, 0}}},
+    {3, "TCA9555 address must be 0x20-0x27", {{0x20, 0x27}, {0, 0}}},
+    {4, "PCF857x address must be 0x20-0x27 or 0x38-0x3F", {{0x20, 0x27}, {0x38, 0x3F}}},
+    {5, "MCP4725 address must be 0x60 or 0x61", {{0x60, 0x61}, {0, 0}}},
+    {6, "DAC7571 address must be 0x4C or 0x4D", {{0x4C, 0x4D}, {0, 0}}},
+    {7, "DAC7573 address must be 0x4C-0x5B", {{0x4C, 0x5B}, {0, 0}}}
+};
+
 inline bool validateIp4(const char* s) {
     if (s == nullptr || s[0] == '\0') return true;
     uint8_t part = 0;
@@ -30,29 +51,23 @@ inline bool validateIp4(const char* s) {
 }
 
 inline bool sourceAddressValid(uint8_t source, uint8_t address) {
-    switch (source) {
-        case 1: return address >= 0x40 && address <= 0x47; // PCA9685
-        case 2: return address >= 0x20 && address <= 0x27; // MCP23017
-        case 3: return address >= 0x20 && address <= 0x27; // TCA9555
-        case 4: return (address >= 0x20 && address <= 0x27) || (address >= 0x38 && address <= 0x3F); // PCF857x / PCF8574A
-        case 5: return address == 0x60 || address == 0x61; // MCP4725
-        case 6: return address == 0x4C || address == 0x4D; // DAC7571
-        case 7: return address >= 0x4C && address <= 0x5B; // DAC7573
-        default: return source == 0;
+    if (source == 0) return true;
+    for (const auto& rule : SOURCE_ADDRESS_RULES) {
+        if (rule.source != source) continue;
+        for (const auto& range : rule.ranges) {
+            if (range.min == 0 && range.max == 0) continue;
+            if (address >= range.min && address <= range.max) return true;
+        }
+        return false;
     }
+    return false;
 }
 
 inline const char* sourceAddressRangeLabel(uint8_t source) {
-    switch (source) {
-        case 1: return "PCA9685 address must be 0x40-0x47";
-        case 2: return "MCP23017 address must be 0x20-0x27";
-        case 3: return "TCA9555 address must be 0x20-0x27";
-        case 4: return "PCF857x address must be 0x20-0x27 or 0x38-0x3F";
-        case 5: return "MCP4725 address must be 0x60 or 0x61";
-        case 6: return "DAC7571 address must be 0x4C or 0x4D";
-        case 7: return "DAC7573 address must be 0x4C-0x5B";
-        default: return "Unsupported I2C source";
+    for (const auto& rule : SOURCE_ADDRESS_RULES) {
+        if (rule.source == source) return rule.label;
     }
+    return "Unsupported I2C source";
 }
 
 inline bool validateSourceAddress(uint8_t source, uint8_t address, const String& label, String& message) {

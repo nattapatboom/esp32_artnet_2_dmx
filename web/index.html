@@ -1254,6 +1254,15 @@ const OUTPUT_GPIOS=[4,12,14,15,2,17,32,33];
 const INPUT_GPIOS=[36,39,34,35,32,33];
 const INPUT_ONLY_GPIOS=[36,39,34,35];
 const FORBIDDEN_OUTPUT_GPIOS={0:'Ethernet RMII clock / BOOT',16:'Ethernet PHY power',18:'Ethernet RMII MDIO',19:'Ethernet RMII TXD0',21:'Ethernet RMII TX_EN',22:'Ethernet RMII TXD1',23:'Ethernet RMII MDC',25:'Ethernet RMII RXD0',26:'Ethernet RMII RXD1',27:'Ethernet RMII CRS_DV'};
+const SOURCE_ADDRESS_RULES={
+  1:{label:'PCA9685 address must be 0x40-0x47',ranges:[[0x40,0x47]]},
+  2:{label:'MCP23017 address must be 0x20-0x27',ranges:[[0x20,0x27]]},
+  3:{label:'TCA9555 address must be 0x20-0x27',ranges:[[0x20,0x27]]},
+  4:{label:'PCF857x address must be 0x20-0x27 or 0x38-0x3F',ranges:[[0x20,0x27],[0x38,0x3F]]},
+  5:{label:'MCP4725 address must be 0x60 or 0x61',ranges:[[0x60,0x61]]},
+  6:{label:'DAC7571 address must be 0x4C or 0x4D',ranges:[[0x4C,0x4D]]},
+  7:{label:'DAC7573 address must be 0x4C-0x5B',ranges:[[0x4C,0x5B]]}
+};
 
 function typeId(o){
   const t=parseInt(o.type);
@@ -1578,25 +1587,13 @@ function populateExpanderAddresses(el, filterSource){
 function sourceAddressValid(src, addr){
   src=parseInt(src||0); addr=parseInt(addr);
   if(src===0) return true;
-  if(src===1) return addr>=0x40 && addr<=0x47;
-  if(src===2 || src===3) return addr>=0x20 && addr<=0x27;
-  if(src===4) return (addr>=0x20 && addr<=0x27) || (addr>=0x38 && addr<=0x3F);
-  if(src===5) return addr===0x60 || addr===0x61;
-  if(src===6) return addr===0x4C || addr===0x4D;
-  if(src===7) return addr>=0x4C && addr<=0x5B;
-  return false;
+  const rule=SOURCE_ADDRESS_RULES[src];
+  return !!rule&&rule.ranges.some(([min,max])=>addr>=min&&addr<=max);
 }
 
 function sourceAddressRangeLabel(src){
   src=parseInt(src||0);
-  if(src===1) return 'PCA9685 address must be 0x40-0x47';
-  if(src===2) return 'MCP23017 address must be 0x20-0x27';
-  if(src===3) return 'TCA9555 address must be 0x20-0x27';
-  if(src===4) return 'PCF857x address must be 0x20-0x27 or 0x38-0x3F';
-  if(src===5) return 'MCP4725 address must be 0x60 or 0x61';
-  if(src===6) return 'DAC7571 address must be 0x4C or 0x4D';
-  if(src===7) return 'DAC7573 address must be 0x4C-0x5B';
-  return 'Unsupported I2C source';
+  return SOURCE_ADDRESS_RULES[src]?.label||'Unsupported I2C source';
 }
 
 function validateSourceAddress(src, addr, label){
@@ -1890,52 +1887,42 @@ function channelUsesI2C(o){
   if(seg) for(let s of seg) if(srcIsI2C(parseInt(s)||0)) return true;
   return false;
 }
+const SCORE_DEFS={
+  hwMax:{ledc:16,rmt:8,uart:2,dac:2,timer:4},
+  cpu:{baseOverheadUs:500,safetyReserveUs:1500,i2cWriteUs:180,dmxOutputServiceUs:250},
+  ram:{limit:48000,baseChannel:224,dmxBuffer:512,pixelStripObject:256,dfPlayerObject:160,stepperRuntime:512,funcGenObject:1120,rmtDmxDriver:5150*4+32,i2cRoute:32},
+  channelCpuUs:[5,250,5,80,6,18,35,80,12,35,30,900,30,35,10,6,120,10,25]
+};
+const HW_MAX=SCORE_DEFS.hwMax;
+const RAM_LIMIT=SCORE_DEFS.ram.limit;
+const BASE_CHANNEL_RAM=SCORE_DEFS.ram.baseChannel;
+const BASE_OVERHEAD_US=SCORE_DEFS.cpu.baseOverheadUs;
+const SAFETY_RESERVE_US=SCORE_DEFS.cpu.safetyReserveUs;
+const I2C_WRITE_US=SCORE_DEFS.cpu.i2cWriteUs;
+const DMX_BUFFER_RAM=SCORE_DEFS.ram.dmxBuffer;
+const PIXEL_STRIP_OBJECT_RAM=SCORE_DEFS.ram.pixelStripObject;
+const DFPLAYER_OBJECT_RAM=SCORE_DEFS.ram.dfPlayerObject;
+const STEPPER_RUNTIME_RAM=SCORE_DEFS.ram.stepperRuntime;
+const FUNCGEN_OBJECT_RAM=SCORE_DEFS.ram.funcGenObject;
+const RMT_DMX_DRIVER_RAM=SCORE_DEFS.ram.rmtDmxDriver;
+const I2C_ROUTE_RAM=SCORE_DEFS.ram.i2cRoute;
+const DMX_OUTPUT_SERVICE_US=SCORE_DEFS.cpu.dmxOutputServiceUs;
+
 function channelCost(o){
   const t=typeId(o);
   const ledCount=parseInt(o.led_count||0);
-  let cpu=0, ram=BASE_CHANNEL_RAM;
+  let cpu=SCORE_DEFS.channelCpuUs[t]||0, ram=BASE_CHANNEL_RAM;
   const i2cWrites=i2cWriteCount(o);
   ram+=dmxBufferRam(t,ledCount,parseInt(o.color_order||0),parseInt(o.mc_resolution||8),parseInt(o.mc_mode||0));
-  switch(t){
-    case 0: cpu=5; break;
-    case 1: cpu=DMX_OUTPUT_SERVICE_US; break;
-    case 2: cpu=5; break;
-    case 3: cpu=ledStripServiceUs(ledCount, parseInt(o.color_order||0)); ram+=pixelBufferRam(ledCount,parseInt(o.color_order||0))+PIXEL_STRIP_OBJECT_RAM; break;
-    case 4: cpu=6; break;
-    case 5: cpu=18; break;
-    case 6: cpu=35; break;
-    case 7: cpu=80; ram+=STEPPER_RUNTIME_RAM; break;
-    case 8: cpu=12; break;
-    case 9: cpu=35; break;
-    case 10: cpu=30; ram+=DFPLAYER_OBJECT_RAM+100; break;
-    case 11: cpu=900; break;
-    case 12: cpu=30; break;
-    case 13: cpu=35; break;
-    case 14: cpu=10; break;
-    case 15: cpu=6; break;
-    case 16: cpu=120; ram+=FUNCGEN_OBJECT_RAM; break;
-    case 17: cpu=10; break;
-    case 18: cpu=25; break;
-  }
+  if(t===3) cpu=ledStripServiceUs(ledCount, parseInt(o.color_order||0));
+  if(t===3) ram+=pixelBufferRam(ledCount,parseInt(o.color_order||0))+PIXEL_STRIP_OBJECT_RAM;
+  if(t===7) ram+=STEPPER_RUNTIME_RAM;
+  if(t===10) ram+=DFPLAYER_OBJECT_RAM+100;
+  if(t===16) ram+=FUNCGEN_OBJECT_RAM;
   cpu+=i2cWrites*I2C_WRITE_US;
   ram+=i2cWrites*I2C_ROUTE_RAM;
   return {cpu,ram};
 }
-const HW_MAX={ledc:16,rmt:8,uart:2,dac:2,timer:4};
-// RAM limit: C++ keeps ~150KB free, the rest for buffers (capped 64KB). Local pre-check at 48KB.
-const RAM_LIMIT=48000;
-const BASE_CHANNEL_RAM=224;
-const BASE_OVERHEAD_US=500;
-const SAFETY_RESERVE_US=1500;
-const I2C_WRITE_US=180;
-const DMX_BUFFER_RAM=512;
-const PIXEL_STRIP_OBJECT_RAM=256;
-const DFPLAYER_OBJECT_RAM=160;
-const STEPPER_RUNTIME_RAM=512;
-const FUNCGEN_OBJECT_RAM=1120;
-const RMT_DMX_DRIVER_RAM=5150*4+32;
-const I2C_ROUTE_RAM=32;
-const DMX_OUTPUT_SERVICE_US=250;
 
 function dmxBufferRam(type,ledCount,colorOrder,resolution=8,mode=0){
   type=parseInt(type); mode=parseInt(mode||0);

@@ -309,28 +309,13 @@ struct PerChannelCost {
 // Includes serialized DMX/TM1637 work, LED strip mapping/enqueue, and active I2C transactions.
 inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     PerChannelCost c;
+    c.cpuUs = (ch.type <= 18) ? ScoringDefs::CHANNEL_CPU_US[ch.type] : 0;
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(ch.type, ch.led_count, ch.color_order, ch.mc_resolution, ch.mc_mode);
-    switch (ch.type) {
-        case 0:  c.cpuUs = 5; break;
-        case 1:  c.cpuUs = DMX_OUTPUT_SERVICE_US; break;
-        case 2:  c.cpuUs = 5; break;
-        case 3:  c.cpuUs = ledStripServiceUs(ch.led_count, ch.color_order); c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order) + PIXEL_STRIP_OBJECT_RAM; break;
-        case 4:  c.cpuUs = 6; break;
-        case 5:  c.cpuUs = 18; break;
-        case 6:  c.cpuUs = 35; break;
-        case 7:  c.cpuUs = 80; c.ramBytes += STEPPER_RUNTIME_RAM; break;
-        case 8:  c.cpuUs = 12; break;
-        case 9:  c.cpuUs = 35; break;
-        case 10: c.cpuUs = 30; c.ramBytes += DFPLAYER_OBJECT_RAM + 100; break;
-        case 11: c.cpuUs = 900; break;
-        case 12: c.cpuUs = 30; break;
-        case 13: c.cpuUs = 35; break;
-        case 14: c.cpuUs = 10; break;
-        case 15: c.cpuUs = 6; break;
-        case 16: c.cpuUs = 120; c.ramBytes += FUNCGEN_OBJECT_RAM; break;
-        case 17: c.cpuUs = 10; break;
-        case 18: c.cpuUs = 25; break;
-    }
+    if (ch.type == 3) c.cpuUs = ledStripServiceUs(ch.led_count, ch.color_order);
+    if (ch.type == 3) c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order) + PIXEL_STRIP_OBJECT_RAM;
+    if (ch.type == 7) c.ramBytes += STEPPER_RUNTIME_RAM;
+    if (ch.type == 10) c.ramBytes += DFPLAYER_OBJECT_RAM + 100;
+    if (ch.type == 16) c.ramBytes += FUNCGEN_OBJECT_RAM;
     c.cpuUs += (uint16_t)i2cWritesForChannel(ch) * I2C_WRITE_US;
     c.ramBytes += (uint32_t)i2cWritesForChannel(ch) * I2C_ROUTE_RAM;
     return c;
@@ -591,28 +576,13 @@ inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
     uint8_t t = j["type"] | 0;
     uint16_t ledCount = j["led_count"] | 0;
     uint8_t colorOrder = j["color_order"] | 0;
+    c.cpuUs = (t <= 18) ? ScoringDefs::CHANNEL_CPU_US[t] : 0;
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(t, ledCount, colorOrder, j["mc_resolution"] | 8, j["mc_mode"] | 0);
-    switch (t) {
-        case 0:  c.cpuUs = 5; break;
-        case 1:  c.cpuUs = DMX_OUTPUT_SERVICE_US; break;
-        case 2:  c.cpuUs = 5; break;
-        case 3:  c.cpuUs = ledStripServiceUs(ledCount, colorOrder); c.ramBytes += pixelBufferRam(ledCount, colorOrder) + PIXEL_STRIP_OBJECT_RAM; break;
-        case 4:  c.cpuUs = 6; break;
-        case 5:  c.cpuUs = 18; break;
-        case 6:  c.cpuUs = 35; break;
-        case 7:  c.cpuUs = 80; c.ramBytes += STEPPER_RUNTIME_RAM; break;
-        case 8:  c.cpuUs = 12; break;
-        case 9:  c.cpuUs = 35; break;
-        case 10: c.cpuUs = 30; c.ramBytes += DFPLAYER_OBJECT_RAM + 100; break;
-        case 11: c.cpuUs = 900; break;
-        case 12: c.cpuUs = 30; break;
-        case 13: c.cpuUs = 35; break;
-        case 14: c.cpuUs = 10; break;
-        case 15: c.cpuUs = 6; break;
-        case 16: c.cpuUs = 120; c.ramBytes += FUNCGEN_OBJECT_RAM; break;
-        case 17: c.cpuUs = 10; break;
-        case 18: c.cpuUs = 25; break;
-    }
+    if (t == 3) c.cpuUs = ledStripServiceUs(ledCount, colorOrder);
+    if (t == 3) c.ramBytes += pixelBufferRam(ledCount, colorOrder) + PIXEL_STRIP_OBJECT_RAM;
+    if (t == 7) c.ramBytes += STEPPER_RUNTIME_RAM;
+    if (t == 10) c.ramBytes += DFPLAYER_OBJECT_RAM + 100;
+    if (t == 16) c.ramBytes += FUNCGEN_OBJECT_RAM;
     c.cpuUs += (uint16_t)i2cWritesFromJson(j) * I2C_WRITE_US;
     c.ramBytes += (uint32_t)i2cWritesFromJson(j) * I2C_ROUTE_RAM;
     return c;
