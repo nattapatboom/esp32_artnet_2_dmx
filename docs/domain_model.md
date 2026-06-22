@@ -1,6 +1,6 @@
 # Domain Model: ESP32 Art-Net Firmware
 
-This document is the result of a `/grilling` domain-modeling session, extracted primarily from `include/output_control.h`, `include/scoring.h`, `include/config.h`, `src/main.cpp`, `web/index.html`, `docs/user_manual/main.typ`, `docs/resource_calculator.md`, `include/output_defs.h`, `include/type_protocol.h`, `include/type_interfaces/*.h`, and `include/gpio_control.h`.
+This document is the result of a `/grilling` domain-modeling session, extracted primarily from `include/output_control.h`, `include/scoring.h`, `include/config.h`, `src/main.cpp`, `web/index.html`, `docs/user_manual/main.typ`, `docs/resource_calculator.md`, `include/output_defs.h`, `include/type_protocol.h`, `include/type_interfaces/*.h`, `include/gpio_control.h`, `include/source_rules.h`, `include/display_protocol.h`, and `include/scoring_limits.h`.
 
 ## Core Domain
 

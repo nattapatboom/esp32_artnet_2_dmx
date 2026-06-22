@@ -3,78 +3,29 @@
 
 #include <Arduino.h>
 #include "output_defs.h"
+#include "scoring_limits.h"
 
 namespace ScoringDefs {
-struct HardwareLimits {
-    uint8_t ledc;
-    uint8_t rmt;
-    uint8_t uart;
-    uint8_t dac;
-    uint8_t timer;
-};
 
-struct CpuRuntimeDef {
-    uint32_t baseOverheadUs;
-    uint32_t safetyReserveUs;
-    uint16_t i2cWriteUs;
-    uint16_t dmxOutputServiceUs;
-};
+// Runtime constants specific to scoring logic (not hardware limits)
+// Hardware limits moved to ScoringLimits in scoring_limits.h
 
-struct RamRuntimeDef {
-    uint32_t keepFree;
-    uint32_t limitCap;
-    uint32_t baseChannel;
-    uint32_t dmxBuffer;
-    uint32_t pixelStripObject;
-    uint32_t dfPlayerObject;
-    uint32_t stepperRuntime;
-    uint32_t funcGenObject;
-    uint32_t i2cRoute;
-};
+constexpr uint8_t MAX_LEDC_RESOURCE = ScoringLimits::MAX_LEDC;
+constexpr uint8_t MAX_RMT_RESOURCE = ScoringLimits::MAX_RMT;
+constexpr uint8_t MAX_UART_RESOURCE = ScoringLimits::MAX_UART;
+constexpr uint8_t MAX_DAC_RESOURCE = ScoringLimits::MAX_DAC;
+constexpr uint8_t MAX_TIMER_RESOURCE = ScoringLimits::MAX_TIMER;
 
-constexpr HardwareLimits HARDWARE_LIMITS = {
-    16, // LEDC
-    8,  // RMT
-    2,  // UART usable by outputs (UART0 is console)
-    2,  // internal DAC count; WT32-ETH01 blocks GPIO25/26
-    4   // timer/runtime slots
-};
+constexpr uint32_t CPU_BASE_OVERHEAD_US = ScoringLimits::BASE_OVERHEAD_US;
+constexpr uint32_t CPU_SAFETY_RESERVE_US = ScoringLimits::SAFETY_RESERVE_US;
+constexpr uint32_t RAM_KEEP_FREE = ScoringLimits::KEEP_FREE_BYTES;
+constexpr uint32_t RAM_LIMIT_CAP = ScoringLimits::LIMIT_CAP_BYTES;
 
-constexpr CpuRuntimeDef CPU_RUNTIME = {
-    500,  // output loop base overhead per frame
-    1500, // safety reserve per frame
-    180,  // active I2C route write
-    250   // DMX UART/RMT enqueue service time
-};
-
-constexpr RamRuntimeDef RAM_RUNTIME = {
-    150 * 1024, // keep free for network/system
-    65535,      // output allocation scoring cap
-    224,        // OutputChannel vector slot + allocator/header slack
-    512,        // DMX universe buffer
-    0,          // (moved to OutputDefs::ModeCost::extraRamBytes)
-    0,          // (moved to OutputDefs::ModeCost::extraRamBytes)
-    0,          // (moved to OutputDefs::ModeCost::extraRamBytes)
-    0,          // (moved to OutputDefs::ModeCost::extraRamBytes)
-    32          // I2C route bookkeeping estimate
-};
-
-constexpr uint8_t MAX_LEDC_RESOURCE = HARDWARE_LIMITS.ledc;
-constexpr uint8_t MAX_RMT_RESOURCE = HARDWARE_LIMITS.rmt;
-constexpr uint8_t MAX_UART_RESOURCE = HARDWARE_LIMITS.uart;
-constexpr uint8_t MAX_DAC_RESOURCE = HARDWARE_LIMITS.dac;
-constexpr uint8_t MAX_TIMER_RESOURCE = HARDWARE_LIMITS.timer;
-
-constexpr uint32_t CPU_BASE_OVERHEAD_US = CPU_RUNTIME.baseOverheadUs;
-constexpr uint32_t CPU_SAFETY_RESERVE_US = CPU_RUNTIME.safetyReserveUs;
-constexpr uint32_t RAM_KEEP_FREE = RAM_RUNTIME.keepFree;
-constexpr uint32_t RAM_LIMIT_CAP = RAM_RUNTIME.limitCap;
-
-constexpr uint16_t I2C_WRITE_US = CPU_RUNTIME.i2cWriteUs;
-constexpr uint32_t BASE_CHANNEL_RAM = RAM_RUNTIME.baseChannel;
-constexpr uint32_t DMX_BUFFER_RAM = RAM_RUNTIME.dmxBuffer;
-constexpr uint32_t I2C_ROUTE_RAM = RAM_RUNTIME.i2cRoute;
-constexpr uint32_t DMX_OUTPUT_SERVICE_US = CPU_RUNTIME.dmxOutputServiceUs;
+constexpr uint16_t I2C_WRITE_US = ScoringLimits::I2C_WRITE_US;
+constexpr uint32_t BASE_CHANNEL_RAM = ScoringLimits::BASE_CHANNEL_BYTES;
+constexpr uint32_t DMX_BUFFER_RAM = ScoringLimits::DMX_BUFFER_BYTES;
+constexpr uint32_t I2C_ROUTE_RAM = ScoringLimits::I2C_ROUTE_BYTES;
+constexpr uint32_t DMX_OUTPUT_SERVICE_US = ScoringLimits::DMX_SERVICE_US;
 }
 
 #endif

@@ -59,6 +59,9 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - `include/type_protocol.h` — shared types for the firmware↔Web UI interface contract (`FieldDef`, `TestCmdDef`)
 - `include/type_interfaces/type_N.h` — per-output-type interface definitions (config fields, test commands, field validation limits)
 - `include/gpio_control.h` — GPIO pin availability, reserved pins, validation helpers (`isInputOnlyPin`, `enumerateChannelGpios`, etc.)
+- `include/source_rules.h` — I2C source address validation rules (`SourceRules::addressValid()`, etc.)
+- `include/display_protocol.h` — display type IDs and I2C address validation
+- `include/scoring_limits.h` — hardware limits (`MAX_LEDC`, `MAX_RMT`), CPU/RAM budget constants
 - `docs/domain_model.md` — project/domain context, device modes, thread safety, ADRs
 - `docs/resource_calculator.md` — hardware scoring and constraints
 - `docs/hardware_guidelines.md` — ESD protection, flyback diode, datasheet checklist

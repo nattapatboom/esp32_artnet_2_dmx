@@ -4,27 +4,25 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include "output_control.h"
+#include "source_rules.h"
+#include "display_protocol.h"
 
-struct AddressRange {
-    uint8_t min;
-    uint8_t max;
-};
+// ── Backward-compat wrappers (delegate to new single-source-of-truth) ──
 
-struct SourceAddressRule {
-    uint8_t source;
-    const char* label;
-    AddressRange ranges[2];
-};
+inline bool sourceAddressValid(uint8_t source, uint8_t address) {
+    return SourceRules::addressValid(source, address);
+}
+inline const char* sourceAddressRangeLabel(uint8_t source) {
+    return SourceRules::addressRangeLabel(source);
+}
+inline bool validateSourceAddress(uint8_t source, uint8_t address, const String& label, String& message) {
+    return SourceRules::validateAddress(source, address, label, message);
+}
+inline bool displayAddressValid(uint8_t displayType, uint8_t address) {
+    return DisplayProtocol::addressValid(displayType, address);
+}
 
-constexpr SourceAddressRule SOURCE_ADDRESS_RULES[] = {
-    {1, "PCA9685 address must be 0x40-0x47", {{0x40, 0x47}, {0, 0}}},
-    {2, "MCP23017 address must be 0x20-0x27", {{0x20, 0x27}, {0, 0}}},
-    {3, "TCA9555 address must be 0x20-0x27", {{0x20, 0x27}, {0, 0}}},
-    {4, "PCF857x address must be 0x20-0x27 or 0x38-0x3F", {{0x20, 0x27}, {0x38, 0x3F}}},
-    {5, "MCP4725 address must be 0x60 or 0x61", {{0x60, 0x61}, {0, 0}}},
-    {6, "DAC7571 address must be 0x4C or 0x4D", {{0x4C, 0x4D}, {0, 0}}},
-    {7, "DAC7573 address must be 0x4C-0x5B", {{0x4C, 0x5B}, {0, 0}}}
-};
+// ── IP validation (general-purpose, not duplicated in JS) ──
 
 inline bool validateIp4(const char* s) {
     if (s == nullptr || s[0] == '\0') return true;
@@ -50,39 +48,7 @@ inline bool validateIp4(const char* s) {
     }
 }
 
-inline bool sourceAddressValid(uint8_t source, uint8_t address) {
-    if (source == 0) return true;
-    for (const auto& rule : SOURCE_ADDRESS_RULES) {
-        if (rule.source != source) continue;
-        for (const auto& range : rule.ranges) {
-            if (range.min == 0 && range.max == 0) continue;
-            if (address >= range.min && address <= range.max) return true;
-        }
-        return false;
-    }
-    return false;
-}
-
-inline const char* sourceAddressRangeLabel(uint8_t source) {
-    for (const auto& rule : SOURCE_ADDRESS_RULES) {
-        if (rule.source == source) return rule.label;
-    }
-    return "Unsupported I2C source";
-}
-
-inline bool validateSourceAddress(uint8_t source, uint8_t address, const String& label, String& message) {
-    if (source == 0) return true;
-    if (sourceAddressValid(source, address)) return true;
-    message = label + " has invalid I2C address 0x" + String(address, HEX) + ". " + sourceAddressRangeLabel(source);
-    return false;
-}
-
-inline bool displayAddressValid(uint8_t displayType, uint8_t address) {
-    if (displayType == 0) return true;
-    if (displayType == 1 || displayType == 2) return address == 0x3C || address == 0x3D;
-    if (displayType == 3) return address == 0x27 || address == 0x3F;
-    return false;
-}
+// ── GPIO routing helpers (stay here — unique to output routing logic) ──
 
 inline bool isPin2GpioRouting(uint8_t type, uint8_t source, uint8_t pin2Source) {
     if (type == OutputDefs::TYPE_MOTOR || type == CHAN_TYPE_ANALOG_RGB || type == OutputDefs::TYPE_SMOKE || (type == OutputDefs::TYPE_STEPPER && pin2Source == 0)) return pin2Source == 0;
