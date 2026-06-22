@@ -61,54 +61,67 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
     - Issue: type 12/13 common-dim modes (`mc_mode` 6-9) count every GPIO segment as LEDC, but only the COM pin needs PWM; segments are digital. Valid configs can be blocked by false LEDC exhaustion.
     - Fix direction: update JS `channelHardware()` and C++ scoring to count one LEDC for the COM GPIO path only in common-dim modes; keep direct-dim modes counting per PWM segment.
 
-12. **Web UI inversion fields mix unrelated semantics**
+14. **Web UI inversion fields mix unrelated semantics**
     - Files: `web/index.html`, `include/output_control.h`
+    - Status: ✅ Completed (`fix(ui): invert field OR-mixing`)
     - Issue: `no_pin_invert`, `no_pin2_invert`, and `no_pin3_invert` are saved both as generic `pin*_invert` fields and stepper/motion fields (`mc_step_invert`, `mc_dir_invert`, `mc_enable_active_high`). Editing can OR unrelated values and save unintended motion behavior.
     - Fix direction: split UI controls by output type or map one canonical persisted field per semantic; avoid OR-ing generic invert state into motion-specific fields.
 
+12. **Expander/Non-GPIO `pca_addr` lost on edit**
+    - Files: `web/index.html`
+    - Status: ✅ Completed (`fix(ui): expander addr restore on edit + DAC single-row layout`)
+    - Issue: `editOutput()` calls `toggleOutFields()` which calls `renderPinRows()` — this rebuilds DOM before source-dependent values are set. If previous render was for GPIO (source=0), `no_pca_addr` element didn't exist, so `saved` never captured it. After re-render with correct expander source, the restored `no_pca_addr` gets the first option (0x20) instead of the persisted value. Only DAC type 14 had the workaround (3rd toggle + explicit set).
+    - Fix direction: re-apply `o.pca_addr` and `o.pca_channel` for all non-zero sources after the final `toggleOutFields()`, not just for DAC type 14.
+
+13. **DAC type 14 renders a non-standard two-row layout**
+    - Files: `web/index.html`
+    - Status: ✅ Completed (`fix(ui): expander addr restore on edit + DAC single-row layout`)
+    - Issue: DAC UI used a specialized 2-row pin layout (Row 1: DAC + addr; Row 2: DAC IC + CH selector/CH A badge), unlike every other type which uses a single standard Source | Address | Pin | Invert row.
+    - Fix direction: collapse to one row; pin column shows channel dropdown (DAC7573 only) or "CH A" badge (MCP4725/DAC7571); address column shows I2C addr dropdown; invert column hidden.
+
 ## P2 / Follow-Up
 
-13. **PCF857x 8-bit vs 16-bit handling**
+15. **PCF857x 8-bit vs 16-bit handling**
     - Files: `include/i2c_gpio_expander.h`, validation in `src/main.cpp`/`web/index.html`
     - Issue: PCF857x write path sends two bytes, but PCF8574/PCF8574A are 8-bit devices. Channel 8-15 can be accepted for 8-bit addresses.
     - Fix direction: distinguish PCF8574/PCF8574A (8-bit) from PCF8575 (16-bit) or restrict channels by model/address contract.
 
-14. **PCA/expander channel upper-bound validation incomplete**
+16. **PCA/expander channel upper-bound validation incomplete**
     - Files: `src/main.cpp`, `web/index.html`
     - Issue: many routes only reject missing `255`, not channels `>15`, and 7-seg base routing does not validate `base + numSeg - 1 <= 15`.
     - Fix direction: centralize route validation helper for source/address/channel and apply to primary, hybrid, and segment routes.
 
-15. **I2C scan/display can block output I2C timing**
+17. **I2C scan/display can block output I2C timing**
     - Files: `src/main.cpp`, `include/display_driver.h`
     - Issue: I2C scan holds `i2cMutex` across all addresses; display update holds mutex across full clear/print operations. Core 1 I2C outputs can wait up to 100 ms.
     - Fix direction: scan one address per mutex acquisition or use shorter time-sliced scans; reduce display critical section frequency/duration.
 
-16. **Output test path bypasses Core 1 ownership**
+18. **Output test path bypasses Core 1 ownership**
     - Files: `src/main.cpp`
     - Issue: `/api/output-test` mutates `dmxBuffer` and invokes output updates from AsyncWebServer callback context.
     - Fix direction: queue test commands to output task instead of direct mutation/rendering.
 
-17. **Recovery mode is Ethernet-only**
+19. **Recovery mode is Ethernet-only**
     - Files: `src/main.cpp`, docs recovery section
     - Issue: recovery disables Wi-Fi/AP, so recovery UI is unavailable if Ethernet is broken. Docs currently describe dual Ethernet + open AP recovery.
     - Fix direction: either implement recovery AP or update docs if Ethernet-only is intentional.
 
-18. **Web UI reserved-pin validation parity gaps**
+20. **Web UI reserved-pin validation parity gaps**
     - Files: `web/index.html`, `src/main.cpp`
     - Issue: add/edit validation checks conflicts with Status LED, ZC, and I2C pins, but does not give immediate Web UI feedback for Ethernet RMII/PHY reserved pins; C++ rejects these later. I2C SDA/SCL changes also do not trigger `autoAssignOutputPins()` even though they affect reserved pins.
     - Fix direction: add the same reserved-pin list used by firmware validation to Web UI add/edit validation; include `i2c_sda` and `i2c_scl` in auto-assign change listeners.
 
-19. **Web UI settings fields need stronger validation and state feedback**
+21. **Web UI settings fields need stronger validation and state feedback**
     - Files: `web/index.html`
     - Issue: static IPv4 fields are plain text without client-side format validation; OTA upload has no file-size guard; ESP-NOW peer edits have no dirty/unsaved indicator; resource bars can be stale when `device_mode` changes.
     - Fix direction: add IPv4 validation in `saveSettings()`, OTA file-size guard, peer dirty state, and score-bar refresh on device mode/ESP-NOW settings changes.
 
-20. **Web UI diagnostics/header labels are inconsistent**
+22. **Web UI diagnostics/header labels are inconsistent**
     - Files: `web/index.html`
     - Issue: the telemetry card label says `Mode`, but `updateTelemetry()` writes `d.time` to `tel-time`. The value should either be uptime/time with a matching label, or the UI should show actual device mode.
     - Fix direction: rename the label to `Uptime`/`Time`, or map `device_mode` to a readable mode string.
 
-21. **Web UI usability polish backlog**
+23. **Web UI usability polish backlog**
     - Files: `web/index.html`
     - Issue: 7-segment direct-drive routing is shown as an unlabeled GPIO list; save buttons are not disabled during in-flight saves; alert areas lack accessible roles/semantic grouping.
     - Fix direction: add per-segment labels in `gpioLabel()`, disable save actions while pending, and add minimal accessibility semantics (`role="alert"`, field grouping) where practical.

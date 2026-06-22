@@ -2631,9 +2631,10 @@ function editOutput(idx){
   setVal('mc_scale_factor',o.mc_scale_factor??0.0);
   setChk('mc_invert',o.mc_invert||false);
   setChk('mc_brake',o.mc_brake||false);
-  setChk('no_pin_invert',o.mc_step_invert||o.pin_invert||false);
-  setChk('no_pin2_invert',o.mc_dir_invert||o.pin2_invert||false);
-  setChk('no_pin3_invert',o.mc_enable_active_high||o.pin3_invert||false);
+  const isStepperType=o.type===7;
+  setChk('no_pin_invert',isStepperType?(o.mc_step_invert||false):(o.pin_invert||false));
+  setChk('no_pin2_invert',isStepperType?(o.mc_dir_invert||false):(o.pin2_invert||false));
+  setChk('no_pin3_invert',isStepperType?(o.mc_enable_active_high||false):(o.pin3_invert||false));
   setChk('no_pin4_invert',o.pin4_invert||false);
   setVal('mc_homing_mode',o.mc_homing_mode??0);
   setVal('mc_homing_dir',o.mc_homing_dir??0);
@@ -2745,9 +2746,9 @@ function addOrUpdateOutput(){
     led_count:parseInt(document.getElementById('no_cnt').value)||170,
     color_order:parseInt(document.getElementById('no_ord').value),
     led_protocol:parseInt(document.getElementById('no_led_proto').value||0),
-    pin_invert: document.getElementById('no_pin_invert')?.checked || false,
-    pin2_invert: document.getElementById('no_pin2_invert')?.checked || false,
-    pin3_invert: document.getElementById('no_pin3_invert')?.checked || false,
+    pin_invert: type===7?false:(document.getElementById('no_pin_invert')?.checked || false),
+    pin2_invert: type===7?false:(document.getElementById('no_pin2_invert')?.checked || false),
+    pin3_invert: type===7?false:(document.getElementById('no_pin3_invert')?.checked || false),
     pin4_invert: document.getElementById('no_pin4_invert')?.checked || false,
     pin2: gv('no_pin2',255),
     pin3: gv('no_pin3',255),
@@ -2775,9 +2776,9 @@ function addOrUpdateOutput(){
     mc_scale_factor: parseFloat(document.getElementById('mc_scale_factor').value),
     mc_invert: document.getElementById('mc_invert').checked,
     mc_brake: document.getElementById('mc_brake').checked,
-    mc_enable_active_high: document.getElementById('no_pin3_invert')?.checked || false,
-    mc_dir_invert: document.getElementById('no_pin2_invert')?.checked || false,
-    mc_step_invert: document.getElementById('no_pin_invert')?.checked || false,
+    mc_enable_active_high: type===7?(document.getElementById('no_pin3_invert')?.checked || false):false,
+    mc_dir_invert: type===7?(document.getElementById('no_pin2_invert')?.checked || false):false,
+    mc_step_invert: type===7?(document.getElementById('no_pin_invert')?.checked || false):false,
     mc_homing_mode: parseInt(document.getElementById('mc_homing_mode').value),
     mc_homing_dir: parseInt(document.getElementById('mc_homing_dir').value),
     mc_homing_speed: parseInt(document.getElementById('mc_homing_speed').value),
