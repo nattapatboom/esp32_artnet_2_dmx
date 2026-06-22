@@ -23,6 +23,8 @@
 #include "i2c_devices/display_driver.h"
 #include "scoring.h"
 #include "config_rules.h"
+#include "source_rules.h"
+#include "display_protocol.h"
 #include "network_protocol.h"
 #include "ota_control.h"
 #include "recovery_control.h"

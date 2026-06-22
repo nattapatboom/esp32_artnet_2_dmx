@@ -2,10 +2,7 @@
 #define CONFIG_RULES_H
 
 #include <Arduino.h>
-#include <ArduinoJson.h>
-#include "output_control.h"
-#include "source_rules.h"
-#include "display_protocol.h"
+#include "output_defs.h"
 
 // ── IP validation (general-purpose, not duplicated in JS) ──
 

@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include "output_defs.h"
-#include "config_rules.h"
 
 // ─────────────────────────────────────────────
 //  GPIO Control
