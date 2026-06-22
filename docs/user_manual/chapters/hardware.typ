@@ -404,6 +404,114 @@ Passive RC filters have high output impedance and cannot drive significant loads
 - *Gain Calculation:* $ "Gain" = 1 + R_f / R_g = 1 + 20"k"Omega / 10"k"Omega = 3.0 $ (Input $3.3"V" times 3.0 = 9.9"V"$ max output). For exactly $10.0"V"$, replace $R_f$ with a $20"k"Omega$ multi-turn potentiometer.
 - *Op-Amp VCC:* Must be powered by $+12"V"$ to $+24"V"$ for adequate headroom to reach $+10"V"$.
 
+=== Active 0-5V and 0-24V Buffer/Amplifier (LM358)
+
+To output other standard industrial voltage ranges like 0-5V or 0-24V from the ESP32's 3.3V PWM output, the same non-inverting amplifier topology is used by adjusting the feedback resistor values ($R_f$ and $R_g$) and the Op-Amp supply voltage (VCC):
+
+- *0-5V Analog Output:* Configure $R_g = 10"k"Omega$, $R_f = 5.1"k"Omega$ (Gain = $1.51$, output up to $approx 4.98"V"$). Power the Op-Amp with at least $+7"V"$ ($+12"V"$ is recommended).
+- *0-24V Analog Output:* Configure $R_g = 10"k"Omega$, $R_f = 62"k"Omega$ (Gain = $7.2$, output up to $approx 23.76"V"$). For exactly $24"V"$, replace $R_f$ with a $50"k"Omega$ trimmer in series with a $47"k"Omega$ resistor. Power the Op-Amp with at least $+26"V"$.
+
+=== Active 4-20mA Current Loop Transmitter
+
+To output a standard 4-20mA current-loop signal, a voltage-controlled current sink using an Op-Amp and a power N-MOSFET (or NPN Darlington transistor like TIP122) in the feedback loop is recommended.
+
+#v(0.8em)
+#align(center)[
+#canvas(length: 1cm, {
+  import draw: *
+
+  let wire-color = rgb("#1a5fb4")
+  let s-wire = (stroke: 1.2pt + wire-color)
+  let s-comp = (stroke: 1.2pt + rgb("#333333"))
+
+  // Input pin
+  circle((-7.0, 0.6), radius: 0.1, fill: rgb("#333333"), stroke: none)
+  content((-7.0, 0.9), [#text(8pt, weight: "bold")[PWM Input]])
+
+  // Resistor R
+  rect((-5.0, 0.8), (-3.8, 0.4), ..s-comp, name: "r")
+  content("r", [#text(8pt)[R]])
+
+  // Capacitor C
+  line((-3.1, -0.1), (-2.5, -0.1), ..(stroke: 1.8pt + rgb("#333333")))
+  line((-3.1, -0.3), (-2.5, -0.3), ..(stroke: 1.8pt + rgb("#333333")))
+  content((-2.1, -0.2), [#text(8pt)[C]])
+
+  // GND for Cap
+  line((-3.2, -0.9), (-2.4, -0.9), ..s-comp)
+  line((-3.05, -1.05), (-2.55, -1.05), ..s-comp)
+  line((-2.9, -1.2), (-2.7, -1.2), ..s-comp)
+
+  // Op-Amp Triangle Symbol
+  line((-1.0, 1.3), (-1.0, -0.3), ..s-comp)
+  line((-1.0, 1.3), (0.8, 0.5), ..s-comp)
+  line((-1.0, -0.3), (0.8, 0.5), ..s-comp)
+  content((-0.4, 0.5), [#text(9pt)[LM358]])
+
+  // Op-Amp Pins (+) and (-)
+  content((-0.8, 0.9), [#text(8pt)[+]])
+  content((-0.8, 0.1), [#text(8pt)[-]])
+
+  // MOSFET Symbol (Gate, Channel, Source, Drain)
+  line((1.9, 0.2), (1.9, 0.8), ..(stroke: 1.8pt + rgb("#333333"))) // Gate bar
+  line((2.2, 0.0), (2.2, 1.0), ..(stroke: 1.8pt + rgb("#333333"))) // Channel bar
+  line((1.4, 0.5), (1.9, 0.5), ..s-wire) // Gate lead wire
+  content((2.5, 0.5), [#text(8pt)[MOSFET]])
+
+  // Drain and Source connections
+  line((2.2, 0.8), (2.8, 0.8), ..s-wire) // Drain lead
+  line((2.8, 0.8), (2.8, 1.7), ..s-wire) // Drain to Out Terminal
+  circle((2.8, 1.8), radius: 0.1, fill: rgb("#333333"), stroke: none)
+  content((2.8, 2.1), [#text(8pt, weight: "bold")[OUT Terminal]])
+
+  line((2.2, 0.2), (2.8, 0.2), ..s-wire) // Source lead
+  line((2.8, 0.2), (2.8, -1.0), ..s-wire) // Source to Rsense
+
+  // Rsense (Sense resistor)
+  rect((2.2, -1.0), (3.4, -1.4), ..s-comp, name: "rsense")
+  content("rsense", [#text(8pt)[Rsense: 100]])
+
+  // GND for Rsense
+  line((2.2, -2.1), (3.0, -2.1), ..s-comp)
+  line((2.35, -2.25), (2.85, -2.25), ..s-comp)
+  line((2.5, -2.4), (2.7, -2.4), ..s-comp)
+
+  // Connections
+  line((-6.9, 0.6), (-5.0, 0.6), ..s-wire) // Input to R
+  
+  // R to Op-Amp (+) input:
+  // Tap for Capacitor is at x=-2.8, y=0.6
+  line((-3.8, 0.6), (-1.8, 0.6), ..s-wire)
+  line((-1.8, 0.6), (-1.8, 0.9), ..s-wire)
+  line((-1.8, 0.9), (-1.0, 0.9), ..s-wire)
+
+  line((-2.8, 0.6), (-2.8, -0.1), ..s-wire)  // Tap to top plate of cap
+  line((-2.8, -0.3), (-2.8, -0.9), ..s-wire) // Bottom plate to GND
+
+  // Op-amp output to MOSFET Gate:
+  line((0.8, 0.5), (1.4, 0.5), ..s-wire)
+
+  // Feedback loop:
+  // Tap from source node (x=2.8, y=-0.5) to inverting input (-)
+  // (-) is at (-1.0, 0.1)
+  // Route left to x=1.0, down to y=-1.6, left to x=-2.2, up to y=0.1, right to (-)
+  line((2.8, -0.5), (1.0, -0.5), ..s-wire)
+  line((1.0, -0.5), (1.0, -1.6), ..s-wire)
+  line((1.0, -1.6), (-2.2, -1.6), ..s-wire)
+  line((-2.2, -1.6), (-2.2, 0.1), ..s-wire)
+  line((-2.2, 0.1), (-1.0, 0.1), ..s-wire)
+
+  // Rsense to GND:
+  line((2.8, -1.4), (2.8, -2.1), ..s-wire)
+})
+]
+#v(0.8em)
+
+- *Operating Principle:* The loop load is connected between $+24"V"$ loop power and the `OUT Terminal`. The output current is governed by the relation $I_("out") = V_("in") / R_("sense")$. With $R_("sense") = 100 Omega$:
+  - $V_("in") = 0.4"V" => I_("out") = 4"mA"$
+  - $V_("in") = 2.0"V" => I_("out") = 20"mA"$
+- *Software Calibration:* In the Web UI settings for the PWM DAC channel, set *`pwm_dac_min`* to `1212` (representing 12.12% duty cycle, $approx 0.4"V"$) and *`pwm_dac_max`* to `6060` (representing 60.60% duty cycle, $approx 2.0"V"$) to calibrate the 4-20mA signal window.
+
 == Device Reference
 
 All external peripheral devices must have reference datasheets for driver code verification.

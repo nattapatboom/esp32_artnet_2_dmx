@@ -160,6 +160,77 @@ graph TD
 - **Gain Calculation:** $\text{Gain} = 1 + \frac{R_f}{R_g} = 1 + \frac{20\text{ k}\Omega}{10\text{ k}\Omega} = 3.0$ (Input $3.3\text{V} \times 3.0 = 9.9\text{V}$ maximum output).
   - To achieve exactly $10.0\text{V}$, replace $R_f$ with a $20\text{ k}\Omega$ multi-turn potentiometer in series with a $5\text{ k}\Omega$ resistor to calibrate the top end.
 
+#### 1.4.3 Active 0-5V and 0-24V Buffer/Amplifier (LM358)
+
+To output other standard industrial voltage ranges like 0-5V or 0-24V from the ESP32's 3.3V PWM output, the same non-inverting amplifier topology can be used by modifying the feedback resistor values ($R_f$ and $R_g$) and adjusting the supply voltage (VCC) of the Op-Amp:
+
+1. **0-5V Analog Output:**
+   - **Gain Required:** $\text{Gain} = \frac{5.0\text{V}}{3.3\text{V}} \approx 1.515$
+   - **Feedback Resistors:** $R_g = 10\text{ k}\Omega$, $R_f = 5.1\text{ k}\Omega$ (provides a gain of $1 + \frac{5.1}{10} = 1.51$, giving an output of $\approx 4.98\text{V}$).
+   - **Power Supply (VCC):** Minimum $+7\text{V}$ (to allow for the LM358's $1.5\text{V}$ output headroom). $+12\text{V}$ is recommended.
+
+2. **0-24V Analog Output:**
+   - **Gain Required:** $\text{Gain} = \frac{24.0\text{V}}{3.3\text{V}} \approx 7.27$
+   - **Feedback Resistors:** $R_g = 10\text{ k}\Omega$, $R_f = 62\text{ k}\Omega$ (provides a gain of $1 + \frac{62}{10} = 7.20$, giving an output of $\approx 23.76\text{V}$). For exactly $24\text{V}$, replace $R_f$ with a $50\text{ k}\Omega$ trimmer in series with a $47\text{ k}\Omega$ resistor.
+   - **Power Supply (VCC):** Minimum $+26\text{V}$ (to allow a full $+24\text{V}$ output with $2\text{V}$ headroom).
+
+---
+
+#### 1.4.4 Active 4-20mA Current Loop Transmitter
+
+Industrial 4-20mA signals are current-driven to prevent signal degradation over long wire runs. A simple active voltage-to-current converter (Current Sink) can be constructed using an Op-Amp and a power N-MOSFET (or NPN Darlington transistor like TIP122) in the feedback loop:
+
+```text
+                                                     [ +24V Loop Power ]
+                                                              │
+                                                        [ Loop Load ]
+                                                              │
+                                                        [ OUT Terminal ]
+                                                              │
+                                                          D ┌─┴─┐
+                       ┌─────────┐                ┌────────>│   │ N-MOSFET (e.g., 2N7000 / IRF540)
+                  R    │      (+)├────────────────┤       G │   │
+  [ESP32 PWM] ───[R]───┼─┬───────│                │         └─┬─┘
+                       │ │    (-)├────────────────┼───────────┤ S
+                       │ └───────┘                │           │
+                       │   LM358                  │         [ Rsense: 100 Ohm ]
+                      [C]                         │           │
+                       │                          │         [ GND ]
+                     [GND]                        └─────────── (Feedback to op-amp inverting input)
+```
+
+```mermaid
+graph TD
+    PWM[ESP32 PWM Pin] --> R[Filter Resistor R]
+    R --> C_Node[Filter Node]
+    C[Capacitor C] --- C_Node
+    C --- GND[GND]
+    C_Node --> OpAmpInP[Op-Amp Non-Inverting +]
+    
+    OpAmpOut[Op-Amp Output] --> MOSFET_G[N-MOSFET Gate]
+    MOSFET_D[N-MOSFET Drain] --- OUT_Term[OUT Terminal]
+    OUT_Term --- Load[Industrial Loop Load]
+    Load --- LoopPower[+24V Loop Power]
+    
+    MOSFET_S[N-MOSFET Source] --> Feedback_Node[Feedback Node]
+    Feedback_Node --> OpAmpInM[Op-Amp Inverting -]
+    Feedback_Node --> Rsense[Sense Resistor Rsense: 100Ω]
+    Rsense --> GND2[GND]
+```
+
+**Operating Principle:**
+1. The RC filter smooths the ESP32's PWM signal into a clean DC input voltage $V_{\text{in}}$ at the non-inverting input (+).
+2. The Op-Amp drives the MOSFET gate until the voltage at the source ($V_{\text{source}}$) matches $V_{\text{in}}$.
+3. The current through the loop is determined by $I_{\text{out}} = \frac{V_{\text{in}}}{R_{\text{sense}}}$.
+4. With $R_{\text{sense}} = 100\text{ }\Omega$:
+   - $V_{\text{in}} = 0.4\text{V} \implies I_{\text{out}} = \frac{0.4\text{V}}{100\text{ }\Omega} = 4\text{ mA}$
+   - $V_{\text{in}} = 2.0\text{V} \implies I_{\text{out}} = \frac{2.0\text{V}}{100\text{ }\Omega} = 20\text{ mA}$
+
+**Software Calibration Setup:**
+Instead of building complex offset-shifting analog hardware, software mapping is used to define the 4-20mA range on the 0-3.3V PWM output. In the Web UI, configure the PWM DAC (Type 15) settings:
+* **`pwm_dac_min` (Min Duty):** Set to `1212` (12.12% duty cycle $\approx 0.4\text{V}$). This maps DMX value `0` to $4\text{ mA}$.
+* **`pwm_dac_max` (Max Duty):** Set to `6060` (60.60% duty cycle $\approx 2.0\text{V}$). This maps DMX value `255` to $20\text{ mA}$.
+
 ---
 
 ### 1.5 GPIO12 / MTDI Bootstrap Pin Field Use
