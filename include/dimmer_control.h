@@ -91,7 +91,7 @@ public:
         // Find all Dimmer channels
         std::vector<OutputChannel>& chs = outputCtrl.getChannels();
         for (auto& ch : chs) {
-            if (ch.type == 0 && ch.dmxBuffer != nullptr) { // CHAN_TYPE_DIMMER
+            if (ch.type == OutputDefs::TYPE_DIMMER && ch.dmxBuffer != nullptr) { // CHAN_TYPE_DIMMER
                 if (numDimmerChannels < MAX_DIMMER_CHANNELS) {
                     dimmerChannels[numDimmerChannels].pin = ch.pin;
                     dimmerChannels[numDimmerChannels].dmxVal = &ch.dmxBuffer;

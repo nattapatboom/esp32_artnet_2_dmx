@@ -15,12 +15,13 @@
 #include "pca9685_control.h"
 #include "i2c_gpio_expander.h"
 #include "funcgen_control.h"
+#include "output_defs.h"
 
 extern PCA9685Manager pcaManager;
 extern DigitalExpanderManager digitalExpanderManager;
 
 #define DMX_BUFFER_SIZE 512
-#define CHAN_TYPE_ANALOG_RGB 5
+#define CHAN_TYPE_ANALOG_RGB OutputDefs::TYPE_ANALOG_RGB
 
 inline uint8_t dmxValueByteCount(uint8_t resolution) {
     if (resolution <= 8) return 1;
@@ -454,11 +455,11 @@ private:
         uint16_t firstConfiguredFreq = 0;
         for (const auto& candidate : channels) {
             if (candidate.source != 1 || candidate.pca_addr != address) continue;
-            if (candidate.type == 8) { // v3 8 = Servo
+            if (candidate.type == OutputDefs::TYPE_SERVO) {
                 return 50; // PCA9685 frequency is shared per chip; RC servo requires 50 Hz.
             }
-            if ((candidate.type == 4 || candidate.type == 6 || // v3 6 = Motor
-                 candidate.type == CHAN_TYPE_ANALOG_RGB || candidate.type == 18 || candidate.type == 15) && // v3 18 = Smoke Shooter, 15 = PWM DAC
+            if ((candidate.type == OutputDefs::TYPE_SINGLE_LED || candidate.type == OutputDefs::TYPE_MOTOR ||
+                 candidate.type == CHAN_TYPE_ANALOG_RGB || candidate.type == OutputDefs::TYPE_SMOKE || candidate.type == OutputDefs::TYPE_PWM_DAC) &&
                 firstConfiguredFreq == 0) {
                 firstConfiguredFreq = candidate.mc_freq;
             }
@@ -468,7 +469,7 @@ private:
 
 public:
     uint16_t getUniverseCount(const OutputChannel& ch) const {
-        if (ch.type == 3) { // RGB LED strip (v3)
+        if (ch.type == OutputDefs::TYPE_LED_STRIP) { // RGB LED strip (v3)
             uint8_t bytesPerPixel = (ch.color_order >= 4) ? 4 : 3;
             uint16_t pixelsPerUniverse = 512 / bytesPerPixel;
             return (ch.led_count + pixelsPerUniverse - 1) / pixelsPerUniverse;
@@ -487,7 +488,7 @@ public:
         for (auto& ch : channels) {
             if (ch.shadowBuffer == nullptr) continue;
 
-            if (ch.type == 3) { // RGB LED strip (v3)
+            if (ch.type == OutputDefs::TYPE_LED_STRIP) { // RGB LED strip (v3)
                 uint16_t numUniverses = getUniverseCount(ch);
                 if (universe >= ch.start_universe && universe < ch.start_universe + numUniverses) {
                     uint16_t universeOffset = universe - ch.start_universe;
@@ -499,7 +500,7 @@ public:
                         matched = true;
                     }
                 }
-            } else if (ch.type == 1 && ch.start_universe == universe) {
+            } else if (ch.type == OutputDefs::TYPE_DMX && ch.start_universe == universe) {
                 if (dataOffset < ch.bufferSize) {
                     uint32_t available = (uint32_t)ch.bufferSize - dataOffset;
                     uint32_t lenToCopy = min((uint32_t)copyLen, available);
@@ -817,7 +818,7 @@ public:
                         item["pin3_addr"] = ch.pin3_addr;
                         item["pin3_channel"] = ch.pin3_channel;
                     }
-                    if (ch.type == 7) {
+                    if (ch.type == OutputDefs::TYPE_STEPPER) {
                         item["mc_enable_active_high"] = ch.mc_enable_active_high;
                         item["mc_dir_invert"] = ch.mc_dir_invert;
                         item["mc_step_invert"] = ch.mc_step_invert;
@@ -837,27 +838,27 @@ public:
                 item["mc_homing_timeout"] = ch.mc_homing_timeout;
                 item["mc_scale_factor"] = ch.mc_scale_factor;
                 item["mc_unit_type"] = ch.mc_unit_type;
-            } else if (ch.type == 17) {
+            } else if (ch.type == OutputDefs::TYPE_SOLENOID) {
                 item["solenoid_mode"] = ch.solenoid_mode;
                 item["solenoid_threshold"] = ch.solenoid_threshold;
                 item["solenoid_pulse_ms"] = ch.solenoid_pulse_ms;
                 item["solenoid_pre_delay"] = ch.solenoid_pre_delay;
                 item["solenoid_post_delay"] = ch.solenoid_post_delay;
-            } else if (ch.type == 18) {
+            } else if (ch.type == OutputDefs::TYPE_SMOKE) {
                 item["pin2"] = ch.pin2;
                 item["pin2_source"] = ch.pin2_source;
                 item["pin2_addr"] = ch.pin2_addr;
                 item["pin2_channel"] = ch.pin2_channel;
                 item["solenoid_threshold"] = ch.solenoid_threshold;
-            } else if (ch.type == 9) {
+            } else if (ch.type == OutputDefs::TYPE_BUZZER) {
                 item["mc_freq"] = ch.mc_freq;
-            } else if (ch.type == 11 || ch.type == 12 || ch.type == 13) {
+            } else if (ch.type == OutputDefs::TYPE_TM1637 || ch.type == OutputDefs::TYPE_7SEG_7PIN || ch.type == OutputDefs::TYPE_7SEG_8PIN) {
                 item["pin2"] = ch.pin2;
                 item["pin2_source"] = ch.pin2_source;
                 item["pin2_addr"] = ch.pin2_addr;
                 item["pin2_channel"] = ch.pin2_channel;
                 item["mc_mode"] = ch.mc_mode;
-                if (ch.type == 12 || ch.type == 13) {
+                if (ch.type == OutputDefs::TYPE_7SEG_7PIN || ch.type == OutputDefs::TYPE_7SEG_8PIN) {
                     JsonArray segArr = item["seg_pins"].to<JsonArray>();
                     for (int s = 0; s < 8; s++) {
                         segArr.add(ch.seg_pins[s]);
@@ -872,9 +873,9 @@ public:
                     }
                     item["seg_inverts"] = ch.seg_inverts;
                 }
-            } else if (ch.type == 10) {
+            } else if (ch.type == OutputDefs::TYPE_DFPLAYER) {
                 item["pin2"] = ch.pin2;
-            } else if (ch.type == 15 || ch.type == 16) {
+            } else if (ch.type == OutputDefs::TYPE_PWM_DAC || ch.type == OutputDefs::TYPE_FUNC_GEN) {
                 item["mc_freq"] = ch.mc_freq;
                 item["mc_resolution"] = ch.mc_resolution;
             }
@@ -889,7 +890,7 @@ public:
                 delete ch.pixelStrip;
                 ch.pixelStrip = nullptr;
             }
-            if (ch.type == 1 && ch.dmxPort != 255) {
+            if (ch.type == OutputDefs::TYPE_DMX && ch.dmxPort != 255) {
                 dmx_driver_delete((dmx_port_t)ch.dmxPort);
                 ch.dmxPort = 255;
             }
@@ -931,7 +932,7 @@ public:
         bool uart2Used = false;
         bool uart1Used = false;
         for (const auto& ch : channels) {
-            if (ch.type == 10) {
+            if (ch.type == OutputDefs::TYPE_DFPLAYER) {
                 if (!uart2Used) {
                     uart2Used = true;
                 } else if (!uart1Used) {
@@ -951,16 +952,16 @@ public:
                 continue;
             } else if (ch.source >= 2 && ch.source <= 4) {
                 writeOutputPin(ch, 1, false);
-                if ((ch.type == 18 || ch.type == 6 || ch.type == 7) && ch.pca_channel2 != 255) {
+                if ((ch.type == OutputDefs::TYPE_SMOKE || ch.type == OutputDefs::TYPE_MOTOR || ch.type == OutputDefs::TYPE_STEPPER) && ch.pca_channel2 != 255) {
                     writeOutputPin(ch, 2, false);
                 }
-                if ((ch.type == 6 || ch.type == 7) && ch.pca_channel3 != 255) {
+                if ((ch.type == OutputDefs::TYPE_MOTOR || ch.type == OutputDefs::TYPE_STEPPER) && ch.pca_channel3 != 255) {
                     writeOutputPin(ch, 3, false);
                 }
                 Serial.printf("Expander initialized: src=%d addr=0x%02X type=%d\n", ch.source, ch.pca_addr, ch.type);
                 continue;
             }
-            if (ch.type == 3) {
+            if (ch.type == OutputDefs::TYPE_LED_STRIP) {
                 if (ch.pixelStrip != nullptr) {
                     delete ch.pixelStrip;
                     ch.pixelStrip = nullptr;
@@ -981,18 +982,18 @@ public:
                 } else {
                     Serial.println("Max 8 LED channels reached.");
                 }
-            } else if (ch.type == 2) {
+            } else if (ch.type == OutputDefs::TYPE_RELAY) {
                 pinMode(ch.pin, OUTPUT);
                 digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
                 Serial.printf("Relay init: GPIO%d U%d\n", ch.pin, ch.start_universe);
-            } else if (ch.type == 17) {
+            } else if (ch.type == OutputDefs::TYPE_SOLENOID) {
                 pinMode(ch.pin, OUTPUT);
                 digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
                 if (ch.solenoid_pulse_ms == 0) ch.solenoid_pulse_ms = 50;
                 if (ch.solenoid_threshold == 0) ch.solenoid_threshold = 127;
                 Serial.printf("Solenoid init: GPIO%d U%d pulse=%dms thresh=%d\n",
                     ch.pin, ch.start_universe, ch.solenoid_pulse_ms, ch.solenoid_threshold);
-            } else if (ch.type == 1) {
+            } else if (ch.type == OutputDefs::TYPE_DMX) {
                 if (ch.dmxPort != 255) {
                     dmx_driver_delete((dmx_port_t)ch.dmxPort);
                     ch.dmxPort = 255;
@@ -1026,7 +1027,7 @@ public:
                 } else {
                     Serial.println("Max 8 RMTs reached.");
                 }
-            } else if (ch.type == 18) {
+            } else if (ch.type == OutputDefs::TYPE_SMOKE) {
                 if (ch.source == 0) {
                     pinMode(ch.pin, OUTPUT);
                     pinMode(ch.pin2, OUTPUT);
@@ -1037,7 +1038,7 @@ public:
                 ch.smoke_state = 0;
                 ch.smoke_prev_trigger = false;
                 Serial.printf("Smoke Shooter init: pin=%d pin2=%d thresh=%d\n", ch.pin, ch.pin2, ch.solenoid_threshold);
-            } else if (ch.type == 10) {
+            } else if (ch.type == OutputDefs::TYPE_DFPLAYER) {
                 ch.dfPlayer = new DFPlayerController();
                 if (dfPlayerCount == 0) {
                     ch.dfPlayer->begin(Serial2, ch.pin, ch.pin2);
@@ -1119,7 +1120,7 @@ public:
 
     void updateRelays() {
         for (auto& ch : channels) {
-            if (ch.type == 2 && ch.dmxBuffer != nullptr) {
+            if (ch.type == OutputDefs::TYPE_RELAY && ch.dmxBuffer != nullptr) {
                 // Relay threshold at 50% (127)
                 bool state = ch.dmxBuffer[0] > 127;
                 writeOutputPin(ch, 1, state);
@@ -1231,7 +1232,7 @@ public:
 private:
     void sendDmxFrames() {
         for (auto& ch : channels) {
-            if (ch.type == 1 && ch.dmxBuffer != nullptr) {
+            if (ch.type == OutputDefs::TYPE_DMX && ch.dmxBuffer != nullptr) {
                 if (ch.dmxPort != 255) {
                     dmx_port_t port = (dmx_port_t)ch.dmxPort;
                     if (!dmx_wait_sent(port, 0)) continue;

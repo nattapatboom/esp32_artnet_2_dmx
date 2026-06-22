@@ -85,24 +85,24 @@ inline bool displayAddressValid(uint8_t displayType, uint8_t address) {
 }
 
 inline bool isPin2GpioRouting(uint8_t type, uint8_t source, uint8_t pin2Source) {
-    if (type == 6 || type == CHAN_TYPE_ANALOG_RGB || type == 18 || (type == 7 && pin2Source == 0)) return pin2Source == 0;
-    if (type == 11 || type == 10) return source == 0;
+    if (type == OutputDefs::TYPE_MOTOR || type == CHAN_TYPE_ANALOG_RGB || type == OutputDefs::TYPE_SMOKE || (type == OutputDefs::TYPE_STEPPER && pin2Source == 0)) return pin2Source == 0;
+    if (type == OutputDefs::TYPE_TM1637 || type == OutputDefs::TYPE_DFPLAYER) return source == 0;
     return false;
 }
 
 inline bool isPin3GpioRouting(uint8_t type, uint8_t pin3Source, uint8_t mcMode) {
-    if (type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2) || type == 7) return pin3Source == 0;
+    if (type == CHAN_TYPE_ANALOG_RGB || (type == OutputDefs::TYPE_MOTOR && mcMode == 2) || type == OutputDefs::TYPE_STEPPER) return pin3Source == 0;
     return false;
 }
 
 inline bool isPin4GpioRouting(uint8_t type, uint8_t pin4Source, uint8_t colorOrder, uint8_t homingMode) {
     if (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4) return pin4Source == 0;
-    if (type == 7 && homingMode == 0) return pin4Source == 0;
+    if (type == OutputDefs::TYPE_STEPPER && homingMode == 0) return pin4Source == 0;
     return false;
 }
 
 inline uint8_t numSegPins(uint8_t type) {
-    return (type == 13) ? 8 : 7;
+    return (type == OutputDefs::TYPE_7SEG_8PIN) ? 8 : 7;
 }
 
 inline bool isSegCommonDim(uint8_t mcMode) {
