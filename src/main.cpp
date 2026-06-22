@@ -268,53 +268,68 @@ bool collectRequestBody(AsyncWebServerRequest* request, uint8_t* data, size_t le
     return true;
 }
 
-bool jsonPinMatches(JsonVariantConst value, uint8_t reservedPin) {
-    int pin = value | 255;
-    return reservedPin != 255 && pin != 255 && pin == reservedPin;
+template <typename F>
+bool forEachOutputGpioPin(JsonObjectConst output, F&& callback) {
+    uint8_t source = output["source"] | 0;
+    uint8_t type = output["type"] | 0;
+    uint8_t mcMode = output["mc_mode"] | 0;
+    const OutputDefs::OutputModeDef* def = OutputDefs::modeDef(type, mcMode);
+    if (def == nullptr) return false;
+
+    JsonArrayConst segPins = output["seg_pins"].as<JsonArrayConst>();
+    JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
+    bool hasSegPins = !segPins.isNull();
+    bool sevenSegCommonDim = def->pins == OutputDefs::PINS_7SEG_COMMON_DIM;
+    bool sevenSeg = def->pins == OutputDefs::PINS_7SEG_DIRECT ||
+                    def->pins == OutputDefs::PINS_7SEG_DIMMED ||
+                    sevenSegCommonDim;
+    int basePin = output["pin"] | 255;
+
+    auto routeSourceForSlot = [&](uint8_t slotIndex) -> uint8_t {
+        if (slotIndex == 0) return source;
+        if (sevenSeg && hasSegPins) {
+            uint8_t segIndex = sevenSegCommonDim ? (uint8_t)(slotIndex - 1) : slotIndex;
+            if (segIndex < segSources.size()) return segSources[segIndex] | 0;
+            return 0;
+        }
+        if (slotIndex == 1) return output["pin2_source"] | 0;
+        if (slotIndex == 2) return output["pin3_source"] | 0;
+        if (slotIndex == 3) return output["pin4_source"] | 0;
+        return 255;
+    };
+
+    auto pinForSlot = [&](uint8_t slotIndex) -> int {
+        if (sevenSeg) {
+            uint8_t segIndex = sevenSegCommonDim ? (slotIndex == 0 ? 255 : (uint8_t)(slotIndex - 1)) : slotIndex;
+            if (hasSegPins && segIndex != 255 && segIndex < segPins.size()) return segPins[segIndex] | 255;
+            if (slotIndex == 0) return basePin;
+            if (slotIndex == 1) return output["pin2"] | ((basePin != 255) ? basePin + 1 : 255);
+            if (slotIndex == 2) return output["pin3"] | ((basePin != 255) ? basePin + 2 : 255);
+            if (slotIndex == 3) return output["pin4"] | ((basePin != 255) ? basePin + 3 : 255);
+            return (basePin != 255) ? basePin + slotIndex : 255;
+        }
+        if (slotIndex == 0) return output["pin"] | 255;
+        if (slotIndex == 1) return output["pin2"] | 255;
+        if (slotIndex == 2) return output["pin3"] | 255;
+        if (slotIndex == 3) return output["pin4"] | 255;
+        return 255;
+    };
+
+    for (uint8_t slot = 0; slot < def->pinCount; slot++) {
+        uint8_t routeSource = routeSourceForSlot(slot);
+        if (!OutputDefs::pinSlotUsesGpio(type, mcMode, slot, routeSource)) continue;
+        int pin = pinForSlot(slot);
+        if (pin == 255 || pin < 0) continue;
+        if (callback(pin, def->pins[slot].label)) return true;
+    }
+    return false;
 }
 
 bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
     if (reservedPin == 255) return false;
-    uint8_t source = output["source"] | 0;
-    uint8_t type = output["type"] | 0;
-    uint8_t mcMode = output["mc_mode"] | 0;
-    uint8_t pin2Source = output["pin2_source"] | 0;
-    uint8_t pin3Source = output["pin3_source"] | 0;
-    uint8_t pin4Source = output["pin4_source"] | 0;
-
-    if (source == 0 && jsonPinMatches(output["pin"], reservedPin)) return true;
-
-    if (OutputDefs::isSevenSegType(type)) {
-        if (pin2Source == 0) {
-            uint8_t nSeg = OutputDefs::sevenSegSegmentCount(type, mcMode);
-            uint8_t startIdx = OutputDefs::sevenSegFirstAuxSegment(type, mcMode);
-            if (output.containsKey("seg_pins")) {
-                JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
-                JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
-                for (int s = startIdx; s < nSeg; s++) {
-                    if (s < segSources.size() && (uint8_t)(segSources[s] | 0) != 0) continue;
-                    if (s < segArr.size()) {
-                        if (jsonPinMatches(segArr[s], reservedPin)) return true;
-                    } else if (source == 0) {
-                        int basePin = output["pin"] | 255;
-                        if (basePin != 255 && (basePin + s) == reservedPin) return true;
-                    }
-                }
-            } else if (source == 0) {
-                int basePin = output["pin"] | 255;
-                if (basePin != 255) {
-                    for (int s = startIdx; s < nSeg; s++) {
-                        if ((basePin + s) == reservedPin) return true;
-                    }
-                }
-            }
-        }
-    } else {
-        if (OutputDefs::pinSlotUsesGpio(type, mcMode, 1, pin2Source) && jsonPinMatches(output["pin2"], reservedPin)) return true;
-        if (OutputDefs::pinSlotUsesGpio(type, mcMode, 2, pin3Source) && jsonPinMatches(output["pin3"], reservedPin)) return true;
-        if (OutputDefs::pinSlotUsesGpio(type, mcMode, 3, pin4Source) && jsonPinMatches(output["pin4"], reservedPin)) return true;
-    }
-    return false;
+    return forEachOutputGpioPin(output, [&](int pin, const char*) {
+        return pin == reservedPin;
+    });
 }
 
 bool outputsUseReservedPin(JsonArray outputs, uint8_t reservedPin, const char* label, String& message) {
@@ -345,13 +360,6 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
     };
     uint8_t channel = 1;
     for (JsonObject output : outputs) {
-        uint8_t source = output["source"] | 0;
-        uint8_t type = output["type"] | 0;
-        uint8_t mcMode = output["mc_mode"] | 0;
-        uint8_t pin2Source = output["pin2_source"] | 0;
-        uint8_t pin3Source = output["pin3_source"] | 0;
-        uint8_t pin4Source = output["pin4_source"] | 0;
-
         auto forbid = [&](int rawPin, const char* label) -> bool {
             int8_t p = isForbiddenOutput(rawPin);
             if (p < 0) return false;
@@ -363,43 +371,9 @@ bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
             return true;
         };
 
-        if (source == 0) {
-            if (forbid(output["pin"] | 255, "")) return true;
-        }
-
-        if (OutputDefs::isSevenSegType(type)) {
-            if (pin2Source == 0) {
-                uint8_t nSeg = OutputDefs::sevenSegSegmentCount(type, mcMode);
-                uint8_t startIdx = OutputDefs::sevenSegFirstAuxSegment(type, mcMode);
-                if (output.containsKey("seg_pins")) {
-                    JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
-                    JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
-                    for (int s = startIdx; s < nSeg; s++) {
-                        if (s < segSources.size() && (uint8_t)(segSources[s] | 0) != 0) continue;
-                        int pVal = 255;
-                        if (s < segArr.size()) pVal = segArr[s] | 255;
-                        if (pVal == 255 && source == 0) {
-                            int basePin = output["pin"] | 255;
-                            pVal = (basePin != 255) ? (basePin + s) : 255;
-                        }
-                        if (forbid(pVal, " segment")) return true;
-                    }
-                } else if (source == 0) {
-                    int basePin = output["pin"] | 255;
-                    for (int s = startIdx; s < nSeg; s++) {
-                        if (forbid((basePin != 255) ? (basePin + s) : 255, " segment")) return true;
-                    }
-                }
-            }
-        } else {
-            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 1, pin2Source) && forbid(output["pin2"] | 255, " pin2")) return true;
-            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 2, pin3Source) && forbid(output["pin3"] | 255, " pin3")) return true;
-
-            int p4Pin = output["pin4"] | 255;
-            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 3, pin4Source)) {
-                if (forbid(p4Pin, " pin4")) return true;
-            }
-        }
+        if (forEachOutputGpioPin(output, [&](int pin, const char* label) {
+            return forbid(pin, (String(" ") + label).c_str());
+        })) return true;
         channel++;
     }
     return false;
@@ -431,51 +405,9 @@ bool outputsHaveDuplicateGpio(JsonArray outputs, String& message) {
 
     uint8_t channel = 1;
     for (JsonObject output : outputs) {
-        uint8_t source = output["source"] | 0;
-        uint8_t type = output["type"] | 0;
-        uint8_t mcMode = output["mc_mode"] | 0;
-        uint8_t pin2Source = output["pin2_source"] | 0;
-        uint8_t pin3Source = output["pin3_source"] | 0;
-        uint8_t pin4Source = output["pin4_source"] | 0;
-
-        if (source == 0) {
-            if (addPin(output["pin"] | 255, channel)) return true;
-        }
-
-        if (OutputDefs::isSevenSegType(type)) {
-            if (pin2Source == 0) {
-                uint8_t nSeg = OutputDefs::sevenSegSegmentCount(type, mcMode);
-                uint8_t startIdx = OutputDefs::sevenSegFirstAuxSegment(type, mcMode);
-                if (output.containsKey("seg_pins")) {
-                    JsonArrayConst segArr = output["seg_pins"].as<JsonArrayConst>();
-                    JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
-                    for (int s = startIdx; s < nSeg; s++) {
-                        if (s < segSources.size() && (uint8_t)(segSources[s] | 0) != 0) continue;
-                        int pVal = 255;
-                        if (s < segArr.size()) {
-                            pVal = segArr[s] | 255;
-                        }
-                        if (pVal == 255 && source == 0) {
-                            int basePin = output["pin"] | 255;
-                            pVal = (basePin != 255) ? (basePin + s) : 255;
-                        }
-                        if (addPin(pVal, channel)) return true;
-                    }
-                } else {
-                    if (source == 0) {
-                        int basePin = output["pin"] | 255;
-                        for (int s = startIdx; s < nSeg; s++) {
-                            int pVal = (basePin != 255) ? (basePin + s) : 255;
-                            if (addPin(pVal, channel)) return true;
-                        }
-                    }
-                }
-            }
-        } else {
-            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 1, pin2Source) && addPin(output["pin2"] | 255, channel)) return true;
-            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 2, pin3Source) && addPin(output["pin3"] | 255, channel)) return true;
-            if (OutputDefs::pinSlotUsesGpio(type, mcMode, 3, pin4Source) && addPin(output["pin4"] | 255, channel)) return true;
-        }
+        if (forEachOutputGpioPin(output, [&](int pin, const char*) {
+            return addPin(pin, channel);
+        })) return true;
         channel++;
     }
     return false;

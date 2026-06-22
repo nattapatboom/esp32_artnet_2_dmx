@@ -287,25 +287,6 @@ inline bool pinSlotUsesGpio(uint8_t type, uint8_t mode, uint8_t slotIndex, uint8
     return rule != nullptr && routeSource == 0 && (rule->sources & SRC_GPIO);
 }
 
-inline bool isSevenSegType(uint8_t type) {
-    return type == TYPE_7SEG_7PIN || type == TYPE_7SEG_8PIN;
-}
-
-inline bool isSevenSegCommonDim(uint8_t type, uint8_t mode) {
-    const OutputModeDef* def = modeDef(type, mode);
-    return def != nullptr && def->pins == PINS_7SEG_COMMON_DIM;
-}
-
-inline uint8_t sevenSegSegmentCount(uint8_t type, uint8_t mode) {
-    const OutputModeDef* def = modeDef(type, mode);
-    if (def == nullptr) return 0;
-    return isSevenSegCommonDim(type, mode) ? (uint8_t)(def->pinCount - 1) : def->pinCount;
-}
-
-inline uint8_t sevenSegFirstAuxSegment(uint8_t type, uint8_t mode) {
-    return isSevenSegCommonDim(type, mode) ? 0 : 1;
-}
-
 // ─────────────────────────────────────
 //  Type interface (Web UI contract) lookup
 // ─────────────────────────────────────
