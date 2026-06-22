@@ -2171,7 +2171,13 @@ void networkTask(void* pvParameters) {
             JsonDocument doc;
             JsonArray arr = doc.to<JsonArray>();
             if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                bool held = true;
                 for (uint8_t addr = 1; addr < 128; addr++) {
+                    if ((addr & 0x07) == 0 && addr > 1) {
+                        xSemaphoreGive(i2cMutex);
+                        vTaskDelay(pdMS_TO_TICKS(1));
+                        if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) { held = false; break; }
+                    }
                     Wire.beginTransmission(addr);
                     uint8_t error = Wire.endTransmission();
                     if (error == 0) {
@@ -2204,7 +2210,7 @@ void networkTask(void* pvParameters) {
                         if (usedBy.length() > 0) obj["used_by"] = usedBy;
                     }
                 }
-                xSemaphoreGive(i2cMutex);
+                if (held) xSemaphoreGive(i2cMutex);
             }
 
             String result;
