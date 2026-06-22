@@ -300,7 +300,14 @@ private:
 
             // Queue for thread-safe processing on Core 1 loop
             if (espNowQueue != nullptr) {
-                xQueueSend(espNowQueue, &packet, 0);
+                if (xQueueSend(espNowQueue, &packet, 0) != pdTRUE) {
+                    static uint32_t lastDropLog = 0;
+                    uint32_t now = millis();
+                    if (now - lastDropLog > 5000) {
+                        lastDropLog = now;
+                        Serial.println("ESP-NOW: queue full, packet dropped");
+                    }
+                }
             }
         }
     }

@@ -55,6 +55,7 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 
 9. **ESP-NOW receive queue silently drops chunks**
    - Files: `include/espnow_control.h`, `src/main.cpp`
+   - Status: ✅ Completed (`fix: check xQueueSend return, log warning on drop`)
    - Issue: queue depth is 16 but `espnow_chunk_size=16` requires 32 packets for one full universe; `xQueueSend()` return value is ignored.
    - Fix direction: either raise minimum chunk size or queue depth, check/drop-count on send failure, and expose a diagnostic counter.
 
