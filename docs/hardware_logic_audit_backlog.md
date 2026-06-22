@@ -12,11 +12,13 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 
 2. **7-segment direct PWM LEDC allocation overlaps later outputs**
    - Files: `include/motion_control.h`, `include/scoring.h`, `web/index.html`
+   - Status: ✅ Completed (`fix: reserve full LEDC block for 7-seg DD PWM segments`)
    - Issue: direct-drive 7-seg modes use `baseChan + s` for 7/8 segments but call `allocateLedc()` only once. Later outputs can reuse those LEDC channels.
    - Fix direction: reserve a contiguous LEDC block or allocate per segment; sync scoring and Web UI LEDC counts.
 
 3. **7-segment PCA/expander routed outputs can pass config but not update**
    - Files: `include/motion_control.h`, `src/main.cpp`, `web/index.html`
+   - Status: ✅ Completed (`fix: let 7-segment DD bypass source==1 / !=0 gates in begin() and update()`)
    - Issue: `MotionControl::begin()` skips most `source != 0` channels, and `update()` handles `ch.source == 1` before 7-seg logic then `continue`s.
    - Fix direction: route type 12/13 through the dedicated 7-seg update path before generic PCA branches, and ensure setup runs for PCA/expander/common-dim modes.
 

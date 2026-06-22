@@ -249,7 +249,7 @@ public:
         engine.init();
 
         for (auto& ch : outputCtrl.getChannels()) {
-            if (ch.source != 0 && ch.type != 7 && ch.type != CHAN_TYPE_ANALOG_RGB) continue; // Stepper and Analog RGB may be hybrid/independent.
+            if (ch.source != 0 && ch.type != 7 && ch.type != CHAN_TYPE_ANALOG_RGB && ch.type != 11 && ch.type != 12 && ch.type != 13) continue; // Stepper, Analog RGB, and 7-segment may be hybrid/independent.
             if (ch.type == 4) { // CHAN_TYPE_PWM
                 uint8_t pwmChan = allocateLedc();
                 if (pwmChan != 255) {
@@ -493,6 +493,9 @@ public:
                     if (ch.type == 12 || ch.type == 13) {
                         uint8_t baseChan = allocateLedc();
                         if (baseChan != 255) {
+                            // Reserve remaining segment channels as a contiguous block
+                            ledcChannelIndex = baseChan + numSeg;
+                            if (ledcChannelIndex > 16) ledcChannelIndex = 16;
                             for (uint8_t s = 0; s < numSeg; s++) {
                                 uint8_t segPin = segmentGpio(ch, s);
                                 if (ch.seg_sources[s] == 0 && segPin != 255 && baseChan + s <= 15) {
@@ -643,7 +646,7 @@ public:
                     }
                 }
 
-                continue; // Skip ESP32 direct hardware update
+                if (ch.type != 11 && ch.type != 12 && ch.type != 13) continue; // Skip ESP32 direct hardware update; 7-segment handled below
             } else if (ch.source == 5) { // MCP4725 I2C DAC
                 if (ch.type == 14) writeMcp4725(ch.pca_addr, ch.dmxBuffer[0]);
                 continue;
@@ -654,7 +657,7 @@ public:
                 if (ch.type == 14) writeDac7573(ch.pca_addr, ch.pca_channel, ch.dmxBuffer[0]);
                 continue;
             } else if (ch.source != 0) {
-                continue; // Digital expanders are handled by OutputControl for on/off modes.
+                if (ch.type != 11 && ch.type != 12 && ch.type != 13) continue; // Digital expanders are handled by OutputControl for on/off modes; 7-segment handled below
             }
 
             if (ch.type == 4) { // PWM
