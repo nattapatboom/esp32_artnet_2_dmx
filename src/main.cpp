@@ -1307,12 +1307,20 @@ void setupNetwork() {
 }
 
 void startRecoveryEthernetOnly() {
-    WiFi.mode(WIFI_OFF);
-    WiFi.disconnect(true, true);
-    WiFi.softAPdisconnect(true);
+    WiFi.persistent(false);
+    configureWiFiRadioForBoot();
+    WiFi.mode(WIFI_AP_STA);
+    String recoverySsid = "ESP32-ArtNet-Recovery";
+    {
+        String mac = WiFi.macAddress();
+        mac.replace(":", "");
+        String suffix = mac.substring(mac.length() - 4);
+        recoverySsid = recoverySsid + "-" + suffix;
+    }
+    WiFi.softAP(recoverySsid.c_str(), NULL, 1);
+    Serial.printf("Recovery AP started: %s\n", recoverySsid.c_str());
 
     WiFi.onEvent(onWiFiEvent);
-    WiFi.persistent(false);
     resetEthernetPhy();
     ETH.begin(ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_TYPE, ETH_CLK_MODE);
 
@@ -1328,7 +1336,7 @@ void startRecoveryEthernetOnly() {
     }
 
     setupWebServer();
-    Serial.println("Recovery Mode ready on Ethernet only. Wi-Fi/AP disabled to avoid brownout.");
+    Serial.println("Recovery Mode ready on Ethernet + AP. Connect to " + recoverySsid);
 }
 
 void setupWebServer() {
