@@ -34,7 +34,7 @@ select option{background:#fff;color:#222}
 .cb{display:flex;align-items:center;gap:6px;padding:4px 0}
 .cb input{width:auto}
 .cb label{margin:0;font-size:0.82rem}
-.hint{font-size:0.68rem;color:#94a3b8;margin-top:2px}
+.hint{font-size:0.68rem;color:#64748b;margin-top:2px}
 .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .btn{padding:7px 16px;border:none;border-radius:5px;cursor:pointer;font-size:0.82rem;font-weight:600;transition:opacity .15s}
 .btn:hover{opacity:0.85}
@@ -105,12 +105,12 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
     <div class="sc"><small>IP Address</small><strong id="tel-ip">--</strong></div>
     <div class="sc"><small>Art-Net Packets</small><strong id="tel-packets">--</strong></div>
     <div class="sc"><small>Free Heap</small><strong id="tel-heap">--</strong></div>
-    <div class="sc"><small>CPU</small><strong id="tel-cpu">--</strong></div>
+    <div class="sc"><small>CPU Freq</small><strong id="tel-cpu">--</strong></div>
     <div class="sc"><small>Mode</small><strong id="tel-time">--</strong></div>
   </div>
 
-  <div id="alert-ok" class="alert al-ok">Settings saved successfully.</div>
-  <div id="alert-err" class="alert al-err">Error saving settings.</div>
+  <div id="alert-ok" class="alert al-ok" aria-live="polite">Settings saved successfully.</div>
+  <div id="alert-err" class="alert al-err" aria-live="assertive">Error saving settings.</div>
 
   <div class="tabs">
     <button class="tb on" onclick="showTab(event,'net')">Network</button>
@@ -273,7 +273,7 @@ progress::-webkit-progress-value{background:#1e3a8a;border-radius:4px}
       <div class="section">
       <div class="section-head"><h3>Output Timing</h3><span class="pill">Render</span></div>
       <div class="fg">
-        <div class="f"><label for="output_fps">Global Output FPS</label><input type="number" id="output_fps" name="output_fps" min="1" max="44"></div>
+        <div class="f"><label for="output_fps">Global Output FPS</label><input type="number" id="output_fps" name="output_fps" min="1" max="44" oninput="updateScoreBar()"></div>
       </div>
       </div>
 
@@ -856,11 +856,11 @@ async function diagRefreshSysInfo(){
     document.getElementById('diag-cpu').textContent=d.cpu_freq+' MHz';
     document.getElementById('diag-mac').textContent=d.board_mac;
     document.getElementById('diag-eth-status').innerHTML=d.eth_up?'<span style="color:#16a34a">Connected</span>':'<span style="color:#94a3b8">Down</span>';
-    document.getElementById('diag-eth-ip').textContent=d.eth_up?d.ip:'-';
+    document.getElementById('diag-eth-ip').textContent=d.eth_ip||(d.eth_up?d.ip:'-');
     document.getElementById('diag-wifi-status').innerHTML=d.wifi_up?'<span style="color:#16a34a">Connected</span>':'<span style="color:#94a3b8">Down</span>';
-    document.getElementById('diag-wifi-ip').textContent=d.wifi_up?d.ip:'-';
+    document.getElementById('diag-wifi-ip').textContent=d.wifi_ip||(d.wifi_up?d.ip:'-');
     document.getElementById('diag-ap-status').innerHTML=d.ap_up?'<span style="color:#16a34a">Active</span>':'<span style="color:#94a3b8">Off</span>';
-    document.getElementById('diag-ap-ip').textContent=d.ap_up?d.ip:'-';
+    document.getElementById('diag-ap-ip').textContent=d.ap_ip||(d.ap_up?d.ip:'-');
   }catch(e){
     document.getElementById('diag-heap').textContent='Error';
   }
@@ -939,6 +939,17 @@ function setOutputsDirty(dirty){
 function markOutputsSaved(){
   savedOutputsJson=JSON.stringify(outputs);
   setOutputsDirty(false);
+}
+
+function validateIp4(s){
+  if(!s||s==='') return true;
+  const parts=s.split('.');
+  if(parts.length!==4) return false;
+  for(const p of parts){
+    const n=parseInt(p,10);
+    if(isNaN(n)||n<0||n>255||String(n)!==p) return false;
+  }
+  return true;
 }
 
 // Telemetry
@@ -1127,11 +1138,20 @@ async function saveSettings(e){
     alert('I2C SCL GPIO '+obj.i2c_scl+' is already used by output channel '+(sclConflict+1)+'. Select another GPIO.');
     return;
   }
+  for(const field of ['eth_ip','eth_netmask','eth_gateway','eth_dns','wifi_ip','wifi_netmask','wifi_gateway','wifi_dns']){
+    if(!validateIp4(obj[field])){
+      alert('Invalid IP address in '+field+'. Each octet must be 0-255.');
+      return;
+    }
+  }
+  const settingsBtn=e.target.querySelector('button[type="submit"]');
+  if(settingsBtn){settingsBtn.disabled=true;settingsBtn.textContent='Saving...';}
   try{
     const res=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});
     showAlert(res.ok);
     if(res.ok) startRebootCountdown('Saving settings and restarting...', 4);
   }catch(err){showAlert(false);}
+  if(settingsBtn){settingsBtn.disabled=false;settingsBtn.textContent='Save & Restart';}
 }
 
 function setBackupStatus(text,kind='blue'){
@@ -3403,6 +3423,9 @@ window.addEventListener('DOMContentLoaded',()=>{
   toggleOutFields();
   updateTelemetry();
   setInterval(updateTelemetry,10000);
+  window.addEventListener('beforeunload',(e)=>{
+    if(outputsDirty){e.preventDefault();e.returnValue='';}
+  });
 });
 </script>
 </body>

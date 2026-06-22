@@ -235,6 +235,13 @@ void copyConfigString(char* dest, size_t destSize, const char* src) {
     dest[destSize - 1] = '\0';
 }
 
+bool validateIp4(const char* s) {
+    if (s == nullptr || s[0] == '\0') return true;
+    uint8_t octets[4];
+    int parsed = sscanf(s, "%hhu.%hhu.%hhu.%hhu", &octets[0], &octets[1], &octets[2], &octets[3]);
+    return parsed == 4;
+}
+
 bool collectRequestBody(AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total, String& body) {
     if (total > 65536) { // Reject requests larger than 64KB
         request->send(413, "application/json", "{\"status\":\"error\",\"message\":\"Payload too large\"}");
@@ -740,6 +747,23 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
             return false;
         }
     }
+    auto validateIpField = [&](const char* key) -> bool {
+        if (settings[key].is<const char*>()) {
+            if (!validateIp4(settings[key] | "")) {
+                message = String(key) + " is not a valid IPv4 address";
+                return false;
+            }
+        }
+        return true;
+    };
+    if (!validateIpField("eth_ip")) return false;
+    if (!validateIpField("eth_netmask")) return false;
+    if (!validateIpField("eth_gateway")) return false;
+    if (!validateIpField("eth_dns")) return false;
+    if (!validateIpField("wifi_ip")) return false;
+    if (!validateIpField("wifi_netmask")) return false;
+    if (!validateIpField("wifi_gateway")) return false;
+    if (!validateIpField("wifi_dns")) return false;
     uint8_t statusPin = settings["status_led_pin"].is<int>() ? (uint8_t)(int)settings["status_led_pin"] : sysCfg.status_led_pin;
     uint8_t zcPin = settings["zc_pin"].is<int>() ? (uint8_t)(int)settings["zc_pin"] : sysCfg.zc_pin;
     uint8_t sdaPin = settings["i2c_sda"].is<int>() ? (uint8_t)(int)settings["i2c_sda"] : sysCfg.i2c_sda;
@@ -1909,6 +1933,11 @@ void setupWebServer() {
         doc["wifi_up"] = wifiUp;
         doc["ap_up"]   = apActive;
         doc["wifi_ssid_active"] = wifiUp ? WiFi.SSID().c_str() : "";
+
+        // Per-interface IPs
+        doc["eth_ip"] = ethConnected ? ETH.localIP().toString() : "";
+        doc["wifi_ip"] = wifiUp ? WiFi.localIP().toString() : "";
+        doc["ap_ip"] = apActive ? WiFi.softAPIP().toString() : "";
 
         // Active IP (Ethernet priority)
         IPAddress localIp;
