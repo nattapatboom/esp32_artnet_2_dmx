@@ -47,6 +47,7 @@ private:
 
 public:
     bool channelLocked = false;
+    volatile bool reloadPeersPending = false;
     uint8_t currentScanChannel = 1;
     unsigned long lastChannelSwitchTime = 0;
     unsigned long lastPacketRecvTime = 0;

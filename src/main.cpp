@@ -1855,8 +1855,8 @@ void setupWebServer() {
             serializeJson(doc, file);
             file.close();
             
-            // Reload peers in ESP-NOW controller
-            espNowCtrl.loadPeers();
+            // Queue peer reload for network task (avoids race with sendDmx)
+            espNowCtrl.reloadPeersPending = true;
 
             request->send(200, "application/json", "{\"status\":\"ok\"}");
         }
@@ -2080,6 +2080,12 @@ void networkTask(void* pvParameters) {
             updateStatusLedPattern();
             vTaskDelay(pdMS_TO_TICKS(20));
             continue;
+        }
+
+        // Deferred ESP-NOW peer reload (avoids race with sendDmx iteration)
+        if (espNowCtrl.reloadPeersPending) {
+            espNowCtrl.reloadPeersPending = false;
+            espNowCtrl.loadPeers();
         }
 
         // Run network stack loops

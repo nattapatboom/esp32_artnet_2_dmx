@@ -48,7 +48,9 @@ Created after a runtime/hardware logic review. This is a next-session fix list; 
 
 8. **ESP-NOW peer list race while saving peers**
    - Files: `include/espnow_control.h`, `src/main.cpp`
+   - Status: ✅ Completed (`fix: deferred peer reload to networkTask`)
    - Issue: web callback can call `loadPeers()` and mutate `peerList` while network processing iterates it in `sendDmx()`.
+   - Fix direction: queue the reload to the network task via `reloadPeersPending` volatile flag, checked at the top of `networkTask` loop before Art-Net/sACN processing.
    - Fix direction: protect peer list with a mutex or defer reload to the network task; copy peer list snapshot before iteration if needed.
 
 9. **ESP-NOW receive queue silently drops chunks**
