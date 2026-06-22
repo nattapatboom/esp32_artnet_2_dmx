@@ -393,63 +393,7 @@ inline uint8_t asciiToSegment(uint8_t c) {
 
 class OutputControl {
 private:
-    uint8_t dmxTxBuffer[513]; // 1 start code + 512 channels
-    
     std::vector<OutputChannel> channels;
-
-    PixelStripWrapper* createPixelStrip(uint8_t rmtChannel, uint16_t count, uint8_t pin, uint8_t protocol) {
-        if (protocol == 1) {
-            switch (rmtChannel) {
-                case 0: return new PixelStripRmt<NeoEsp32Rmt0Ws2811Method>(count, pin);
-                case 1: return new PixelStripRmt<NeoEsp32Rmt1Ws2811Method>(count, pin);
-                case 2: return new PixelStripRmt<NeoEsp32Rmt2Ws2811Method>(count, pin);
-                case 3: return new PixelStripRmt<NeoEsp32Rmt3Ws2811Method>(count, pin);
-                case 4: return new PixelStripRmt<NeoEsp32Rmt4Ws2811Method>(count, pin);
-                case 5: return new PixelStripRmt<NeoEsp32Rmt5Ws2811Method>(count, pin);
-                case 6: return new PixelStripRmt<NeoEsp32Rmt6Ws2811Method>(count, pin);
-                case 7: return new PixelStripRmt<NeoEsp32Rmt7Ws2811Method>(count, pin);
-                default: return nullptr;
-            }
-        }
-        switch (rmtChannel) {
-            case 0: return new PixelStripRmt<NeoEsp32Rmt0Ws2812xMethod>(count, pin);
-            case 1: return new PixelStripRmt<NeoEsp32Rmt1Ws2812xMethod>(count, pin);
-            case 2: return new PixelStripRmt<NeoEsp32Rmt2Ws2812xMethod>(count, pin);
-            case 3: return new PixelStripRmt<NeoEsp32Rmt3Ws2812xMethod>(count, pin);
-            case 4: return new PixelStripRmt<NeoEsp32Rmt4Ws2812xMethod>(count, pin);
-            case 5: return new PixelStripRmt<NeoEsp32Rmt5Ws2812xMethod>(count, pin);
-            case 6: return new PixelStripRmt<NeoEsp32Rmt6Ws2812xMethod>(count, pin);
-            case 7: return new PixelStripRmt<NeoEsp32Rmt7Ws2812xMethod>(count, pin);
-            default: return nullptr;
-        }
-    }
-
-    PixelStripWrapper* createPixelStripRgbw(uint8_t rmtChannel, uint16_t count, uint8_t pin, uint8_t protocol) {
-        if (protocol == 1) {
-            switch (rmtChannel) {
-                case 0: return new PixelStripRmtRgbw<NeoEsp32Rmt0Ws2811Method>(count, pin);
-                case 1: return new PixelStripRmtRgbw<NeoEsp32Rmt1Ws2811Method>(count, pin);
-                case 2: return new PixelStripRmtRgbw<NeoEsp32Rmt2Ws2811Method>(count, pin);
-                case 3: return new PixelStripRmtRgbw<NeoEsp32Rmt3Ws2811Method>(count, pin);
-                case 4: return new PixelStripRmtRgbw<NeoEsp32Rmt4Ws2811Method>(count, pin);
-                case 5: return new PixelStripRmtRgbw<NeoEsp32Rmt5Ws2811Method>(count, pin);
-                case 6: return new PixelStripRmtRgbw<NeoEsp32Rmt6Ws2811Method>(count, pin);
-                case 7: return new PixelStripRmtRgbw<NeoEsp32Rmt7Ws2811Method>(count, pin);
-                default: return nullptr;
-            }
-        }
-        switch (rmtChannel) {
-            case 0: return new PixelStripRmtRgbw<NeoEsp32Rmt0Ws2812xMethod>(count, pin);
-            case 1: return new PixelStripRmtRgbw<NeoEsp32Rmt1Ws2812xMethod>(count, pin);
-            case 2: return new PixelStripRmtRgbw<NeoEsp32Rmt2Ws2812xMethod>(count, pin);
-            case 3: return new PixelStripRmtRgbw<NeoEsp32Rmt3Ws2812xMethod>(count, pin);
-            case 4: return new PixelStripRmtRgbw<NeoEsp32Rmt4Ws2812xMethod>(count, pin);
-            case 5: return new PixelStripRmtRgbw<NeoEsp32Rmt5Ws2812xMethod>(count, pin);
-            case 6: return new PixelStripRmtRgbw<NeoEsp32Rmt6Ws2812xMethod>(count, pin);
-            case 7: return new PixelStripRmtRgbw<NeoEsp32Rmt7Ws2812xMethod>(count, pin);
-            default: return nullptr;
-        }
-    }
 
     uint16_t getPcaSharedFrequency(uint8_t address) const {
         uint16_t firstConfiguredFreq = 0;
@@ -543,8 +487,9 @@ public:
         }
     }
 
+    void setupChannels();
+
     void begin() {
-        memset(dmxTxBuffer, 0, sizeof(dmxTxBuffer));
         loadChannels();
         setupChannels();
         Serial.println("Output Control initialized");
@@ -924,332 +869,115 @@ public:
         channels.clear();
     }
 
-    void setupChannels() {
-        uint8_t rmtIdx = 0;
-        uint8_t dmxIdx = 0;
-        pcaManager.clear();
-        digitalExpanderManager.clear();
-        bool uart2Used = false;
-        bool uart1Used = false;
-        for (const auto& ch : channels) {
-            if (ch.type == OutputDefs::TYPE_DFPLAYER) {
-                if (!uart2Used) {
-                    uart2Used = true;
-                } else if (!uart1Used) {
-                    uart1Used = true;
-                }
-            }
-        }
 
-        uint8_t dfPlayerCount = 0;
 
-        for (auto& ch : channels) {
-            if (ch.source == 1) {
-                uint16_t freq = getPcaSharedFrequency(ch.pca_addr);
-                pcaManager.getOrCreateDriver(ch.pca_addr);
-                pcaManager.setFrequency(ch.pca_addr, freq);
-                Serial.printf("PCA9685 initialized at 0x%02X: freq=%dHz type=%d\n", ch.pca_addr, freq, ch.type);
-                continue;
-            } else if (ch.source >= 2 && ch.source <= 4) {
-                writeOutputPin(ch, 1, false);
-                if ((ch.type == OutputDefs::TYPE_SMOKE || ch.type == OutputDefs::TYPE_MOTOR || ch.type == OutputDefs::TYPE_STEPPER) && ch.pca_channel2 != 255) {
-                    writeOutputPin(ch, 2, false);
-                }
-                if ((ch.type == OutputDefs::TYPE_MOTOR || ch.type == OutputDefs::TYPE_STEPPER) && ch.pca_channel3 != 255) {
-                    writeOutputPin(ch, 3, false);
-                }
-                Serial.printf("Expander initialized: src=%d addr=0x%02X type=%d\n", ch.source, ch.pca_addr, ch.type);
-                continue;
-            }
-            if (ch.type == OutputDefs::TYPE_LED_STRIP) {
-                if (ch.pixelStrip != nullptr) {
-                    delete ch.pixelStrip;
-                    ch.pixelStrip = nullptr;
-                }
-                if (rmtIdx < 8) {
-                    if (ch.color_order >= 4) {
-                        ch.pixelStrip = createPixelStripRgbw(rmtIdx, ch.led_count, ch.pin, ch.led_protocol);
-                    } else {
-                        ch.pixelStrip = createPixelStrip(rmtIdx, ch.led_count, ch.pin, ch.led_protocol);
-                    }
-                    if (ch.pixelStrip != nullptr) {
-                        ch.pixelStrip->Begin();
-                        ch.pixelStrip->Show();
-                        Serial.printf("LED init: GPIO%d cnt=%d U%d RMT%d %s\n",
-                            ch.pin, ch.led_count, ch.start_universe, rmtIdx, ch.color_order >= 4 ? "RGBW" : "RGB");
-                    }
-                    rmtIdx++;
-                } else {
-                    Serial.println("Max 8 LED channels reached.");
-                }
-            } else if (ch.type == OutputDefs::TYPE_RELAY) {
-                pinMode(ch.pin, OUTPUT);
-                digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
-                Serial.printf("Relay init: GPIO%d U%d\n", ch.pin, ch.start_universe);
-            } else if (ch.type == OutputDefs::TYPE_SOLENOID) {
-                pinMode(ch.pin, OUTPUT);
-                digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
-                if (ch.solenoid_pulse_ms == 0) ch.solenoid_pulse_ms = 50;
-                if (ch.solenoid_threshold == 0) ch.solenoid_threshold = 127;
-                Serial.printf("Solenoid init: GPIO%d U%d pulse=%dms thresh=%d\n",
-                    ch.pin, ch.start_universe, ch.solenoid_pulse_ms, ch.solenoid_threshold);
-            } else if (ch.type == OutputDefs::TYPE_DMX) {
-                if (ch.dmxPort != 255) {
-                    dmx_driver_delete((dmx_port_t)ch.dmxPort);
-                    ch.dmxPort = 255;
-                }
-                if (ch.rmtDmx != nullptr) {
-                    delete ch.rmtDmx;
-                    ch.rmtDmx = nullptr;
-                }
-                
-                if (!uart2Used) {
-                    ch.dmxPort = (uint8_t)DMX_NUM_2;
-                    uart2Used = true;
-                    dmx_config_t dmxConfig = DMX_CONFIG_DEFAULT;
-                    dmx_driver_install(DMX_NUM_2, &dmxConfig, DMX_INTR_FLAGS_DEFAULT);
-                    dmx_set_pin(DMX_NUM_2, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
-                    Serial.printf("DMX Channel initialized: GPIO %d, Start Universe %d on UART2\n", 
-                                  ch.pin, ch.start_universe);
-                } else if (!uart1Used) {
-                    ch.dmxPort = (uint8_t)DMX_NUM_1;
-                    uart1Used = true;
-                    dmx_config_t dmxConfig = DMX_CONFIG_DEFAULT;
-                    dmx_driver_install(DMX_NUM_1, &dmxConfig, DMX_INTR_FLAGS_DEFAULT);
-                    dmx_set_pin(DMX_NUM_1, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
-                    Serial.printf("DMX Channel initialized: GPIO %d, Start Universe %d on UART1\n", 
-                                  ch.pin, ch.start_universe);
-                } else if (rmtIdx < 8) {
-                    ch.rmtDmx = new RmtDmxDriver(rmtIdx, ch.pin);
-                    ch.rmtDmx->begin();
-                    Serial.printf("DMX (RMT%d): GPIO%d U%d\n", rmtIdx, ch.pin, ch.start_universe);
-                    rmtIdx++;
-                } else {
-                    Serial.println("Max 8 RMTs reached.");
-                }
-            } else if (ch.type == OutputDefs::TYPE_SMOKE) {
-                if (ch.source == 0) {
-                    pinMode(ch.pin, OUTPUT);
-                    pinMode(ch.pin2, OUTPUT);
-                    digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
-                    digitalWrite(ch.pin2, ch.pin2_invert ? HIGH : LOW);
-                }
-                if (ch.solenoid_threshold == 0) ch.solenoid_threshold = 127;
-                ch.smoke_state = 0;
-                ch.smoke_prev_trigger = false;
-                Serial.printf("Smoke Shooter init: pin=%d pin2=%d thresh=%d\n", ch.pin, ch.pin2, ch.solenoid_threshold);
-            } else if (ch.type == OutputDefs::TYPE_DFPLAYER) {
-                ch.dfPlayer = new DFPlayerController();
-                if (dfPlayerCount == 0) {
-                    ch.dfPlayer->begin(Serial2, ch.pin, ch.pin2);
-                    Serial.printf("DFPlayer (UART2): TX=%d RX=%d\n", ch.pin, ch.pin2);
-                    dfPlayerCount++;
-                } else if (dfPlayerCount == 1) {
-                    ch.dfPlayer->begin(Serial1, ch.pin, ch.pin2);
-                    Serial.printf("DFPlayer (UART1): TX=%d RX=%d\n", ch.pin, ch.pin2);
-                    dfPlayerCount++;
-                } else {
-                    Serial.println("Error: No UART for DFPlayer!");
-                }
-            }
-        }
-    }
+    void loop();
 
-    void loop() {
-        static unsigned long lastDmxSend = 0;
-        unsigned long now = millis();
-        uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
-        unsigned long interval = 1000 / fps;
-        if (now - lastDmxSend >= interval) {
-            lastDmxSend = now;
-            sendDmxFrames();
-            updateRelays();
-            updateSolenoids();
-            updateSmokeShooters();
-        }
-    }
 
-    void updateSmokeShooters() {
-        unsigned long now = millis();
-        for (auto& ch : channels) {
-            if (ch.type != 18) continue;
-            if (ch.dmxBuffer == nullptr) continue;
-            bool trigger_active = (ch.dmxBuffer[0] > ch.solenoid_threshold);
-            if (ch.smoke_state == 0) {
-                writeOutputPin(ch, 1, false);
-                writeOutputPin(ch, 2, false);
-                if (trigger_active && !ch.smoke_prev_trigger) {
-                    ch.smoke_state = 1;
-                    ch.smoke_timer = now;
-                    writeOutputPin(ch, 1, true);
-                }
-            } else if (ch.smoke_state == 1) {
-                writeOutputPin(ch, 1, true);
-                writeOutputPin(ch, 2, false);
-                if (now - ch.smoke_timer >= ch.smoke_duration_ms) {
-                    ch.smoke_state = 2;
-                    ch.smoke_timer = now;
-                    writeOutputPin(ch, 1, false);
-                }
-            } else if (ch.smoke_state == 2) {
-                writeOutputPin(ch, 1, false);
-                writeOutputPin(ch, 2, false);
-                if (now - ch.smoke_timer >= ch.settle_delay_ms) {
-                    ch.smoke_state = 3;
-                    ch.smoke_timer = now;
-                    writeOutputPin(ch, 2, true);
-                }
-            } else if (ch.smoke_state == 3) {
-                writeOutputPin(ch, 1, false);
-                writeOutputPin(ch, 2, true);
-                if (now - ch.smoke_timer >= ch.shoot_duration_ms) {
-                    ch.smoke_state = 4;
-                    ch.smoke_timer = now;
-                    writeOutputPin(ch, 2, false);
-                }
-            } else if (ch.smoke_state == 4) {
-                writeOutputPin(ch, 1, false);
-                writeOutputPin(ch, 2, false);
-                if (now - ch.smoke_timer >= ch.smoke_lockout_ms) {
-                    ch.smoke_state = 0;
-                }
-            }
-            ch.smoke_prev_trigger = trigger_active;
-        }
-    }
 
-    void updateRelays() {
-        for (auto& ch : channels) {
-            if (ch.type == OutputDefs::TYPE_RELAY && ch.dmxBuffer != nullptr) {
-                // Relay threshold at 50% (127)
-                bool state = ch.dmxBuffer[0] > 127;
-                writeOutputPin(ch, 1, state);
-            }
-        }
-    }
-
-    void updateSolenoids() {
-        unsigned long now = millis();
-        for (auto& ch : channels) {
-            if (ch.type != 17) continue;
-            if (ch.dmxBuffer == nullptr) continue;
-            bool should_trigger = (ch.dmxBuffer[0] > ch.solenoid_threshold);
-            if (now - ch.solenoid_last_trigger < ch.solenoid_post_delay) should_trigger = false;
-            if (should_trigger && !ch.solenoid_pulse_active) {
-                if (now >= ch.solenoid_last_trigger + ch.solenoid_post_delay + ch.solenoid_pre_delay) {
-                    ch.solenoid_pulse_active = true;
-                    ch.solenoid_pulse_start = now;
-                    writeOutputPin(ch, 1, true);
-                    ch.solenoid_last_trigger = now;
-                }
-            }
-            if (ch.solenoid_pulse_active && (now - ch.solenoid_pulse_start >= ch.solenoid_pulse_ms)) {
-                writeOutputPin(ch, 1, false);
-                ch.solenoid_pulse_active = false;
-            }
-        }
-    }
-
-    // Refresh LED strip output from the local DMX buffers
-    void updateLeds() {
-        static unsigned long lastUpdate = 0;
-        unsigned long now = millis();
-        uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
-        if (now - lastUpdate < (1000 / fps)) return;
-        lastUpdate = now;
-
-        for (auto& ch : channels) {
-            if (ch.type != 3) continue; // LED only (v3)
-            if (ch.pixelStrip == nullptr || ch.dmxBuffer == nullptr) continue;
-            if (!ch.pixelStrip->CanShow()) continue;
-
-            const uint8_t colorOrder = ch.color_order;
-            const uint16_t ledCount = ch.led_count;
-            const uint16_t bufSize = ch.bufferSize;
-            const uint8_t* buf = ch.dmxBuffer;
-            const bool isRgbw = ch.pixelStrip->IsRgbw();
-            const uint8_t bytesPerPixel = isRgbw ? 4 : 3;
-            const uint16_t pixelsPerUniverse = 512 / bytesPerPixel; // 128 for RGBW, 170 for RGB
-
-            // Precompute universe boundary to avoid per-pixel division
-            uint16_t universe = 0;
-            uint16_t posInUniverse = 0; // pixel index within current universe
-            uint16_t bufOffset = 0;     // byte index into dmxBuffer
-
-            for (uint16_t i = 0; i < ledCount; i++) {
-                // Advance universe boundary when pixel block is full
-                if (posInUniverse == pixelsPerUniverse) {
-                    universe++;
-                    posInUniverse = 0;
-                    bufOffset = universe * 512;
-                }
-
-                uint16_t idx = bufOffset + posInUniverse * bytesPerPixel;
-                posInUniverse++;
-
-                if (idx + bytesPerPixel > bufSize) continue;
-
-                uint8_t r = buf[idx];
-                uint8_t g = buf[idx + 1];
-                uint8_t b = buf[idx + 2];
-                uint8_t w = isRgbw ? buf[idx + 3] : 0;
-
-                // Apply software color reordering and set pixel
-                if (isRgbw) {
-                    RgbwColor color;
-                    switch (colorOrder) {
-                        case COLOR_RGBW: color = RgbwColor(r, g, b, w); break;
-                        case COLOR_GRBW: color = RgbwColor(g, r, b, w); break;
-                        case COLOR_BRGW: color = RgbwColor(b, r, g, w); break;
-                        case COLOR_WRGB: color = RgbwColor(w, r, g, b); break;
-                        default:         color = RgbwColor(r, g, b, w); break;
-                    }
-                    ch.pixelStrip->SetPixelColorRgbw(i, color);
-                } else {
-                    RgbColor color;
-                    switch (colorOrder) {
-                        case COLOR_GRB: color = RgbColor(g, r, b); break;
-                        case COLOR_BRG: color = RgbColor(b, r, g); break;
-                        case COLOR_RBG: color = RgbColor(r, b, g); break;
-                        case COLOR_RGB:
-                        default:        color = RgbColor(r, g, b); break;
-                    }
-                    ch.pixelStrip->SetPixelColor(i, color);
-                }
-            }
-            ch.pixelStrip->Show();
-        }
-
-        // Let MotionControl read the same buffers
-        extern void updateMotionControl();
-        updateMotionControl();
-    }
+    void updateLeds();
 
     std::vector<OutputChannel>& getChannels() {
         return channels;
     }
 
-private:
-    void sendDmxFrames() {
-        for (auto& ch : channels) {
-            if (ch.type == OutputDefs::TYPE_DMX && ch.dmxBuffer != nullptr) {
-                if (ch.dmxPort != 255) {
-                    dmx_port_t port = (dmx_port_t)ch.dmxPort;
-                    if (!dmx_wait_sent(port, 0)) continue;
-                    dmxTxBuffer[0] = 0x00;
-                    memcpy(dmxTxBuffer + 1, ch.dmxBuffer, 512);
-
-                    // Write and send via hardware serial
-                    dmx_write(port, dmxTxBuffer, DMX_PACKET_SIZE);
-                    dmx_send(port, DMX_PACKET_SIZE);
-                } else if (ch.rmtDmx != nullptr) {
-                    ch.rmtDmx->send(ch.dmxBuffer);
-                }
-            }
-        }
-    }
 };
 
 extern OutputControl outputCtrl;
+
+// Per-type output device includes (after class definition to break circular deps)
+#include "output_devices/relay.h"
+#include "output_devices/solenoid.h"
+#include "output_devices/smoke_shooter.h"
+#include "output_devices/dmx.h"
+#include "output_devices/led_strip.h"
+
+inline void OutputControl::loop() {
+    static unsigned long lastDmxSend = 0;
+    unsigned long now = millis();
+    uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
+    unsigned long interval = 1000 / fps;
+    if (now - lastDmxSend >= interval) {
+        lastDmxSend = now;
+        dmxUpdate();
+        relayUpdate();
+        solenoidUpdate();
+        smokeShooterUpdate();
+    }
+}
+
+inline void OutputControl::updateLeds() {
+    ledStripUpdate();
+    extern void updateMotionControl();
+    updateMotionControl();
+}
+
+inline void OutputControl::setupChannels() {
+    uint8_t rmtIdx = 0;
+    uint8_t dmxIdx = 0;
+    pcaManager.clear();
+    digitalExpanderManager.clear();
+    bool uart2Used = false;
+    bool uart1Used = false;
+    for (const auto& ch : channels) {
+        if (ch.type == OutputDefs::TYPE_DFPLAYER) {
+            if (!uart2Used) {
+                uart2Used = true;
+            } else if (!uart1Used) {
+                uart1Used = true;
+            }
+        }
+    }
+
+    uint8_t dfPlayerCount = 0;
+
+    for (auto& ch : channels) {
+        if (ch.source == 1) {
+            uint16_t freq = getPcaSharedFrequency(ch.pca_addr);
+            pcaManager.getOrCreateDriver(ch.pca_addr);
+            pcaManager.setFrequency(ch.pca_addr, freq);
+            Serial.printf("PCA9685 initialized at 0x%02X: freq=%dHz type=%d\n", ch.pca_addr, freq, ch.type);
+            continue;
+        } else if (ch.source >= 2 && ch.source <= 4) {
+            writeOutputPin(ch, 1, false);
+            if ((ch.type == OutputDefs::TYPE_SMOKE || ch.type == OutputDefs::TYPE_MOTOR || ch.type == OutputDefs::TYPE_STEPPER) && ch.pca_channel2 != 255) {
+                writeOutputPin(ch, 2, false);
+            }
+            if ((ch.type == OutputDefs::TYPE_MOTOR || ch.type == OutputDefs::TYPE_STEPPER) && ch.pca_channel3 != 255) {
+                writeOutputPin(ch, 3, false);
+            }
+            Serial.printf("Expander initialized: src=%d addr=0x%02X type=%d\n", ch.source, ch.pca_addr, ch.type);
+            continue;
+        }
+        if (ch.type == OutputDefs::TYPE_LED_STRIP) {
+            ledStripSetup(ch, rmtIdx);
+        } else if (ch.type == OutputDefs::TYPE_RELAY) {
+            relaySetup(ch);
+            Serial.printf("Relay init: GPIO%d U%d\n", ch.pin, ch.start_universe);
+        } else if (ch.type == OutputDefs::TYPE_SOLENOID) {
+            solenoidSetup(ch);
+            Serial.printf("Solenoid init: GPIO%d U%d pulse=%dms thresh=%d\n",
+                ch.pin, ch.start_universe, ch.solenoid_pulse_ms, ch.solenoid_threshold);
+        } else if (ch.type == OutputDefs::TYPE_DMX) {
+            dmxSetup(ch, uart2Used, uart1Used, rmtIdx);
+        } else if (ch.type == OutputDefs::TYPE_SMOKE) {
+            smokeShooterSetup(ch);
+            Serial.printf("Smoke Shooter init: pin=%d pin2=%d thresh=%d\n", ch.pin, ch.pin2, ch.solenoid_threshold);
+        } else if (ch.type == OutputDefs::TYPE_DFPLAYER) {
+            ch.dfPlayer = new DFPlayerController();
+            if (dfPlayerCount == 0) {
+                ch.dfPlayer->begin(Serial2, ch.pin, ch.pin2);
+                Serial.printf("DFPlayer (UART2): TX=%d RX=%d\n", ch.pin, ch.pin2);
+                dfPlayerCount++;
+            } else if (dfPlayerCount == 1) {
+                ch.dfPlayer->begin(Serial1, ch.pin, ch.pin2);
+                Serial.printf("DFPlayer (UART1): TX=%d RX=%d\n", ch.pin, ch.pin2);
+                dfPlayerCount++;
+            } else {
+                Serial.println("Error: No UART for DFPlayer!");
+            }
+        }
+    }
+}
 
 #endif // OUTPUT_CONTROL_H
