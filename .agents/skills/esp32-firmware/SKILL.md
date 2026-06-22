@@ -95,8 +95,8 @@ Receives Art-Net via Ethernet (LAN) → controls multiple output types via GPIO,
 - `include/motion_control.h` — thin coordinator delegating to `output_devices/` files
 - `include/output_devices/` — one file per output type (17 files total: 0-18)
 - `include/scoring.h` — Resource + Compute scoring (limit ~109pts)
-- `include/funcgen_control.h` — Function Generator (Type 16) waveform engine using esp_timer + LEDC
-- `include/dfplayer_control.h` — DFPlayer MP3 protocol driver
+- `include/output_devices/funcgen_control.h` — Function Generator (Type 16) waveform engine using esp_timer + LEDC
+- `include/output_devices/dfplayer_control.h` — DFPlayer MP3 protocol driver
 - `include/config.h` — System configuration struct
 - `src/main.cpp` — Entry point, HTTP API routes, validation, network tasks
 - `include/web_pages.h` — Embedded HTML/CSS/JS for Web UI (auto-generated from `web/index.html`)
@@ -304,14 +304,14 @@ include/
   output_devices/       One file per output type (17 files: 0-18)
   i2c_devices/          I2C DAC, GPIO expander, PCA9685 drivers
 
-  dfplayer_control.h    DFPlayer MP3 protocol driver (Type 10)
-  funcgen_control.h     Function Generator (Type 16, esp_timer + LEDC waveform engine)
+  output_devices/dfplayer_control.h    DFPlayer MP3 protocol driver (Type 10)
+  output_devices/funcgen_control.h     Function Generator (Type 16, esp_timer + LEDC waveform engine)
   i2c_devices/i2c_gpio_expander.h   MCP23017, TCA9555, PCF857x drivers
   i2c_devices/pca9685.h             PCA9685 PWM driver
   lighting_protocols/artnet_control.h      Art-Net UDP listener
   lighting_protocols/sacn_control.h        sACN E1.31 listener
   espnow_control.h      ESP-NOW master/slave bridge
-  rmt_dmx.h             RMT-based DMX TX fallback
+  output_devices/rmt_dmx.h             RMT-based DMX TX fallback
   i2c_devices/display_driver.h      SSD1306/SH1106 OLED + PCF8574 LCD driver
 src/
   main.cpp              Setup, network, web APIs, RTOS tasks, OTA, validation
@@ -373,7 +373,7 @@ tools/
 - **Calibration:** `pwm_dac_mode` labels Custom/0-10V/4-20mA; `pwm_dac_min` and `pwm_dac_max` store duty percent x100 (0..10000) and map DMX 0..full-scale to the calibrated duty range for external 0-10V or 4-20mA interface circuits.
 
 ### 6. Function Generator (Type 16)
-- **Engine:** `FuncGenController` in `include/funcgen_control.h`
+- **Engine:** `FuncGenController` in `include/output_devices/funcgen_control.h`
 - **Hardware:** esp_timer (high-res timer interrupt) + LEDC (PWM output)
 - **DMX 5 Bytes:** Byte 0-1 = Freq (1-10000 Hz), Byte 2 = Waveform, Byte 3 = Amplitude, Byte 4 = DC Offset
 - **Waveforms:** 0=Sine, 1=Triangle, 2=Sawtooth, 3=Square, 4=PWM

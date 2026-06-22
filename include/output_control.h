@@ -5,16 +5,16 @@
 #include <atomic>
 #include <esp_dmx.h>
 #include <NeoPixelBus.h>
-#include "rmt_dmx.h"
+#include "output_devices/rmt_dmx.h"
 #include <vector>
 #include <algorithm>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include "config.h"
-#include "dfplayer_control.h"
+#include "output_devices/dfplayer_control.h"
 #include "i2c_devices/pca9685.h"
 #include "i2c_devices/i2c_gpio_expander.h"
-#include "funcgen_control.h"
+#include "output_devices/funcgen_control.h"
 #include "output_defs.h"
 #include "output_devices/seven_seg_digits.h"
 

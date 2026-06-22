@@ -60,17 +60,15 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - `include/` — C++ headers and most firmware subsystems
 - `include/config.h` — SystemConfig, NVS load/save
 - `include/config_rules.h` — config/IP/routing validation helpers
-- `include/dfplayer_control.h` — DFPlayer MP3 protocol driver
 - `include/espnow_control.h` — ESP-NOW master/slave bridge
-- `include/funcgen_control.h` — Function Generator waveform engine
 - `include/motion_control.h` — thin coordinator delegating motion/PWM/audio output types to `output_devices/`
 - `include/ota_control.h` — OTA update state/task declarations
 - `include/recovery_control.h` — recovery mode constants/state declarations
-- `include/rmt_dmx.h` — RMT-based DMX TX fallback
 - `include/scoring.h` — hardware/CPU/RAM scoring logic
 - `include/output_devices/` — one file per output device type:
   - `ledc_helpers.h` — shared LEDC allocation, DMX value, segment, PWM DAC calibration helpers
   - `dimmer.h` — Type 0 AC Dimmer setup/update (ZC + timer ISR)
+  - `rmt_dmx.h` — RMT-based DMX TX fallback
   - `dmx.h` — Type 1 DMX Output setup/update (UART/RMT)
   - `relay.h` — Type 2 Relay setup/update
   - `led_strip.h` — Type 3 RGB/RGBW LED Strip setup/update (NeoPixelBus/RMT)
@@ -80,11 +78,13 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
   - `stepper.h` — Type 7 Stepper Motor setup/update (FastAccelStepper)
   - `servo.h` — Type 8 RC Servo setup/update
   - `buzzer.h` — Type 9 Passive Buzzer setup/update
+  - `dfplayer_control.h` — DFPlayer MP3 protocol driver
   - `dfplayer.h` — Type 10 DFPlayer MP3 update
   - `seven_seg_digits.h` — shared 7-segment digit lookup table
   - `seven_seg.h` — Types 11/12/13 7-Segment setup/update (TM1637 + DD via GPIO/PCA/EXP)
   - `dac.h` — Type 14 I2C DAC update (MCP4725, DAC7571, DAC7573)
   - `pwm_dac.h` — Type 15 PWM DAC setup/update
+  - `funcgen_control.h` — Function Generator waveform engine
   - `funcgen.h` — Type 16 Function Generator setup/update
   - `solenoid.h` — Type 17 Solenoid setup/update
   - `smoke_shooter.h` — Type 18 Smoke Shooter setup/update

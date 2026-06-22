@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <esp_dmx.h>
 #include "output_control.h"
-#include "rmt_dmx.h"
+#include "output_devices/rmt_dmx.h"
 
 inline void dmxSetup(OutputChannel& ch, bool& uart2Used, bool& uart1Used, uint8_t& rmtIdx) {
     if (ch.dmxPort != 255) {
