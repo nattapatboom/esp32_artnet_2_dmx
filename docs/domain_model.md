@@ -1,6 +1,6 @@
 # Domain Model: ESP32 Art-Net Firmware
 
-This document is the result of a `/grilling` domain-modeling session, extracted primarily from `include/output_control.h`, `include/scoring.h`, `include/config.h`, `src/main.cpp`, `web/index.html`, `docs/user_manual/main.typ`, and `docs/resource_calculator.md`.
+This document is the result of a `/grilling` domain-modeling session, extracted primarily from `include/output_control.h`, `include/scoring.h`, `include/config.h`, `src/main.cpp`, `web/index.html`, `docs/user_manual/main.typ`, `docs/resource_calculator.md`, `include/output_defs.h`, `include/type_protocol.h`, and `include/type_interfaces/*.h`.
 
 ## Core Domain
 
@@ -638,6 +638,45 @@ Known implementation drift (scoring-specific):
 ### ADR012: Independent Art-Net Enablement Option
 - **Rationale:** In networks with heavy Art-Net traffic, users may want to disable Art-Net to prevent overlap
 - **Decision:** Added `artnet_enabled` (bool, default `true`) to NVS `SystemConfig` and Web UI checkbox; Core 0 gates `artNetCtrl.begin()` and `artNetCtrl.loop()` based on this flag; if both Art-Net and sACN are disabled → validation error to prevent the board from losing all lighting data. Implemented in config.h, main.cpp, and web/index.html.
+
+---
+
+## Type Interface Protocol (Firmware ↔ Web UI Contract)
+
+Each output type (0-18) has a dedicated header file in `include/type_interfaces/type_N.h` that defines the **contract between firmware C++ code and the Web UI**.
+
+Key files:
+- `include/type_protocol.h` — Shared types: `FieldDef`, `TestCmdDef`, `FieldType` enum
+- `include/type_interfaces/type_0.h` through `type_18.h` — Per-type definitions
+- `include/output_defs.h` — Central include hub; adds lookup functions `typeExtraFields()`, `typeTestCommands()`, `typeInterfaceName()`
+
+### What each type_N.h defines
+
+| Section | Purpose |
+| --- | --- |
+| `TYPE_NAME` | Human-readable name for Web UI display |
+| `EXTRA_FIELDS` array | Array of `FieldDef` describing all type-specific config fields beyond base routing: JSON key name, type (number/bool/select/float), label, min/max/default, dropdown options |
+| `TEST_COMMANDS` array | Array of `TestCmdDef` describing test buttons: label, command byte value, description |
+
+### Benefits
+
+- **Single source of truth** for field names, ranges, and defaults — both C++ and JS (auto-generated) reference the same definitions
+- **Adding a new field** only requires editing one `.h` file and the corresponding JS config module
+- **Web UI generation** can use `FieldDef` data to render correct input types and validation without manual HTML
+- **Self-documenting** — each `type_N.h` is the complete API contract for that output type
+
+### FieldDef JSON field naming convention
+
+Field keys in `EXTRA_FIELDS` must match the JSON keys used in `/api/outputs` POST/PUT and `OutputChannel` serialization:
+
+- `mc_*` — motion control fields (resolution, frequency, mode, homing parameters)
+- `pwm_dac_*` — PWM DAC calibration fields
+- `solenoid_*` — solenoid pulse configuration fields
+- `smoke_*` — smoke shooter sequence fields
+- `led_count`, `color_order`, `led_protocol` — LED strip configuration
+- `pin_invert`, `pin2_invert`, etc. — pin inversion flags
+
+Base routing fields (`source`, `pin`, `pca_addr`, `pca_channel`, `start_universe`, `start_address`, `pin2`, `pin3`, `pin4`, etc.) are shared across all types and defined in the Web UI routing pane, not in per-type `EXTRA_FIELDS`.
 
 ---
 

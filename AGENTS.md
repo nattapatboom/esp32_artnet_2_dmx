@@ -56,6 +56,8 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - `src/main.cpp` — setup, HTTP API, validation, network/display tasks
 - `web/index.html` — Web UI source; edit this file, then run `tools/build_web.py`
 - `include/web_pages.h` — generated embedded Web UI; do not edit directly
+- `include/type_protocol.h` — shared types for the firmware↔Web UI interface contract (`FieldDef`, `TestCmdDef`)
+- `include/type_interfaces/type_N.h` — per-output-type interface definitions (config fields, test commands, field validation limits)
 - `docs/domain_model.md` — project/domain context, device modes, thread safety, ADRs
 - `docs/resource_calculator.md` — hardware scoring and constraints
 - `docs/hardware_guidelines.md` — ESD protection, flyback diode, datasheet checklist

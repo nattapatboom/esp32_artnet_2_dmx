@@ -1,0 +1,32 @@
+#ifndef TYPE_12_H
+#define TYPE_12_H
+
+#include "type_protocol.h"
+
+// ─────────────────────────────────────────────
+//  Type 12 — 7-Segment Direct-Drive 7-Pin PWM
+//  7 segments + DP via GPIO or PCA9685.
+//  Modes: -1=no dim, 4/5=direct dim, 6/7=common dim.
+// ─────────────────────────────────────────────
+namespace Type12 {
+using namespace TypeProtocol;
+
+constexpr uint8_t TYPE_ID = 12;
+constexpr const char* TYPE_NAME = "7-Seg 7-Pin PWM";
+
+constexpr const char* MODE_OPTS =
+    "-1:No Dim,4:Direct CA,5:Direct CC,6:Common Anode,7:Common Cathode";
+
+constexpr FieldDef EXTRA_FIELDS[] = {
+    {"mc_mode", FT_SELECT, "Dim Mode", -1, 7, -1, MODE_OPTS},
+    {"mc_invert", FT_BOOL, "Invert Segments", 0, 1, 0, nullptr}
+};
+
+constexpr TestCmdDef TEST_COMMANDS[] = {
+    {"Apply Num",  0, "Set numeric value"},
+    {"Clear",      1, "Clear all segments"},
+    {"All On",     2, "Light all segments"}
+};
+
+}  // namespace Type12
+#endif

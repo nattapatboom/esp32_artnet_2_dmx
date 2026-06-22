@@ -2,6 +2,26 @@
 #define OUTPUT_DEFS_H
 
 #include <Arduino.h>
+#include "type_protocol.h"
+#include "type_interfaces/type_0.h"
+#include "type_interfaces/type_1.h"
+#include "type_interfaces/type_2.h"
+#include "type_interfaces/type_3.h"
+#include "type_interfaces/type_4.h"
+#include "type_interfaces/type_5.h"
+#include "type_interfaces/type_6.h"
+#include "type_interfaces/type_7.h"
+#include "type_interfaces/type_8.h"
+#include "type_interfaces/type_9.h"
+#include "type_interfaces/type_10.h"
+#include "type_interfaces/type_11.h"
+#include "type_interfaces/type_12.h"
+#include "type_interfaces/type_13.h"
+#include "type_interfaces/type_14.h"
+#include "type_interfaces/type_15.h"
+#include "type_interfaces/type_16.h"
+#include "type_interfaces/type_17.h"
+#include "type_interfaces/type_18.h"
 
 namespace OutputDefs {
 
@@ -254,6 +274,85 @@ inline const OutputModeDef* modeDef(uint8_t type, uint8_t mode) {
 inline uint16_t baseCpuUs(uint8_t type, uint8_t mode = 0) {
     const OutputModeDef* def = modeDef(type, mode);
     return def ? def->cost.cpuUs : 0;
+}
+
+// ─────────────────────────────────────
+//  Type interface (Web UI contract) lookup
+// ─────────────────────────────────────
+
+inline const char* typeInterfaceName(uint8_t type) {
+    switch (type) {
+        case TYPE_DIMMER:    return Type0::TYPE_NAME;
+        case TYPE_DMX:       return Type1::TYPE_NAME;
+        case TYPE_RELAY:     return Type2::TYPE_NAME;
+        case TYPE_LED_STRIP: return Type3::TYPE_NAME;
+        case TYPE_SINGLE_LED:return Type4::TYPE_NAME;
+        case TYPE_ANALOG_RGB:return Type5::TYPE_NAME;
+        case TYPE_MOTOR:     return Type6::TYPE_NAME;
+        case TYPE_STEPPER:   return Type7::TYPE_NAME;
+        case TYPE_SERVO:     return Type8::TYPE_NAME;
+        case TYPE_BUZZER:    return Type9::TYPE_NAME;
+        case TYPE_DFPLAYER:  return Type10::TYPE_NAME;
+        case TYPE_TM1637:    return Type11::TYPE_NAME;
+        case TYPE_7SEG_7PIN: return Type12::TYPE_NAME;
+        case TYPE_7SEG_8PIN: return Type13::TYPE_NAME;
+        case TYPE_DAC:       return Type14::TYPE_NAME;
+        case TYPE_PWM_DAC:   return Type15::TYPE_NAME;
+        case TYPE_FUNC_GEN:  return Type16::TYPE_NAME;
+        case TYPE_SOLENOID:  return Type17::TYPE_NAME;
+        case TYPE_SMOKE:     return Type18::TYPE_NAME;
+        default: return "Unknown";
+    }
+}
+
+inline const TypeProtocol::FieldDef* typeExtraFields(uint8_t type, uint8_t& count) {
+    switch (type) {
+        case TYPE_DIMMER:    count = TYPEPROTO_ARRAY_SIZE(Type0::EXTRA_FIELDS);  return Type0::EXTRA_FIELDS;
+        case TYPE_DMX:       count = TYPEPROTO_ARRAY_SIZE(Type1::EXTRA_FIELDS);  return Type1::EXTRA_FIELDS;
+        case TYPE_RELAY:     count = TYPEPROTO_ARRAY_SIZE(Type2::EXTRA_FIELDS);  return Type2::EXTRA_FIELDS;
+        case TYPE_LED_STRIP: count = TYPEPROTO_ARRAY_SIZE(Type3::EXTRA_FIELDS);  return Type3::EXTRA_FIELDS;
+        case TYPE_SINGLE_LED:count = TYPEPROTO_ARRAY_SIZE(Type4::EXTRA_FIELDS);  return Type4::EXTRA_FIELDS;
+        case TYPE_ANALOG_RGB:count = TYPEPROTO_ARRAY_SIZE(Type5::EXTRA_FIELDS);  return Type5::EXTRA_FIELDS;
+        case TYPE_MOTOR:     count = TYPEPROTO_ARRAY_SIZE(Type6::EXTRA_FIELDS);  return Type6::EXTRA_FIELDS;
+        case TYPE_STEPPER:   count = TYPEPROTO_ARRAY_SIZE(Type7::EXTRA_FIELDS);  return Type7::EXTRA_FIELDS;
+        case TYPE_SERVO:     count = TYPEPROTO_ARRAY_SIZE(Type8::EXTRA_FIELDS);  return Type8::EXTRA_FIELDS;
+        case TYPE_BUZZER:    count = TYPEPROTO_ARRAY_SIZE(Type9::EXTRA_FIELDS);  return Type9::EXTRA_FIELDS;
+        case TYPE_DFPLAYER:  count = TYPEPROTO_ARRAY_SIZE(Type10::EXTRA_FIELDS); return Type10::EXTRA_FIELDS;
+        case TYPE_TM1637:    count = TYPEPROTO_ARRAY_SIZE(Type11::EXTRA_FIELDS); return Type11::EXTRA_FIELDS;
+        case TYPE_7SEG_7PIN: count = TYPEPROTO_ARRAY_SIZE(Type12::EXTRA_FIELDS); return Type12::EXTRA_FIELDS;
+        case TYPE_7SEG_8PIN: count = TYPEPROTO_ARRAY_SIZE(Type13::EXTRA_FIELDS); return Type13::EXTRA_FIELDS;
+        case TYPE_DAC:       count = TYPEPROTO_ARRAY_SIZE(Type14::EXTRA_FIELDS); return Type14::EXTRA_FIELDS;
+        case TYPE_PWM_DAC:   count = TYPEPROTO_ARRAY_SIZE(Type15::EXTRA_FIELDS); return Type15::EXTRA_FIELDS;
+        case TYPE_FUNC_GEN:  count = TYPEPROTO_ARRAY_SIZE(Type16::EXTRA_FIELDS); return Type16::EXTRA_FIELDS;
+        case TYPE_SOLENOID:  count = TYPEPROTO_ARRAY_SIZE(Type17::EXTRA_FIELDS); return Type17::EXTRA_FIELDS;
+        case TYPE_SMOKE:     count = TYPEPROTO_ARRAY_SIZE(Type18::EXTRA_FIELDS); return Type18::EXTRA_FIELDS;
+        default: count = 0; return nullptr;
+    }
+}
+
+inline const TypeProtocol::TestCmdDef* typeTestCommands(uint8_t type, uint8_t& count) {
+    switch (type) {
+        case TYPE_DIMMER:    count = TYPEPROTO_ARRAY_SIZE(Type0::TEST_COMMANDS);  return Type0::TEST_COMMANDS;
+        case TYPE_DMX:       count = TYPEPROTO_ARRAY_SIZE(Type1::TEST_COMMANDS);  return Type1::TEST_COMMANDS;
+        case TYPE_RELAY:     count = TYPEPROTO_ARRAY_SIZE(Type2::TEST_COMMANDS);  return Type2::TEST_COMMANDS;
+        case TYPE_LED_STRIP: count = TYPEPROTO_ARRAY_SIZE(Type3::TEST_COMMANDS);  return Type3::TEST_COMMANDS;
+        case TYPE_SINGLE_LED:count = TYPEPROTO_ARRAY_SIZE(Type4::TEST_COMMANDS);  return Type4::TEST_COMMANDS;
+        case TYPE_ANALOG_RGB:count = TYPEPROTO_ARRAY_SIZE(Type5::TEST_COMMANDS);  return Type5::TEST_COMMANDS;
+        case TYPE_MOTOR:     count = TYPEPROTO_ARRAY_SIZE(Type6::TEST_COMMANDS);  return Type6::TEST_COMMANDS;
+        case TYPE_STEPPER:   count = TYPEPROTO_ARRAY_SIZE(Type7::TEST_COMMANDS);  return Type7::TEST_COMMANDS;
+        case TYPE_SERVO:     count = TYPEPROTO_ARRAY_SIZE(Type8::TEST_COMMANDS);  return Type8::TEST_COMMANDS;
+        case TYPE_BUZZER:    count = TYPEPROTO_ARRAY_SIZE(Type9::TEST_COMMANDS);  return Type9::TEST_COMMANDS;
+        case TYPE_DFPLAYER:  count = TYPEPROTO_ARRAY_SIZE(Type10::TEST_COMMANDS); return Type10::TEST_COMMANDS;
+        case TYPE_TM1637:    count = TYPEPROTO_ARRAY_SIZE(Type11::TEST_COMMANDS); return Type11::TEST_COMMANDS;
+        case TYPE_7SEG_7PIN: count = TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS); return Type12::TEST_COMMANDS;
+        case TYPE_7SEG_8PIN: count = TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS); return Type13::TEST_COMMANDS;
+        case TYPE_DAC:       count = TYPEPROTO_ARRAY_SIZE(Type14::TEST_COMMANDS); return Type14::TEST_COMMANDS;
+        case TYPE_PWM_DAC:   count = TYPEPROTO_ARRAY_SIZE(Type15::TEST_COMMANDS); return Type15::TEST_COMMANDS;
+        case TYPE_FUNC_GEN:  count = TYPEPROTO_ARRAY_SIZE(Type16::TEST_COMMANDS); return Type16::TEST_COMMANDS;
+        case TYPE_SOLENOID:  count = TYPEPROTO_ARRAY_SIZE(Type17::TEST_COMMANDS); return Type17::TEST_COMMANDS;
+        case TYPE_SMOKE:     count = TYPEPROTO_ARRAY_SIZE(Type18::TEST_COMMANDS); return Type18::TEST_COMMANDS;
+        default: count = 0; return nullptr;
+    }
 }
 
 }  // namespace OutputDefs
