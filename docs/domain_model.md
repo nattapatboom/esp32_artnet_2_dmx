@@ -696,14 +696,8 @@ Validation helpers:
 | --- | --- |
 | `isInputOnlyPin(pin)` | True if pin 34-39 |
 | `isReservedEthernetPin(pin)` | True if Ethernet-reserved |
-| `reservedEthernetReason(pin)` | Returns human-readable reason string |
-| `isPinAvailableForOutput(pin)` | True if pin is not 255, not input-only, not Ethernet |
-| `pinsConflict(a, b)` | True if both non-255 and equal |
-| `enumerateChannelGpios(...)` | Template function that calls a callback per GPIO pin found in a channel's routing |
 
-The `enumerateChannelGpios()` template is the C++ equivalent of `outputGpios()` in `web/js/_gpio.js`. Both walk the same routing rules to collect all GPIO pins used by a channel.
-
-`outputsUseForbiddenGpio()`, `outputsHaveDuplicateGpio()`, `outputJsonUsesPin()`, and `outputsUseReservedPin()` in `src/main.cpp` use these helpers for full JSON-based validation on the `/api/outputs` and `/api/settings` endpoints.
+`outputsUseForbiddenGpio()`, `outputsHaveDuplicateGpio()`, `outputJsonUsesPin()`, and `outputsUseReservedPin()` in `src/main.cpp` combine these pin helpers with routing helpers in `include/config_rules.h` for full JSON-based validation on the `/api/outputs` and `/api/settings` endpoints.
 
 ---
 

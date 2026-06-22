@@ -16,12 +16,12 @@
 #include "i2c_devices/i2c_gpio_expander.h"
 #include "funcgen_control.h"
 #include "output_defs.h"
+#include "output_devices/seven_seg_digits.h"
 
 extern PCA9685Manager pcaManager;
 extern DigitalExpanderManager digitalExpanderManager;
 
 #define DMX_BUFFER_SIZE 512
-#define CHAN_TYPE_ANALOG_RGB OutputDefs::TYPE_ANALOG_RGB
 
 inline uint8_t dmxValueByteCount(uint8_t resolution) {
     if (resolution <= 8) return 1;
@@ -33,8 +33,6 @@ inline uint8_t dmxValueByteCount(uint8_t resolution) {
 extern unsigned long lastDmxUpdateTime;
 extern bool systemActive;
 extern std::atomic<bool> networkFramePending;
-
-const uint8_t SEG_DIGITS[10] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
 
 class PixelStripWrapper {
 public:
@@ -403,7 +401,7 @@ private:
                 return 50; // PCA9685 frequency is shared per chip; RC servo requires 50 Hz.
             }
             if ((candidate.type == OutputDefs::TYPE_SINGLE_LED || candidate.type == OutputDefs::TYPE_MOTOR ||
-                 candidate.type == CHAN_TYPE_ANALOG_RGB || candidate.type == OutputDefs::TYPE_SMOKE || candidate.type == OutputDefs::TYPE_PWM_DAC) &&
+                 candidate.type == OutputDefs::TYPE_ANALOG_RGB || candidate.type == OutputDefs::TYPE_SMOKE || candidate.type == OutputDefs::TYPE_PWM_DAC) &&
                 firstConfiguredFreq == 0) {
                 firstConfiguredFreq = candidate.mc_freq;
             }

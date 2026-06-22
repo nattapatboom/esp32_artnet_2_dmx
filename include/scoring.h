@@ -5,17 +5,17 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include "output_control.h"
-#include "scoring_defs.h"
+#include "scoring_limits.h"
 
 // ═══════════════════════════════════════
 //  HARDWARE RESOURCE COUNTS
 // ═══════════════════════════════════════
 
-constexpr uint8_t MAX_LEDC_RESOURCE = ScoringDefs::MAX_LEDC_RESOURCE;
-constexpr uint8_t MAX_RMT_RESOURCE = ScoringDefs::MAX_RMT_RESOURCE;
-constexpr uint8_t MAX_UART_RESOURCE = ScoringDefs::MAX_UART_RESOURCE;
-constexpr uint8_t MAX_DAC_RESOURCE = ScoringDefs::MAX_DAC_RESOURCE;
-constexpr uint8_t MAX_TIMER_RESOURCE = ScoringDefs::MAX_TIMER_RESOURCE;
+constexpr uint8_t MAX_LEDC_RESOURCE = ScoringLimits::MAX_LEDC;
+constexpr uint8_t MAX_RMT_RESOURCE = ScoringLimits::MAX_RMT;
+constexpr uint8_t MAX_UART_RESOURCE = ScoringLimits::MAX_UART;
+constexpr uint8_t MAX_DAC_RESOURCE = ScoringLimits::MAX_DAC;
+constexpr uint8_t MAX_TIMER_RESOURCE = ScoringLimits::MAX_TIMER;
 
 // GPIO is NOT counted — expanders can substitute.
 // PCA9685, digital expander channels are NOT counted as hardware — they use I2C
@@ -55,8 +55,8 @@ inline bool hardwareWithinLimit(const HardwareResource& h) {
 // Budget = frame_time_us - safety reserve; total starts with base loop overhead.
 // RAM is static buffer estimate in bytes.
 struct CpuBudget {
-    static constexpr uint32_t BASE_OVERHEAD_US = ScoringDefs::CPU_BASE_OVERHEAD_US;
-    static constexpr uint32_t SAFETY_RESERVE_US = ScoringDefs::CPU_SAFETY_RESERVE_US;
+    static constexpr uint32_t BASE_OVERHEAD_US = ScoringLimits::BASE_OVERHEAD_US;
+    static constexpr uint32_t SAFETY_RESERVE_US = ScoringLimits::SAFETY_RESERVE_US;
     uint32_t usPerFrame = BASE_OVERHEAD_US;  // starts with base overhead
 
     CpuBudget operator+(const CpuBudget& o) const {
@@ -84,9 +84,9 @@ struct RamBudget {
     static uint32_t limit() {
         // Keep at least 150 KB free for system/network/runtime; use the rest for output buffers, capped at 64 KB.
         int32_t freeHeap = ESP.getFreeHeap();
-        int32_t available = freeHeap - ScoringDefs::RAM_KEEP_FREE;
+        int32_t available = freeHeap - ScoringLimits::KEEP_FREE_BYTES;
         if (available < 0) available = 0;
-        if (available > ScoringDefs::RAM_LIMIT_CAP) available = ScoringDefs::RAM_LIMIT_CAP;
+        if (available > ScoringLimits::LIMIT_CAP_BYTES) available = ScoringLimits::LIMIT_CAP_BYTES;
         return (uint32_t)available;
     }
 };
@@ -163,7 +163,7 @@ inline uint8_t sevenSegCount(uint8_t type, uint8_t mode) {
     return 0;
 }
 
-constexpr uint16_t I2C_WRITE_US = ScoringDefs::I2C_WRITE_US;
+constexpr uint16_t I2C_WRITE_US = ScoringLimits::I2C_WRITE_US;
 
 inline uint8_t i2cWritesForChannel(const OutputChannel& ch) {
     const auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
@@ -176,10 +176,10 @@ inline uint8_t i2cWritesForChannel(const OutputChannel& ch) {
 }
 
 // Service time & RAM per channel (independent of FPS)
-constexpr uint32_t BASE_CHANNEL_RAM = ScoringDefs::BASE_CHANNEL_RAM;
+constexpr uint32_t BASE_CHANNEL_RAM = ScoringLimits::BASE_CHANNEL_BYTES;
 constexpr uint32_t RMT_DMX_DRIVER_RAM = 5150UL * sizeof(rmt_item32_t) + 32;
-constexpr uint32_t I2C_ROUTE_RAM = ScoringDefs::I2C_ROUTE_RAM;
-constexpr uint32_t DMX_OUTPUT_SERVICE_US = ScoringDefs::DMX_OUTPUT_SERVICE_US;
+constexpr uint32_t I2C_ROUTE_RAM = ScoringLimits::I2C_ROUTE_BYTES;
+constexpr uint32_t DMX_OUTPUT_SERVICE_US = ScoringLimits::DMX_SERVICE_US;
 
 inline uint32_t frameTimeUs(uint8_t outputFps) {
     if (outputFps < 1) outputFps = 40;

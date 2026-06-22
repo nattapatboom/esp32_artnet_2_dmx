@@ -2,7 +2,6 @@
 #define MOTION_CONTROL_H
 
 #include <Arduino.h>
-#include <Wire.h>
 #include "output_control.h"
 #include "i2c_devices/i2c_dac.h"
 #include <FastAccelStepper.h>
@@ -47,7 +46,7 @@ public:
                 case OutputDefs::TYPE_MOTOR:
                     motorSetup(ch, ledcChannelIndex);
                     break;
-                case CHAN_TYPE_ANALOG_RGB:
+                case OutputDefs::TYPE_ANALOG_RGB:
                     analogRgbSetup(ch, ledcChannelIndex);
                     break;
                 case OutputDefs::TYPE_STEPPER:
@@ -75,7 +74,7 @@ public:
             if (ch.dmxBuffer == nullptr) continue;
 
             switch (ch.type) {
-                case CHAN_TYPE_ANALOG_RGB:
+                case OutputDefs::TYPE_ANALOG_RGB:
                     analogRgbUpdate(ch);
                     break;
                 case OutputDefs::TYPE_SINGLE_LED:

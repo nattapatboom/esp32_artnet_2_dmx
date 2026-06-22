@@ -2,8 +2,7 @@
 #define OUTPUT_DEVICES_TM1637_H
 
 #include <Arduino.h>
-
-extern const uint8_t SEG_DIGITS[10];
+#include "seven_seg_digits.h"
 
 class TM1637Driver {
 private:

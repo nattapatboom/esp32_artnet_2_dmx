@@ -58,6 +58,16 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 ## Project Structure
 
 - `include/` — C++ headers and most firmware subsystems
+- `include/config.h` — SystemConfig, NVS load/save
+- `include/config_rules.h` — config/IP/routing validation helpers
+- `include/dfplayer_control.h` — DFPlayer MP3 protocol driver
+- `include/espnow_control.h` — ESP-NOW master/slave bridge
+- `include/funcgen_control.h` — Function Generator waveform engine
+- `include/motion_control.h` — thin coordinator delegating motion/PWM/audio output types to `output_devices/`
+- `include/ota_control.h` — OTA update state/task declarations
+- `include/recovery_control.h` — recovery mode constants/state declarations
+- `include/rmt_dmx.h` — RMT-based DMX TX fallback
+- `include/scoring.h` — hardware/CPU/RAM scoring logic
 - `include/output_devices/` — one file per output device type:
   - `ledc_helpers.h` — shared LEDC allocation, DMX value, segment, PWM DAC calibration helpers
   - `dimmer.h` — Type 0 AC Dimmer setup/update (ZC + timer ISR)
@@ -71,6 +81,7 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
   - `servo.h` — Type 8 RC Servo setup/update
   - `buzzer.h` — Type 9 Passive Buzzer setup/update
   - `dfplayer.h` — Type 10 DFPlayer MP3 update
+  - `seven_seg_digits.h` — shared 7-segment digit lookup table
   - `seven_seg.h` — Types 11/12/13 7-Segment setup/update (TM1637 + DD via GPIO/PCA/EXP)
   - `dac.h` — Type 14 I2C DAC update (MCP4725, DAC7571, DAC7573)
   - `pwm_dac.h` — Type 15 PWM DAC setup/update
@@ -91,7 +102,7 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - `include/web_pages.h` — generated embedded Web UI; do not edit directly
 - `include/type_protocol.h` — shared types for the firmware↔Web UI interface contract (`FieldDef`, `TestCmdDef`)
 - `include/type_interfaces/type_N.h` — per-output-type interface definitions (config fields, test commands, field validation limits)
-- `include/gpio_control.h` — GPIO pin availability, reserved pins, validation helpers (`isInputOnlyPin`, `enumerateChannelGpios`, etc.)
+- `include/gpio_control.h` — GPIO pin availability, reserved pins, validation helpers (`isInputOnlyPin`, `isReservedEthernetPin`)
 - `include/source_rules.h` — I2C source address validation rules (`SourceRules::addressValid()`, etc.)
 - `include/display_protocol.h` — display type IDs and I2C address validation
 - `include/scoring_limits.h` — hardware limits (`MAX_LEDC`, `MAX_RMT`), CPU/RAM budget constants
@@ -117,7 +128,7 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - Main entity: `OutputChannel` in `include/output_control.h`
 - System settings: `SystemConfig` in `include/config.h`
 - Output types: v3 type IDs `0..18`
-- Source IDs: `0=GPIO`, `1=PCA9685`, `2=MCP23017`, `3=TCA9555`, `4=PCF857x`, `5=MCP4725 DAC`
+- Source IDs: `0=GPIO`, `1=PCA9685`, `2=MCP23017`, `3=TCA9555`, `4=PCF857x`, `5=MCP4725 DAC`, `6=DAC7571`, `7=DAC7573`
 - Source/routing/scoring source of truth: `docs/domain_model.md` -> `Configuration Contract`
 - Validation/interlock source of truth: C++ in `src/main.cpp` and matching JS in `web/index.html`
 

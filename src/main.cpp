@@ -523,11 +523,11 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
         bool primaryIsSevenSegA = (type == 12 || type == 13) && (mcMode >= 2 && mcMode <= 5);
         if (source != 0 && !primaryIsSevenSegA) {
             if (addChannel(source, address, output["pca_channel"] | 0, outputIndex)) return true;
-            if ((type == 6 || type == 7 || type == CHAN_TYPE_ANALOG_RGB || type == 18) &&
+            if ((type == 6 || type == 7 || type == OutputDefs::TYPE_ANALOG_RGB || type == 18) &&
                 addChannel(source, address, output["pca_channel2"] | 255, outputIndex)) return true;
-            if ((type == 7 || type == CHAN_TYPE_ANALOG_RGB || (type == 6 && mcMode == 2)) &&
+            if ((type == 7 || type == OutputDefs::TYPE_ANALOG_RGB || (type == 6 && mcMode == 2)) &&
                 addChannel(source, address, output["pca_channel3"] | 255, outputIndex)) return true;
-            if ((type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4) &&
+            if ((type == OutputDefs::TYPE_ANALOG_RGB && colorOrder >= 4) &&
                 addChannel(source, address, output["pca_channel4"] | 255, outputIndex)) return true;
         }
 
@@ -793,7 +793,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             return false;
         }
         uint8_t mcMode = output["mc_mode"] | 0;
-        bool pcaOk = (type == 2 || type == 4 || type == 6 || type == 7 || type == 8 || type == CHAN_TYPE_ANALOG_RGB || type == 15 || type == 17 || type == 18 || type == 12 || type == 13);
+        bool pcaOk = (type == 2 || type == 4 || type == 6 || type == 7 || type == 8 || type == OutputDefs::TYPE_ANALOG_RGB || type == 15 || type == 17 || type == 18 || type == 12 || type == 13);
         bool digitalOk = (type == 2 || type == 17 || type == 18 || ((type == 12 || type == 13) && (mcMode == 2 || mcMode == 3)));
         if (source == 1 && !pcaOk) {
             message = "PCA9685 source is not supported by output channel " + String(channelNumber);
@@ -951,7 +951,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
         }
-        if (type == CHAN_TYPE_ANALOG_RGB) {
+        if (type == OutputDefs::TYPE_ANALOG_RGB) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             uint8_t pin3Source = output["pin3_source"] | 0;
             uint8_t pin4Source = output["pin4_source"] | 0;

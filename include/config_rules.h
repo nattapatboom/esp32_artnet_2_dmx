@@ -36,18 +36,18 @@ inline bool validateIp4(const char* s) {
 // ── GPIO routing helpers (stay here — unique to output routing logic) ──
 
 inline bool isPin2GpioRouting(uint8_t type, uint8_t source, uint8_t pin2Source) {
-    if (type == OutputDefs::TYPE_MOTOR || type == CHAN_TYPE_ANALOG_RGB || type == OutputDefs::TYPE_SMOKE || (type == OutputDefs::TYPE_STEPPER && pin2Source == 0)) return pin2Source == 0;
+    if (type == OutputDefs::TYPE_MOTOR || type == OutputDefs::TYPE_ANALOG_RGB || type == OutputDefs::TYPE_SMOKE || (type == OutputDefs::TYPE_STEPPER && pin2Source == 0)) return pin2Source == 0;
     if (type == OutputDefs::TYPE_TM1637 || type == OutputDefs::TYPE_DFPLAYER) return source == 0;
     return false;
 }
 
 inline bool isPin3GpioRouting(uint8_t type, uint8_t pin3Source, uint8_t mcMode) {
-    if (type == CHAN_TYPE_ANALOG_RGB || (type == OutputDefs::TYPE_MOTOR && mcMode == 2) || type == OutputDefs::TYPE_STEPPER) return pin3Source == 0;
+    if (type == OutputDefs::TYPE_ANALOG_RGB || (type == OutputDefs::TYPE_MOTOR && mcMode == 2) || type == OutputDefs::TYPE_STEPPER) return pin3Source == 0;
     return false;
 }
 
 inline bool isPin4GpioRouting(uint8_t type, uint8_t pin4Source, uint8_t colorOrder, uint8_t homingMode) {
-    if (type == CHAN_TYPE_ANALOG_RGB && colorOrder >= 4) return pin4Source == 0;
+    if (type == OutputDefs::TYPE_ANALOG_RGB && colorOrder >= 4) return pin4Source == 0;
     if (type == OutputDefs::TYPE_STEPPER && homingMode == 0) return pin4Source == 0;
     return false;
 }
