@@ -22,35 +22,21 @@ const I2C_ROUTE_RAM=SCORE_DEFS.ram.i2cRoute;
 const DMX_OUTPUT_SERVICE_US=SCORE_DEFS.cpu.dmxOutputServiceUs;
 
 function channelHardware(o){
-  const t=typeId(o);
-  let ledc=0,rmt=0,uart=0,dac=0,timer=0;
-  switch(t){
-    case 0: break;
-    case 1: uart=1; break;
-    case 2: break;
-    case 3: rmt=1; break;
-    case 4: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
-    case 5: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
-    case 6: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
-    case 7: rmt=2; break;
-    case 8: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
-    case 9: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
-    case 10: uart=1; break;
-    case 11: break;
-    case 12:
-    case 13:
-      if((o.mc_mode||0)>=6&&(o.mc_mode||0)<=9){
-        eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;});
-        break;
-      }
-      eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;});
-      break;
-    case 14: if(!(o.source>=5&&o.source<=7)) dac=1; break;
-    case 15: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
-    case 16: ledc=1; timer=1; break;
-    case 17: break;
-    case 18: break;
-  }
+  var mode=outputModeDef(typeId(o),parseInt(o.mc_mode||0));
+  if(!mode) return {ledc:0,rmt:0,uart:0,dac:0,timer:0};
+  var hw=(mode.cost&&mode.cost.hardware)||{};
+  var ledc=0,rmt=hw.rmt||0,uart=hw.uart||0,dac=hw.dac||0,timer=hw.timer||0,countedW=false;
+
+  eachSlot(o,function(slot,pin,src,rule){
+    if(src===0){
+      if(rule.hwIfGpio===1){ledc++;if(slot==='pin4') countedW=true;}
+      if(rule.hwIfGpio===2&&rmt<(hw.rmt||0)) rmt++;
+    }
+  });
+
+  if(typeId(o)===5&&(parseInt(o.color_order||0))<4&&countedW) ledc--;
+  if(typeId(o)===14&&(parseInt(o.source||0))===0) dac=1;
+
   return {ledc,rmt,uart,dac,timer};
 }
 function srcIsI2C(src){ return src>=1&&src<=7; }
@@ -103,50 +89,11 @@ function ledStripServiceUs(ledCount,colorOrder){
   return 80+ledCount*(bytesPerPixel===4?4:3);
 }
 
-function sevenSegCount(o){ return typeId(o)===13?8:(typeId(o)===12?7:0); }
 
 function i2cWriteCount(o){
-  var t=typeId(o), mode=parseInt(o.mc_mode||0);
-  var si=function(s){return srcIsI2C(parseInt(s)||0);};
-  if([2,17,4,8,15,14].includes(t)){
-    var writes=0;
-    eachSlot(o,function(slot,pin,src,rule){if(si(src)) writes++;});
-    return writes;
-  }
-  if(t===5){
-    var writes=0;
-    eachSlot(o,function(slot,pin,src,rule){if(si(src)) writes++;});
-    return writes;
-  }
-  if(t===6){
-    var writes=0;
-    if(si(o.source||0)){writes+=mode===2?3:2;}
-    else{eachSlot(o,function(slot,pin,src,rule){
-      if(slot!=='pin1'&&si(src)) writes++;
-    });}
-    return writes;
-  }
-  if(t===7){
-    var writes=0;
-    eachSlot(o,function(slot,pin,src,rule){if(slot!=='pin1'&&si(src)) writes++;});
-    return writes;
-  }
-  if(t===12||t===13){
-    var writes=0;
-    var n=sevenSegCount(o);
-    if(mode>=2&&si(o.pin2_source)){writes+=n;}
-    else{eachSlot(o,function(slot,pin,src,rule){
-      if(slot!=='pin1'&&si(src)) writes++;
-    });}
-    if(mode>=6&&mode<=9&&si(o.source||0)) writes++;
-    return writes;
-  }
-  if(t===18){
-    var writes=0;
-    eachSlot(o,function(slot,pin,src,rule){if(si(src)) writes++;});
-    return writes;
-  }
-  return 0;
+  var writes=0;
+  eachSlot(o,function(slot,pin,src,rule){if(srcIsI2C(src)) writes++;});
+  return writes;
 }
 
 function cpuLimit(fps){
