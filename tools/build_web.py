@@ -94,6 +94,32 @@ TEST_UI_MAP = {
     "TEST_UI_DFPLAYER": 6, "TEST_UI_7SEG": 7,
 }
 
+TEST_UI_FIELDS = {
+    1: [{"key": "test_level_num", "type": "number", "label": "Value", "min": 0, "max": 255, "def": 128}],
+    2: [
+        {"key": "test_dmx_ch", "type": "number", "label": "DMX Channel", "min": 1, "max": 512, "def": 1},
+        {"key": "test_level_num", "type": "number", "label": "Value", "min": 0, "max": 255, "def": 128},
+    ],
+    3: [
+        {"key": "test_color", "type": "color", "label": "Custom Color", "def": "#ff0000"},
+        {"key": "test_white", "type": "number", "label": "White", "min": 0, "max": 255, "def": 0},
+        {"key": "test_pixel", "type": "number", "label": "Pixel Number", "min": 1, "max": 1360, "def": 1},
+    ],
+    4: [{"key": "test_motor_num", "type": "number", "label": "Speed", "min": 0, "max": 255, "def": 128}],
+    5: [
+        {"key": "test_step_pos", "type": "number", "label": "Position", "min": 0, "max": 4294967295, "def": 128},
+        {"key": "test_step_speed", "type": "number", "label": "Speed", "min": 0, "max": 255, "def": 180},
+    ],
+    6: [
+        {"key": "test_mp3_track", "type": "number", "label": "Track", "min": 0, "max": 255, "def": 1},
+        {"key": "test_mp3_vol", "type": "number", "label": "Volume", "min": 0, "max": 255, "def": 200},
+    ],
+    7: [
+        {"key": "test_7seg_num", "type": "number", "label": "Number", "min": 0, "max": 9999, "def": 1234},
+        {"key": "test_7seg_text", "type": "text", "label": "ASCII Text", "min": 0, "max": 4, "def": "ABCD"},
+    ],
+}
+
 FIELD_TYPE_MAP = {
     "FT_NUMBER": "number",
     "FT_FLOAT": "float",
@@ -439,6 +465,7 @@ def generate_output_defs_js():
         "byteCounts": byte_counts if len(byte_counts) == 19 else [],
         "modeKeyMap": mode_key_map,
         "testUi": test_ui_per_type,
+        "testFields": TEST_UI_FIELDS,
         "testCmds": test_cmds_js,
         "fields": fields_js,
         "resOpts": res_opts,

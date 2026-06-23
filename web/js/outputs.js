@@ -286,15 +286,6 @@ async function stopOutputTest(){
     showAlert(res.ok);
   }catch(e){showAlert(false);}
 }
-const TEST_UI_FIELDS={
-  1:[{key:'test_level_num',type:'number',label:'Value',min:0,max:255,def:128}],
-  2:[{key:'test_dmx_ch',type:'number',label:'DMX Channel',min:1,max:512,def:1},{key:'test_level_num',type:'number',label:'Value',min:0,max:255,def:128}],
-  3:[{key:'test_color',type:'color',label:'Custom Color',def:'#ff0000'},{key:'test_white',type:'number',label:'White',min:0,max:255,def:0},{key:'test_pixel',type:'number',label:'Pixel Number',min:1,max:1360,def:1}],
-  4:[{key:'test_motor_num',type:'number',label:'Speed',min:0,max:255,def:128}],
-  5:[{key:'test_step_pos',type:'number',label:'Position',min:0,max:4294967295,def:128},{key:'test_step_speed',type:'number',label:'Speed',min:0,max:255,def:180}],
-  6:[{key:'test_mp3_track',type:'number',label:'Track',min:0,max:255,def:1},{key:'test_mp3_vol',type:'number',label:'Volume',min:0,max:255,def:200}],
-  7:[{key:'test_7seg_num',type:'number',label:'Number',min:0,max:9999,def:1234},{key:'test_7seg_text',type:'text',label:'ASCII Text',min:0,max:4,def:'ABCD'}]
-};
 function renderTestField(field){
   var value=field.def!==undefined?field.def:'';
   if(field.type==='color') return `<div class="f"><label for="${field.key}">${field.label}</label><input type="color" id="${field.key}" value="${value}"></div>`;
@@ -304,7 +295,7 @@ function renderTestField(field){
 function renderTestFields(ui){
   var box=document.getElementById('test-field-container');
   if(!box) return;
-  box.innerHTML=(TEST_UI_FIELDS[ui]||[]).map(renderTestField).join('');
+  box.innerHTML=(TYPE_META.testFields?.[ui]||[]).map(renderTestField).join('');
 }
 function testValue(id,fallback){
   var el=document.getElementById(id);
@@ -573,13 +564,8 @@ function editOutput(idx){
 
 function cancelEditOutput(){
   editOutIdx=-1;
-  const setVal=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val;};
   resetRouteFields();
-  setVal('pwm_dac_mode',0);
-  setVal('pwm_dac_min','0.00');
-  setVal('pwm_dac_max','100.00');
-  setVal('sol_threshold',127);
-  if(document.getElementById('smoke_threshold')) setVal('smoke_threshold',127);
+  writeGeneratedFields({type:parseInt(document.getElementById('no_type')?.value||0)});
   document.getElementById('out-add-btn').textContent='Add Channel';
   document.getElementById('out-cancel-btn').style.display='none';
   document.getElementById('edit-banner').style.display='none';
@@ -592,41 +578,11 @@ function addOrUpdateOutput(){
     type:type,
     start_universe:parseInt(document.getElementById('no_uni').value),
     start_address:parseInt(document.getElementById('no_addr').value)||1,
-    led_count:parseInt(cfgEl('led_count')?.value||170),
-    color_order:parseInt(cfgEl('color_order')?.value||0),
-    led_protocol:parseInt(cfgEl('led_protocol')?.value||0),
-    mc_mode: parseInt(cfgEl('mc_mode')?.value||0),
-    mc_resolution: parseInt(cfgEl('mc_resolution')?.value||8),
-    mc_freq: parseInt(cfgEl('mc_freq')?.value||1000),
-    pwm_dac_mode: parseInt(document.getElementById('pwm_dac_mode')?.value || 0),
-    pwm_dac_min: dutyPctToInt('pwm_dac_min', 0),
-    pwm_dac_max: dutyPctToInt('pwm_dac_max', 10000),
-    mc_deadband: parseInt(cfgEl('mc_deadband')?.value||0),
-    mc_min_us: parseInt(cfgEl('mc_min_us')?.value||1000),
-    mc_max_us: parseInt(cfgEl('mc_max_us')?.value||2000),
-    mc_steps_per_rev: parseInt(cfgEl('mc_steps_per_rev')?.value||200),
-    mc_unit_type: parseInt(cfgEl('mc_unit_type')?.value||0),
-    mc_scale_factor: parseFloat(cfgEl('mc_scale_factor')?.value||'0'),
-    mc_invert: cfgEl('mc_invert')?.checked||false,
-    mc_brake: cfgEl('mc_brake')?.checked||false,
     mc_enable_active_high: false,
     mc_dir_invert: false,
-    mc_step_invert: false,
-    mc_homing_mode: parseInt(cfgEl('mc_homing_mode')?.value||0),
-    mc_homing_dir: parseInt(cfgEl('mc_homing_dir')?.value||0),
-    mc_homing_speed: parseInt(cfgEl('mc_homing_speed')?.value||500),
-    mc_homing_timeout: parseInt(cfgEl('mc_homing_timeout')?.value||5),
-    solenoid_mode: 0,
-    solenoid_threshold: (type===18) ? parseInt(document.getElementById('smoke_threshold')?.value || 127) : parseInt(document.getElementById('sol_threshold')?.value || 127),
-    solenoid_pulse_ms: parseInt(document.getElementById('sol_pulse_ms')?.value || 50),
-    solenoid_pre_delay: parseInt(document.getElementById('sol_pre_delay')?.value || 0),
-    solenoid_post_delay: parseInt(document.getElementById('sol_post_delay')?.value || 100),
-    
-    smoke_duration_ms: parseInt(document.getElementById('smoke_dur')?.value || 1000),
-    settle_delay_ms: parseInt(document.getElementById('smoke_settle')?.value || 500),
-    shoot_duration_ms: parseInt(document.getElementById('smoke_shoot')?.value || 1000),
-    smoke_lockout_ms: parseInt(document.getElementById('smoke_lockout')?.value || 2000)
+    mc_step_invert: false
   };
+  readGeneratedFields(ch,type);
   readRouteFields(ch,type);
   if(type===T.STEPPER){
     ch.pin_invert=false;
@@ -636,7 +592,6 @@ function addOrUpdateOutput(){
     ch.mc_dir_invert=routeChecked('no_pin2_invert',false);
     ch.mc_step_invert=routeChecked('no_pin_invert',false);
   }
-  readGeneratedFields(ch,type);
 
   if(editOutIdx>=0){outputs[editOutIdx]=ch;cancelEditOutput();}
   else {outputs.push(ch); autoAssignOutputPins();}
