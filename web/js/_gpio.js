@@ -375,14 +375,6 @@ function sourceAddressRangeLabel(src){
   return SOURCE_ADDRESS_RULES[src]?.label||'Unsupported I2C source';
 }
 
-function displayAddressValid(type, addr){
-  type=parseInt(type||0); addr=parseInt(addr);
-  if(type===0) return true;
-  if(type===1 || type===2) return addr===0x3C || addr===0x3D;
-  if(type===3) return addr===0x27 || addr===0x3F;
-  return false;
-}
-
 function setHybridDefaultAddr(sourceId, addrId){
   const src=parseInt(document.getElementById(sourceId)?.value||0);
   const addrEl=document.getElementById(addrId);

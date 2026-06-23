@@ -3,11 +3,11 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
 
-from build_web import generate_gpio_js, generate_source_rules_js, generate_output_defs_js
+from build_web import generate_score_limits_js, generate_gpio_js, generate_source_rules_js, generate_display_js, generate_output_defs_js
 
 # Collect all JS
-js_parts = [generate_gpio_js(), generate_source_rules_js(), generate_output_defs_js()]
-JS_ORDER = ["_gpio.js", "network_protocol.js", "scoring.js", "espnow.js", "app.js", "outputs.js"]
+js_parts = [generate_score_limits_js(), generate_gpio_js(), generate_source_rules_js(), generate_display_js(), generate_output_defs_js()]
+JS_ORDER = ["_gpio.js", "network_protocol.js", "scoring.js", "espnow.js", "outputs.js", "app.js"]
 for js_file in JS_ORDER:
     with open(os.path.join("web/js", js_file)) as f:
         js_parts.append(f.read())

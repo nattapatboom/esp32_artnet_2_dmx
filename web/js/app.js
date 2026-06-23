@@ -62,7 +62,7 @@ const I2C_GUESS_ENTRIES = [
       return addrs;
     }).map(addr => [addr, SOURCES[r.source]])
   ),
-  [0x3C, 'SSD1306 OLED'],[0x3D, 'SSD1306 OLED'],[0x3F, 'PCF8574 LCD Backpack'],
+  ...Object.entries(DISPLAY_DATA.addresses||{}).flatMap(([type,addrs]) => addrs.map(addr => [addr, DISPLAY_DATA.typeNames?.[type]||'I2C Display'])),
   [0x48, 'ADS1115 / PCF8591'],[0x49, 'ADS1115 / PCF8591'],[0x4A, 'ADS1115 / PCF8591'],[0x4B, 'ADS1115 / PCF8591'],
   [0x50, 'AT24C EEPROM'],[0x51, 'AT24C EEPROM'],[0x57, 'AT24C EEPROM'],
   [0x68, 'DS3231 RTC / MPU6050'],[0x76, 'BME280 / BMP280'],[0x77, 'BME280 / BMP280'],
@@ -159,9 +159,8 @@ function updateDisplayAddressOptions(){
   const sel=document.getElementById('display_i2c_addr');
   if(!sel) return;
   const current=parseInt(sel.value||60);
-  const opts=(type===3)
-    ? [[0x27,'0x27 (LCD default)'],[0x3F,'0x3F (LCD alt)']]
-    : [[0x3C,'0x3C (OLED default)'],[0x3D,'0x3D']];
+  const addrs=DISPLAY_DATA.addresses?.[type]||DISPLAY_DATA.addresses?.[DISPLAY_DATA.typeIds.SSD1306]||[0x3C];
+  const opts=addrs.map((v,i)=>[v,'0x'+v.toString(16).toUpperCase()+(i===0?' (default)':'')]);
   sel.innerHTML=opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   sel.value=opts.some(([v])=>v===current)?current:opts[0][0];
 }

@@ -32,7 +32,7 @@ PANE_MARKERS = {
     "<!-- PANE_DIAG -->":   "pane-diag.html",
 }
 
-JS_ORDER = ["_gpio.js", "network_protocol.js", "scoring.js", "espnow.js", "app.js", "outputs.js"]
+JS_ORDER = ["_gpio.js", "network_protocol.js", "scoring.js", "espnow.js", "outputs.js", "app.js"]
 
 
 def minify_html(html):
@@ -552,6 +552,36 @@ def generate_source_rules_js():
     return "const SOURCE_DATA=" + json.dumps(data, separators=(",", ":")) + ";\n"
 
 
+def generate_display_js():
+    src = read_file(DISPLAY_PROTO_PATH)
+
+    def parse_addr_array(name):
+        m = re.search(rf"constexpr\s+uint8_t\s+{re.escape(name)}\[\]\s*=\s*\{{(.*?)\}}\s*;", src, re.DOTALL)
+        if not m:
+            return []
+        return [int(v.strip(), 0) for v in m.group(1).split(",") if v.strip()]
+
+    type_ids = {
+        name.replace("DTYPE_", ""): int(value)
+        for name, value in re.findall(r"constexpr\s+uint8_t\s+(DTYPE_\w+)\s*=\s*(\d+)\s*;", src)
+    }
+    type_names = []
+    m = re.search(r"constexpr\s+const\s+char\s*\*\s*TYPE_NAMES\[\]\s*=\s*\{(.*?)\};", src, re.DOTALL)
+    if m:
+        type_names = re.findall(r'"([^"]+)"', m.group(1))
+
+    data = {
+        "typeIds": type_ids,
+        "typeNames": type_names,
+        "addresses": {
+            str(type_ids.get("SSD1306", 1)): parse_addr_array("SSD1306_ADDRS"),
+            str(type_ids.get("SH1106", 2)): parse_addr_array("SH1106_ADDRS"),
+            str(type_ids.get("LCD", 3)): parse_addr_array("LCD_ADDRS"),
+        },
+    }
+    return "const DISPLAY_DATA=" + json.dumps(data, separators=(",", ":")) + ";\n"
+
+
 def main():
     print(f"=== Compiling {SHELL_PATH} -> {HEADER_PATH} ===")
 
@@ -589,7 +619,7 @@ def main():
         print(f"Warning: {test_panel_path} not found, leaving PANE_TEST marker")
 
     # Embed JS files into <script> tag (generated metadata, main JS, then per-type config/test)
-    js_parts = [generate_score_limits_js(), generate_gpio_js(), generate_source_rules_js(), generate_output_defs_js()]
+    js_parts = [generate_score_limits_js(), generate_gpio_js(), generate_source_rules_js(), generate_display_js(), generate_output_defs_js()]
     for js_file in JS_ORDER:
         js_path = os.path.join(JS_DIR, js_file)
         if not os.path.exists(js_path):

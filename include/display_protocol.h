@@ -6,9 +6,8 @@
 // ─────────────────────────────────────────────
 //  Display Protocol
 //  Display type IDs and I2C address validation.
-//  Single source of truth shared between C++
-//  and Web UI (mirror of displayAddressValid()
-//  in web/js/_gpio.js).
+//  Single source of truth for firmware validation.
+//  Web UI submits settings and displays API responses.
 // ─────────────────────────────────────────────
 
 namespace DisplayProtocol {
