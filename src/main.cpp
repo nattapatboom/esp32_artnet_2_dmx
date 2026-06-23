@@ -326,6 +326,33 @@ bool forEachOutputGpioPin(JsonObjectConst output, F&& callback) {
     return false;
 }
 
+bool isHexDigitChar(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
+}
+
+char upperHexChar(char c) {
+    if (c >= 'a' && c <= 'f') return (char)(c - 'a' + 'A');
+    return c;
+}
+
+bool normalizeEspNowPeerMac(const char* input, char* output, size_t outputSize) {
+    if (input == nullptr || output == nullptr || outputSize < 18) return false;
+    if (strlen(input) != 17) return false;
+    const char sep = input[2];
+    if (sep != ':' && sep != '-') return false;
+    for (uint8_t i = 0; i < 17; i++) {
+        if ((i % 3) == 2) {
+            if (input[i] != sep) return false;
+            output[i] = ':';
+        } else {
+            if (!isHexDigitChar(input[i])) return false;
+            output[i] = upperHexChar(input[i]);
+        }
+    }
+    output[17] = '\0';
+    return true;
+}
+
 bool outputJsonUsesPin(JsonObjectConst output, uint8_t reservedPin) {
     if (reservedPin == 255) return false;
     return forEachOutputGpioPin(output, [&](int pin, const char*) {
@@ -1767,6 +1794,12 @@ void setupWebServer() {
                     request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Each peer route needs a MAC address\"}");
                     return;
                 }
+                char normalizedMac[18];
+                if (!normalizeEspNowPeerMac(obj["mac"].as<const char*>(), normalizedMac, sizeof(normalizedMac))) {
+                    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid peer MAC address\"}");
+                    return;
+                }
+                obj["mac"] = normalizedMac;
                 uint16_t su = obj["start_universe"] | 0;
                 uint16_t sa = obj["start_address"] | 1;
                 uint16_t eu = obj["end_universe"] | su;

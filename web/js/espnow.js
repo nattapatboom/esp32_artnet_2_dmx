@@ -37,7 +37,6 @@ function renderPeers(){
 }
 function addPeer(){
   const mac=document.getElementById('np_mac').value.trim().toUpperCase();
-  if(!/^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$/.test(mac)){alert('Invalid MAC Address format');return;}
   const peer={
     mac:mac,
     start_universe:parseInt(document.getElementById('np_start_uni').value)||0,
@@ -45,14 +44,6 @@ function addPeer(){
     end_universe:parseInt(document.getElementById('np_end_uni').value)||0,
     end_address:parseInt(document.getElementById('np_end_addr').value)||512
   };
-  if(peer.start_address<1) peer.start_address=1;
-  if(peer.start_address>512) peer.start_address=512;
-  if(peer.end_address<1) peer.end_address=1;
-  if(peer.end_address>512) peer.end_address=512;
-  if(peer.end_universe<peer.start_universe || (peer.end_universe===peer.start_universe && peer.end_address<peer.start_address)){
-    alert('End range must be after Start range.');
-    return;
-  }
   espPeers.push(peer);
   document.getElementById('np_mac').value='';
   document.getElementById('np_start_uni').value=peer.end_universe;
@@ -65,7 +56,11 @@ function delPeer(idx){espPeers.splice(idx,1);renderPeers();}
 async function savePeers(){
   try{
     const res=await fetch('/api/espnow-peers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({peers:espPeers.map(normPeer)})});
+    let msg='';
+    try{const d=await res.json(); msg=d.message||'';}catch(e){}
     showAlert(res.ok);
+    if(res.ok) loadPeers();
+    else if(msg) alert(msg);
   }catch(e){showAlert(false);}
 }
 
