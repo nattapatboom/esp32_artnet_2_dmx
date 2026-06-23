@@ -128,8 +128,8 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - System settings: `SystemConfig` in `include/config.h`
 - Output types: v3 type IDs `0..18`
 - Source IDs: `0=GPIO`, `1=PCA9685`, `2=MCP23017`, `3=TCA9555`, `4=PCF857x`, `5=MCP4725 DAC`, `6=DAC7571`, `7=DAC7573`
-- Source/routing/scoring source of truth: `docs/domain_model.md` -> `Configuration Contract`
-- Validation/interlock source of truth: C++ in `src/main.cpp` and matching JS in `web/index.html`
+- Source/routing/scoring source of truth: C++ firmware validation/scoring, with `docs/domain_model.md` -> `Configuration Contract` documenting intended behavior
+- Validation/interlock source of truth: C++ in `src/main.cpp`; the Web UI is a thin client and must not duplicate conflict/interlock logic
 
 ## Output Types
 
@@ -146,12 +146,10 @@ The single source of truth for resource scoring, hard peripheral limits, physica
   - **HardwareResource:** counts only (LEDC ≤16, RMT ≤8, UART ≤2, DAC ≤2, timer ≤4) – GPIO/PCA/EXP not counted
   - **CpuBudget:** per-type µs/frame + 500 µs base overhead + per-I2C-write overhead + AC Dimmer/Function Generator background timer cost + ESP-NOW Master; limit = `(1,000,000 / fps) - 1,500` µs
   - **RamBudget:** `224B` channel slot + actual DMX buffer estimate + runtime objects (NeoPixel/DFPlayer/Stepper/FuncGen/RMT fallback/I2C route); limit = 65535 (64 KB)
-- **Verification Parity:** Must match between:
-  - C++ Firmware: `include/scoring.h` -> `estimateHardware()`, `estimateChannelCost()`, `checkScores()`
-  - Web UI: `web/index.html` -> `channelHardware()`, `channelCost()`, `hwBlocked()/cpuBlocked()/ramBlocked()`
+- **Authoritative Validation:** C++ Firmware owns resource scoring and save blocking through `include/scoring.h` and `src/main.cpp`. The Web UI may display metadata-driven forms and server-returned errors, but must not independently block saves for conflicts, interlocks, or resource limits.
 - **LED strip runtime:** `OutputControl::updateLeds()` must call NeoPixelBus/RMT `CanShow()` before pixel mapping and `Show()`; if busy, skip that strip for the current tick and send the newest DMX buffer on a later frame.
 - **Hard Resource Limits:** Refer to [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#1-peripheral-limits) for LEDC (16 max), RMT (8 max), UART (2 usable), timer (4 max), and shared I2C bus constraints.
-- **Interlocks To Preserve:** Validate every config rule in both the C++ API and Web UI. You must prevent duplicate GPIOs, pin overlaps (Status LED, I2C, ZC), PCA9685 frequency conflicts, and incorrect expander usage. See [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#6-hard-validation-rules) for details.
+- **Interlocks To Preserve:** Validate every config rule in the C++ API. The Web UI sends user values to the firmware and surfaces API errors/warnings; it must not maintain parallel conflict logic for duplicate GPIOs, pin overlaps (Status LED, I2C, ZC), PCA9685 frequency conflicts, incorrect expander usage, or resource blocking. See [docs/resource_calculator.md](file:///c:/Users/natta/Documents/bar_program/esp32_eth01_artnet_device/docs/resource_calculator.md#6-hard-validation-rules) for details.
 
 ## Documentation as Source of Truth
 
@@ -180,7 +178,8 @@ When working on this project:
 - Use `networkFramePending.exchange(false)` for the atomic pending-frame flag
 - If editing Web UI, edit `web/index.html`, regenerate `include/web_pages.h`, then build
 - Web UI output menus must load output device metadata, I2C expander options, and I2C address rules from the firmware header/source-of-truth generator path, not hardcoded JS copies. If menu data is missing, add it to the firmware header source of truth (for example `OUTPUT_MODES[]` / related protocol headers) and generate the Web UI data from there. Common Web UI fields that are not output-device menu metadata, such as `start_universe`, `start_address`, display layout, and other shared base form controls, may remain implemented on the Web UI side.
-- Output-device-specific UI/settings/scoring/pin-conflict/source-validation/test metadata must not be implemented as ad-hoc per-type JS/C++ functions or hardcoded type checks. Use a common metadata/runtime layer driven by `include/output_defs.h` `OUTPUT_MODES[]`, `PinRule`, `ModeCost`, `include/type_interfaces/type_N.h` `EXTRA_FIELDS[]`/`TEST_COMMANDS[]`, and generated Web UI data from `tools/build_web.py`. If the Web UI needs realtime rendering, render from generated metadata; if static HTML/JS is needed for size/performance, generate it from headers at build time. Device-specific code is allowed only inside physical runtime drivers under `include/output_devices/` or clearly isolated strategy functions referenced by generated metadata.
+- Web UI must behave as a thin client for output configuration: collect values, render metadata-driven forms/test controls, submit JSON to the API, and display firmware responses. Do not implement or preserve client-side save blockers for pin conflicts, source compatibility, I2C address validation, PCA9685 frequency conflicts, resource scoring, or type-specific interlocks; those belong in C++ firmware validation only.
+- Output-device-specific UI/settings/test metadata must not be implemented as ad-hoc per-type JS/C++ functions or hardcoded type checks. Use a common metadata/runtime layer driven by `include/output_defs.h` `OUTPUT_MODES[]`, `PinRule`, `ModeCost`, `include/type_interfaces/type_N.h` `EXTRA_FIELDS[]`/`TEST_COMMANDS[]`, and generated Web UI data from `tools/build_web.py`. If the Web UI needs realtime rendering, render from generated metadata; if static HTML/JS is needed for size/performance, generate it from headers at build time. Device-specific code is allowed only inside physical runtime drivers under `include/output_devices/` or clearly isolated firmware strategy functions referenced by generated metadata.
 
 ## Typst User Manual
 
