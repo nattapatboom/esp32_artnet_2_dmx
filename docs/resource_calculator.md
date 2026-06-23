@@ -201,6 +201,8 @@ Because only a small number of general output pins are available, I2C expanders 
 
 ## 5. I2C Device Specifications
 
+All I2C output devices share the same bus and must follow the common I2C base architecture: one mutex-guarded transaction path, centralized source/address metadata, common route lookup semantics, and manager/device lifecycle helpers. PCA9685, I2C DACs, and digital GPIO expanders should only implement chip-specific packet/register details on top of that base so future ICs can be added without duplicating validation, scoring, Web UI, or bus-locking code.
+
 ### 5.1 PCA9685 PWM/Servo Expander
 
 * **Interface:** I2C.

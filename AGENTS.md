@@ -176,6 +176,7 @@ When working on this project:
 - Use `std::vector<OutputChannel>` for channel storage
 - `mc_mode` may carry signed metadata values such as `-1` (stored in `uint8_t` as `255`); cast to `int8_t` before comparing mode ranges or checking values like `-1`, especially for 7-segment modes.
 - Every `Wire` operation must be protected by `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100))`
+- I2C device families (PCA9685, I2C DACs, digital GPIO expanders, displays where practical) must share a common I2C base layer for bus locking, address validation metadata, device lookup/registration, and route handling. Keep per-chip code limited to protocol-specific register/data transactions so adding a new IC does not require duplicating manager, mutex, validation, scoring, or Web UI plumbing.
 - Use `networkFramePending.exchange(false)` for the atomic pending-frame flag
 - If editing Web UI, edit `web/index.html`, regenerate `include/web_pages.h`, then build
 - Web UI output menus must load output device metadata, I2C expander options, and I2C address rules from the firmware header/source-of-truth generator path, not hardcoded JS copies. If menu data is missing, add it to the firmware header source of truth (for example `OUTPUT_MODES[]` / related protocol headers) and generate the Web UI data from there. Common Web UI fields that are not output-device menu metadata, such as `start_universe`, `start_address`, display layout, and other shared base form controls, may remain implemented on the Web UI side.

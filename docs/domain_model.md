@@ -140,6 +140,7 @@ Key rules:
 - Primary source compatibility is declared by `PinRule.sources` in `OUTPUT_MODES[]`; firmware validation must consume this metadata instead of maintaining parallel per-type allow lists.
 - Shared output mapping behavior is declared by `OutputModeDef`/`OUTPUT_MODES[]` metadata. Modes with `startAtFirstUniverse=true` read from channel 1 of `start_universe` instead of applying `start_address`; currently this applies to DMX Output and LED Strip.
 - Every `Wire` (I2C) operation must be protected by `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100))` — including PCA9685, MCP23017, I2C DAC, and display drawing
+- I2C device families must use a common base architecture for mutex handling, address/source metadata, route lookup, and manager/device lifecycle. PCA9685, I2C DACs, and digital expanders should differ only in chip-specific register/data transactions, so adding a future I2C IC is a metadata + driver extension instead of a new parallel subsystem.
 - I2C Display task (Core 0) uses a queue to avoid frequent I2C bus contention
 
 ### Protocol Input Context
