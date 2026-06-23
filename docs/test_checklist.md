@@ -2,6 +2,41 @@
 
 Use this checklist before field deployment, after large refactors, and before OTA updates to shared hardware.
 
+## How To Record A Test Run
+
+Do not mark this source checklist directly. For every real verification pass:
+
+- [ ] Copy this file to `docs/test_runs/YYYY-MM-DD_HHMM_test_checklist.md` before testing.
+- [ ] Fill in the test run header below with date, time, firmware commit, tester, device/IP, and test scope.
+- [ ] Check each item as pass/fail/not-tested in the copied file.
+- [ ] Add notes for every skipped or failed item so the next run can see what was incomplete.
+- [ ] Add any newly discovered missing test items under `Additional Test Items Found` in the copied file, then update this source checklist if the item should become permanent.
+
+Test run header to copy into each run file:
+
+```md
+# Test Run Record
+
+- Date/time:
+- Firmware commit:
+- Firmware version/build:
+- Tester:
+- Device/IP:
+- Hardware setup:
+- Test scope:
+- Result summary: Pass / Partial / Failed
+
+## Incomplete Or Failed Items
+
+- [ ]
+
+## Additional Test Items Found
+
+- [ ]
+
+## Checklist
+```
+
 ## 1. Build And Static Checks
 
 - [ ] Run `& "C:\Users\natta\.platformio\penv\Scripts\platformio.exe" run` and confirm success.
