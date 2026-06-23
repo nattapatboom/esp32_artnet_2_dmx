@@ -16,6 +16,7 @@ const DMX_BUFFER_RAM=SCORE_DEFS.ram.dmxBuffer;
 const RMT_DMX_DRIVER_RAM=SCORE_DEFS.ram.rmtDmxDriver;
 const I2C_ROUTE_RAM=SCORE_DEFS.ram.i2cRoute;
 const DMX_OUTPUT_SERVICE_US=SCORE_DEFS.cpu.dmxOutputServiceUs;
+var T=TYPE_META.typeIds;
 
 function channelHardware(o){
   var mode=outputModeDef(typeId(o),parseInt(o.mc_mode||0));
@@ -30,8 +31,8 @@ function channelHardware(o){
     }
   });
 
-  if(typeId(o)===5&&(parseInt(o.color_order||0))<4&&countedW) ledc--;
-  if(typeId(o)===14&&(parseInt(o.source||0))===0) dac=1;
+  if(typeId(o)===T.ANALOG_RGB&&(parseInt(o.color_order||0))<4&&countedW) ledc--;
+  if(typeId(o)===T.DAC&&(parseInt(o.source||0))===0) dac=1;
 
   return {ledc,rmt,uart,dac,timer};
 }
@@ -51,8 +52,8 @@ function channelCost(o){
   var cpu=(mode&&mode.cost&&mode.cost.cpuUs)||0, ram=BASE_CHANNEL_RAM;
   ram+=dmxBufferRam(t,ledCount,parseInt(o.color_order||0),parseInt(o.mc_resolution||8),parseInt(o.mc_mode||0));
   if(mode&&mode.cost&&mode.cost.extraRam) ram+=mode.cost.extraRam;
-  if(t===3) cpu=ledStripServiceUs(ledCount, parseInt(o.color_order||0));
-  if(t===3) ram+=pixelBufferRam(ledCount,parseInt(o.color_order||0));
+  if(t===T.LED_STRIP) cpu=ledStripServiceUs(ledCount, parseInt(o.color_order||0));
+  if(t===T.LED_STRIP) ram+=pixelBufferRam(ledCount,parseInt(o.color_order||0));
   var i2cWrites=i2cWriteCount(o);
   cpu+=i2cWrites*I2C_WRITE_US;
   ram+=i2cWrites*I2C_ROUTE_RAM;
@@ -61,16 +62,16 @@ function channelCost(o){
 
 function dmxBufferRam(type,ledCount,colorOrder,resolution=8,mode=0){
   type=parseInt(type); mode=parseInt(mode||0);
-  if(type===1) return DMX_BUFFER_RAM;
-  if(type===3){
+  if(type===T.DMX) return DMX_BUFFER_RAM;
+  if(type===T.LED_STRIP){
     const bytesPerPixel=parseInt(colorOrder||0)>=4?4:3;
     const pixelsPerUniverse=Math.floor(512/bytesPerPixel);
     return Math.max(1,Math.ceil((parseInt(ledCount)||0)/pixelsPerUniverse))*512;
   }
-  if(type===5) return parseInt(colorOrder||0)>=4?4:3;
-  if(type===7) return valueByteCount(resolution)+2;
-  if(type===9||type===11) return mode===1?4:2;
-  if(type===12||type===13) return (mode===4||mode===5||mode>=6)?2:1;
+  if(type===T.ANALOG_RGB) return parseInt(colorOrder||0)>=4?4:3;
+  if(type===T.STEPPER) return valueByteCount(resolution)+2;
+  if(type===T.BUZZER||type===T.TM1637) return mode===1?4:2;
+  if(type===T['7SEG_7PIN']||type===T['7SEG_8PIN']) return (mode===4||mode===5||mode>=6)?2:1;
   var def=outputModeDef(type,mode);
   if(def&&def.cost&&def.cost.dmxSlots>0) return def.cost.dmxSlots;
   return valueByteCount(resolution);
@@ -101,9 +102,9 @@ function totalHardware(arr){
     const h=channelHardware(o);
     t.ledc+=h.ledc;t.rmt+=h.rmt;t.uart+=h.uart;t.dac+=h.dac;t.timer+=h.timer;
     const typ=typeId(o);
-    if(typ===0) hasDimmer=true;
-    if(typ===1&&parseInt(o.source||0)===0) dmxCount++;
-    else if(typ===10) dfPlayerCount++;
+    if(typ===T.DIMMER) hasDimmer=true;
+    if(typ===T.DMX&&parseInt(o.source||0)===0) dmxCount++;
+    else if(typ===T.DFPLAYER) dfPlayerCount++;
   });
   const freeUarts=Math.max(0,2-dfPlayerCount);
   const dmxUartUse=Math.min(dmxCount,freeUarts);
@@ -121,8 +122,8 @@ function totalCpu(arr,fps){
   let dimmerCount=0, funcGenCount=0;
   arr.forEach(o=>{
     us+=channelCost(o).cpu;
-    if(typeId(o)===0) dimmerCount++;
-    else if(typeId(o)===16) funcGenCount++;
+    if(typeId(o)===T.DIMMER) dimmerCount++;
+    else if(typeId(o)===T.FUNC_GEN) funcGenCount++;
   });
   us+=acDimmerBackgroundUs(dimmerCount,fps)+funcGenBackgroundUs(funcGenCount,fps);
 
@@ -139,8 +140,8 @@ function totalRam(arr){
   let b=0, dmxCount=0, dfPlayerCount=0;
   arr.forEach(o=>{
     b+=channelCost(o).ram;
-    if(typeId(o)===1&&parseInt(o.source||0)===0) dmxCount++;
-    else if(typeId(o)===10) dfPlayerCount++;
+    if(typeId(o)===T.DMX&&parseInt(o.source||0)===0) dmxCount++;
+    else if(typeId(o)===T.DFPLAYER) dfPlayerCount++;
   });
   const freeUarts=Math.max(0,2-dfPlayerCount);
   const dmxRmtUse=Math.max(0,dmxCount-freeUarts);

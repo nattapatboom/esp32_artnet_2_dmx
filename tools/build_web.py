@@ -334,6 +334,7 @@ def generate_output_defs_js():
         "testUi": test_ui_per_type,
         "testCmds": test_cmds_js,
         "resOpts": res_opts,
+        "typeIds": {name.replace("TYPE_", ""): val for name, val in type_ids.items()},
     }
 
     return (
