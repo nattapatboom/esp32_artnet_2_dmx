@@ -10,8 +10,6 @@ PORT = 8000
 HTML_FILE = "web/index.html"
 JS_DIR = "web/js"
 PARTS_DIR = "web/parts"
-OUTPUT_CONFIG_DIR = "web/parts/output-config"
-
 JS_ORDER = ["_gpio.js", "network_protocol.js", "scoring.js", "espnow.js", "app.js", "outputs.js"]
 
 PANE_MARKERS = {
@@ -144,19 +142,10 @@ class MockRequestHandler(BaseHTTPRequestHandler):
                     with open(pane_path, "r", encoding="utf-8") as pf:
                         html = html.replace(marker, pf.read())
 
-            # Collect per-type config HTML
+            # Use the same metadata-rendered output config container as build_web.py.
             config_marker = "<!-- CONFIG_TYPE_FIELDS -->"
-            config_combined = ""
-            if os.path.isdir(OUTPUT_CONFIG_DIR):
-                for fn in sorted(os.listdir(OUTPUT_CONFIG_DIR)):
-                    fp = os.path.join(OUTPUT_CONFIG_DIR, fn)
-                    if os.path.isfile(fp):
-                        with open(fp, "r", encoding="utf-8") as sf:
-                            config_combined += sf.read() + "\n"
             if config_marker in html:
-                html = html.replace(config_marker, config_combined)
-            elif config_combined:
-                html = html.replace("</div><!-- /w -->", f"{config_combined}\n</div><!-- /w -->")
+                html = html.replace(config_marker, '<div id="type-config-generated" class="type-config" style="display:none"></div>')
 
             # Replace generic test panel marker
             test_panel_path = os.path.join(PARTS_DIR, "pane-test.html")

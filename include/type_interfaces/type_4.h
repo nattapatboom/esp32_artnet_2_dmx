@@ -13,7 +13,12 @@ using namespace TypeProtocol;
 constexpr uint8_t TYPE_ID = 4;
 constexpr const char* TYPE_NAME = "Single-Color PWM";
 
-constexpr FieldDef EXTRA_FIELDS[] = {};
+constexpr const char* RES_OPTS = "8:8-bit,10:10-bit,12:12-bit,16:16-bit";
+
+constexpr FieldDef EXTRA_FIELDS[] = {
+    {"mc_resolution", FT_SELECT, "Resolution",     8,  16,    8,    RES_OPTS},
+    {"mc_freq",       FT_NUMBER, "Frequency (Hz)", 1,  40000, 1000, nullptr}
+};
 
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Apply",   0, "Set brightness level"},

@@ -8,10 +8,68 @@ let savedOutputsJson = '';
 let currentTestIdx = -1;
 var OUTPUT_IDX = null;
 
+function fieldDefaultValue(field){
+  return field&&field.def!==undefined?field.def:0;
+}
+function renderGeneratedField(field){
+  var id=field.key;
+  if(field.type==='bool'){
+    return `<div class="f" id="${id}_grp" style="flex:0 0 auto"><div class="cb"><input type="checkbox" id="${id}" ${fieldDefaultValue(field)?'checked':''}><label for="${id}" id="${id}_lbl">${field.label}</label></div></div>`;
+  }
+  if(field.type==='select'){
+    var opts=(field.opts||[]).map(function(opt){return `<option value="${opt[0]}">${opt[1]}</option>`;}).join('');
+    return `<div class="f" id="${id}_grp"><label for="${id}" id="${id}_lbl">${field.label}</label><select id="${id}">${opts}</select></div>`;
+  }
+  var inputType=field.type==='color'?'color':'number';
+  var step=field.type==='float'?'any':'1';
+  return `<div class="f" id="${id}_grp"><label for="${id}" id="${id}_lbl">${field.label}</label><input type="${inputType}" id="${id}" value="${fieldDefaultValue(field)}" min="${field.min}" max="${field.max}" step="${step}"></div>`;
+}
+function renderTypeConfig(t){
+  var el=document.getElementById('type-config-generated');
+  if(!el) return;
+  var typeKey=String(parseInt(t));
+  var preserve=el.dataset.type===typeKey;
+  var saved={};
+  if(preserve){
+    Array.from(el.querySelectorAll('input,select')).forEach(function(input){
+      saved[input.id]=input.type==='checkbox'?!!input.checked:input.value;
+    });
+  }
+  var fields=(TYPE_META.fields&&TYPE_META.fields[typeKey])||[];
+  el.innerHTML=fields.map(renderGeneratedField).join('');
+  el.dataset.type=typeKey;
+  Object.keys(saved).forEach(function(id){
+    var input=document.getElementById(id);
+    if(!input) return;
+    if(input.type==='checkbox') input.checked=!!saved[id];
+    else input.value=saved[id];
+  });
+  el.style.display=fields.length?'contents':'none';
+}
 function showTypeConfig(t) {
   document.querySelectorAll('.type-config').forEach(function(el) { el.style.display = 'none'; });
-  var el = document.getElementById('type-config-' + parseInt(t));
-  if (el) el.style.display = '';
+  renderTypeConfig(t);
+}
+function writeGeneratedFields(o){
+  var fields=(TYPE_META.fields&&TYPE_META.fields[String(parseInt(o.type))])||[];
+  fields.forEach(function(field){
+    var el=document.getElementById(field.key);
+    if(!el) return;
+    var val=o[field.key];
+    if(val===undefined) val=fieldDefaultValue(field);
+    if(field.type==='bool') el.checked=!!val;
+    else el.value=String(val);
+  });
+}
+function readGeneratedFields(ch,type){
+  var fields=(TYPE_META.fields&&TYPE_META.fields[String(parseInt(type))])||[];
+  fields.forEach(function(field){
+    var el=document.getElementById(field.key);
+    if(!el){ ch[field.key]=fieldDefaultValue(field); return; }
+    if(field.type==='bool') ch[field.key]=!!el.checked;
+    else if(field.type==='float') ch[field.key]=parseFloat(el.value||fieldDefaultValue(field));
+    else ch[field.key]=parseInt(el.value||fieldDefaultValue(field));
+  });
 }
 
 function setSaveState(label,kind='ok'){
@@ -268,6 +326,7 @@ function testMp3(idx,action){
 
 function toggleOutFields(){
   const t=parseInt(document.getElementById('no_type').value);
+  showTypeConfig(t);
   const mcMode = parseInt(cfgEl('mc_mode')?.value||0);
   // Helper: safe style access; no-op if element missing
   const _st=(id,v)=>{const e=cfgEl(id);if(e)e.style.display=v;};
@@ -401,7 +460,6 @@ function toggleOutFields(){
   autoAssignOutputPins();
   const pinMapContainer = document.getElementById('pin-mapping-container');
   if(pinMapContainer) pinMapContainer.style.display = '';
-  showTypeConfig(t);
 }
 
 document.addEventListener('change', function(e){
@@ -492,6 +550,7 @@ function editOutput(idx){
   if(o.type===14){
     toggleOutFields();
   }
+  writeGeneratedFields(o);
   if (o.source !== 0) {
     setVal('no_pca_addr', o.pca_addr??(o.source===5?96:o.source===6?76:o.source===7?76:64));
     setVal('no_pca_channel', o.pca_channel??0);
@@ -594,10 +653,10 @@ function addOrUpdateOutput(){
     pwm_dac_mode: parseInt(document.getElementById('pwm_dac_mode')?.value || 0),
     pwm_dac_min: dutyPctToInt('pwm_dac_min', 0),
     pwm_dac_max: dutyPctToInt('pwm_dac_max', 10000),
-    mc_deadband: parseInt(document.getElementById('mc_deadband').value),
-    mc_min_us: parseInt(document.getElementById('mc_min_us').value),
-    mc_max_us: parseInt(document.getElementById('mc_max_us').value),
-    mc_steps_per_rev: parseInt(document.getElementById('mc_steps_per_rev').value),
+    mc_deadband: parseInt(cfgEl('mc_deadband')?.value||0),
+    mc_min_us: parseInt(cfgEl('mc_min_us')?.value||1000),
+    mc_max_us: parseInt(cfgEl('mc_max_us')?.value||2000),
+    mc_steps_per_rev: parseInt(cfgEl('mc_steps_per_rev')?.value||200),
     mc_unit_type: parseInt(cfgEl('mc_unit_type')?.value||0),
     mc_scale_factor: parseFloat(cfgEl('mc_scale_factor')?.value||'0'),
     mc_invert: cfgEl('mc_invert')?.checked||false,
@@ -657,6 +716,7 @@ function addOrUpdateOutput(){
       return acc | (isInv ? (1 << s) : 0);
     }, 0) : 0
   };
+  readGeneratedFields(ch,type);
 
   const statusPin=parseInt(document.getElementById('status_led_pin').value);
   const zcPin=parseInt(document.getElementById('zc_pin').value);

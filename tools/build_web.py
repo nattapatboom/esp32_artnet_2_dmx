@@ -14,7 +14,6 @@ import re
 WEB_DIR = "web"
 PARTS_DIR = os.path.join(WEB_DIR, "parts")
 JS_DIR = os.path.join(WEB_DIR, "js")
-OUTPUT_CONFIG_DIR = os.path.join(PARTS_DIR, "output-config")
 HEADER_PATH = "include/web_pages.h"
 SHELL_PATH = os.path.join(WEB_DIR, "index.html")
 OUTPUT_DEFS_PATH = os.path.join("include", "output_defs.h")
@@ -34,15 +33,6 @@ PANE_MARKERS = {
 }
 
 JS_ORDER = ["_gpio.js", "network_protocol.js", "scoring.js", "espnow.js", "app.js", "outputs.js"]
-
-
-def collect_type_files(directory, sort_key=lambda f: f):
-    """Collect files from directory sorted by type number."""
-    if not os.path.isdir(directory):
-        return []
-    files = [f for f in os.listdir(directory) if f.endswith(".html") or f.endswith(".js")]
-    files.sort(key=sort_key)
-    return files
 
 
 def minify_html(html):
@@ -104,6 +94,14 @@ TEST_UI_MAP = {
     "TEST_UI_DFPLAYER": 6, "TEST_UI_7SEG": 7,
 }
 
+FIELD_TYPE_MAP = {
+    "FT_NUMBER": "number",
+    "FT_FLOAT": "float",
+    "FT_BOOL": "bool",
+    "FT_SELECT": "select",
+    "FT_COLOR": "color",
+}
+
 RES_LABELS_DMX = ["8-bit (1 DMX Ch)", "10-bit (2 DMX Ch)", "12-bit (2 DMX Ch)", "16-bit (2 DMX Ch)", "24-bit (3 DMX Ch)", "32-bit (4 DMX Ch)"]
 RES_LABELS_POS = ["8-bit (1 Pos Ch)", "10-bit (2 Pos Ch)", "12-bit (2 Pos Ch)", "16-bit (2 Pos Ch)", "24-bit (3 Pos Ch)", "32-bit (4 Pos Ch)"]
 RES_LABELS_7SEG = ["ASCII / Character", "Numeric (0-9, 10-19 for DP)", None, None, None, None]
@@ -153,6 +151,64 @@ def parse_test_commands_for_type(type_num):
     for label, cmd, desc in entry_re.findall(body):
         cmds.append([label, int(cmd), desc])
     return cmds
+
+
+def parse_type_string_constants(src):
+    constants = {}
+    for name, value in re.findall(r'constexpr\s+const\s+char\s*\*\s*(\w+)\s*=\s*"([^"]*)"\s*;', src):
+        constants[name] = value
+    return constants
+
+
+def parse_field_options(expr, constants):
+    expr = expr.strip()
+    if expr == "nullptr":
+        return []
+    if expr.startswith('"'):
+        raw = parse_cpp_string(expr)
+    else:
+        raw = constants.get(expr, "")
+    opts = []
+    for part in raw.split(","):
+        if not part:
+            continue
+        key, sep, label = part.partition(":")
+        if not sep:
+            continue
+        try:
+            value = int(key.strip())
+        except ValueError:
+            continue
+        opts.append([value, label.strip()])
+    return opts
+
+
+def parse_extra_fields_for_type(type_num):
+    """Parse EXTRA_FIELDS[] from include/type_interfaces/type_{num}.h."""
+    path = os.path.join("include", "type_interfaces", f"type_{type_num}.h")
+    if not os.path.exists(path):
+        return []
+    src = read_file(path)
+    constants = parse_type_string_constants(src)
+    m = re.search(r"constexpr\s+FieldDef\s+EXTRA_FIELDS\[\]\s*=\s*\{(.*?)\}\s*;", src, re.DOTALL)
+    if not m:
+        return []
+    body = m.group(1)
+    fields = []
+    entry_re = re.compile(
+        r'\{\s*"([^"]+)"\s*,\s*(FT_\w+)\s*,\s*"([^"]*)"\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*([^}]+?)\s*\}'
+    )
+    for key, field_type, label, min_val, max_val, default, opts_expr in entry_re.findall(body):
+        fields.append({
+            "key": key,
+            "type": FIELD_TYPE_MAP.get(field_type, "number"),
+            "label": label,
+            "min": int(min_val),
+            "max": int(max_val),
+            "def": int(default),
+            "opts": parse_field_options(opts_expr.rstrip(","), constants),
+        })
+    return fields
 
 
 def generate_score_limits_js():
@@ -244,12 +300,14 @@ def generate_output_defs_js():
                 "hwIfGpio": int(hw),
             })
 
-    # Pre-parse test commands for all types 0-18
+    # Pre-parse type interface metadata for all types 0-18
     test_cmds_by_type = {}
+    fields_by_type = {}
     for tn in range(19):
         cmd_list = parse_test_commands_for_type(tn)
         if cmd_list:
             test_cmds_by_type[tn] = cmd_list
+        fields_by_type[tn] = parse_extra_fields_for_type(tn)
 
     # Parse OUTPUT_MODES array using brace matching
     defs = {}
@@ -371,6 +429,10 @@ def generate_output_defs_js():
         if tn in test_cmds_by_type:
             test_cmds_js[str(tn)] = test_cmds_by_type[tn]
 
+    fields_js = {}
+    for tn in range(19):
+        fields_js[str(tn)] = fields_by_type.get(tn, [])
+
     meta = {
         "configLabels": config_labels if len(config_labels) == 19 else [],
         "channelCounts": channel_counts if len(channel_counts) == 19 else [],
@@ -378,6 +440,7 @@ def generate_output_defs_js():
         "modeKeyMap": mode_key_map,
         "testUi": test_ui_per_type,
         "testCmds": test_cmds_js,
+        "fields": fields_js,
         "resOpts": res_opts,
         "typeIds": {name.replace("TYPE_", ""): val for name, val in type_ids.items()},
     }
@@ -484,15 +547,12 @@ def main():
             continue
         html = html.replace(marker, pane_html)
 
-    # Replace per-type config markers with all type-N.html files
+    # Replace per-type config marker with a single metadata-rendered container.
     marker = "<!-- CONFIG_TYPE_FIELDS -->"
     if marker not in html:
         print(f"Warning: marker {marker} not found in shell, skipping")
     else:
-        type_files = collect_type_files(OUTPUT_CONFIG_DIR)
-        combined = "\n".join(read_file(os.path.join(OUTPUT_CONFIG_DIR, f)) for f in type_files
-                             if os.path.isfile(os.path.join(OUTPUT_CONFIG_DIR, f)))
-        html = html.replace(marker, combined)
+        html = html.replace(marker, '<div id="type-config-generated" class="type-config" style="display:none"></div>')
 
     # Replace generic test panel marker
     test_panel_path = os.path.join(PARTS_DIR, "pane-test.html")

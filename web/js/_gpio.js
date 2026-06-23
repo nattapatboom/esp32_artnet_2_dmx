@@ -83,7 +83,7 @@ function cfgEl(id){
   var t=document.getElementById('no_type');
   t=t&&parseInt(t.value);
   if(!isNaN(t)){
-    var cfg=document.getElementById('type-config-'+t);
+    var cfg=document.getElementById('type-config-generated');
     if(cfg){
       var el=cfg.querySelector('#'+id);
       if(el) return el;

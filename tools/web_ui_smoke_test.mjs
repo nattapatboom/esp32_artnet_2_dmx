@@ -189,9 +189,10 @@ async function main() {
           }
         }
 
-        // Type-scoped mc_mode setter for duplicate IDs
         function setTypeMcMode(type, mode) {
-          var sel = document.querySelector('#type-config-' + type + ' #mc_mode');
+          typeSel.value = String(type);
+          toggleOutFields();
+          var sel = document.getElementById('mc_mode');
           if (!sel) return;
           sel.value = String(mode);
           sel.dispatchEvent(new Event('change', { bubbles: true }));
