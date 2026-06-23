@@ -138,8 +138,8 @@ struct OutputChannel {
     uint32_t prev_7seg_val = 0;
     bool prev_7seg_valid = false;
     
-    uint8_t pin2;
-    uint8_t pin3;
+    uint8_t pin2 = 255;
+    uint8_t pin3 = 255;
     uint8_t pin4 = 255;
     uint8_t pin4_source = 0;
     uint8_t pin4_addr = 0x20;
@@ -151,14 +151,14 @@ struct OutputChannel {
     uint8_t pin3_addr = 0x20;
     uint8_t pin3_channel = 255;
     uint8_t mc_resolution = 8; // 8, 10, 12, 16 bit
-    uint16_t mc_freq;      // PWM Frequency / Speed
-    uint8_t mc_mode;       // Motor Sub-mode
-    uint8_t mc_deadband;
-    bool mc_invert;
-    bool mc_brake;
-    uint16_t mc_min_us;
-    uint16_t mc_max_us;
-    uint16_t mc_steps_per_rev;
+    uint16_t mc_freq = 1000;      // PWM Frequency / Speed
+    uint8_t mc_mode = 0;       // Motor Sub-mode
+    uint8_t mc_deadband = 10;
+    bool mc_invert = false;
+    bool mc_brake = true;
+    uint16_t mc_min_us = 1000;
+    uint16_t mc_max_us = 2000;
+    uint16_t mc_steps_per_rev = 200;
     uint8_t mc_homing_dir = 0; // 0 = Forward, 1 = Reverse
     uint8_t mc_homing_mode = 0; // 0 = Sensor, 1 = Time/Stall
     uint16_t mc_homing_speed = 500; // speed in Hz during homing

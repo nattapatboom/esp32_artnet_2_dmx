@@ -996,6 +996,19 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 message = "start_address must be 1-512 on channel " + String(channelNumber);
                 return false;
             }
+            if (type != OutputDefs::TYPE_LED_STRIP && type != OutputDefs::TYPE_DMX) {
+                OutputChannel temp;
+                temp.type = type;
+                temp.led_count = output["led_count"] | 0;
+                temp.color_order = output["color_order"] | 0;
+                temp.mc_resolution = output["mc_resolution"] | 8;
+                temp.mc_mode = mcMode;
+                uint16_t byteCount = outputDmxByteCount(temp);
+                if (byteCount > 0 && (uint32_t)sa + byteCount - 1U > 512U) {
+                    message = "DMX address range exceeds universe 512 on channel " + String(channelNumber);
+                    return false;
+                }
+            }
         }
         channelNumber++;
     }

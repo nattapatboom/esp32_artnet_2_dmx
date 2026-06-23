@@ -227,7 +227,13 @@ Internal `saveChannels()` calls (migration path, default-creation) log `Serial.p
 
 ---
 
-### 3.3 ★★☆ `mc_resolution` has no default initializer
+### ~~3.3 `mc_resolution` has no default initializer~~
+
+**RESOLVED** — `OutputChannel` now initializes `mc_resolution` and the neighboring motion/pin fields (`pin2`, `pin3`, `mc_freq`, `mc_mode`, deadband, invert/brake, pulse limits, steps per rev). Default-constructed fallback channels no longer carry uninitialized motion state.
+
+---
+
+Previous finding retained for audit history:
 
 **File:** `include/output_control.h:151`
 
@@ -235,7 +241,11 @@ All other struct fields have `= value` defaults. `mc_resolution` is uninitialize
 
 ---
 
-### 3.4 ★★☆ `pin` JSON default (4) != struct default (255)
+### ~~3.4 `pin` JSON default (4) != struct default (255)~~
+
+**RESOLVED** — `loadChannels()` now defaults missing `pin` to `255`, matching the struct default and preventing accidental GPIO4 activation.
+
+Previous finding retained for audit history:
 
 **File:** `include/output_control.h:597`
 
@@ -285,7 +295,13 @@ Settings POST handler repeats checks that `validateSettingsAndOutputs()` already
 
 ## 4. Validation Gaps
 
-### 4.1 ★★★ DMX start_address not validated in C++
+### ~~4.1 DMX start_address not validated in C++~~
+
+**RESOLVED** — `validateOutputJson()` now validates `start_address` is `1..512` and rejects non-strip/non-DMX-output channels whose required DMX byte range would exceed universe channel 512. LED strips and DMX outputs keep their existing special mapping paths.
+
+---
+
+Previous finding retained for audit history:
 
 **Missing server-side: `validateOutputJson()` never checks `start_address`**
 
@@ -395,7 +411,6 @@ Status LED, ZC, I2C SDA/SCL dropdown options are hardcoded, not generated from `
 | 2.2 | Stepper array bounds overflow | `stepper.h:28` |
 | 3.1 | NVS save return values ignored | `config.h:198` |
 | 3.2 | LittleFS migration write failure silent | `output_control.h:712` |
-| 4.1 | DMX start_address not validated | `main.cpp:684-991` |
 
 ### ★★☆ High priority
 
@@ -408,8 +423,6 @@ Status LED, ZC, I2C SDA/SCL dropdown options are hardcoded, not generated from `
 | 2.5 | Division by zero (motor/servo) | `motor.h:99` |
 | 2.6 | PCA frequency override conflict | `motor.h` / `setupChannels` |
 | 2.7 | `segmentGpio()` returns invalid pin | `ledc_helpers.h:49` |
-| 3.3 | mc_resolution no default | `output_control.h:151` |
-| 3.4 | pin default mismatch (4 vs 255) | `output_control.h:597` |
 | 3.5 | ip4Valid accepts empty string | `network_protocol.h:178` |
 | 3.6 | Factory reset false success | `main.cpp:1687` |
 | 5.1 | Type 6 Mode 0 LEDC overcount (JS) | `scoring.js` |
