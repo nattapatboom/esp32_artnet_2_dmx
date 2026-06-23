@@ -30,21 +30,16 @@ function channelHardware(o){
     case 1: uart=1; break;
     case 2: break;
     case 3: rmt=1; break;
-    case 4: if(src===0) ledc=1; break;
-    case 5:
-      if(src===0) ledc++;
-      if((o.pin2_source||0)===0) ledc++;
-      if((o.pin3_source||0)===0) ledc++;
-      if((o.color_order||0)>=4&&(o.pin4_source||0)===0) ledc++;
-      break;
+    case 4: ledc=gpioPinCount(o); break;
+    case 5: ledc=gpioPinCount(o); break;
     case 6:
       if(src===0) ledc++;
       if((o.pin2_source||0)===0&&(o.mc_mode||0)!==0) ledc++;
       if((o.mc_mode||0)===2&&(o.pin3_source||0)===0) ledc++;
       break;
     case 7: rmt=2; break;
-    case 8: if(src===0) ledc=1; break;
-    case 9: if(src===0) ledc=1; break;
+    case 8: ledc=gpioPinCount(o); break;
+    case 9: ledc=gpioPinCount(o); break;
     case 10: uart=1; break;
     case 11: break;
     case 12:
@@ -60,7 +55,7 @@ function channelHardware(o){
       }
       break;
     case 14: if(!(src>=5&&src<=7)) dac=1; break;
-    case 15: if(src===0) ledc=1; break;
+    case 15: ledc=gpioPinCount(o); break;
     case 16: ledc=1; timer=1; break;
     case 17: break;
     case 18: break;

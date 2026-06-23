@@ -85,21 +85,36 @@ function outputByteCount(o){
   return TYPE_META.byteCounts[t]??1;
 }
 
+function gpioPinCount(o){
+  var n=0;
+  if(parseInt(o.source||0)===0) n++;
+  if(parseInt(o.pin2_source||0)===0) n++;
+  if(parseInt(o.pin3_source||0)===0) n++;
+  var isStepper=parseInt(o.type||0)===7;
+  if(parseInt(o.pin4_source||0)===0&&(!isStepper||parseInt(o.mc_homing_mode||0)===0)) n++;
+  var t=parseInt(o.type||0);
+  if(t===12||t===13){
+    var segSources=o.seg_sources;
+    if(segSources) for(var s=0;s<8;s++) if(parseInt(segSources[s]||0)===0) n++;
+  }
+  return n;
+}
+
 function outputGpios(o){
-  const pins=[];
-  const add=p=>{p=parseInt(p); if(!isNaN(p)&&p!==255&&!pins.includes(p)) pins.push(p);};
+  var pins=[];
+  var add=function(p){p=parseInt(p); if(!isNaN(p)&&p!==255&&pins.indexOf(p)===-1) pins.push(p);};
   if(parseInt(o.source||0)===0) add(o.pin);
   if(parseInt(o.pin2_source||0)===0) add(o.pin2);
   if(parseInt(o.pin3_source||0)===0) add(o.pin3);
-  const isStepper=parseInt(o.type||0)===7;
+  var isStepper=parseInt(o.type||0)===7;
   if(parseInt(o.pin4_source||0)===0){
     if(!isStepper||parseInt(o.mc_homing_mode||0)===0) add(o.pin4);
   }
-  const t=parseInt(o.type||0);
+  var t=parseInt(o.type||0);
   if(t===12||t===13){
-    const segPins=o.seg_pins;
-    const segSources=o.seg_sources;
-    if(segPins&&segSources) for(let s=0; s<8; s++){
+    var segPins=o.seg_pins;
+    var segSources=o.seg_sources;
+    if(segPins&&segSources) for(var s=0;s<8;s++){
       if(parseInt(segSources[s]||0)===0) add(segPins[s]);
     }
   }
