@@ -71,6 +71,119 @@ function readGeneratedFields(ch,type){
     else ch[field.key]=parseInt(el.value||fieldDefaultValue(field));
   });
 }
+function routeValue(id, fallback){
+  var el=document.getElementById(id);
+  return el?parseInt(el.value):fallback;
+}
+function routeChecked(id, fallback){
+  var el=document.getElementById(id);
+  return el?!!el.checked:!!fallback;
+}
+function setRouteValue(id, val){
+  var el=document.getElementById(id);
+  if(el) el.value=val;
+}
+function setRouteChecked(id, val){
+  var el=document.getElementById(id);
+  if(el) el.checked=!!val;
+}
+function routeKeysForSlot(slot){
+  if(slot==='pin1') return {pin:'pin',source:'source',addr:'pca_addr',channel:'pca_channel',invert:'pin_invert'};
+  var n=slot.replace('pin','');
+  return {pin:'pin'+n,source:'pin'+n+'_source',addr:'pin'+n+'_addr',channel:'pin'+n+'_channel',invert:'pin'+n+'_invert'};
+}
+function routeDomForKeys(keys){
+  if(keys.pin==='pin') return {pin:'no_pin',source:'no_source',addr:'no_pca_addr',channel:'no_pca_channel',invert:'no_pin_invert'};
+  var n=keys.pin.replace('pin','');
+  return {pin:'no_pin'+n,source:'no_pin'+n+'_source',addr:'no_pin'+n+'_addr',channel:'no_pin'+n+'_channel',invert:'no_pin'+n+'_invert'};
+}
+function defaultChannelRoutes(ch){
+  ['pin','pin2','pin3','pin4'].forEach(function(k){ ch[k]=255; });
+  ch.source=0;
+  ch.pin2_source=0;
+  ch.pin3_source=0;
+  ch.pin4_source=0;
+  ch.pca_addr=64;
+  ch.pca_channel=0;
+  ch.pin2_addr=32;
+  ch.pin3_addr=32;
+  ch.pin4_addr=32;
+  ch.pin2_channel=255;
+  ch.pin3_channel=255;
+  ch.pin4_channel=255;
+  ch.pin_invert=false;
+  ch.pin2_invert=false;
+  ch.pin3_invert=false;
+  ch.pin4_invert=false;
+  ch.seg_pins=[255,255,255,255,255,255,255,255];
+  ch.seg_sources=[0,0,0,0,0,0,0,0];
+  ch.seg_addrs=[32,32,32,32,32,32,32,32];
+  ch.seg_channels=[255,255,255,255,255,255,255,255];
+  ch.seg_inverts=0;
+}
+function writeRouteSlot(slot,o){
+  var keys=routeKeysForSlot(slot);
+  var ids=routeDomForKeys(keys);
+  setRouteValue(ids.pin,o[keys.pin]??255);
+  setRouteValue(ids.source,o[keys.source]??0);
+  setRouteValue(ids.addr,parseInt(o[keys.addr]??(keys.addr==='pca_addr'?64:32)));
+  setRouteValue(ids.channel,o[keys.channel]??(keys.channel==='pca_channel'?0:255));
+  setRouteChecked(ids.invert,o[keys.invert]||false);
+}
+function writeRouteFields(o){
+  var mode=outputModeDef(typeId(o),parseInt(o.mc_mode||0));
+  Object.keys(mode?.pins||{}).forEach(function(slot){ writeRouteSlot(slot,o); });
+  if(typeId(o)===T.STEPPER){
+    setRouteChecked('no_pin_invert',o.mc_step_invert||false);
+    setRouteChecked('no_pin2_invert',o.mc_dir_invert||false);
+    setRouteChecked('no_pin3_invert',o.mc_enable_active_high||false);
+  }
+  var ssrc=o.seg_sources||[], sps=o.seg_pins||[], saddrs=o.seg_addrs||[], sch=o.seg_channels||[], sinvs=o.seg_inverts||0;
+  for(var s=0;s<8;s++){
+    setRouteValue('no_seg_source_'+s,ssrc[s]!==undefined?ssrc[s]:0);
+    setRouteValue('no_seg_addr_'+s,saddrs[s]!==undefined?saddrs[s]:32);
+    setRouteValue('no_seg_channel_'+s,sch[s]!==undefined?sch[s]:255);
+    setRouteValue('no_seg_pin_'+s,sps[s]!==undefined?sps[s]:255);
+    setRouteChecked('no_seg_pin_invert_'+s,!!((sinvs>>s)&1));
+  }
+}
+function readRouteSlot(ch,slot){
+  var keys=routeKeysForSlot(slot);
+  var ids=routeDomForKeys(keys);
+  ch[keys.pin]=routeValue(ids.pin,255);
+  ch[keys.source]=routeValue(ids.source,0);
+  ch[keys.addr]=routeValue(ids.addr,keys.addr==='pca_addr'?64:32);
+  ch[keys.channel]=routeValue(ids.channel,keys.channel==='pca_channel'?0:255);
+  ch[keys.invert]=routeChecked(ids.invert,false);
+}
+function readRouteFields(ch,type){
+  var mode=outputModeDef(type,parseInt(cfgEl('mc_mode')?.value||0));
+  defaultChannelRoutes(ch);
+  Object.keys(mode?.pins||{}).forEach(function(slot){ readRouteSlot(ch,slot); });
+  if(!mode?.segmentLayout) return;
+  var commonDim=outputModeKey(type,parseInt(cfgEl('mc_mode')?.value||0))==='commonDim';
+  var segCount=Object.keys(mode.pins||{}).length-(commonDim?1:0);
+  for(var s=0;s<segCount;s++){
+    if(s===0&&!commonDim){
+      ch.seg_pins[s]=ch.pin;
+      ch.seg_sources[s]=ch.source;
+      ch.seg_addrs[s]=ch.pca_addr;
+      ch.seg_channels[s]=ch.source!==0?ch.pca_channel:255;
+      if(ch.pin_invert) ch.seg_inverts|=(1<<s);
+    } else {
+      ch.seg_pins[s]=routeValue('no_seg_pin_'+s,255);
+      ch.seg_sources[s]=routeValue('no_seg_source_'+s,0);
+      ch.seg_addrs[s]=routeValue('no_seg_addr_'+s,32);
+      ch.seg_channels[s]=routeValue('no_seg_channel_'+s,255);
+      if(routeChecked('no_seg_pin_invert_'+s,false)) ch.seg_inverts|=(1<<s);
+    }
+  }
+}
+function resetRouteFields(){
+  var ch={type:parseInt(document.getElementById('no_type')?.value||0),mc_mode:parseInt(cfgEl('mc_mode')?.value||0)};
+  defaultChannelRoutes(ch);
+  writeRouteFields(ch);
+}
 
 function setSaveState(label,kind='ok'){
   const el=document.getElementById('out-save-state');
@@ -479,88 +592,12 @@ function editOutput(idx){
   function setVal(id,val){const el=cfgEl(id);if(el)el.value=val;}
   function setChk(id,val){const el=cfgEl(id);if(el)el.checked=val;}
   
-  setVal('no_source',o.source??0);
-  setVal('no_pin',o.pin);
-  setVal('no_pca_addr',o.pca_addr??64);
-  setVal('no_pca_channel',o.pca_channel??0);
-  setVal('no_pca_channel2',o.pca_channel2??255);
-  setVal('no_pca_channel3',o.pca_channel3??255);
-  setVal('no_pca_channel4',o.pca_channel4??255);
   setVal('no_uni',o.start_universe);
   setVal('no_addr',o.start_address||1);
-
-  setVal('no_pin2',o.pin2??255);
-  setVal('no_pin3',o.pin3??255);
-  setVal('no_pin4',o.pin4??255);
-  setVal('no_pin4_source',o.pin4_source??0);
-  setVal('no_pin4_addr',o.pin4_addr??32);
-  setVal('no_pin4_channel',o.pin4_channel??255);
-  setVal('no_pin2_source',o.pin2_source??0);
-  setVal('no_pin2_addr',parseInt(o.pin2_addr??32));
-  setVal('no_pin2_channel',o.pin2_channel??255);
-  setVal('no_pin3_source',o.pin3_source??0);
-  setVal('no_pin3_addr',parseInt(o.pin3_addr??32));
-  setVal('no_pin3_channel',o.pin3_channel??255);
-  setVal('mc_mode',o.mc_mode||0);
-  setVal('mc_resolution',o.mc_resolution||8);
-  setVal('mc_freq',o.mc_freq||1000);
-  setVal('pwm_dac_mode',o.pwm_dac_mode??0);
-  setVal('pwm_dac_min',intToDutyPct(o.pwm_dac_min,0));
-  setVal('pwm_dac_max',intToDutyPct(o.pwm_dac_max,10000));
-  setVal('mc_deadband',o.mc_deadband||10);
-  setVal('mc_min_us',o.mc_min_us||1000);
-  setVal('mc_max_us',o.mc_max_us||2000);
-  setVal('mc_steps_per_rev',o.mc_steps_per_rev||200);
-  setVal('mc_unit_type',o.mc_unit_type??0);
-  setVal('mc_scale_factor',o.mc_scale_factor??0.0);
-  setChk('mc_invert',o.mc_invert||false);
-  setChk('mc_brake',o.mc_brake||false);
-  const isStepperType=o.type===7;
-  setChk('no_pin_invert',isStepperType?(o.mc_step_invert||false):(o.pin_invert||false));
-  setChk('no_pin2_invert',isStepperType?(o.mc_dir_invert||false):(o.pin2_invert||false));
-  setChk('no_pin3_invert',isStepperType?(o.mc_enable_active_high||false):(o.pin3_invert||false));
-  setChk('no_pin4_invert',o.pin4_invert||false);
-  setVal('mc_homing_mode',o.mc_homing_mode??0);
-  setVal('mc_homing_dir',o.mc_homing_dir??0);
-  setVal('mc_homing_speed',o.mc_homing_speed??500);
-  setVal('mc_homing_timeout',o.mc_homing_timeout??5);
-  setVal('sol_threshold',o.solenoid_threshold??127);
-  setVal('sol_pulse_ms',o.solenoid_pulse_ms??50);
-  setVal('sol_pre_delay',o.solenoid_pre_delay??0);
-  setVal('sol_post_delay',o.solenoid_post_delay??100);
-  
-  if(document.getElementById('smoke_threshold')) setVal('smoke_threshold',o.solenoid_threshold??127);
-  if(document.getElementById('smoke_dur')) setVal('smoke_dur',o.smoke_duration_ms??1000);
-  if(document.getElementById('smoke_settle')) setVal('smoke_settle',o.settle_delay_ms??500);
-  if(document.getElementById('smoke_shoot')) setVal('smoke_shoot',o.shoot_duration_ms??1000);
-  if(document.getElementById('smoke_lockout')) setVal('smoke_lockout',o.smoke_lockout_ms??2000);
-
-  const ssrc = o.seg_sources || [];
-  for (let s = 0; s <= 7; s++) {
-    setVal('no_seg_source_' + s, ssrc[s] !== undefined ? ssrc[s] : 0);
-  }
-
-  toggleOutFields();
-  if(o.type===14){
-    toggleOutFields();
-  }
   writeGeneratedFields(o);
-  if (o.source !== 0) {
-    setVal('no_pca_addr', o.pca_addr??(o.source===5?96:o.source===6?76:o.source===7?76:64));
-    setVal('no_pca_channel', o.pca_channel??0);
-  }
-  
-  const sps = o.seg_pins || [];
-  const saddrs = o.seg_addrs || [];
-  const sch = o.seg_channels || [];
-  const sinvs = o.seg_inverts || 0;
-  for (let s = 0; s <= 7; s++) {
-    setVal('no_seg_addr_' + s, saddrs[s] !== undefined ? saddrs[s] : 32);
-    setVal('no_seg_channel_' + s, sch[s] !== undefined ? sch[s] : 255);
-    setVal('no_seg_pin_' + s, sps[s] !== undefined ? sps[s] : 255);
-    const invEl = document.getElementById('no_seg_pin_invert_' + s);
-    if(invEl) invEl.checked = !!((sinvs >> s) & 1);
-  }
+  writeRouteFields(o);
+  toggleOutFields();
+  writeRouteFields(o);
   
   document.getElementById('out-add-btn').textContent='Update Channel';
   document.getElementById('out-cancel-btn').style.display='';
@@ -572,34 +609,12 @@ function editOutput(idx){
 function cancelEditOutput(){
   editOutIdx=-1;
   const setVal=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val;};
-  document.getElementById('no_pca_channel2').value=255;
-  document.getElementById('no_pca_channel3').value=255;
-  document.getElementById('no_pca_channel4').value=255;
-  document.getElementById('no_pin4_source').value=0;
-  document.getElementById('no_pin4_addr').value=32;
-  document.getElementById('no_pin4_channel').value=255;
-  document.getElementById('no_pin2_source').value=0;
-  document.getElementById('no_pin2_channel').value=255;
-  document.getElementById('no_pin3_source').value=0;
-  document.getElementById('no_pin3_channel').value=255;
+  resetRouteFields();
   setVal('pwm_dac_mode',0);
   setVal('pwm_dac_min','0.00');
   setVal('pwm_dac_max','100.00');
-  for(let s=0; s<=7; s++){
-    const pinEl=document.getElementById('no_seg_pin_'+s);
-    const srcEl=document.getElementById('no_seg_source_'+s);
-    const addrEl=document.getElementById('no_seg_addr_'+s);
-    const chEl=document.getElementById('no_seg_channel_'+s);
-    const invEl=document.getElementById('no_seg_pin_invert_'+s);
-    if(pinEl) pinEl.value=255;
-    if(srcEl) srcEl.value=0;
-    if(addrEl) addrEl.value=32;
-    if(chEl) chEl.value=255;
-    if(invEl) invEl.checked=false;
-  }
   setVal('sol_threshold',127);
   if(document.getElementById('smoke_threshold')) setVal('smoke_threshold',127);
-  ['no_pin_invert','no_pin2_invert','no_pin3_invert','no_pin4_invert'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
   document.getElementById('out-add-btn').textContent='Add Channel';
   document.getElementById('out-cancel-btn').style.display='none';
   document.getElementById('edit-banner').style.display='none';
@@ -608,38 +623,13 @@ function cancelEditOutput(){
 
 function addOrUpdateOutput(){
   const type=parseInt(document.getElementById('no_type').value);
-  function gv(id,d){const el=document.getElementById(id);return el?parseInt(el.value):d;}
-  const source=parseInt(document.getElementById('no_source').value||0);
   const ch={
     type:type,
-    source:source,
-    pin: gv('no_pin',255),
-    pca_addr: gv('no_pca_addr',64),
-    pca_channel: gv('no_pca_channel',0),
-    pca_channel2: gv('no_pca_channel2',255),
-    pca_channel3: gv('no_pca_channel3',255),
-    pca_channel4: gv('no_pca_channel4',255),
     start_universe:parseInt(document.getElementById('no_uni').value),
     start_address:parseInt(document.getElementById('no_addr').value)||1,
     led_count:parseInt(cfgEl('led_count')?.value||170),
     color_order:parseInt(cfgEl('color_order')?.value||0),
     led_protocol:parseInt(cfgEl('led_protocol')?.value||0),
-    pin_invert: type===7?false:(document.getElementById('no_pin_invert')?.checked || false),
-    pin2_invert: type===7?false:(document.getElementById('no_pin2_invert')?.checked || false),
-    pin3_invert: type===7?false:(document.getElementById('no_pin3_invert')?.checked || false),
-    pin4_invert: document.getElementById('no_pin4_invert')?.checked || false,
-    pin2: gv('no_pin2',255),
-    pin3: gv('no_pin3',255),
-    pin4: gv('no_pin4',255),
-    pin4_source: gv('no_pin4_source',0),
-    pin4_addr: gv('no_pin4_addr',32),
-    pin4_channel: gv('no_pin4_channel',255),
-    pin2_source: gv('no_pin2_source',0),
-    pin2_addr: gv('no_pin2_addr',32),
-    pin2_channel: gv('no_pin2_channel',255),
-    pin3_source: gv('no_pin3_source',0),
-    pin3_addr: gv('no_pin3_addr',32),
-    pin3_channel: gv('no_pin3_channel',255),
     mc_mode: parseInt(cfgEl('mc_mode')?.value||0),
     mc_resolution: parseInt(cfgEl('mc_resolution')?.value||8),
     mc_freq: parseInt(cfgEl('mc_freq')?.value||1000),
@@ -654,9 +644,9 @@ function addOrUpdateOutput(){
     mc_scale_factor: parseFloat(cfgEl('mc_scale_factor')?.value||'0'),
     mc_invert: cfgEl('mc_invert')?.checked||false,
     mc_brake: cfgEl('mc_brake')?.checked||false,
-    mc_enable_active_high: type===7?(document.getElementById('no_pin3_invert')?.checked || false):false,
-    mc_dir_invert: type===7?(document.getElementById('no_pin2_invert')?.checked || false):false,
-    mc_step_invert: type===7?(document.getElementById('no_pin_invert')?.checked || false):false,
+    mc_enable_active_high: false,
+    mc_dir_invert: false,
+    mc_step_invert: false,
     mc_homing_mode: parseInt(cfgEl('mc_homing_mode')?.value||0),
     mc_homing_dir: parseInt(cfgEl('mc_homing_dir')?.value||0),
     mc_homing_speed: parseInt(cfgEl('mc_homing_speed')?.value||500),
@@ -670,45 +660,17 @@ function addOrUpdateOutput(){
     smoke_duration_ms: parseInt(document.getElementById('smoke_dur')?.value || 1000),
     settle_delay_ms: parseInt(document.getElementById('smoke_settle')?.value || 500),
     shoot_duration_ms: parseInt(document.getElementById('smoke_shoot')?.value || 1000),
-    smoke_lockout_ms: parseInt(document.getElementById('smoke_lockout')?.value || 2000),
-    seg_pins: (type===12||type===13)? [
-      ((type===12||type===13) && (parseInt(cfgEl('mc_mode')?.value||0)>=6 && parseInt(cfgEl('mc_mode')?.value||0)<=9)) ? gv('no_seg_pin_0', 255) : gv('no_pin', 255),
-      gv('no_seg_pin_1', 255),
-      gv('no_seg_pin_2', 255),
-      gv('no_seg_pin_3', 255),
-      gv('no_seg_pin_4', 255),
-      gv('no_seg_pin_5', 255),
-      gv('no_seg_pin_6', 255),
-      gv('no_seg_pin_7', 255)
-    ] : [255, 255, 255, 255, 255, 255, 255, 255],
-    seg_sources: (type===12||type===13)? [0,1,2,3,4,5,6,7].map(s=>{
-      if (s === 0 && !(parseInt(cfgEl('mc_mode')?.value||0)>=6 && parseInt(cfgEl('mc_mode')?.value||0)<=9)) {
-        return parseInt(document.getElementById('no_source').value);
-      }
-      return gv('no_seg_source_'+s,0);
-    }) : [0,0,0,0,0,0,0,0],
-    seg_addrs: (type===12||type===13)? [0,1,2,3,4,5,6,7].map(s=>{
-      if (s === 0 && !(parseInt(cfgEl('mc_mode')?.value||0)>=6 && parseInt(cfgEl('mc_mode')?.value||0)<=9)) {
-        return parseInt(document.getElementById('no_pca_addr')?.value||32);
-      }
-      return gv('no_seg_addr_'+s,32);
-    }) : [32,32,32,32,32,32,32,32],
-    seg_channels: (type===12||type===13)? [0,1,2,3,4,5,6,7].map(s=>{
-      if (s === 0 && !(parseInt(cfgEl('mc_mode')?.value||0)>=6 && parseInt(cfgEl('mc_mode')?.value||0)<=9)) {
-        const mainSrc = parseInt(document.getElementById('no_source').value);
-        return mainSrc !== 0 ? parseInt(document.getElementById('no_pca_channel')?.value||255) : 255;
-      }
-      return gv('no_seg_channel_'+s,255);
-    }) : [255,255,255,255,255,255,255,255],
-    seg_inverts: (type===12||type===13) ? [0,1,2,3,4,5,6,7].reduce((acc, s)=>{
-      if (s === 0 && !(parseInt(cfgEl('mc_mode')?.value||0)>=6 && parseInt(cfgEl('mc_mode')?.value||0)<=9)) {
-        const isInv = document.getElementById('no_pin_invert')?.checked || false;
-        return acc | (isInv ? (1 << s) : 0);
-      }
-      const isInv = document.getElementById('no_seg_pin_invert_'+s)?.checked || false;
-      return acc | (isInv ? (1 << s) : 0);
-    }, 0) : 0
+    smoke_lockout_ms: parseInt(document.getElementById('smoke_lockout')?.value || 2000)
   };
+  readRouteFields(ch,type);
+  if(type===T.STEPPER){
+    ch.pin_invert=false;
+    ch.pin2_invert=false;
+    ch.pin3_invert=false;
+    ch.mc_enable_active_high=routeChecked('no_pin3_invert',false);
+    ch.mc_dir_invert=routeChecked('no_pin2_invert',false);
+    ch.mc_step_invert=routeChecked('no_pin_invert',false);
+  }
   readGeneratedFields(ch,type);
 
   const statusPin=parseInt(document.getElementById('status_led_pin').value);
