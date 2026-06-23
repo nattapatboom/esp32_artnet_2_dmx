@@ -180,6 +180,7 @@ When working on this project:
 - Use `networkFramePending.exchange(false)` for the atomic pending-frame flag
 - If editing Web UI, edit `web/index.html`, regenerate `include/web_pages.h`, then build
 - Web UI output menus must load output device metadata, I2C expander options, and I2C address rules from the firmware header/source-of-truth generator path, not hardcoded JS copies. If menu data is missing, add it to the firmware header source of truth (for example `OUTPUT_MODES[]` / related protocol headers) and generate the Web UI data from there. Common Web UI fields that are not output-device menu metadata, such as `start_universe`, `start_address`, display layout, and other shared base form controls, may remain implemented on the Web UI side.
+- Output-device-specific UI/settings/scoring/pin-conflict/source-validation/test metadata must not be implemented as ad-hoc per-type JS/C++ functions or hardcoded type checks. Use a common metadata/runtime layer driven by `include/output_defs.h` `OUTPUT_MODES[]`, `PinRule`, `ModeCost`, `include/type_interfaces/type_N.h` `EXTRA_FIELDS[]`/`TEST_COMMANDS[]`, and generated Web UI data from `tools/build_web.py`. If the Web UI needs realtime rendering, render from generated metadata; if static HTML/JS is needed for size/performance, generate it from headers at build time. Device-specific code is allowed only inside physical runtime drivers under `include/output_devices/` or clearly isolated strategy functions referenced by generated metadata.
 
 ## Typst User Manual
 
