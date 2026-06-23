@@ -137,10 +137,10 @@ function renderPinRows(){
   const mode=outputModeDef(t,mcMode);
   if(!mode){ container.innerHTML=''; return; }
 
-  const srcOpts=(mask)=>{
-    let h='';
-    if(mask&SRC_GPIO) h+=`<option value="0">ESP32 GPIO</option>`;
-    if(mask&SRC_PCA) h+=`<option value="1">PCA9685</option>`;
+   const srcOpts=(mask)=>{
+     let h='';
+     if(mask&SRC_GPIO) h+=`<option value="0">ESP32 GPIO</option>`;
+     if(mask&SRC_PCA) h+=`<option value="1">PCA9685</option>`;
     if(mask&SRC_DIG) h+=`<option value="2">MCP23017</option><option value="3">TCA9555</option><option value="4">PCF857x</option>`;
     if(mask&SRC_DAC) h+=`<option value="5">MCP4725</option><option value="6">DAC7571</option><option value="7">DAC7573</option>`;
     return h;
@@ -182,16 +182,20 @@ function renderPinRows(){
     const n=slotNumber(slot);
     const mask=mode?.slotActiveMask??0;
     if(!(mask&(1<<(n-1)))) return false;
+    const typeCfg=window['CONFIG_TYPE_'+t];
+    if(typeCfg?.slotActive) return typeCfg.slotActive(slot,t,mcMode,colorOrder,hMode);
     if(t===6&&n===3) return mcMode===2;
     return true;
   };
   const sourceFor=(field,rule)=>{
     const current=parseInt(saved[field.source]??0);
-    if(rule.sources&SRC_DAC) return (current>=5&&current<=7)?current:5;
-    if(rule.sources&SRC_GPIO) return current;
-    if(rule.sources&SRC_PCA) return current===1?current:1;
-    if(rule.sources&SRC_DIG) return (current>=2&&current<=4)?current:2;
-    return current;
+    if(rule.sources&(1<<current)) return current;
+    const allowed=rule.sources;
+    if(allowed&SRC_GPIO) return 0;
+    if(allowed&SRC_PCA) return 1;
+    if(allowed&SRC_DIG) return 2;
+    if(allowed&SRC_DAC) return 5;
+    return 0;
   };
   const pinDefs=Object.keys(mode.pins).sort((a,b)=>slotNumber(a)-slotNumber(b)).filter(slot=>!isSevenSegDD||slot==='pin1').filter(slotActive).map((slot)=>{
     const rule=mode.pins[slot];
@@ -237,7 +241,9 @@ function renderPinRows(){
       const segLabel='Seg '+(s+1);
       const segDesc=s===0&&!isCommonDim?'Seg A (main pin)':'';
       const segField={source:'no_seg_source_'+s,pin:'no_seg_pin_'+s,addr:'no_seg_addr_'+s,channel:'no_seg_channel_'+s,invert:'no_seg_pin_invert_'+s};
-      const segRule={sources:SRC_GPIO|SRC_PCA|SRC_DIG,dir:'out',invert:true};
+      const segPinSlot=isCommonDim?'pin'+(s+2):'pin'+(s+1);
+      const segPinRule=mode.pins[segPinSlot];
+      const segRule={sources:segPinRule?.sources??(SRC_GPIO|SRC_PCA),dir:'out',invert:segPinRule?.invert??true};
       const src=sourceFor(segField,segRule);
       let addrHtml=localBadge(src===0?'ESP32 GPIO':'Select Source');
       let pinHtml='';
@@ -249,7 +255,7 @@ function renderPinRows(){
       }
       rows.push(`<div class="pin-row" style="display:flex;gap:6px;align-items:end;margin-bottom:6px;flex-wrap:wrap">
         <div style="min-width:44px;padding-bottom:4px"><div style="font-weight:600;font-size:0.82rem;color:#475569">${segLabel}</div><div style="font-size:0.62rem;color:#94a3b8">${segDesc}</div></div>
-        <div class="f" style="flex:1;min-width:120px;margin:0">${mkSel(segField.source,srcOpts(SRC_GPIO|SRC_PCA|SRC_DIG))}</div>
+        <div class="f" style="flex:1;min-width:120px;margin:0">${mkSel(segField.source,srcOpts(segRule.sources))}</div>
         <div class="f" style="flex:1;min-width:100px;margin:0">${addrHtml}</div>
         <div class="f" style="flex:1;min-width:100px;margin:0">${pinHtml}</div>
         <div class="f" style="flex:0 0 auto;margin:0;padding-bottom:4px;display:flex;align-items:center;gap:4px">
@@ -270,6 +276,9 @@ function renderPinRows(){
       el.value=saved[id];
       if(el.value!==saved[id]&&el.options.length) el.value=el.options[0].value;
     }
+  });
+  container.querySelectorAll('select').forEach(function(el){
+    if(el.selectedIndex===-1&&el.options.length) el.selectedIndex=0;
   });
 }
 

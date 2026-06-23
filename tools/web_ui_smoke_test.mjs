@@ -163,7 +163,7 @@ async function main() {
 
     const expression = `
       (async function(){
-        const result = { renderErrors: [], alerts: [], hasFuncGen: false, outputCount: 0, typeOptions: 0, typeGroups: false, sevenSegDirect: false, sevenSegMixed: false, gpioInvert: false, analogPcaChannels: false, solenoidPca: false, smokeExpander: false, motorEnPca: false, mcp4725: false };
+        const result = { renderErrors: [], alerts: [], hasFuncGen: false, outputCount: 0, typeOptions: 0, typeGroups: false, sevenSegDirect: false, sevenSegMixed: false, sevenSegCommonDimExpander: false, gpioInvert: false, analogPcaChannels: false, solenoidPca: false, smokeExpander: false, motorEnPca: false, mcp4725: false };
         const byId = id => document.getElementById(id);
         if(!byId('no_type')) throw new Error('missing #no_type');
         if(typeof toggleOutFields !== 'function') throw new Error('missing toggleOutFields()');
@@ -204,13 +204,27 @@ async function main() {
         renderPinRows();
         const pinText = document.getElementById('pin-mapping-container')?.textContent || '';
         result.sevenSegDirect = !pinText.includes('Segs Src') && !!document.getElementById('no_seg_pin_1');
+        // Direct dim segments must NOT allow digital expanders (only GPIO/PCA)
         setValue('no_seg_source_1', 2);
         toggleOutFields();
         renderPinRows();
-        result.sevenSegMixed = document.getElementById('no_seg_source_1')?.value === '2'
-          && !!document.getElementById('no_seg_addr_1')
-          && !!document.getElementById('no_seg_channel_1')
-          && !document.getElementById('no_seg_pin_1');
+        // Debug: trace value after last render of sevenSegDirect
+        result.sevenSegMixed = document.getElementById('no_seg_source_1')?.value === '0'
+          && !document.getElementById('no_seg_addr_1')
+          && !document.getElementById('no_seg_channel_1')
+          && !!document.getElementById('no_seg_pin_1');
+        // Verify common dim segments DO allow expanders
+        setTypeMcMode(12, 6);  // Common dim mode
+        setValue('no_pin2_source', 0);
+        toggleOutFields();
+        renderPinRows();
+        setValue('no_seg_source_0', 2);
+        toggleOutFields();
+        renderPinRows();
+        result.sevenSegCommonDimExpander = document.getElementById('no_seg_source_0')?.value === '2'
+          && !!document.getElementById('no_seg_addr_0')
+          && !!document.getElementById('no_seg_channel_0')
+          && !document.getElementById('no_seg_pin_0');
 
         setValue('no_type', 2);
         setValue('no_source', 0);
@@ -318,8 +332,9 @@ async function main() {
     if (!value.motorEnPca) throw new Error(`Motor EN PCA UI is incomplete: ${JSON.stringify(value)}`);
     if (!value.mcp4725) throw new Error(`MCP4725 DAC UI is incomplete: ${JSON.stringify(value)}`);
     if (!value.hasFuncGen) throw new Error(`Function Generator add failed: ${JSON.stringify(value)}`);
+    if (!value.sevenSegCommonDimExpander) throw new Error(`7-Seg common dim expander UI is incomplete: ${JSON.stringify(value)}`);
 
-    console.log(`PASS web UI smoke test: ${value.typeOptions} types rendered, type groups OK, 7-Seg direct/mixed OK, GPIO invert visible, Analog PCA channels OK, Solenoid/Smoke expander OK, Motor EN PCA OK, MCP4725 OK, Function Generator add OK.`);
+    console.log(`PASS web UI smoke test: ${value.typeOptions} types rendered, type groups OK, 7-Seg direct/mixed OK, 7-Seg common dim expander OK, GPIO invert visible, Analog PCA channels OK, Solenoid/Smoke expander OK, Motor EN PCA OK, MCP4725 OK, Function Generator add OK.`);
   } finally {
     if (cdp) cdp.close();
     if (browser) browser.kill();
