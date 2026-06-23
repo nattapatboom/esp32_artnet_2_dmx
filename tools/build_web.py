@@ -21,6 +21,9 @@ OUTPUT_DEFS_PATH = os.path.join("include", "output_defs.h")
 SOURCE_RULES_PATH = os.path.join("include", "source_rules.h")
 GPIO_CONTROL_PATH = os.path.join("include", "gpio_control.h")
 DISPLAY_PROTO_PATH = os.path.join("include", "display_protocol.h")
+SCORE_LIMITS_PATH = os.path.join("include", "scoring_limits.h")
+DIMMER_PATH = os.path.join("include", "output_devices", "dimmer.h")
+SCORING_PATH = os.path.join("include", "scoring.h")
 
 PANE_MARKERS = {
     "<!-- PANE_NET -->":    "pane-network.html",
@@ -150,6 +153,48 @@ def parse_test_commands_for_type(type_num):
     for label, cmd, desc in entry_re.findall(body):
         cmds.append([label, int(cmd), desc])
     return cmds
+
+
+def generate_score_limits_js():
+    """Parse scoring_limits.h, dimmer.h, scoring.h → const SCORE_LIMITS."""
+    out = {}
+    # scoring_limits.h: constexpr values
+    src_limits = read_file(SCORE_LIMITS_PATH)
+    for name, val in re.findall(r"constexpr\s+\w+\s+(\w+)\s*=\s*([^;]+)\s*;", src_limits):
+        try:
+            val = eval(val.replace("UL", "").replace("u", "").replace("U", ""))
+            if isinstance(val, (int, float)):
+                out[name] = int(val)
+        except Exception:
+            pass
+
+    # dimmer.h: DIMMER_TICK_US #define
+    src_dimmer = read_file(DIMMER_PATH)
+    m = re.search(r"#define\s+DIMMER_TICK_US\s+(\d+)", src_dimmer)
+    if m:
+        out["DIMMER_TICK_US"] = int(m.group(1))
+
+    # scoring.h: RMT_DMX_DRIVER_RAM (computed)
+    src_scoring = read_file(SCORING_PATH)
+    m = re.search(
+        r"constexpr\s+uint32_t\s+RMT_DMX_DRIVER_RAM\s*=\s*(\d+)UL\s*\*\s*sizeof\s*\(\s*rmt_item32_t\s*\)\s*\+\s*(\d+)",
+        src_scoring,
+    )
+    if m:
+        out["RMT_DMX_DRIVER_RAM"] = int(m.group(1)) * 4 + int(m.group(2))
+
+    # Domain constants not yet in headers
+    out["FUNCGEN_MIN_PERIOD_US"] = 50
+    out["FUNCGEN_ISR_US"] = 4
+    out["ESPNOW_BASE_US"] = 500
+    out["ESPNOW_PER_CHUNK_US"] = 170
+    out["ESPNOW_PER_UNIVERSE_US"] = 100
+    out["ESPNOW_OVERHEAD_BYTES"] = 44
+    out["STEPPER_POSITION_BYTES"] = 2
+    out["AC_DIMMER_TIMER_COUNT"] = 1
+    out["DEFAULT_OUTPUT_FPS"] = 40
+
+    return "const SCORE_LIMITS=" + json.dumps(out, separators=(",", ":")) + ";\n"
 
 
 def generate_output_defs_js():
@@ -457,7 +502,7 @@ def main():
         print(f"Warning: {test_panel_path} not found, leaving PANE_TEST marker")
 
     # Embed JS files into <script> tag (generated metadata, main JS, then per-type config/test)
-    js_parts = [generate_gpio_js(), generate_source_rules_js(), generate_output_defs_js()]
+    js_parts = [generate_score_limits_js(), generate_gpio_js(), generate_source_rules_js(), generate_output_defs_js()]
     for js_file in JS_ORDER:
         js_path = os.path.join(JS_DIR, js_file)
         if not os.path.exists(js_path):

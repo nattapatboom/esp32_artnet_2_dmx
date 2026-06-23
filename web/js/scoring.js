@@ -1,21 +1,16 @@
 // ==========================================
 // === RESOURCE SCORING & BUDGET CHECKS ===
+// Single source of truth: SCORE_LIMITS from scoring_limits.h
 // ==========================================
-const SCORE_DEFS={
-  hwMax:{ledc:16,rmt:8,uart:2,dac:2,timer:4},
-  cpu:{baseOverheadUs:500,safetyReserveUs:1500,i2cWriteUs:180,dmxOutputServiceUs:250},
-  ram:{limit:48000,baseChannel:224,dmxBuffer:512,rmtDmxDriver:5150*4+32,i2cRoute:32}
-};
-const HW_MAX=SCORE_DEFS.hwMax;
-const RAM_LIMIT=SCORE_DEFS.ram.limit;
-const BASE_CHANNEL_RAM=SCORE_DEFS.ram.baseChannel;
-const BASE_OVERHEAD_US=SCORE_DEFS.cpu.baseOverheadUs;
-const SAFETY_RESERVE_US=SCORE_DEFS.cpu.safetyReserveUs;
-const I2C_WRITE_US=SCORE_DEFS.cpu.i2cWriteUs;
-const DMX_BUFFER_RAM=SCORE_DEFS.ram.dmxBuffer;
-const RMT_DMX_DRIVER_RAM=SCORE_DEFS.ram.rmtDmxDriver;
-const I2C_ROUTE_RAM=SCORE_DEFS.ram.i2cRoute;
-const DMX_OUTPUT_SERVICE_US=SCORE_DEFS.cpu.dmxOutputServiceUs;
+const S=SCORE_LIMITS;
+const HW_MAX={ledc:S.MAX_LEDC,rmt:S.MAX_RMT,uart:S.MAX_UART,dac:S.MAX_DAC,timer:S.MAX_TIMER};
+const RAM_LIMIT=S.LIMIT_CAP_BYTES;
+const BASE_CHANNEL_RAM=S.BASE_CHANNEL_BYTES;
+const BASE_OVERHEAD_US=S.BASE_OVERHEAD_US;
+const SAFETY_RESERVE_US=S.SAFETY_RESERVE_US;
+const I2C_WRITE_US=S.I2C_WRITE_US;
+const DMX_BUFFER_RAM=S.DMX_BUFFER_BYTES;
+const I2C_ROUTE_RAM=S.I2C_ROUTE_BYTES;
 var T=TYPE_META.typeIds;
 
 function channelHardware(o){
@@ -64,12 +59,12 @@ function dmxBufferRam(type,ledCount,colorOrder,resolution=8,mode=0){
   type=parseInt(type); mode=parseInt(mode||0);
   if(type===T.DMX) return DMX_BUFFER_RAM;
   if(type===T.LED_STRIP){
-    const bytesPerPixel=parseInt(colorOrder||0)>=4?4:3;
-    const pixelsPerUniverse=Math.floor(512/bytesPerPixel);
-    return Math.max(1,Math.ceil((parseInt(ledCount)||0)/pixelsPerUniverse))*512;
+    var bpp=parseInt(colorOrder||0)>=4?4:3;
+    var pixPerUni=Math.floor(S.DMX_BUFFER_BYTES/bpp);
+    return Math.max(1,Math.ceil((parseInt(ledCount)||0)/pixPerUni))*S.DMX_BUFFER_BYTES;
   }
   if(type===T.ANALOG_RGB) return parseInt(colorOrder||0)>=4?4:3;
-  if(type===T.STEPPER) return valueByteCount(resolution)+2;
+  if(type===T.STEPPER) return valueByteCount(resolution)+S.STEPPER_POSITION_BYTES;
   if(type===T.BUZZER||type===T.TM1637) return mode===1?4:2;
   if(type===T['7SEG_7PIN']||type===T['7SEG_8PIN']) return (mode===4||mode===5||mode>=6)?2:1;
   var def=outputModeDef(type,mode);
@@ -97,7 +92,7 @@ function i2cWriteCount(o){
 }
 
 function cpuLimit(fps){
-  const frameUs=Math.floor(1000000/(parseInt(fps)||40));
+  const frameUs=Math.floor(1000000/(parseInt(fps)||S.DEFAULT_OUTPUT_FPS));
   return frameUs>SAFETY_RESERVE_US?frameUs-SAFETY_RESERVE_US:Math.floor(frameUs/2);
 }
 function totalHardware(arr){
@@ -111,17 +106,17 @@ function totalHardware(arr){
     if(typ===T.DMX&&parseInt(o.source||0)===0) dmxCount++;
     else if(typ===T.DFPLAYER) dfPlayerCount++;
   });
-  const freeUarts=Math.max(0,2-dfPlayerCount);
+  const freeUarts=Math.max(0,S.MAX_UART-dfPlayerCount);
   const dmxUartUse=Math.min(dmxCount,freeUarts);
   const dmxRmtUse=Math.max(0,dmxCount-freeUarts);
   t.uart=dfPlayerCount+dmxUartUse;
   t.rmt+=dmxRmtUse;
-  if(hasDimmer) t.timer+=1;
+  if(hasDimmer) t.timer+=S.AC_DIMMER_TIMER_COUNT;
   return t;
 }
-function frameTimeUs(fps){ return Math.floor(1000000/(parseInt(fps)||40)); }
-function acDimmerBackgroundUs(count,fps){ return count>0?Math.floor(frameTimeUs(fps)/39)*(1+count):0; }
-function funcGenBackgroundUs(count,fps){ return count>0?Math.floor(frameTimeUs(fps)/50)*4*count:0; }
+function frameTimeUs(fps){ return Math.floor(1000000/(parseInt(fps)||S.DEFAULT_OUTPUT_FPS)); }
+function acDimmerBackgroundUs(count,fps){ return count>0?Math.floor(frameTimeUs(fps)/S.DIMMER_TICK_US)*(1+count):0; }
+function funcGenBackgroundUs(count,fps){ return count>0?Math.floor(frameTimeUs(fps)/S.FUNCGEN_MIN_PERIOD_US)*S.FUNCGEN_ISR_US*count:0; }
 function totalCpu(arr,fps){
   let us = BASE_OVERHEAD_US;
   let dimmerCount=0, funcGenCount=0;
@@ -136,7 +131,7 @@ function totalCpu(arr,fps){
   if (modeVal === 1) {
     const unis = new Set(arr.map(o => parseInt(o.start_universe || 0)));
     const peerCount = Math.max(1, espPeers.length);
-    const chunkSize = parseInt(document.getElementById('espnow_chunk_size')?.value || 200);
+    const chunkSize = parseInt(document.getElementById('espnow_chunk_size')?.value) || S.DMX_BUFFER_BYTES;
     us += espnowMasterCost(peerCount, unis.size, chunkSize).cpu;
   }
   return us;
@@ -148,14 +143,14 @@ function totalRam(arr){
     if(typeId(o)===T.DMX&&parseInt(o.source||0)===0) dmxCount++;
     else if(typeId(o)===T.DFPLAYER) dfPlayerCount++;
   });
-  const freeUarts=Math.max(0,2-dfPlayerCount);
+  const freeUarts=Math.max(0,S.MAX_UART-dfPlayerCount);
   const dmxRmtUse=Math.max(0,dmxCount-freeUarts);
-  let ramVal = b+dmxRmtUse*RMT_DMX_DRIVER_RAM;
+  let ramVal = b+dmxRmtUse*S.RMT_DMX_DRIVER_RAM;
 
   const modeVal = parseInt(document.getElementById('device_mode')?.value || 0);
   if (modeVal === 1) {
     const peerCount = Math.max(1, espPeers.length);
-    const chunkSize = parseInt(document.getElementById('espnow_chunk_size')?.value || 200);
+    const chunkSize = parseInt(document.getElementById('espnow_chunk_size')?.value) || S.DMX_BUFFER_BYTES;
     ramVal += espnowMasterCost(peerCount, 0, chunkSize).ram;
   }
   return ramVal;
@@ -169,9 +164,10 @@ function cpuBlocked(cpu,fps){
 function ramBlocked(ram){
   return ram>RAM_LIMIT;
 }
-function espnowMasterCost(peerCount, universeCount, chunkSize=200){
-  const cpusPerUni = Math.ceil(512/chunkSize);
-  return {cpu: 500 + peerCount*cpusPerUni*170 + universeCount*100, ram: 512 + peerCount*(chunkSize+44)};
+function espnowMasterCost(peerCount, universeCount, chunkSize){
+  if(!chunkSize) chunkSize=S.DMX_BUFFER_BYTES;
+  const cpusPerUni=Math.ceil(S.DMX_BUFFER_BYTES/chunkSize);
+  return {cpu:S.ESPNOW_BASE_US+peerCount*cpusPerUni*S.ESPNOW_PER_CHUNK_US+universeCount*S.ESPNOW_PER_UNIVERSE_US, ram:S.DMX_BUFFER_BYTES+peerCount*(chunkSize+S.ESPNOW_OVERHEAD_BYTES)};
 }
 function updateScoreBar(){
   const cpuBar=document.getElementById('cpu-score-fill');
@@ -179,7 +175,7 @@ function updateScoreBar(){
   const ramBar=document.getElementById('ram-score-fill');
   const ramTxt=document.getElementById('ram-score-text');
   if(!cpuBar||!cpuTxt||!ramBar||!ramTxt) return;
-  const fps=parseInt(document.getElementById('output_fps')?.value)||40;
+  const fps=parseInt(document.getElementById('output_fps')?.value)||S.DEFAULT_OUTPUT_FPS;
   const hw=totalHardware(outputs);
   const cpu=totalCpu(outputs,fps);
   const ram=totalRam(outputs);

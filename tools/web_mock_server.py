@@ -4,7 +4,7 @@ import json
 import random
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
-from build_web import generate_gpio_js, generate_source_rules_js, generate_output_defs_js
+from build_web import generate_score_limits_js, generate_gpio_js, generate_source_rules_js, generate_output_defs_js
 
 PORT = 8000
 HTML_FILE = "web/index.html"
@@ -165,7 +165,7 @@ class MockRequestHandler(BaseHTTPRequestHandler):
                     html = html.replace("<!-- PANE_TEST -->", pf.read())
 
             # Inline generated metadata and JS files
-            js_parts = [generate_gpio_js(), generate_source_rules_js(), generate_output_defs_js()]
+            js_parts = [generate_score_limits_js(), generate_gpio_js(), generate_source_rules_js(), generate_output_defs_js()]
             for js_file in JS_ORDER:
                 js_path = os.path.join(JS_DIR, js_file)
                 if os.path.exists(js_path):
