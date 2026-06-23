@@ -238,7 +238,7 @@ async function main() {
 
         setValue('no_type', 5);
         setValue('no_source', 1);
-        setValue('no_ord', 4);
+        setValue('color_order', 4);
         toggleOutFields();
         renderPinRows();
         setValue('no_pin2_source', 1);

@@ -386,17 +386,13 @@ function toggleOutFields(){
   }
   
   _st('no_addr_grp',(isDmx||t===3)?'none':'');
-  _st('no_cnt_grp',(isDmx||isRelay||isDimmer||isMc||isSolenoid||isAnalogRgb||isBuzzer||isSmoke||is7Seg||isDfPlayer||isPwmDac||isDac||isFuncGen)?'none':'');
-  _st('no_ord_grp',(t===3||t===5)?'':'none');
-  _st('no_led_proto_grp',(t===3)?'':'none');
-  
   _st('no_mc_grp',(isMc||is7Seg||isFuncGen||isPwmDac)?'':'none');
   _st('no_sol_grp',isSolenoid?'':'none');
   _st('no_smoke_grp',isSmoke?'':'none');
   if(isDfPlayer) renderPinRows();
   
   const hMode = parseInt(cfgEl('mc_homing_mode')?.value||0);
-  const colorOrder = parseInt(document.getElementById('no_ord').value||0);
+  const colorOrder = parseInt(cfgEl('color_order')?.value||0);
   _st('no_pca_channel2_grp','none');
   _st('no_pca_channel3_grp','none');
   _st('no_pca_channel4_grp','none');
@@ -464,7 +460,7 @@ function toggleOutFields(){
 
 document.addEventListener('change', function(e){
   var id=e.target&&e.target.id;
-  if(id==='mc_mode'||id==='mc_homing_mode'||id==='no_ord') toggleOutFields();
+  if(id==='mc_mode'||id==='mc_homing_mode'||id==='color_order') toggleOutFields();
 });
 document.getElementById('status_led_pin').addEventListener('change', autoAssignOutputPins);
 document.getElementById('zc_pin').addEventListener('change', autoAssignOutputPins);
@@ -491,9 +487,6 @@ function editOutput(idx){
   setVal('no_pca_channel4',o.pca_channel4??255);
   setVal('no_uni',o.start_universe);
   setVal('no_addr',o.start_address||1);
-  setVal('no_cnt',o.led_count||170);
-  setVal('no_ord',o.color_order||0);
-  setVal('no_led_proto',o.led_protocol??0);
 
   setVal('no_pin2',o.pin2??255);
   setVal('no_pin3',o.pin3??255);
@@ -581,7 +574,6 @@ function cancelEditOutput(){
   document.getElementById('no_pca_channel2').value=255;
   document.getElementById('no_pca_channel3').value=255;
   document.getElementById('no_pca_channel4').value=255;
-  document.getElementById('no_led_proto').value=0;
   document.getElementById('no_pin4_source').value=0;
   document.getElementById('no_pin4_addr').value=32;
   document.getElementById('no_pin4_channel').value=255;
@@ -628,9 +620,9 @@ function addOrUpdateOutput(){
     pca_channel4: gv('no_pca_channel4',255),
     start_universe:parseInt(document.getElementById('no_uni').value),
     start_address:parseInt(document.getElementById('no_addr').value)||1,
-    led_count:parseInt(document.getElementById('no_cnt').value)||170,
-    color_order:parseInt(document.getElementById('no_ord').value),
-    led_protocol:parseInt(document.getElementById('no_led_proto').value||0),
+    led_count:parseInt(cfgEl('led_count')?.value||170),
+    color_order:parseInt(cfgEl('color_order')?.value||0),
+    led_protocol:parseInt(cfgEl('led_protocol')?.value||0),
     pin_invert: type===7?false:(document.getElementById('no_pin_invert')?.checked || false),
     pin2_invert: type===7?false:(document.getElementById('no_pin2_invert')?.checked || false),
     pin3_invert: type===7?false:(document.getElementById('no_pin3_invert')?.checked || false),

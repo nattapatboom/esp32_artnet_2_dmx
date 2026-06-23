@@ -134,13 +134,6 @@
       <div class="f" id="no_pca_channel2_grp" style="display:none"><label for="no_pca_channel2">Addl Channel 2</label><select id="no_pca_channel2"><option value="255">None</option><option value="0">CH 0</option><option value="1">CH 1</option><option value="2">CH 2</option><option value="3">CH 3</option><option value="4">CH 4</option><option value="5">CH 5</option><option value="6">CH 6</option><option value="7">CH 7</option><option value="8">CH 8</option><option value="9">CH 9</option><option value="10">CH 10</option><option value="11">CH 11</option><option value="12">CH 12</option><option value="13">CH 13</option><option value="14">CH 14</option><option value="15">CH 15</option></select></div>
       <div class="f" id="no_pca_channel3_grp" style="display:none"><label for="no_pca_channel3">Addl Channel 3</label><select id="no_pca_channel3"><option value="255">None</option><option value="0">CH 0</option><option value="1">CH 1</option><option value="2">CH 2</option><option value="3">CH 3</option><option value="4">CH 4</option><option value="5">CH 5</option><option value="6">CH 6</option><option value="7">CH 7</option><option value="8">CH 8</option><option value="9">CH 9</option><option value="10">CH 10</option><option value="11">CH 11</option><option value="12">CH 12</option><option value="13">CH 13</option><option value="14">CH 14</option><option value="15">CH 15</option></select></div>
       <div class="f" id="no_pca_channel4_grp" style="display:none"><label for="no_pca_channel4">Addl Channel 4</label><select id="no_pca_channel4"><option value="255">None</option><option value="0">CH 0</option><option value="1">CH 1</option><option value="2">CH 2</option><option value="3">CH 3</option><option value="4">CH 4</option><option value="5">CH 5</option><option value="6">CH 6</option><option value="7">CH 7</option><option value="8">CH 8</option><option value="9">CH 9</option><option value="10">CH 10</option><option value="11">CH 11</option><option value="12">CH 12</option><option value="13">CH 13</option><option value="14">CH 14</option><option value="15">CH 15</option></select></div>
-      <div class="f" id="no_led_proto_grp">
-        <label for="no_led_proto">LED Protocol</label>
-        <select id="no_led_proto">
-          <option value="0">WS2812 / WS2812B / SK6812 (800kHz)</option>
-          <option value="1">WS2811 Low-Speed (400kHz)</option>
-        </select>
-      </div>
       <div class="f">
         <label for="no_uni">Start Universe</label>
         <input type="number" id="no_uni" value="0" min="0" max="32767">
@@ -149,27 +142,6 @@
         <label for="no_addr">Start Address</label>
         <input type="number" id="no_addr" value="1" min="1" max="512">
         <div class="hint">DMX channel inside the universe for relay, dimmer, motion, and solenoid outputs.</div>
-      </div>
-      <div class="f" id="no_cnt_grp">
-        <label for="no_cnt">LED Count</label>
-        <input type="number" id="no_cnt" value="170" min="1" max="1360">
-      </div>
-      <div class="f" id="no_ord_grp">
-        <label for="no_ord">Color Order</label>
-        <select id="no_ord">
-          <optgroup label="RGB Strips (3-channel)">
-            <option value="0">GRB</option>
-            <option value="1">RGB</option>
-            <option value="2">BRG</option>
-            <option value="3">RBG</option>
-          </optgroup>
-          <optgroup label="RGBW Strips (4-channel)">
-            <option value="4">RGBW</option>
-            <option value="5">GRBW</option>
-            <option value="6">BRGW</option>
-            <option value="7">WRGB</option>
-          </optgroup>
-        </select>
       </div>
       <!-- CONFIG_TYPE_FIELDS -->
     </div>

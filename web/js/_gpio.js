@@ -180,7 +180,7 @@ function renderPinRows(){
   const t=parseInt(document.getElementById('no_type').value);
   const mcMode=parseInt(cfgEl('mc_mode')?.value||0);
   const hMode=parseInt(cfgEl('mc_homing_mode')?.value||0);
-  const colorOrder=parseInt(document.getElementById('no_ord')?.value||0);
+  const colorOrder=parseInt(cfgEl('color_order')?.value||0);
   const mode=outputModeDef(t,mcMode);
   if(!mode){ container.innerHTML=''; return; }
 
@@ -229,8 +229,6 @@ function renderPinRows(){
     const n=slotNumber(slot);
     const mask=mode?.slotActiveMask??0;
     if(!(mask&(1<<(n-1)))) return false;
-    const typeCfg=window['CONFIG_TYPE_'+t];
-    if(typeCfg?.slotActive) return typeCfg.slotActive(slot,t,mcMode,colorOrder,hMode);
     if(t===6&&n===3) return mcMode===2;
     return true;
   };
