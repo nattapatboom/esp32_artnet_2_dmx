@@ -16,16 +16,16 @@ public:
 private:
     esp_timer_handle_t timer = nullptr;
     volatile bool timerRunning = false;
-    uint8_t ledcChan = 255;
+    volatile uint8_t ledcChan = 255;
     uint8_t pin = 255;
 
     uint16_t freq = 100;
-    uint8_t type = 0;
-    uint8_t amp = 128;
-    uint8_t offset = 128;
+    volatile uint8_t type = 0;
+    volatile uint8_t amp = 128;
+    volatile uint8_t offset = 128;
 
-    uint32_t sampleIdx = 0;
-    uint8_t numSamples = 128;
+    volatile uint32_t sampleIdx = 0;
+    volatile uint8_t numSamples = 128;
 
     uint16_t lastFreq = 0;
     uint8_t lastType = 0;

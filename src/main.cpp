@@ -51,8 +51,8 @@ const char* getFirmwareVersion() {
 
 // Instantiate Global Control Instances
 SystemConfig sysCfg;
-unsigned long lastDmxUpdateTime = 0;
-bool systemActive = false;
+std::atomic<unsigned long> lastDmxUpdateTime{0};
+std::atomic<bool> systemActive{false};
 std::atomic<bool> networkFramePending(false);
 
 OutputControl outputCtrl;
@@ -63,7 +63,7 @@ MotionControl motionCtrl;
 DimmerControl dimmerCtrl;
 hw_timer_t *dimmerTimer = NULL;
 volatile uint32_t dimmer_tick = 0;
-DimmerCh dimmerChannels[MAX_DIMMER_CHANNELS];
+volatile DimmerCh dimmerChannels[MAX_DIMMER_CHANNELS];
 volatile uint8_t numDimmerChannels = 0;
 volatile bool dimmerEnabled = false;
 
@@ -1826,7 +1826,7 @@ void setupWebServer() {
         doc["time"]     = (sysCfg.device_mode == MODE_ARTNET_ETHERNET) ? "Art-Net" :
                           (sysCfg.device_mode == MODE_ESPNOW_MASTER) ? "ESP-NOW Master" :
                           (sysCfg.device_mode == MODE_ESPNOW_SLAVE) ? "ESP-NOW Slave" : "Unknown";
-        doc["active"]   = systemActive;
+        doc["active"]   = systemActive.load();
 
         // System resource metrics
         doc["heap_free"]  = ESP.getFreeHeap();

@@ -20,7 +20,7 @@ struct DimmerCh {
     uint8_t** dmxVal;
 };
 
-extern DimmerCh dimmerChannels[MAX_DIMMER_CHANNELS];
+extern volatile DimmerCh dimmerChannels[MAX_DIMMER_CHANNELS];
 extern volatile uint8_t numDimmerChannels;
 extern volatile bool dimmerEnabled;
 

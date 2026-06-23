@@ -32,8 +32,8 @@ inline uint8_t dmxValueByteCount(uint8_t resolution) {
     return 4;
 }
 
-extern unsigned long lastDmxUpdateTime;
-extern bool systemActive;
+extern std::atomic<unsigned long> lastDmxUpdateTime;
+extern std::atomic<bool> systemActive;
 extern std::atomic<bool> networkFramePending;
 
 class PixelStripWrapper {
@@ -984,6 +984,10 @@ inline void OutputControl::setupChannels() {
             Serial.printf("Smoke Shooter init: pin=%d pin2=%d thresh=%d\n", ch.pin, ch.pin2, ch.solenoid_threshold);
         } else if (ch.type == OutputDefs::TYPE_DFPLAYER) {
             ch.dfPlayer = new DFPlayerController();
+            if (!ch.dfPlayer) {
+                Serial.println("Error: DFPlayer malloc failed!");
+                continue;
+            }
             if (dfPlayerCount == 0) {
                 ch.dfPlayer->begin(Serial2, ch.pin, ch.pin2);
                 Serial.printf("DFPlayer (UART2): TX=%d RX=%d\n", ch.pin, ch.pin2);

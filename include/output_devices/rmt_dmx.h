@@ -31,14 +31,22 @@ public:
         config.rmt_mode = RMT_MODE_TX;
         config.channel = channel;
         config.gpio_num = (gpio_num_t)pin;
-        config.clk_div = 80; // 1 tick = 1us
+        config.clk_div = 80;
         config.tx_config.loop_en = false;
         config.tx_config.carrier_en = false;
         config.tx_config.idle_output_en = true;
         config.tx_config.idle_level = RMT_IDLE_LEVEL_HIGH;
 
-        rmt_config(&config);
-        rmt_driver_install(channel, 0, 0);
+        esp_err_t err;
+        err = rmt_config(&config);
+        if (err != ESP_OK) {
+            Serial.printf("RmtDmx: rmt_config failed ch=%d err=%d\n", channel, err);
+            return;
+        }
+        err = rmt_driver_install(channel, 0, 0);
+        if (err != ESP_OK) {
+            Serial.printf("RmtDmx: rmt_driver_install failed ch=%d err=%d\n", channel, err);
+        }
     }
 
     void send(uint8_t* dmx_data) {

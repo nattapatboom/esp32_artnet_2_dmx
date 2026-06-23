@@ -17,18 +17,37 @@ inline void dmxSetup(OutputChannel& ch, bool& uart2Used, bool& uart1Used, uint8_
         ch.rmtDmx = nullptr;
     }
 
+    esp_err_t err;
     if (!uart2Used) {
         ch.dmxPort = (uint8_t)DMX_NUM_2;
         uart2Used = true;
         dmx_config_t dmxConfig = DMX_CONFIG_DEFAULT;
-        dmx_driver_install(DMX_NUM_2, &dmxConfig, DMX_INTR_FLAGS_DEFAULT);
-        dmx_set_pin(DMX_NUM_2, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
+        err = dmx_driver_install(DMX_NUM_2, &dmxConfig, DMX_INTR_FLAGS_DEFAULT);
+        if (err != ESP_OK) {
+            Serial.printf("DMX: dmx_driver_install UART2 failed err=%d\n", err);
+            ch.dmxPort = 255;
+            uart2Used = false;
+            return;
+        }
+        err = dmx_set_pin(DMX_NUM_2, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
+        if (err != ESP_OK) {
+            Serial.printf("DMX: dmx_set_pin UART2 failed err=%d\n", err);
+        }
     } else if (!uart1Used) {
         ch.dmxPort = (uint8_t)DMX_NUM_1;
         uart1Used = true;
         dmx_config_t dmxConfig = DMX_CONFIG_DEFAULT;
-        dmx_driver_install(DMX_NUM_1, &dmxConfig, DMX_INTR_FLAGS_DEFAULT);
-        dmx_set_pin(DMX_NUM_1, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
+        err = dmx_driver_install(DMX_NUM_1, &dmxConfig, DMX_INTR_FLAGS_DEFAULT);
+        if (err != ESP_OK) {
+            Serial.printf("DMX: dmx_driver_install UART1 failed err=%d\n", err);
+            ch.dmxPort = 255;
+            uart1Used = false;
+            return;
+        }
+        err = dmx_set_pin(DMX_NUM_1, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
+        if (err != ESP_OK) {
+            Serial.printf("DMX: dmx_set_pin UART1 failed err=%d\n", err);
+        }
     } else if (rmtIdx < 8) {
         ch.rmtDmx = new RmtDmxDriver(rmtIdx, ch.pin);
         ch.rmtDmx->begin();
