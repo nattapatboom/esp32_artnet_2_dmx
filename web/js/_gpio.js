@@ -3,6 +3,46 @@
 // ==========================================
 
 const SENTINEL_NONE = 255;
+
+// Routing slot field keys: "pinN" → JSON object property for pin value and source value
+var SLOT_PIN_KEY={pin1:'pin',pin2:'pin2',pin3:'pin3',pin4:'pin4'};
+var SLOT_SRC_KEY={pin1:'source',pin2:'pin2_source',pin3:'pin3_source',pin4:'pin4_source'};
+
+function outputModeKeyForObj(o){
+  var t=parseInt(o.type||0);
+  var mcMode=parseInt(o.mc_mode||0);
+  return outputModeKey(t,mcMode);
+}
+function eachSlot(o,fn){
+  var t=parseInt(o.type||0);
+  var mode=outputModeDef(t,parseInt(o.mc_mode||0));
+  if(!mode) return;
+  var is7seg=t===12||t===13;
+  var isCommonDim=outputModeKeyForObj(o)==='commonDim';
+  var pinDefs=mode.pins||{};
+  Object.keys(pinDefs).sort().forEach(function(slot){
+    var rule=pinDefs[slot];
+    var n=parseInt(slot.replace('pin',''));
+    var pin=255,src=0;
+    if(is7seg&&n>1){
+      var seg=isCommonDim?n-2:n-1;
+      pin=parseInt(o.seg_pins?.[seg]??255);
+      src=parseInt(o.seg_sources?.[seg]??0);
+    } else if(is7seg&&n===1){
+      if(isCommonDim){
+        pin=parseInt(o.pin??255);
+        src=parseInt(o.source??0);
+      } else {
+        pin=parseInt(o.seg_pins?.[0]??255);
+        src=parseInt(o.seg_sources?.[0]??0);
+      }
+    } else {
+      pin=parseInt(o[SLOT_PIN_KEY[slot]]??255);
+      src=parseInt(o[SLOT_SRC_KEY[slot]]??0);
+    }
+    fn(slot,pin,src,rule);
+  });
+}
 // Generated constants (from C++ headers via build_web.py):
 //   GPIO_PINS  — GPIO_PINS.{output,input,inputOnly,reserved}
 //   SOURCE_DATA — SOURCE_DATA.{names,addressRules,masks}
@@ -86,37 +126,19 @@ function outputByteCount(o){
 }
 
 function gpioPinCount(o){
-  var n=0;
-  if(parseInt(o.source||0)===0) n++;
-  if(parseInt(o.pin2_source||0)===0) n++;
-  if(parseInt(o.pin3_source||0)===0) n++;
-  var isStepper=parseInt(o.type||0)===7;
-  if(parseInt(o.pin4_source||0)===0&&(!isStepper||parseInt(o.mc_homing_mode||0)===0)) n++;
-  var t=parseInt(o.type||0);
-  if(t===12||t===13){
-    var segSources=o.seg_sources;
-    if(segSources) for(var s=0;s<8;s++) if(parseInt(segSources[s]||0)===0) n++;
-  }
-  return n;
+  return outputGpios(o).length;
 }
 
 function outputGpios(o){
   var pins=[];
-  var add=function(p){p=parseInt(p); if(!isNaN(p)&&p!==255&&pins.indexOf(p)===-1) pins.push(p);};
-  if(parseInt(o.source||0)===0) add(o.pin);
-  if(parseInt(o.pin2_source||0)===0) add(o.pin2);
-  if(parseInt(o.pin3_source||0)===0) add(o.pin3);
-  var isStepper=parseInt(o.type||0)===7;
-  if(parseInt(o.pin4_source||0)===0){
-    if(!isStepper||parseInt(o.mc_homing_mode||0)===0) add(o.pin4);
-  }
+  eachSlot(o,function(slot,pin,src,rule){
+    if(src===0&&pin!==255&&pins.indexOf(pin)===-1) pins.push(pin);
+  });
   var t=parseInt(o.type||0);
-  if(t===12||t===13){
-    var segPins=o.seg_pins;
-    var segSources=o.seg_sources;
-    if(segPins&&segSources) for(var s=0;s<8;s++){
-      if(parseInt(segSources[s]||0)===0) add(segPins[s]);
-    }
+  var isStepper=t===7;
+  if(isStepper&&parseInt(o.mc_homing_mode||0)>0&&parseInt(o.pin4_source||0)!==0){
+    var idx=pins.indexOf(parseInt(o.pin4));
+    if(idx!==-1) pins.splice(idx,1);
   }
   return pins;
 }

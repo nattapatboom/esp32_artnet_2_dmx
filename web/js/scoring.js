@@ -23,39 +23,30 @@ const DMX_OUTPUT_SERVICE_US=SCORE_DEFS.cpu.dmxOutputServiceUs;
 
 function channelHardware(o){
   const t=typeId(o);
-  const src=o.source||0;
   let ledc=0,rmt=0,uart=0,dac=0,timer=0;
   switch(t){
     case 0: break;
     case 1: uart=1; break;
     case 2: break;
     case 3: rmt=1; break;
-    case 4: ledc=gpioPinCount(o); break;
-    case 5: ledc=gpioPinCount(o); break;
-    case 6:
-      if(src===0) ledc++;
-      if((o.pin2_source||0)===0&&(o.mc_mode||0)!==0) ledc++;
-      if((o.mc_mode||0)===2&&(o.pin3_source||0)===0) ledc++;
-      break;
+    case 4: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
+    case 5: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
+    case 6: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
     case 7: rmt=2; break;
-    case 8: ledc=gpioPinCount(o); break;
-    case 9: ledc=gpioPinCount(o); break;
+    case 8: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
+    case 9: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
     case 10: uart=1; break;
     case 11: break;
     case 12:
     case 13:
       if((o.mc_mode||0)>=6&&(o.mc_mode||0)<=9){
-        if(src===0) ledc=1;
+        eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;});
         break;
       }
-      const numSeg = t === 13 ? 8 : 7;
-      for (let s = 0; s < numSeg; s++) {
-        const segSrc = parseInt(o.seg_sources?.[s] ?? 0);
-        if (segSrc === 0) ledc++;
-      }
+      eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;});
       break;
-    case 14: if(!(src>=5&&src<=7)) dac=1; break;
-    case 15: ledc=gpioPinCount(o); break;
+    case 14: if(!(o.source>=5&&o.source<=7)) dac=1; break;
+    case 15: eachSlot(o,function(s,pin,src,rule){if(src===0&&rule.hwIfGpio) ledc+=rule.hwIfGpio;}); break;
     case 16: ledc=1; timer=1; break;
     case 17: break;
     case 18: break;
@@ -64,13 +55,11 @@ function channelHardware(o){
 }
 function srcIsI2C(src){ return src>=1&&src<=7; }
 function channelUsesI2C(o){
-  if(srcIsI2C(o.source||0)) return true;
-  if(srcIsI2C(o.pin2_source||0)) return true;
-  if(srcIsI2C(o.pin3_source||0)) return true;
-  if(srcIsI2C(o.pin4_source||0)) return true;
-  const seg = o.seg_sources;
-  if(seg) for(let s of seg) if(srcIsI2C(parseInt(s)||0)) return true;
-  return false;
+  var found=false;
+  eachSlot(o,function(slot,pin,src,rule){
+    if(srcIsI2C(src)) found=true;
+  });
+  return found;
 }
 
 function channelCost(o){
@@ -117,39 +106,47 @@ function ledStripServiceUs(ledCount,colorOrder){
 function sevenSegCount(o){ return typeId(o)===13?8:(typeId(o)===12?7:0); }
 
 function i2cWriteCount(o){
-  const t=typeId(o), src=parseInt(o.source||0), mode=parseInt(o.mc_mode||0);
-  let writes=0;
-  const si=s=>srcIsI2C(parseInt(s)||0);
-  if([2,17,4,8,15].includes(t)){ if(si(src)) writes++; }
-  else if(t===5){
-    if(si(src)) writes++;
-    if(si(o.pin2_source)) writes++;
-    if(si(o.pin3_source)) writes++;
-    if(parseInt(o.color_order||0)>=4&&si(o.pin4_source)) writes++;
-  } else if(t===6){
-    if(si(src)) writes+=mode===2?3:2;
-    else {
-      if(si(o.pin2_source)) writes++;
-      if(mode===2&&si(o.pin3_source)) writes++;
-    }
-  } else if(t===7){
-    if(si(o.pin2_source)) writes++;
-    if(si(o.pin3_source)) writes++;
-  } else if(t===12||t===13){
-    const n=sevenSegCount(o);
-    if(mode>=2&&si(o.pin2_source)) writes+=n;
-    else {
-      const seg=o.seg_sources||[];
-      for(let i=0;i<n;i++) if(si(seg[i]||0)) writes++;
-    }
-    if(mode>=6&&mode<=9&&si(src)) writes++;
-  } else if(t===14){
-    if(si(src)) writes++;
-  } else if(t===18){
-    if(si(src)) writes++;
-    if(si(o.pin2_source)) writes++;
+  var t=typeId(o), mode=parseInt(o.mc_mode||0);
+  var si=function(s){return srcIsI2C(parseInt(s)||0);};
+  if([2,17,4,8,15,14].includes(t)){
+    var writes=0;
+    eachSlot(o,function(slot,pin,src,rule){if(si(src)) writes++;});
+    return writes;
   }
-  return writes;
+  if(t===5){
+    var writes=0;
+    eachSlot(o,function(slot,pin,src,rule){if(si(src)) writes++;});
+    return writes;
+  }
+  if(t===6){
+    var writes=0;
+    if(si(o.source||0)){writes+=mode===2?3:2;}
+    else{eachSlot(o,function(slot,pin,src,rule){
+      if(slot!=='pin1'&&si(src)) writes++;
+    });}
+    return writes;
+  }
+  if(t===7){
+    var writes=0;
+    eachSlot(o,function(slot,pin,src,rule){if(slot!=='pin1'&&si(src)) writes++;});
+    return writes;
+  }
+  if(t===12||t===13){
+    var writes=0;
+    var n=sevenSegCount(o);
+    if(mode>=2&&si(o.pin2_source)){writes+=n;}
+    else{eachSlot(o,function(slot,pin,src,rule){
+      if(slot!=='pin1'&&si(src)) writes++;
+    });}
+    if(mode>=6&&mode<=9&&si(o.source||0)) writes++;
+    return writes;
+  }
+  if(t===18){
+    var writes=0;
+    eachSlot(o,function(slot,pin,src,rule){if(si(src)) writes++;});
+    return writes;
+  }
+  return 0;
 }
 
 function cpuLimit(fps){
