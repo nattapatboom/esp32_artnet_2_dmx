@@ -16,7 +16,13 @@ Example:
 
 Workflow:
 
-- Copy `docs/test_checklist.md` into this directory before starting a verification pass.
+- Create a run file before starting a verification pass:
+
+```powershell
+& "C:\Users\natta\.platformio\penv\Scripts\python.exe" tools/create_test_run.py --tester "<name>" --device-ip "<ip or note>" --hardware-setup "<setup>" --scope "<scope>"
+```
+
+- If the helper is unavailable, copy `docs/test_checklist.md` into this directory manually.
 - Fill in date/time, firmware commit, firmware version/build, tester, device/IP, hardware setup, and test scope.
 - Mark every item as completed, failed, or not tested in the copied file.
 - Record incomplete or failed items so the next run can confirm whether previous verification was complete.

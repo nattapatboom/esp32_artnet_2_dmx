@@ -6,7 +6,8 @@ Use this checklist before field deployment, after large refactors, and before OT
 
 Do not mark this source checklist directly. For every real verification pass:
 
-- [ ] Copy this file to `docs/test_runs/YYYY-MM-DD_HHMM_test_checklist.md` before testing.
+- [ ] Create a run file with `& "C:\Users\natta\.platformio\penv\Scripts\python.exe" tools/create_test_run.py --tester "<name>" --device-ip "<ip or note>" --hardware-setup "<setup>" --scope "<scope>"` before testing.
+- [ ] If the helper is unavailable, copy this file manually to `docs/test_runs/YYYY-MM-DD_HHMM_test_checklist.md` before testing.
 - [ ] Fill in the test run header below with date, time, firmware commit, tester, device/IP, and test scope.
 - [ ] Check each item as pass/fail/not-tested in the copied file.
 - [ ] Add notes for every skipped or failed item so the next run can see what was incomplete.
