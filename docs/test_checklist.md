@@ -54,14 +54,19 @@ Use this checklist before field deployment, after large refactors, and before OT
 - [ ] Reject input-only GPIO34, GPIO35, GPIO36, and GPIO39 as outputs.
 - [ ] Reject duplicate expander/PCA source-address-channel routes.
 - [ ] Reject invalid I2C source addresses for PCA9685, MCP23017, TCA9555, PCF857x, MCP4725, DAC7571, and DAC7573.
+- [ ] Reject Type 14 DAC with ESP32 GPIO source on WT32-ETH01; only I2C DAC sources `5..7` are valid.
 - [ ] Reject DMX address ranges that overflow universe channel 512.
 - [ ] Confirm DMX Output and LED Strip start mapping at channel 1 of `start_universe`.
 - [ ] Reject AC Dimmer output when ZC pin is disabled.
 - [ ] Reject DFPlayer count above 2.
-- [ ] Reject RMT usage above 8 channels.
+- [ ] Reject RMT usage above 8 channels, including LED strips, DMX RMT fallback, and Stepper runtime cost.
 - [ ] Reject LEDC usage above 16 channels.
+- [ ] Reject timer usage above 4, including AC Dimmer shared timer and Function Generator timer-like runtime slots.
 - [ ] Reject CPU budget over-limit layouts.
 - [ ] Reject RAM budget over-limit layouts.
+- [ ] Reject 7-segment Direct Dim modes when segment routes use digital expanders instead of ESP32 GPIO or PCA9685.
+- [ ] Reject Motor `IN1+IN2+EN` mode when EN is routed to a digital expander; EN must be ESP32 GPIO or PCA9685.
+- [ ] Confirm Stepper configurations above available runtime/RMT capacity are rejected before runtime setup.
 
 ## 6. I2C Devices And Bus Safety
 
@@ -75,6 +80,7 @@ Use this checklist before field deployment, after large refactors, and before OT
 - [ ] Confirm TCA9555 output routing works.
 - [ ] Confirm PCF857x output routing works.
 - [ ] Confirm PCF857x input read works for stepper homing routes.
+- [ ] Confirm digital expander routes are rejected for PWM-only requirements such as Motor EN and 7-segment Direct Dim.
 - [ ] Confirm MCP4725 DAC output changes with DMX value.
 - [ ] Confirm DAC7571 DAC output changes with DMX value.
 - [ ] Confirm DAC7573 channel A-D selection works.
