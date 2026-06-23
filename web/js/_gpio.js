@@ -93,6 +93,14 @@ function outputGpios(o){
   if(parseInt(o.pin4_source||0)===0){
     if(!isStepper||parseInt(o.mc_homing_mode||0)===0) add(o.pin4);
   }
+  const t=parseInt(o.type||0);
+  if(t===12||t===13){
+    const segPins=o.seg_pins;
+    const segSources=o.seg_sources;
+    if(segPins&&segSources) for(let s=0; s<8; s++){
+      if(parseInt(segSources[s]||0)===0) add(segPins[s]);
+    }
+  }
   return pins;
 }
 

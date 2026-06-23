@@ -176,7 +176,7 @@ inline bool deviceModeValid(uint8_t mode) {
 }
 
 inline bool ip4Valid(const char* s) {
-    if (s == nullptr || s[0] == '\0') return true;
+    if (s == nullptr || s[0] == '\0') return false;
     uint8_t part = 0;
     uint16_t value = 0;
     bool hasDigit = false;

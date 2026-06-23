@@ -85,6 +85,7 @@ inline void motorSetup(OutputChannel& ch, uint8_t& ledcIdx) {
 inline void motorUpdate(OutputChannel& ch) {
     uint32_t val = getDmxValue(ch);
     uint32_t max_val = getMaxValue(ch.mc_resolution);
+    if (max_val == 0) return;
     int32_t center = max_val / 2;
     int32_t offset = (int32_t)val - center;
     bool is_forward = ch.mc_invert ? (offset < 0) : (offset > 0);

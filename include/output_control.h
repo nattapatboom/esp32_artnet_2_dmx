@@ -148,7 +148,7 @@ struct OutputChannel {
     uint8_t pin3_source = 0;
     uint8_t pin3_addr = 0x20;
     uint8_t pin3_channel = 255;
-    uint8_t mc_resolution; // 8, 10, 12, 16 bit
+    uint8_t mc_resolution = 8; // 8, 10, 12, 16 bit
     uint16_t mc_freq;      // PWM Frequency / Speed
     uint8_t mc_mode;       // Motor Sub-mode
     uint8_t mc_deadband;
@@ -476,6 +476,7 @@ public:
     }
 
     void swapBuffers() {
+        if (swapMutex && xSemaphoreTake(swapMutex, pdMS_TO_TICKS(10)) != pdTRUE) return;
         for (auto& ch : channels) {
             if (ch.shadowBuffer != nullptr && ch.dmxBuffer != nullptr) {
                 uint8_t* tmp = ch.dmxBuffer;
@@ -483,6 +484,7 @@ public:
                 ch.shadowBuffer = tmp;
             }
         }
+        if (swapMutex) xSemaphoreGive(swapMutex);
     }
 
     void setupChannels();
@@ -594,7 +596,7 @@ public:
                 ch.type = rawType;
             }
             ch.source = item["source"] | 0;
-            ch.pin = item["pin"] | 4;
+            ch.pin = item["pin"] | 255;
             ch.pca_addr = item["pca_addr"] | 0x40;
             ch.pca_channel = item["pca_channel"] | 0;
             ch.pca_channel2 = item["pca_channel2"] | 255;
@@ -709,13 +711,13 @@ public:
         Serial.printf("Loaded %d output channels from /outputs.json\n", channels.size());
     }
  
-     void saveChannels() {
+     bool saveChannels() {
          File file = LittleFS.open("/outputs.json", "w");
          if (!file) {
-             Serial.println("Failed to open outputs.json for writing");
-             return;
+             Serial.println("[config] ERROR: Failed to open outputs.json for writing");
+             return false;
          }
- 
+
          JsonDocument doc;
          doc["version"] = 3;
          JsonArray arr = doc["outputs"].to<JsonArray>();
@@ -826,6 +828,7 @@ public:
 
         serializeJson(doc, file);
         file.close();
+        return true;
     }
     void clearChannels() {
         for (auto& ch : channels) {

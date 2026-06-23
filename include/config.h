@@ -8,6 +8,7 @@
 #include <freertos/semphr.h>
 
 extern SemaphoreHandle_t i2cMutex;
+extern SemaphoreHandle_t swapMutex;
 
 // Device Mode Enum
 enum DeviceMode {
@@ -195,9 +196,12 @@ inline void loadConfig(SystemConfig& cfg) {
     prefs.end();
 }
 
-inline void saveConfig(const SystemConfig& cfg) {
+inline bool saveConfig(const SystemConfig& cfg) {
     Preferences prefs;
-    prefs.begin("system", false); // Read-write
+    if (!prefs.begin("system", false)) {
+        Serial.println("[config] ERROR: Failed to open NVS 'system' namespace for writing");
+        return false;
+    }
 
     prefs.putUChar("mode", cfg.device_mode);
     prefs.putBool("dhcp", cfg.eth_dhcp);
@@ -235,6 +239,7 @@ inline void saveConfig(const SystemConfig& cfg) {
     prefs.putUChar("disp_brt", cfg.display_brightness);
 
     prefs.end();
+    return true;
 }
 
 #endif // CONFIG_H

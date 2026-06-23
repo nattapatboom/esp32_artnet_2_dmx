@@ -17,6 +17,7 @@ inline void servoSetup(OutputChannel& ch, uint8_t& ledcIdx) {
 
 inline void servoUpdate(OutputChannel& ch) {
     uint32_t max_val = getMaxValue(ch.mc_resolution);
+    if (max_val == 0) return;
     uint32_t val = getDmxValue(ch);
     uint32_t pulse_us = ch.mc_min_us + (val * (ch.mc_max_us - ch.mc_min_us)) / max_val;
     if (ch.source == 1) {

@@ -8,6 +8,7 @@
 
 inline void stepperSetup(OutputChannel& ch, FastAccelStepperEngine& engine, FastAccelStepper** steppers, uint8_t& stepperCount) {
     if (ch.source != 0) return;
+    if (stepperCount >= 8) return;
 
     FastAccelStepper* stepper = engine.stepperConnectToPin(ch.pin);
     if (stepper) {
@@ -115,6 +116,7 @@ inline void stepperUpdate(OutputChannel& ch, FastAccelStepper** steppers, uint8_
         stepper->setSpeedInHz(target_speed);
         uint32_t val = getDmxValue(ch);
         uint32_t max_val = getMaxValue(ch.mc_resolution);
+        if (max_val == 0) return;
         int32_t targetPos;
         if (ch.mc_scale_factor > 0.0f) {
             targetPos = (int32_t)round(val * ch.mc_scale_factor);

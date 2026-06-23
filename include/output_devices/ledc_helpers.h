@@ -46,7 +46,8 @@ inline uint32_t calibratedPwmDacDuty(OutputChannel& ch, uint32_t value, uint32_t
 }
 
 inline uint8_t segmentGpio(OutputChannel& ch, uint8_t idx) {
-    return (ch.seg_pins[idx] != 255) ? ch.seg_pins[idx] : (ch.pin + idx);
+    uint8_t gpio = (ch.seg_pins[idx] != 255) ? ch.seg_pins[idx] : (ch.pin + idx);
+    return (gpio > 39) ? 255 : gpio;
 }
 
 inline void setupSegmentOutput(OutputChannel& ch, uint8_t idx, bool offState) {

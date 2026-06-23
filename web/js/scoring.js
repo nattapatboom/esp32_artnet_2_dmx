@@ -39,7 +39,7 @@ function channelHardware(o){
       break;
     case 6:
       if(src===0) ledc++;
-      if((o.pin2_source||0)===0&&(o.mc_mode||0)===0) ledc++;
+      if((o.pin2_source||0)===0&&(o.mc_mode||0)!==0) ledc++;
       if((o.mc_mode||0)===2&&(o.pin3_source||0)===0) ledc++;
       break;
     case 7: rmt=2; break;

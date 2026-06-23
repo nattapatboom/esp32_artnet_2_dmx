@@ -60,7 +60,6 @@ inline void sevenSegSetup(OutputChannel& ch, uint8_t& ledcIdx) {
             if (ch.type == OutputDefs::TYPE_7SEG_7PIN || ch.type == OutputDefs::TYPE_7SEG_8PIN) {
                 uint8_t baseChan = allocateLedc(ledcIdx);
                 if (baseChan != 255) {
-                    uint8_t savedIndex = ledcIdx;
                     ledcIdx = baseChan + numSeg;
                     if (ledcIdx > 16) ledcIdx = 16;
                     for (uint8_t s = 0; s < numSeg; s++) {

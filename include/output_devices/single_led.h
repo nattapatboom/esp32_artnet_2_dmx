@@ -18,6 +18,7 @@ inline void singleLedSetup(OutputChannel& ch, uint8_t& ledcIdx) {
 inline void singleLedUpdate(OutputChannel& ch) {
     if (ch.dmxPort != 255) {
         uint32_t max_val = getMaxValue(ch.mc_resolution);
+        if (max_val == 0) return;
         uint32_t val = getDmxValue(ch);
         if (ch.source == 1) {
             uint16_t duty = (uint32_t)((uint64_t)val * 4095) / max_val;

@@ -93,6 +93,7 @@ volatile bool otaInProgress = false;
 unsigned long lastWifiReconnectAttempt = 0;
 SemaphoreHandle_t i2cMutex = NULL;
 SemaphoreHandle_t i2cScanMutex = NULL;
+SemaphoreHandle_t swapMutex = NULL;
 String i2cScanJson = "[]";
 volatile bool i2cScanRequested = false;
 volatile bool i2cScanPending = false;
@@ -962,6 +963,13 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
         }
+        {
+            uint16_t sa = output["start_address"] | 1;
+            if (sa < 1 || sa > 512) {
+                message = "start_address must be 1-512 on channel " + String(channelNumber);
+                return false;
+            }
+        }
         channelNumber++;
     }
     // PCA9685 shared frequency conflict detection (non-blocking warning)
@@ -1391,7 +1399,10 @@ void setupWebServer() {
             if (doc["display_i2c_addr"].is<int>()) sysCfg.display_i2c_addr = doc["display_i2c_addr"];
             if (doc["display_brightness"].is<int>()) sysCfg.display_brightness = doc["display_brightness"];
 
-            saveConfig(sysCfg);
+            if (!saveConfig(sysCfg)) {
+                request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to save config to NVS\"}");
+                return;
+            }
             request->send(200, "application/json", "{\"status\":\"ok\"}");
 
             // Perform reboot to apply pin layouts and network assignments
@@ -1473,7 +1484,10 @@ void setupWebServer() {
             }
 
             applySettingsFromJson(settings);
-            saveConfig(sysCfg);
+            if (!saveConfig(sysCfg)) {
+                request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to save config to NVS\"}");
+                return;
+            }
 
             JsonDocument outDoc;
             JsonArray outArr = outDoc["outputs"].to<JsonArray>();
@@ -1687,7 +1701,10 @@ void setupWebServer() {
     server.on("/api/config/factory-reset", HTTP_POST, [](AsyncWebServerRequest *request) {
         // Clear all preferences
         Preferences prefs;
-        prefs.begin("system", false);
+        if (!prefs.begin("system", false)) {
+            request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to open NVS for factory reset\"}");
+            return;
+        }
         prefs.clear();
         prefs.end();
 
@@ -1703,10 +1720,12 @@ void setupWebServer() {
         item["color_order"] = 0;
 
         File file = LittleFS.open("/outputs.json", "w");
-        if (file) {
-            serializeJson(doc, file);
-            file.close();
+        if (!file) {
+            request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to write outputs file\"}");
+            return;
         }
+        serializeJson(doc, file);
+        file.close();
 
         request->send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Factory reset complete. Rebooting...\"}");
 
@@ -2247,6 +2266,7 @@ void setup() {
     }
     i2cMutex = xSemaphoreCreateMutex();
     i2cScanMutex = xSemaphoreCreateMutex();
+    swapMutex = xSemaphoreCreateMutex();
 
     // Initialize I2C Display
     display.begin(sysCfg.display_enabled, sysCfg.display_i2c_addr);
