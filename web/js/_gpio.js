@@ -1,6 +1,8 @@
 // ==========================================
 // === SHARED GPIO HELPERS & OUTPUT DEFS ===
 // ==========================================
+
+const SENTINEL_NONE = 255;
 // Generated constants (from C++ headers via build_web.py):
 //   GPIO_PINS  — GPIO_PINS.{output,input,inputOnly,reserved}
 //   SOURCE_DATA — SOURCE_DATA.{names,addressRules,masks}

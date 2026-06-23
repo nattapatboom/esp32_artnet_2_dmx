@@ -13,6 +13,8 @@
 #include "config.h"
 #include "output_devices/dfplayer_control.h"
 #include "i2c_devices/pca9685.h"
+
+#define SENTINEL_NONE 255
 #include "i2c_devices/i2c_gpio_expander.h"
 #include "output_devices/funcgen_control.h"
 #include "output_defs.h"
@@ -931,13 +933,29 @@ inline void OutputControl::setupChannels() {
     }
 
     uint8_t dfPlayerCount = 0;
+    uint8_t pcaAddrs[8];
+    uint8_t pcaAddrCount = 0;
 
     for (auto& ch : channels) {
         if (ch.source == 1) {
-            uint16_t freq = getPcaSharedFrequency(ch.pca_addr);
-            pcaManager.getOrCreateDriver(ch.pca_addr);
-            pcaManager.setFrequency(ch.pca_addr, freq);
-            Serial.printf("PCA9685 initialized at 0x%02X: freq=%dHz type=%d\n", ch.pca_addr, freq, ch.type);
+            bool alreadyInitialized = false;
+            for (uint8_t i = 0; i < pcaAddrCount; i++) {
+                if (pcaAddrs[i] == ch.pca_addr) {
+                    alreadyInitialized = true;
+                    break;
+                }
+            }
+            if (!alreadyInitialized) {
+                uint16_t freq = getPcaSharedFrequency(ch.pca_addr);
+                pcaManager.getOrCreateDriver(ch.pca_addr);
+                pcaManager.setFrequency(ch.pca_addr, freq);
+                if (pcaAddrCount < 8) pcaAddrs[pcaAddrCount++] = ch.pca_addr;
+                Serial.printf("PCA9685 initialized at 0x%02X: freq=%dHz type=%d\n", ch.pca_addr, freq, ch.type);
+            } else {
+                pcaManager.getOrCreateDriver(ch.pca_addr);
+                uint16_t freq = getPcaSharedFrequency(ch.pca_addr);
+                Serial.printf("PCA9685 at 0x%02X already initialized (shared), type=%d uses freq=%dHz\n", ch.pca_addr, ch.type, freq);
+            }
             continue;
         } else if (ch.source >= 2 && ch.source <= 4) {
             writeOutputPin(ch, 1, false);
