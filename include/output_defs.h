@@ -123,6 +123,27 @@ struct OutputModeDef {
     ModeCost cost;
     const PinRule* pins;
     uint8_t pinCount;
+    bool startAtFirstUniverse;
+
+    constexpr OutputModeDef(
+        uint8_t type,
+        int8_t mode,
+        const char* name,
+        const char* modeKey,
+        uint16_t resolutionBits,
+        uint16_t slotActiveMask,
+        bool segmentLayout,
+        TestUiType testUi,
+        const TypeProtocol::TestCmdDef* testCmds,
+        uint8_t testCmdCount,
+        ModeCost cost,
+        const PinRule* pins,
+        uint8_t pinCount,
+        bool startAtFirstUniverse = false
+    ) : type(type), mode(mode), name(name), modeKey(modeKey), resolutionBits(resolutionBits),
+        slotActiveMask(slotActiveMask), segmentLayout(segmentLayout), testUi(testUi),
+        testCmds(testCmds), testCmdCount(testCmdCount), cost(cost), pins(pins),
+        pinCount(pinCount), startAtFirstUniverse(startAtFirstUniverse) {}
 };
 
 constexpr PinRule PINS_GPIO_MAIN[] = {
@@ -297,9 +318,9 @@ constexpr ModeCost COST_SMOKE = modeCost(25, 0, HW_NONE, 0, 0, 1);
 
 constexpr OutputModeDef OUTPUT_MODES[] = {
     {TYPE_DIMMER, -1,    "Triac dimmer",              "default",    0, 1, false, TEST_UI_SLIDER,   Type0::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type0::TEST_COMMANDS),   COST_DIMMER,               PINS_DIMMER, 1},
-    {TYPE_DMX, -1,       "DMX serial",                "default",    0, 1, false, TEST_UI_DMX,      Type1::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type1::TEST_COMMANDS),   COST_DMX_SERIAL,           PINS_DMX, 1},
+    {TYPE_DMX, -1,       "DMX serial",                "default",    0, 1, false, TEST_UI_DMX,      Type1::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type1::TEST_COMMANDS),   COST_DMX_SERIAL,           PINS_DMX, 1, true},
     {TYPE_RELAY, -1,     "Relay",                     "default",    0, 1, false, TEST_UI_SLIDER,   Type2::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type2::TEST_COMMANDS),   COST_RELAY,                PINS_RELAY_DIGITAL, 1},
-    {TYPE_LED_STRIP, -1, "RGB/RGBW strip",            "default",    0, 1, false, TEST_UI_LED,      Type3::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type3::TEST_COMMANDS),   COST_LED_STRIP_BASE,       PINS_LED_STRIP, 1},
+    {TYPE_LED_STRIP, -1, "RGB/RGBW strip",            "default",    0, 1, false, TEST_UI_LED,      Type3::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type3::TEST_COMMANDS),   COST_LED_STRIP_BASE,       PINS_LED_STRIP, 1, true},
     {TYPE_SINGLE_LED, -1,"Single-color PWM",           "default",    RES_BITS_8_10_12_16, 1, false, TEST_UI_SLIDER,     Type4::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type4::TEST_COMMANDS),   COST_SINGLE_LED,           PINS_PWM, 1},
     {TYPE_ANALOG_RGB, -1,"Analog RGB/RGBW",            "default",    RES_BITS_8_10_12_16, 15, false, TEST_UI_SLIDER,     Type5::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type5::TEST_COMMANDS),   COST_ANALOG_RGBW,          PINS_ANALOG_RGB, 4},
     {TYPE_MOTOR, 0,      "PWM + DIR",                 "pwmDir",     RES_BITS_8_10_12_16, 3, false, TEST_UI_MOTOR,      Type6::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type6::TEST_COMMANDS),   COST_MOTOR_PWM_DIR,        PINS_MOTOR_PWM_DIR, 2},
@@ -418,6 +439,11 @@ inline const PinRule* pinRule(uint8_t type, uint8_t mode, uint8_t slotIndex) {
 inline bool pinSlotUsesGpio(uint8_t type, uint8_t mode, uint8_t slotIndex, uint8_t routeSource) {
     const PinRule* rule = pinRule(type, mode, slotIndex);
     return rule != nullptr && routeSource == 0 && (rule->sources & SRC_GPIO);
+}
+
+inline bool startsAtFirstUniverse(uint8_t type, uint8_t mode = 0) {
+    const OutputModeDef* def = modeDef(type, mode);
+    return def != nullptr && def->startAtFirstUniverse;
 }
 
 // ─────────────────────────────────────

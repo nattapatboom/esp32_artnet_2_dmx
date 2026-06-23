@@ -372,6 +372,7 @@ def generate_output_defs_js():
         cost_ident = args[10].strip()
         pins_ident = args[11].strip()
         pin_count = int(args[12].strip())
+        start_at_first_universe = len(args) > 13 and args[13].strip() == 'true'
 
         type_id = type_ids.get(type_ident, -1)
         if type_id < 0:
@@ -392,6 +393,7 @@ def generate_output_defs_js():
             "resolutionBits": res_bits,
             "slotActiveMask": slot_mask,
             "segmentLayout": seg_layout,
+            "startAtFirstUniverse": start_at_first_universe,
         }
 
         # Build modeKeyMap

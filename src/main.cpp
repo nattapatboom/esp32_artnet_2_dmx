@@ -996,7 +996,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 message = "start_address must be 1-512 on channel " + String(channelNumber);
                 return false;
             }
-            if (type != OutputDefs::TYPE_LED_STRIP && type != OutputDefs::TYPE_DMX) {
+            if (!OutputDefs::startsAtFirstUniverse(type, mcMode)) {
                 OutputChannel temp;
                 temp.type = type;
                 temp.led_count = output["led_count"] | 0;

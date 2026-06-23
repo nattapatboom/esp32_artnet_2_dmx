@@ -297,7 +297,7 @@ Settings POST handler repeats checks that `validateSettingsAndOutputs()` already
 
 ### ~~4.1 DMX start_address not validated in C++~~
 
-**RESOLVED** — `validateOutputJson()` now validates `start_address` is `1..512` and rejects non-strip/non-DMX-output channels whose required DMX byte range would exceed universe channel 512. LED strips and DMX outputs keep their existing special mapping paths.
+**RESOLVED** — `validateOutputJson()` now validates `start_address` is `1..512` and rejects channels whose required DMX byte range would exceed universe channel 512, except modes whose `OutputModeDef` metadata declares `startAtFirstUniverse=true`. LED strips and DMX outputs set that capability in `OUTPUT_MODES[]`.
 
 ---
 
