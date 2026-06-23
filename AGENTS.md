@@ -158,6 +158,7 @@ The documentation files under `docs/` serve as the **canonical design map** of t
 When working on this project:
 - **Docs first** — Understand the relevant `docs/` section before writing or modifying code. The domain model, scoring rules, validation gates, and hardware constraints are all captured there.
 - **Code is more likely wrong** — AI-generated code has a higher error rate than manually curated docs. If code and docs disagree, treat the doc as the assumed truth and fix the code to match, unless the doc is explicitly marked as drift.
+- **Ask on documentation conflicts** — If two docs conflict with each other, or docs conflict with code in a way that is not clearly resolved by the named source of truth, stop and ask the user to verify the correct behavior before changing code or docs.
 - **Fix docs when you fix code** — Any behavioral change must be reflected in the docs. Stale docs cause the next iteration to reintroduce bugs.
 - **Keep docs concise and current** — Remove or strike through resolved items, update packet structures, and sync scoring tables after refactoring.
 
