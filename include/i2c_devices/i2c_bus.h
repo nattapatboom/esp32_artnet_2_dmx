@@ -43,6 +43,30 @@ inline bool writeBytes(uint8_t address, const uint8_t* data, uint8_t length) {
     return Wire.endTransmission() == 0;
 }
 
+inline bool probe(uint8_t address) {
+    Lock lock;
+    if (!lock.locked()) return false;
+    Wire.beginTransmission(address);
+    return Wire.endTransmission() == 0;
+}
+
+inline bool writeThenRead(uint8_t address, const uint8_t* writeData, uint8_t writeLength, uint8_t* readData, uint8_t readLength) {
+    if (readData == nullptr || readLength == 0) return false;
+    Lock lock;
+    if (!lock.locked()) return false;
+    if (writeData != nullptr && writeLength > 0) {
+        Wire.beginTransmission(address);
+        for (uint8_t i = 0; i < writeLength; i++) Wire.write(writeData[i]);
+        if (Wire.endTransmission() != 0) return false;
+    }
+    if (Wire.requestFrom(address, readLength) != readLength) return false;
+    for (uint8_t i = 0; i < readLength; i++) {
+        if (!Wire.available()) return false;
+        readData[i] = Wire.read();
+    }
+    return true;
+}
+
 inline bool writeReg8(uint8_t address, uint8_t reg, uint8_t value) {
     uint8_t data[2] = {reg, value};
     return writeBytes(address, data, sizeof(data));

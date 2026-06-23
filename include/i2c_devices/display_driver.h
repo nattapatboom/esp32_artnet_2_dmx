@@ -146,13 +146,7 @@ public:
         if (_active) return true;
         if (_type == DISPLAY_OFF) return false;
 
-        bool alive = false;
-        {
-            I2cBus::Lock lock;
-            if (!lock.locked()) return false;
-            Wire.beginTransmission(_addr);
-            alive = (Wire.endTransmission() == 0);
-        }
+        bool alive = I2cBus::probe(_addr);
 
         if (!alive) return false;
 

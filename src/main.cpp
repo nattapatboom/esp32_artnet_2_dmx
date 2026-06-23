@@ -12,6 +12,7 @@
 
 #include "config.h"
 #include "web_pages.h"
+#include "i2c_devices/i2c_bus.h"
 #include "i2c_devices/pca9685.h"
 #include "i2c_devices/i2c_gpio_expander.h"
 #include "output_control.h"
@@ -479,9 +480,9 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
         bool primaryIsSevenSegA = def != nullptr && def->primaryRouteIsSegment;
         if (source != 0 && !primaryIsSevenSegA) {
             if (addChannel(source, address, output["pca_channel"] | 0, outputIndex)) return true;
-            if ((type == 6 || type == 7 || type == OutputDefs::TYPE_ANALOG_RGB || type == 18) &&
+            if ((type == OutputDefs::TYPE_MOTOR || type == OutputDefs::TYPE_STEPPER || type == OutputDefs::TYPE_ANALOG_RGB || type == OutputDefs::TYPE_SMOKE) &&
                 addChannel(source, address, output["pca_channel2"] | 255, outputIndex)) return true;
-            if ((type == 7 || type == OutputDefs::TYPE_ANALOG_RGB || (type == 6 && mcMode == 2)) &&
+            if ((type == OutputDefs::TYPE_STEPPER || type == OutputDefs::TYPE_ANALOG_RGB || (type == OutputDefs::TYPE_MOTOR && mcMode == 2)) &&
                 addChannel(source, address, output["pca_channel3"] | 255, outputIndex)) return true;
             if ((type == OutputDefs::TYPE_ANALOG_RGB && colorOrder >= 4) &&
                 addChannel(source, address, output["pca_channel4"] | 255, outputIndex)) return true;
@@ -680,7 +681,7 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
     if (outputsHaveDuplicateGpio(outputs, message)) return false;
     if (outputsHaveDuplicateExpanderChannel(outputs, message)) return false;
     for (JsonObjectConst output : outputs) {
-        if ((uint8_t)(output["type"] | 0) == 0 && zcPin == 255) {
+        if ((uint8_t)(output["type"] | 0) == OutputDefs::TYPE_DIMMER && zcPin == 255) {
             message = "Zero-Crossing pin is not configured (GPIO 255). AC Dimmer outputs require a ZC pin to operate.";
             return false;
         }
@@ -720,11 +721,11 @@ bool validateOutputJson(JsonArray outputs, String& message) {
     for (JsonObject output : outputs) {
         uint8_t type = output["type"] | 0;
         uint8_t source = output["source"] | 0;
-        if (type == 1 && source == 0) { // DMX on local GPIO
+        if (type == OutputDefs::TYPE_DMX && source == 0) { // DMX on local GPIO
             dmxCount++;
-        } else if (type == 10) { // DFPlayer
+        } else if (type == OutputDefs::TYPE_DFPLAYER) { // DFPlayer
             dfPlayerCount++;
-        } else if (type == 3) { // LED Strip
+        } else if (type == OutputDefs::TYPE_LED_STRIP) { // LED Strip
             ledCount++;
         }
     }
@@ -745,7 +746,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
     for (JsonObject output : outputs) {
         uint8_t type = output["type"] | 0;
         uint8_t source = output["source"] | 0;
-        if (type > 18) {
+        if (type > OutputDefs::TYPE_SMOKE) {
             message = "Invalid output type on channel " + String(channelNumber) + ".";
             return false;
         }
@@ -788,7 +789,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         if (!checkHybridChan("Pin 2", "pin2_source", "pin2_channel")) return false;
         if (!checkHybridChan("Pin 3", "pin3_source", "pin3_channel")) return false;
         if (!checkHybridChan("Pin 4", "pin4_source", "pin4_channel")) return false;
-        if (type == 14 && source >= 5 && source <= 7) {
+        if (type == OutputDefs::TYPE_DAC && source >= 5 && source <= 7) {
             uint8_t addr = output["pca_addr"] | defaultAddrForSource(source);
             uint8_t dacChannel = output["pca_channel"] | 0;
             if (!SourceRules::addressValid(source, addr)) {
@@ -860,7 +861,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 }
             }
         }
-        if (type == 7) {
+        if (type == OutputDefs::TYPE_STEPPER) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             uint8_t pin3Source = output["pin3_source"] | 0;
             uint8_t pin4Source = output["pin4_source"] | 0;
@@ -924,7 +925,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
         }
-        if (type == 18) {
+        if (type == OutputDefs::TYPE_SMOKE) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             if (pin2Source > 4) {
                 message = "Unsupported smoke shooter hybrid pin source on channel " + String(channelNumber);
@@ -939,7 +940,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
         }
-        if (type == 6) {
+        if (type == OutputDefs::TYPE_MOTOR) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             uint8_t pin3Source = output["pin3_source"] | 0;
             if (pin2Source > 4 || pin3Source > 4) {
@@ -955,7 +956,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 if (!SourceRules::validateAddress(pin3Source, pin3Addr, "Motor EN I2C source on channel " + String(channelNumber), message)) return false;
             }
         }
-        if (type == 6 && (uint8_t)(output["mc_mode"] | 0) == 2) {
+        if (type == OutputDefs::TYPE_MOTOR && (uint8_t)(output["mc_mode"] | 0) == 2) {
             uint8_t enSource = output["pin3_source"] | 0;
             if (enSource >= 2) {
                 message = "Motor EN pin needs PWM; use ESP32 GPIO or PCA9685 on channel " + String(channelNumber);
@@ -966,7 +967,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
         }
-        if (type == 15) {
+        if (type == OutputDefs::TYPE_PWM_DAC) {
             int minDuty = output["pwm_dac_min"] | 0;
             int maxDuty = output["pwm_dac_max"] | 10000;
             int mode = output["pwm_dac_mode"] | 0;
@@ -1011,7 +1012,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             if (source != 1) continue;
             uint8_t addr = output["pca_addr"] | 0x40;
             auto it = pcaFreqMap.find(addr);
-            if (type == 8) { // servo forces 50 Hz
+            if (type == OutputDefs::TYPE_SERVO) { // servo forces 50 Hz
                 if (it != pcaFreqMap.end() && !it->second.isServo) {
                     Serial.printf("[WARN] PCA9685 at 0x%02X: servo (50 Hz) conflicts with other PWM types on same chip\n", addr);
                 }
@@ -2109,47 +2110,44 @@ void networkTask(void* pvParameters) {
 
             JsonDocument doc;
             JsonArray arr = doc.to<JsonArray>();
-            if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-                bool held = true;
-                for (uint8_t addr = 1; addr < 128; addr++) {
-                    if ((addr & 0x07) == 0 && addr > 1) {
-                        xSemaphoreGive(i2cMutex);
-                        vTaskDelay(pdMS_TO_TICKS(1));
-                        if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) { held = false; break; }
-                    }
+            for (uint8_t addr = 1; addr < 128; addr++) {
+                if ((addr & 0x07) == 0 && addr > 1) vTaskDelay(pdMS_TO_TICKS(1));
+                bool found = false;
+                {
+                    I2cBus::Lock lock;
+                    if (!lock.locked()) break;
                     Wire.beginTransmission(addr);
-                    uint8_t error = Wire.endTransmission();
-                    if (error == 0) {
-                        JsonObject obj = arr.add<JsonObject>();
-                        obj["address"] = addr;
-                        char hex[6];
-                        snprintf(hex, sizeof(hex), "0x%02X", addr);
-                        obj["hex"] = hex;
-                        String usedBy = "";
-                        int idx = 0;
-                        for (const auto& ch : outputCtrl.getChannels()) {
-                            idx++;
-                            if ((ch.source == 1 || (ch.source >= 2 && ch.source <= 4)) && ch.pca_addr == addr) {
-                                if (usedBy.length() > 0) usedBy += ", ";
-                                usedBy += "CH" + String(idx);
-                            }
-                            if (ch.pin2_source >= 1 && ch.pin2_source <= 4 && ch.pin2_addr == addr) {
-                                if (usedBy.length() > 0) usedBy += ", ";
-                                usedBy += "CH" + String(idx) + "(P2)";
-                            }
-                            if (ch.pin3_source >= 1 && ch.pin3_source <= 4 && ch.pin3_addr == addr) {
-                                if (usedBy.length() > 0) usedBy += ", ";
-                                usedBy += "CH" + String(idx) + "(P3)";
-                            }
-                            if (ch.pin4_source >= 2 && ch.pin4_source <= 4 && ch.pin4_addr == addr) {
-                                if (usedBy.length() > 0) usedBy += ", ";
-                                usedBy += "CH" + String(idx) + "(HOM)";
-                            }
-                        }
-                        if (usedBy.length() > 0) obj["used_by"] = usedBy;
-                    }
+                    found = (Wire.endTransmission() == 0);
                 }
-                if (held) xSemaphoreGive(i2cMutex);
+                if (found) {
+                    JsonObject obj = arr.add<JsonObject>();
+                    obj["address"] = addr;
+                    char hex[6];
+                    snprintf(hex, sizeof(hex), "0x%02X", addr);
+                    obj["hex"] = hex;
+                    String usedBy = "";
+                    int idx = 0;
+                    for (const auto& ch : outputCtrl.getChannels()) {
+                        idx++;
+                        if ((ch.source == 1 || (ch.source >= 2 && ch.source <= 4)) && ch.pca_addr == addr) {
+                            if (usedBy.length() > 0) usedBy += ", ";
+                            usedBy += "CH" + String(idx);
+                        }
+                        if (ch.pin2_source >= 1 && ch.pin2_source <= 4 && ch.pin2_addr == addr) {
+                            if (usedBy.length() > 0) usedBy += ", ";
+                            usedBy += "CH" + String(idx) + "(P2)";
+                        }
+                        if (ch.pin3_source >= 1 && ch.pin3_source <= 4 && ch.pin3_addr == addr) {
+                            if (usedBy.length() > 0) usedBy += ", ";
+                            usedBy += "CH" + String(idx) + "(P3)";
+                        }
+                        if (ch.pin4_source >= 2 && ch.pin4_source <= 4 && ch.pin4_addr == addr) {
+                            if (usedBy.length() > 0) usedBy += ", ";
+                            usedBy += "CH" + String(idx) + "(HOM)";
+                        }
+                    }
+                    if (usedBy.length() > 0) obj["used_by"] = usedBy;
+                }
             }
 
             String result;

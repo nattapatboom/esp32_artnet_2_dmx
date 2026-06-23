@@ -80,16 +80,12 @@ public:
         } else if (_kind == DIG_EXP_TCA9555) {
             return regRead16(0x00); // INPUT port
         } else if (_kind == DIG_EXP_PCF857X) {
-            I2cBus::Lock lock;
-            if (!lock.locked()) return 0xFFFF;
-            Wire.beginTransmission(_address);
-            Wire.write(_state & 0xFF);
-            Wire.write((_state >> 8) & 0xFF);
-            Wire.endTransmission();
-            uint16_t val = 0;
-            Wire.requestFrom(_address, (uint8_t)((_state > 0xFF) ? 2 : 1));
-            if (Wire.available()) val = Wire.read();
-            if (_state > 0xFF && Wire.available()) val |= (uint16_t)Wire.read() << 8;
+            uint8_t tx[2] = {(uint8_t)(_state & 0xFF), (uint8_t)((_state >> 8) & 0xFF)};
+            uint8_t rx[2] = {0, 0};
+            uint8_t width = (_state > 0xFF) ? 2 : 1;
+            if (!I2cBus::writeThenRead(_address, tx, width, rx, width)) return 0xFFFF;
+            uint16_t val = rx[0];
+            if (width > 1) val |= (uint16_t)rx[1] << 8;
             return val;
         }
         return 0xFFFF;
