@@ -286,6 +286,78 @@ async function stopOutputTest(){
     showAlert(res.ok);
   }catch(e){showAlert(false);}
 }
+const TEST_UI_FIELDS={
+  1:[{key:'test_level_num',type:'number',label:'Value',min:0,max:255,def:128}],
+  2:[{key:'test_dmx_ch',type:'number',label:'DMX Channel',min:1,max:512,def:1},{key:'test_level_num',type:'number',label:'Value',min:0,max:255,def:128}],
+  3:[{key:'test_color',type:'color',label:'Custom Color',def:'#ff0000'},{key:'test_white',type:'number',label:'White',min:0,max:255,def:0},{key:'test_pixel',type:'number',label:'Pixel Number',min:1,max:1360,def:1}],
+  4:[{key:'test_motor_num',type:'number',label:'Speed',min:0,max:255,def:128}],
+  5:[{key:'test_step_pos',type:'number',label:'Position',min:0,max:4294967295,def:128},{key:'test_step_speed',type:'number',label:'Speed',min:0,max:255,def:180}],
+  6:[{key:'test_mp3_track',type:'number',label:'Track',min:0,max:255,def:1},{key:'test_mp3_vol',type:'number',label:'Volume',min:0,max:255,def:200}],
+  7:[{key:'test_7seg_num',type:'number',label:'Number',min:0,max:9999,def:1234},{key:'test_7seg_text',type:'text',label:'ASCII Text',min:0,max:4,def:'ABCD'}]
+};
+function renderTestField(field){
+  var value=field.def!==undefined?field.def:'';
+  if(field.type==='color') return `<div class="f"><label for="${field.key}">${field.label}</label><input type="color" id="${field.key}" value="${value}"></div>`;
+  if(field.type==='text') return `<div class="f"><label for="${field.key}">${field.label}</label><input type="text" id="${field.key}" value="${value}" maxlength="${field.max||32}"></div>`;
+  return `<div class="f"><label for="${field.key}">${field.label}</label><input type="number" id="${field.key}" value="${value}" min="${field.min}" max="${field.max}"></div>`;
+}
+function renderTestFields(ui){
+  var box=document.getElementById('test-field-container');
+  if(!box) return;
+  box.innerHTML=(TEST_UI_FIELDS[ui]||[]).map(renderTestField).join('');
+}
+function testValue(id,fallback){
+  var el=document.getElementById(id);
+  if(!el) return fallback;
+  return el.type==='text'||el.type==='color'?el.value:parseInt(el.value||fallback);
+}
+function encodeTestValues(o,ui,cmd){
+  if(ui===1){
+    var max=maxDmxFor(o), v=Math.max(0,Math.min(max,parseInt(testValue('test_level_num',128))||0));
+    return valueBytes(v,parseInt(o.mc_resolution||8));
+  }
+  if(ui===2){
+    var ch=Math.max(1,Math.min(512,parseInt(testValue('test_dmx_ch',1))||1));
+    var dmxVal=Math.max(0,Math.min(255,parseInt(testValue('test_level_num',128))||0));
+    var vals=new Array(512).fill(0); vals[ch-1]=dmxVal; return vals;
+  }
+  if(ui===3){
+    var hex=String(testValue('test_color','#ff0000'));
+    var r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16), w=parseInt(testValue('test_white',0))||0;
+    if(o.type===T.ANALOG_RGB) return (parseInt(o.color_order||0)>=4)?[r,g,b,w]:[r,g,b];
+    var count=o.led_count||170, out=[], target=Math.max(1,Math.min(count,parseInt(testValue('test_pixel',1))||1))-1;
+    for(var i=0;i<count;i++){
+      var on=(cmd||'all')!=='pixel'||i===target;
+      out.push(on?r:0,on?g:0,on?b:0);
+      if((o.color_order||0)>=4) out.push(on?w:0);
+    }
+    return out;
+  }
+  if(ui===4){
+    var res=parseInt(o.mc_resolution||8), maxMotor=maxDmxFor(o), speed=Math.max(0,Math.min(255,parseInt(testValue('test_motor_num',128))||0));
+    var center=Math.floor(maxMotor/2), dir=parseInt(cmd||0);
+    var mv=dir===0?center:(dir>0?Math.round(center+(speed/255)*(maxMotor-center)):Math.round(center-(speed/255)*center));
+    return valueBytes(mv,res);
+  }
+  if(ui===5){
+    var stepRes=parseInt(o.mc_resolution||8), maxStep=maxDmxFor(o), pos=Math.max(0,Math.min(maxStep,Number(testValue('test_step_pos',128))||0));
+    var stepVals=valueBytes(pos,stepRes);
+    stepVals.push(Math.max(0,Math.min(255,parseInt(testValue('test_step_speed',180))||0)),cmd);
+    return stepVals;
+  }
+  if(ui===6){
+    var track=parseInt(testValue('test_mp3_track',1))||1, vol=parseInt(testValue('test_mp3_vol',200))||200;
+    return parseInt(cmd)===0?[track,vol,0]:parseInt(cmd)===1?[0,vol,0]:parseInt(cmd)===2?[track,vol,2]:parseInt(cmd)===3?[track,vol,1]:parseInt(cmd)===4?[track,vol,2]:[cmd||0,vol,0];
+  }
+  if(ui===7){
+    if(parseInt(o.mc_mode||0)===1){
+      return String(testValue('test_7seg_text','')).padEnd(4,' ').slice(0,4).split('').map(function(c){return c.charCodeAt(0)&255;});
+    }
+    var n=Math.max(0,Math.min(9999,parseInt(testValue('test_7seg_num',1234))||0));
+    return [(n>>8)&255,n&255];
+  }
+  return [cmd];
+}
 function showOutputTest(idx){
   const o=outputs[idx];
   const t=parseInt(o.type);
@@ -293,13 +365,7 @@ function showOutputTest(idx){
   document.getElementById('test-title').textContent='#'+(idx+1)+' '+deviceLabel(o);
   OUTPUT_IDX = idx;
   const ui=TYPE_META.testUi[t];
-  ['test-level-group','test-dmx-group','test-led-group','test-stepper-group','test-mp3-group','test-7seg-group','test-motor-group'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.style.display='none';
-  });
-  const groupId={1:'test-level-group',2:'test-dmx-group',3:'test-led-group',4:'test-motor-group',5:'test-stepper-group',6:'test-mp3-group',7:'test-7seg-group'}[ui];
-  const groupEl=document.getElementById(groupId);
-  if(groupEl) groupEl.style.display='';
+  renderTestFields(ui);
   const cmds=TYPE_META.testCmds[t];
   const btnContainer=document.getElementById('test-buttons');
   btnContainer.innerHTML='';
@@ -321,26 +387,7 @@ function sendTestCmd(idx,val){
   const t=parseInt(o.type);
   const ui=TYPE_META.testUi[t];
   const dur=testDur();
-  if(ui===1){
-    const max=maxDmxFor(o);
-    const v=Math.max(0,Math.min(max,parseInt(document.getElementById('test_level_num').value)||0));
-    sendOutputTest(idx,valueBytes(v,parseInt(o.mc_resolution||8)),dur);
-  } else if(ui===2){
-    const ch=Math.max(1,Math.min(512,parseInt(document.getElementById('test_dmx_ch').value)||1));
-    const v=Math.max(0,Math.min(255,parseInt(document.getElementById('test_level_num').value)||0));
-    const vals=new Array(512).fill(0); vals[ch-1]=v;
-    sendOutputTest(idx,vals,dur);
-  } else if(ui===3){
-    testLed(idx,val||'all');
-  } else if(ui===5){
-    testStepper(idx,val);
-  } else if(ui===6){
-    testMp3(idx,val);
-  } else if(ui===7){
-    test7Seg(idx);
-  } else {
-    sendOutputTest(idx,[val],dur);
-  }
+  sendOutputTest(idx,encodeTestValues(o,ui,val),dur);
 }
 function anyStopTest(idx){
   sendOutputTest(parseInt(idx), [], 1000);
@@ -354,88 +401,6 @@ function calcRcCutoff(){
   fcEl&&(fcEl.textContent=fc>=1000?fc.toFixed(0):fc.toFixed(1));
 }
 function testDur(){return (parseInt(document.getElementById('test_duration')?.value)||30)*1000;}
-function buildLedValues(o,r,g,b,w,mode){
-  const rgbw=(o.color_order||0)>=4;
-  if(o.type===5){
-    return rgbw?[r,g,b,w]:[r,g,b];
-  }
-  const count=o.led_count||170, vals=[];
-  const target=Math.max(1,Math.min(count,parseInt(document.getElementById('test_pixel')?.value)||1))-1;
-  for(let i=0;i<count;i++){
-    const on=mode!=='pixel'||i===target;
-    vals.push(on?r:0,on?g:0,on?b:0);
-    if(rgbw) vals.push(on?w:0);
-  }
-  return vals;
-}
-function testLed(idx,mode='all'){
-  const o=outputs[idx], hex=document.getElementById('test_color').value;
-  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16), w=parseInt(document.getElementById('test_white').value)||0;
-  sendOutputTest(idx,buildLedValues(o,r,g,b,w,mode),testDur());
-}
-function testLedPreset(idx,r,g,b,mode='all'){
-  const o=outputs[idx];
-  sendOutputTest(idx,buildLedValues(o,r,g,b,0,mode),testDur());
-}
-function testDmx(idx){
-  const ch=Math.max(1,Math.min(512,parseInt(document.getElementById('test_dmx_ch').value)||1));
-  const val=Math.max(0,Math.min(255,parseInt(document.getElementById('test_level_num').value)||0));
-  const vals=new Array(512).fill(0); vals[ch-1]=val; sendOutputTest(idx,vals,testDur());
-}
-function testSingleValue(idx){
-  const o=outputs[idx];
-  const res=parseInt(o.mc_resolution||8);
-  const max=maxDmxFor(o);
-  const val=Math.max(0,Math.min(max,parseInt(document.getElementById('test_level_num').value)||0));
-  testSinglePreset(idx,val);
-}
-function testSinglePreset(idx,val){
-  const o=outputs[idx];
-  const res=parseInt(o.mc_resolution||8);
-  const max=maxDmxFor(o);
-  val=Math.max(0,Math.min(max,parseInt(val)||0));
-  if(o.type===0||o.type===4||o.type===8){
-    sendOutputTest(idx,valueBytes(val,res),testDur());
-  } else {
-    sendOutputTest(idx,[val],testDur());
-  }
-}
-function testMotor(idx,dir){
-  const o=outputs[idx], res=parseInt(o.mc_resolution||8), max=maxDmxFor(o), speed=Math.max(0,Math.min(255,parseInt((document.getElementById('test_motor_num')||document.getElementById('test_level_num')||{}).value)||0));
-  const center=Math.floor(max/2), v=dir===0?center:(dir>0?Math.round(center+(speed/255)*(max-center)):Math.round(center-(speed/255)*center));
-  sendOutputTest(idx,valueBytes(v,res),testDur());
-}
-function testStepper(idx,cmd){
-  const o=outputs[idx], res=parseInt(o.mc_resolution||8), max=maxDmxFor(o);
-  const pos=Math.max(0,Math.min(max,Number(document.getElementById('test_step_pos').value)||0)), vals=valueBytes(pos,res);
-  vals.push(Math.max(0,Math.min(255,parseInt(document.getElementById('test_step_speed').value)||0)),cmd);
-  sendOutputTest(idx,vals,testDur());
-}
-function test7Seg(idx){
-  const o=outputs[idx];
-  if(parseInt(o.mc_mode||0)===1){
-    const text=(document.getElementById('test_7seg_text').value||'').padEnd(4,' ').slice(0,4);
-    sendOutputTest(idx,[...text].map(c=>c.charCodeAt(0)&255),testDur());
-  } else {
-    const n=Math.max(0,Math.min(9999,parseInt(document.getElementById('test_7seg_num').value)||0));
-    sendOutputTest(idx,[(n>>8)&255,n&255],testDur());
-  }
-}
-function testMp3(idx,action){
-  const track=parseInt(document.getElementById('test_mp3_track').value)||1;
-  const vol=parseInt(document.getElementById('test_mp3_vol').value)||200;
-  if(action==='play'){
-    sendOutputTest(idx,[track,vol,0],testDur());
-  } else if(action==='stop'){
-    sendOutputTest(idx,[0,vol,0],1000);
-  } else if(action==='pause'){
-    sendOutputTest(idx,[track,vol,3],testDur());
-  } else if(action==='next'){
-    sendOutputTest(idx,[track,vol,1],testDur());
-  } else if(action==='prev'){
-    sendOutputTest(idx,[track,vol,2],testDur());
-  }
-}
 
 function toggleOutFields(){
   const t=parseInt(document.getElementById('no_type').value);
