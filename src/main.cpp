@@ -475,7 +475,7 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
         uint8_t address = output["pca_addr"] | 0x40;
         uint8_t mcMode = output["mc_mode"] | 0;
         uint8_t colorOrder = output["color_order"] | 0;
-        bool primaryIsSevenSegA = (type == 12 || type == 13) && (mcMode >= 2 && mcMode <= 5);
+        bool primaryIsSevenSegA = OutputDefs::primaryRouteIsSegment(type, mcMode);
         if (source != 0 && !primaryIsSevenSegA) {
             if (addChannel(source, address, output["pca_channel"] | 0, outputIndex)) return true;
             if ((type == 6 || type == 7 || type == OutputDefs::TYPE_ANALOG_RGB || type == 18) &&
@@ -490,7 +490,7 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
         uint8_t pin3Source = output["pin3_source"] | 0;
         uint8_t pin4Source = output["pin4_source"] | 0;
 
-        bool is7SegDD = (type == 12 || type == 13) && (mcMode >= 2 && mcMode <= 9);
+        bool is7SegDD = OutputDefs::directSegmentCount(type, mcMode) > 0;
         if (pin2Source != 0 && !is7SegDD) {
             uint8_t pin2Addr = output["pin2_addr"] | (pin2Source == 1 ? 0x40 : 0x20);
             if (addChannel(pin2Source, pin2Addr, output["pin2_channel"] | 255, outputIndex)) return true;
@@ -508,7 +508,7 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
             if (pin2Source != 0) {
                 uint8_t baseCh = output["pin2_channel"] | 255;
                 uint8_t pin2Addr = output["pin2_addr"] | (pin2Source == 1 ? 0x40 : 0x20);
-                uint8_t numSeg = (type == 13) ? 8 : 7;
+                uint8_t numSeg = OutputDefs::directSegmentCount(type, mcMode);
                 for (uint8_t s = 0; s < numSeg; s++) {
                     if (addChannel(pin2Source, pin2Addr, baseCh != 255 ? baseCh + s : 255, outputIndex)) return true;
                 }
@@ -516,7 +516,7 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
                 JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
                 JsonArrayConst segAddrs = output["seg_addrs"].as<JsonArrayConst>();
                 JsonArrayConst segChannels = output["seg_channels"].as<JsonArrayConst>();
-                uint8_t numSeg = (type == 13) ? 8 : 7;
+                uint8_t numSeg = OutputDefs::directSegmentCount(type, mcMode);
                 for (uint8_t s = 0; s < numSeg; s++) {
                     if (s < segSources.size() && s < segAddrs.size() && s < segChannels.size()) {
                         uint8_t sSrc = segSources[s] | 0;
@@ -801,7 +801,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
         }
-        if (type == 12 || type == 13) {
+        if (OutputDefs::directSegmentCount(type, mcMode) > 0) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             if (pin2Source != 0 && pin2Source > 4) {
                 message = "Unsupported segment expander source on channel " + String(channelNumber);
@@ -821,7 +821,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
             if (pin2Source >= 1 && pin2Source <= 4) {
                 uint8_t baseCh = output["pin2_channel"] | 255;
-                uint8_t numSeg = (type == 13) ? 8 : 7;
+                uint8_t numSeg = OutputDefs::directSegmentCount(type, mcMode);
                 if (baseCh != 255 && (uint8_t)(baseCh + numSeg - 1) > 15) {
                     message = "7-Segment base channel " + String(baseCh) + " with " + String(numSeg) + " segments exceeds channel 15 on channel " + String(channelNumber);
                     return false;
@@ -831,7 +831,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
                 JsonArrayConst segAddrs = output["seg_addrs"].as<JsonArrayConst>();
                 JsonArrayConst segChannels = output["seg_channels"].as<JsonArrayConst>();
-                uint8_t numSeg = (type == 13) ? 8 : 7;
+                uint8_t numSeg = OutputDefs::directSegmentCount(type, mcMode);
                 for (int s = 0; s < segSources.size(); s++) {
                     uint8_t sSrc = segSources[s] | 0;
                     if (sSrc != 0 && sSrc > 4) {

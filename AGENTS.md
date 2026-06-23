@@ -174,6 +174,7 @@ When working on this project:
 - No code comments unless they explain non-obvious hardware/runtime behavior
 - Use ArduinoJson 7.x patterns already present in the code
 - Use `std::vector<OutputChannel>` for channel storage
+- `mc_mode` may carry signed metadata values such as `-1` (stored in `uint8_t` as `255`); cast to `int8_t` before comparing mode ranges or checking values like `-1`, especially for 7-segment modes.
 - Every `Wire` operation must be protected by `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100))`
 - Use `networkFramePending.exchange(false)` for the atomic pending-frame flag
 - If editing Web UI, edit `web/index.html`, regenerate `include/web_pages.h`, then build

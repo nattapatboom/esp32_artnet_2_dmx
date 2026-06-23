@@ -670,6 +670,8 @@ Key files:
 
 Field keys in `EXTRA_FIELDS` must match the JSON keys used in `/api/outputs` POST/PUT and `OutputChannel` serialization:
 
+`mc_mode` can contain signed mode values such as `-1` for default/no-dim 7-segment modes. The firmware stores this in a `uint8_t` field for compact `OutputChannel` layout, so any mode comparison or range check must cast to `int8_t` first.
+
 - `mc_*` — motion control fields (resolution, frequency, mode, homing parameters)
 - `pwm_dac_*` — PWM DAC calibration fields
 - `solenoid_*` — solenoid pulse configuration fields

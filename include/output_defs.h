@@ -460,6 +460,24 @@ inline bool startsAtFirstUniverse(uint8_t type, uint8_t mode = 0) {
     return def != nullptr && def->startAtFirstUniverse;
 }
 
+inline bool isSevenSegmentMode(uint8_t type, uint8_t mode = 0) {
+    const OutputModeDef* def = modeDef(type, mode);
+    return def != nullptr && def->testUi == TEST_UI_7SEG;
+}
+
+inline uint8_t directSegmentCount(uint8_t type, uint8_t mode = 0) {
+    const OutputModeDef* def = modeDef(type, mode);
+    if (def == nullptr) return 0;
+    if (def->pins == PINS_7SEG_COMMON_DIM) return def->pinCount > 0 ? (uint8_t)(def->pinCount - 1) : 0;
+    if (def->pins == PINS_7SEG_DIRECT || def->pins == PINS_7SEG_DIMMED) return def->pinCount;
+    return 0;
+}
+
+inline bool primaryRouteIsSegment(uint8_t type, uint8_t mode = 0) {
+    const OutputModeDef* def = modeDef(type, mode);
+    return def != nullptr && (def->pins == PINS_7SEG_DIRECT || def->pins == PINS_7SEG_DIMMED);
+}
+
 // ─────────────────────────────────────
 //  Type interface (Web UI contract) lookup
 // ─────────────────────────────────────

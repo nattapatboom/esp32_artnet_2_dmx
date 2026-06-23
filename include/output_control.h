@@ -205,6 +205,7 @@ struct OutputChannel {
 };
 
 inline uint16_t outputDmxByteCount(const OutputChannel& ch) {
+    int8_t mode = (int8_t)ch.mc_mode;
     switch (ch.type) {
         case 1:
             return DMX_BUFFER_SIZE;
@@ -221,10 +222,10 @@ inline uint16_t outputDmxByteCount(const OutputChannel& ch) {
             return dmxValueByteCount(ch.mc_resolution) + 2;
         case 9:
         case 11:
-            return ch.mc_mode == 1 ? 4 : 2;
+            return mode == 1 ? 4 : 2;
         case 12:
         case 13:
-            return (ch.mc_mode == 4 || ch.mc_mode == 5 || ch.mc_mode >= 6) ? 2 : 1;
+            return (mode == 4 || mode == 5 || mode >= 6) ? 2 : 1;
         case 10:
             return 3;
         case 16:
@@ -799,13 +800,13 @@ public:
                 item["solenoid_threshold"] = ch.solenoid_threshold;
             } else if (ch.type == OutputDefs::TYPE_BUZZER) {
                 item["mc_freq"] = ch.mc_freq;
-            } else if (ch.type == OutputDefs::TYPE_TM1637 || ch.type == OutputDefs::TYPE_7SEG_7PIN || ch.type == OutputDefs::TYPE_7SEG_8PIN) {
+            } else if (OutputDefs::isSevenSegmentMode(ch.type, ch.mc_mode)) {
                 item["pin2"] = ch.pin2;
                 item["pin2_source"] = ch.pin2_source;
                 item["pin2_addr"] = ch.pin2_addr;
                 item["pin2_channel"] = ch.pin2_channel;
                 item["mc_mode"] = ch.mc_mode;
-                if (ch.type == OutputDefs::TYPE_7SEG_7PIN || ch.type == OutputDefs::TYPE_7SEG_8PIN) {
+                if (OutputDefs::directSegmentCount(ch.type, ch.mc_mode) > 0) {
                     JsonArray segArr = item["seg_pins"].to<JsonArray>();
                     for (int s = 0; s < 8; s++) {
                         segArr.add(ch.seg_pins[s]);

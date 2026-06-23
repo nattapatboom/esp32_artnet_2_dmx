@@ -199,6 +199,7 @@ inline uint32_t funcGenBackgroundUs(uint8_t funcGenCount, uint8_t outputFps) {
 }
 
 inline uint32_t dmxBufferRamForChannel(uint8_t type, uint16_t ledCount, uint8_t colorOrder, uint8_t resolution, uint8_t mode) {
+    int8_t signedMode = (int8_t)mode;
     // DMX: full universe buffer
     if (type == OutputDefs::TYPE_DMX) return 512;
     // LED strip: universe-rounded (led_count may span multiple universes)
@@ -212,8 +213,8 @@ inline uint32_t dmxBufferRamForChannel(uint8_t type, uint16_t ledCount, uint8_t 
     // Types where buffer depends on mode/colorOrder (can't be static)
     if (type == OutputDefs::TYPE_ANALOG_RGB) return colorOrder >= 4 ? 4 : 3;
     if (type == OutputDefs::TYPE_STEPPER) return dmxValueByteCount(resolution) + 2;
-    if (type == OutputDefs::TYPE_BUZZER || type == OutputDefs::TYPE_TM1637) return mode == 1 ? 4 : 2;
-    if (type == OutputDefs::TYPE_7SEG_7PIN || type == OutputDefs::TYPE_7SEG_8PIN) return (mode == 4 || mode == 5 || mode >= 6) ? 2 : 1;
+    if (type == OutputDefs::TYPE_BUZZER || type == OutputDefs::TYPE_TM1637) return signedMode == 1 ? 4 : 2;
+    if (OutputDefs::directSegmentCount(type, mode) > 0) return (signedMode == 4 || signedMode == 5 || signedMode >= 6) ? 2 : 1;
     // Fallback: use dmxSlots from definition, or dmxValueByteCount
     const auto* def = OutputDefs::modeDef(type, mode);
     if (!def) return 1;
