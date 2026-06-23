@@ -1,6 +1,7 @@
+const RES_OPTS_PWM_DAC=[[8,'8-bit (1 DMX Ch)'],[10,'10-bit (2 DMX Ch)'],[12,'12-bit (2 DMX Ch)'],[16,'16-bit (2 DMX Ch)']];
 const CONFIG_TYPE_15 = {
   toggleFields: function() {
-    setResolutionOptions(false, false);
+    setResolutionOptions(RES_OPTS_PWM_DAC);
     document.getElementById('mc_res_grp').style.display = '';
     document.getElementById('mc_freq_grp').style.display = '';
     document.getElementById('mc_freq_lbl').textContent = 'PWM Carrier Frequency (Hz)';
@@ -23,5 +24,11 @@ const CONFIG_TYPE_15 = {
     ch.pwm_dac_min = dutyPctToInt('pwm_dac_min', 0);
     ch.pwm_dac_max = dutyPctToInt('pwm_dac_max', 10000);
     return ch;
+  },
+  channelCount: function(o) { return `${valueByteCount(parseInt(o.mc_resolution||8))} Ch`; },
+  byteCount: function(o) { return valueByteCount(parseInt(o.mc_resolution||8)); },
+  configLabel: function(o) {
+    const modes=['Custom','0-10V','4-20mA'];
+    return `PWM DAC ${modes[o.pwm_dac_mode||0]||'Custom'} @ ${o.mc_freq||50000}Hz ${o.mc_resolution||8}-bit`;
   }
 };

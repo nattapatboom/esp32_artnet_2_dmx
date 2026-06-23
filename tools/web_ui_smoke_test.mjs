@@ -189,8 +189,16 @@ async function main() {
           }
         }
 
+        // Type-scoped mc_mode setter for duplicate IDs
+        function setTypeMcMode(type, mode) {
+          var sel = document.querySelector('#type-config-' + type + ' #mc_mode');
+          if (!sel) return;
+          sel.value = String(mode);
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
         setValue('no_type', 12);
-        setValue('mc_mode', 2);
+        setTypeMcMode(12, 4);  // Direct Dim mode (segmentLayout=true)
         setValue('no_pin2_source', 0);
         toggleOutFields();
         renderPinRows();
@@ -248,7 +256,7 @@ async function main() {
           && document.getElementById('no_pca_channel2_grp')?.style.display === 'none';
 
         setValue('no_type', 6);
-        setValue('mc_mode', 2);
+        setTypeMcMode(6, 2);  // IN1+IN2+EN mode
         setValue('no_source', 0);
         toggleOutFields();
         renderPinRows();

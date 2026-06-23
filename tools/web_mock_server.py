@@ -4,16 +4,13 @@ import json
 import random
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
-from build_web import generate_output_defs_js
+from build_web import generate_gpio_js, generate_source_rules_js, generate_output_defs_js
 
 PORT = 8000
 HTML_FILE = "web/index.html"
 JS_DIR = "web/js"
 PARTS_DIR = "web/parts"
 OUTPUT_CONFIG_DIR = "web/parts/output-config"
-OUTPUT_TEST_DIR = "web/parts/output-test"
-JS_CONFIG_DIR = "web/js/output-config"
-JS_TEST_DIR = "web/js/output-test"
 
 JS_ORDER = ["_gpio.js", "network_protocol.js", "scoring.js", "espnow.js", "app.js", "outputs.js"]
 
@@ -147,38 +144,33 @@ class MockRequestHandler(BaseHTTPRequestHandler):
                     with open(pane_path, "r", encoding="utf-8") as pf:
                         html = html.replace(marker, pf.read())
 
-            # Collect per-type config/test HTML
-            for marker_name, src_dir in [("CONFIG_TYPE_FIELDS", OUTPUT_CONFIG_DIR),
-                                          ("TEST_TYPE_FIELDS", OUTPUT_TEST_DIR)]:
-                marker = f"<!-- {marker_name} -->"
-                combined = ""
-                if os.path.isdir(src_dir):
-                    for fn in sorted(os.listdir(src_dir)):
-                        fp = os.path.join(src_dir, fn)
-                        if os.path.isfile(fp):
-                            with open(fp, "r", encoding="utf-8") as sf:
-                                combined += sf.read() + "\n"
-                if marker in html:
-                    html = html.replace(marker, combined)
-                elif combined:
-                    # Insert before </div><!-- /w --> if marker absent
-                    html = html.replace("</div><!-- /w -->", f"{combined}\n</div><!-- /w -->")
+            # Collect per-type config HTML
+            config_marker = "<!-- CONFIG_TYPE_FIELDS -->"
+            config_combined = ""
+            if os.path.isdir(OUTPUT_CONFIG_DIR):
+                for fn in sorted(os.listdir(OUTPUT_CONFIG_DIR)):
+                    fp = os.path.join(OUTPUT_CONFIG_DIR, fn)
+                    if os.path.isfile(fp):
+                        with open(fp, "r", encoding="utf-8") as sf:
+                            config_combined += sf.read() + "\n"
+            if config_marker in html:
+                html = html.replace(config_marker, config_combined)
+            elif config_combined:
+                html = html.replace("</div><!-- /w -->", f"{config_combined}\n</div><!-- /w -->")
+
+            # Replace generic test panel marker
+            test_panel_path = os.path.join(PARTS_DIR, "pane-test.html")
+            if os.path.exists(test_panel_path):
+                with open(test_panel_path, "r", encoding="utf-8") as pf:
+                    html = html.replace("<!-- PANE_TEST -->", pf.read())
 
             # Inline generated metadata and JS files
-            js_parts = [generate_output_defs_js()]
+            js_parts = [generate_gpio_js(), generate_source_rules_js(), generate_output_defs_js()]
             for js_file in JS_ORDER:
                 js_path = os.path.join(JS_DIR, js_file)
                 if os.path.exists(js_path):
                     with open(js_path, "r", encoding="utf-8") as jf:
                         js_parts.append(jf.read())
-
-            for dir_path in [JS_CONFIG_DIR, JS_TEST_DIR]:
-                if os.path.isdir(dir_path):
-                    for fn in sorted(os.listdir(dir_path)):
-                        fp = os.path.join(dir_path, fn)
-                        if os.path.isfile(fp):
-                            with open(fp, "r", encoding="utf-8") as sf:
-                                js_parts.append(sf.read())
 
             combined_js = "\n".join(js_parts)
             html = html.replace("<script>", f"<script>\n{combined_js}\n</script>")

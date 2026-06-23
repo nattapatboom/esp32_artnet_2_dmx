@@ -1,7 +1,14 @@
+const RES_OPTS_7SEG=[[8,'ASCII / Character'],[10,'Numeric (0-9, 10-19 for DP)']];
+const MODE_OPTS_7SEG_12=[[2,'Direct 7-pin (1 Ch - No Dim)'],[4,'Direct 7-pin Dim (2 Ch - Char+Dim)'],[6,'CA 7-pin Dim (2 Ch - COM Anode)'],[7,'CC 7-pin Dim (2 Ch - COM Cathode)']];
 const CONFIG_TYPE_12 = {
+  modeKey: function(mode) {
+    if(mode===4||mode===5) return 'directDim';
+    if(mode>=6&&mode<=9) return 'commonDim';
+    return String(mode);
+  },
   toggleFields: function() {
-    setModeOptions('7seg', 12);
-    setResolutionOptions(false, true);
+    setModeOptions(MODE_OPTS_7SEG_12, 'Display Mode');
+    setResolutionOptions(RES_OPTS_7SEG);
     const mcMode = parseInt(document.getElementById('mc_mode').value || 2);
     const isDirectDim = (mcMode === 4 || mcMode === 5);
     const isCommonDim = (mcMode >= 6 && mcMode <= 9);
@@ -21,5 +28,45 @@ const CONFIG_TYPE_12 = {
     ch.mc_resolution = parseInt(document.getElementById('mc_resolution').value);
     ch.mc_freq = parseInt(document.getElementById('mc_freq').value);
     return ch;
+  },
+  channelCount: function(o) {
+    const m=parseInt(o.mc_mode||0);
+    if(m===4||m===5||m===6||m===7||m===8||m===9) return '2 Ch (Char+Dim)';
+    return '1 Ch (Direct)';
+  },
+  byteCount: function(o) {
+    const m=parseInt(o.mc_mode||0);
+    if(m===4||m===5||m===6||m===7||m===8||m===9) return 2;
+    return 1;
+  },
+  segmentPinLayout: function(mcMode) { return mcMode>=2&&mcMode<=9; },
+  configLabel: function(o) { return '7-Seg DD 7-Pin PWM'; },
+  gpioExtract: function(o) {
+    const t=12; const mcMode=parseInt(o.mc_mode||0);
+    if(!(mcMode>=2&&mcMode<=9)) return [];
+    const pins=[];
+    const add=p=>{p=parseInt(p); if(!isNaN(p)&&p!==255&&!pins.includes(p)) pins.push(p);};
+    if(parseInt(o.source||0)===0) add(o.pin);
+    if(parseInt(o.pin2_source||0)===0){
+      const numSeg=7; const isCommonDim=(mcMode>=6&&mcMode<=9);
+      const startIdx=isCommonDim?0:1;
+      const sps=o.seg_pins||[]; const ssrc=o.seg_sources||[];
+      for(let s=startIdx;s<numSeg;s++){
+        if(parseInt(ssrc[s]||0)!==0) continue;
+        const sp=(sps[s]!==undefined&&sps[s]!==255)?sps[s]:(parseInt(o.pin)+s);
+        add(sp);
+      }
+    }
+    return pins;
+  },
+  autoAssignPins: function({takeOutput,takeInput}) {
+    const mcMode=parseInt(document.getElementById('mc_mode').value);
+    const pin2Source=parseInt(document.getElementById('no_pin2_source')?.value||0);
+    if(pin2Source===0){
+      const numSeg=7; const startSeg=(mcMode>=6&&mcMode<=9)?0:1;
+      const basePin=takeOutput();
+      setSelectIfOption('no_pin',basePin);
+      if(basePin!==255){for(let s=startSeg;s<numSeg;s++) setSelectIfOption('no_seg_pin_'+s,takeOutput());}
+    }
   }
 };

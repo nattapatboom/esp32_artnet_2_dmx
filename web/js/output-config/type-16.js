@@ -12,5 +12,8 @@ const CONFIG_TYPE_16 = {
   saveFields: function(ch) {
     ch.mc_freq = parseInt(document.getElementById('mc_freq').value);
     return ch;
-  }
+  },
+  channelCount: function(o) { return '5 Ch (Freq+Type+Amp+Off)'; },
+  byteCount: function(o) { return 5; },
+  configLabel: function(o) { return `Function Generator @ ${o.mc_freq||50000}Hz PWM`; }
 };

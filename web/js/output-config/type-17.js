@@ -12,5 +12,6 @@ const CONFIG_TYPE_17 = {
     ch.solenoid_pre_delay = parseInt(document.getElementById('sol_pre_delay')?.value || 0);
     ch.solenoid_post_delay = parseInt(document.getElementById('sol_post_delay')?.value || 100);
     return ch;
-  }
+  },
+  configLabel: function(o) { return `${o.solenoid_pulse_ms||50}ms pulse`; }
 };

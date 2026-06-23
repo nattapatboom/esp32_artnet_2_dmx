@@ -35,6 +35,19 @@ constexpr SourceAddressRule ADDRESS_RULES[] = {
 };
 constexpr uint8_t ADDRESS_RULES_COUNT = 7;
 
+// Source display names (must match index: 0=GPIO, 1=PCA9685, 2-4=digital expanders, 5-7=I2C DAC)
+constexpr const char* SOURCE_NAMES[] = {
+    "ESP32",
+    "PCA9685",
+    "MCP23017",
+    "TCA9555",
+    "PCF857x",
+    "MCP4725 (I2C DAC)",
+    "DAC7571 (I2C DAC)",
+    "DAC7573 (I2C DAC)"
+};
+constexpr uint8_t SOURCE_NAMES_COUNT = 8;
+
 constexpr const char* UNSUPPORTED_LABEL = "Unsupported I2C source";
 
 inline bool addressValid(uint8_t source, uint8_t address) {

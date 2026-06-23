@@ -15,12 +15,12 @@ WEB_DIR = "web"
 PARTS_DIR = os.path.join(WEB_DIR, "parts")
 JS_DIR = os.path.join(WEB_DIR, "js")
 OUTPUT_CONFIG_DIR = os.path.join(PARTS_DIR, "output-config")
-OUTPUT_TEST_DIR = os.path.join(PARTS_DIR, "output-test")
-JS_CONFIG_DIR = os.path.join(JS_DIR, "output-config")
-JS_TEST_DIR = os.path.join(JS_DIR, "output-test")
 HEADER_PATH = "include/web_pages.h"
 SHELL_PATH = os.path.join(WEB_DIR, "index.html")
 OUTPUT_DEFS_PATH = os.path.join("include", "output_defs.h")
+SOURCE_RULES_PATH = os.path.join("include", "source_rules.h")
+GPIO_CONTROL_PATH = os.path.join("include", "gpio_control.h")
+DISPLAY_PROTO_PATH = os.path.join("include", "display_protocol.h")
 
 PANE_MARKERS = {
     "<!-- PANE_NET -->":    "pane-network.html",
@@ -88,35 +88,88 @@ def parse_source_mask(expr):
     return mask
 
 
-def mode_key(type_id, mode):
-    if type_id in (12, 13) and mode in (4, 5):
-        return "directDim"
-    if type_id in (12, 13) and mode >= 6:
-        return "commonDim"
-    return "default" if mode == -1 else str(mode)
+# Resolution bit value lookup
+RES_BIT_MAP = {
+    "RES_BIT_8": 1, "RES_BIT_10": 2, "RES_BIT_12": 4, "RES_BIT_16": 8,
+    "RES_BIT_24": 16, "RES_BIT_32": 32, "RES_BITS_8_10_12_16": 15,
+}
+
+# Test UI ID mapping
+TEST_UI_MAP = {
+    "TEST_UI_NONE": 0, "TEST_UI_SLIDER": 1, "TEST_UI_DMX": 2,
+    "TEST_UI_LED": 3, "TEST_UI_MOTOR": 4, "TEST_UI_STEPPER": 5,
+    "TEST_UI_DFPLAYER": 6, "TEST_UI_7SEG": 7,
+}
+
+RES_LABELS_DMX = ["8-bit (1 DMX Ch)", "10-bit (2 DMX Ch)", "12-bit (2 DMX Ch)", "16-bit (2 DMX Ch)", "24-bit (3 DMX Ch)", "32-bit (4 DMX Ch)"]
+RES_LABELS_POS = ["8-bit (1 Pos Ch)", "10-bit (2 Pos Ch)", "12-bit (2 Pos Ch)", "16-bit (2 Pos Ch)", "24-bit (3 Pos Ch)", "32-bit (4 Pos Ch)"]
+RES_LABELS_7SEG = ["ASCII / Character", "Numeric (0-9, 10-19 for DP)", None, None, None, None]
+
+
+def eval_res_bits(expr):
+    """Evaluate resolution bitmask expression like 'RES_BIT_8|RES_BIT_10'."""
+    val = 0
+    for part in expr.split("|"):
+        val |= RES_BIT_MAP.get(part.strip(), 0)
+    return val
+
+
+def parse_cpp_string(s):
+    """Strip surrounding quotes from a C++ string literal."""
+    return s.strip().strip('"')
+
+
+def match_braces(text, start):
+    """Find matching closing brace from start. Returns index of '}' or -1."""
+    if text[start] != '{':
+        return -1
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == '{':
+            depth += 1
+        elif text[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return i
+    return -1
+
+
+def parse_test_commands_for_type(type_num):
+    """Parse TEST_COMMANDS[] array from include/type_interfaces/type_{num}.h."""
+    path = os.path.join("include", "type_interfaces", f"type_{type_num}.h")
+    if not os.path.exists(path):
+        return []
+    src = read_file(path)
+    # Find the TEST_COMMANDS array block
+    m = re.search(r"constexpr\s+TestCmdDef\s+TEST_COMMANDS\[\]\s*=\s*\{(.*?)\}\s*;", src, re.DOTALL)
+    if not m:
+        return []
+    body = m.group(1)
+    cmds = []
+    entry_re = re.compile(r'\{\s*"([^"]+)"\s*,\s*(\d+)\s*,\s*"([^"]*)"\s*\}')
+    for label, cmd, desc in entry_re.findall(body):
+        cmds.append([label, int(cmd), desc])
+    return cmds
 
 
 def generate_output_defs_js():
     src = read_file(OUTPUT_DEFS_PATH)
 
+    # Type ID constants
     type_ids = {
         name: int(value)
         for name, value in re.findall(r"constexpr\s+uint8_t\s+(TYPE_\w+)\s*=\s*(\d+)\s*;", src)
     }
-    hardware = {
-        name: {
-            "ledc": int(ledc),
-            "rmt": int(rmt),
-            "uart": int(uart),
-            "dac": int(dac),
-            "timer": int(timer),
-        }
-        for name, ledc, rmt, uart, dac, timer in re.findall(
-            r"constexpr\s+HardwareCost\s+(HW_\w+)\s*=\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}\s*;",
-            src,
-        )
-    }
 
+    # HardwareCost constants
+    hardware = {}
+    for name, ledc, rmt, uart, dac, timer in re.findall(
+        r"constexpr\s+HardwareCost\s+(HW_\w+)\s*=\s*\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}\s*;",
+        src,
+    ):
+        hardware[name] = {"ledc": int(ledc), "rmt": int(rmt), "uart": int(uart), "dac": int(dac), "timer": int(timer)}
+
+    # ModeCost constants
     costs = {}
     for name, args_text in re.findall(r"constexpr\s+ModeCost\s+(COST_\w+)\s*=\s*modeCost\((.*?)\)\s*;", src):
         args = split_cpp_args(args_text)
@@ -129,14 +182,14 @@ def generate_output_defs_js():
             "dmxSlots": int(args[5]) if len(args) > 5 else 0,
         }
 
+    # PinRule arrays
     pin_sets = {}
-    pin_array_re = re.compile(r"constexpr\s+PinRule\s+(PINS_\w+)\[\]\s*=\s*\{(.*?)\}\s*;", re.DOTALL)
-    pin_re = re.compile(
-        r"\{\s*\"([^\"]+)\"\s*,\s*\"([^\"]+)\"\s*,\s*(.*?)\s*,\s*(PIN_OUTPUT|PIN_INPUT)\s*,\s*(true|false)\s*,\s*(\d+)\s*\}"
-    )
-    for name, body in pin_array_re.findall(src):
+    for name, body in re.findall(r"constexpr\s+PinRule\s+(PINS_\w+)\[\]\s*=\s*\{(.*?)\}\s*;", src, re.DOTALL):
         pin_sets[name] = []
-        for slot, label, sources, direction, invert, hw in pin_re.findall(body):
+        for slot, label, sources, direction, invert, hw in re.findall(
+            r'\{\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*(.*?)\s*,\s*(PIN_OUTPUT|PIN_INPUT)\s*,\s*(true|false)\s*,\s*(\d+)\s*\}',
+            body,
+        ):
             pin_sets[name].append({
                 "slot": slot,
                 "label": label,
@@ -146,23 +199,221 @@ def generate_output_defs_js():
                 "hwIfGpio": int(hw),
             })
 
+    # Pre-parse test commands for all types 0-18
+    test_cmds_by_type = {}
+    for tn in range(19):
+        cmd_list = parse_test_commands_for_type(tn)
+        if cmd_list:
+            test_cmds_by_type[tn] = cmd_list
+
+    # Parse OUTPUT_MODES array using brace matching
     defs = {}
-    modes_body = re.search(r"constexpr\s+OutputModeDef\s+OUTPUT_MODES\[\]\s*=\s*\{(.*?)\n\};", src, re.DOTALL).group(1)
-    mode_re = re.compile(r"\{\s*(TYPE_\w+)\s*,\s*(-?\d+)\s*,\s*\"([^\"]+)\"\s*,\s*(COST_\w+)\s*,\s*(PINS_\w+)\s*,\s*(\d+)\s*\}")
-    for type_name, mode_value, name, cost_name, pins_name, pin_count in mode_re.findall(modes_body):
-        type_id = type_ids[type_name]
-        mode = int(mode_value)
+    mode_key_map = {}
+    test_ui_per_type = [0] * 19
+
+    modes_body_m = re.search(r"constexpr\s+OutputModeDef\s+OUTPUT_MODES\[\]\s*=\s*\{(.*?)\n\};", src, re.DOTALL)
+    if not modes_body_m:
+        raise RuntimeError("Cannot find OUTPUT_MODES[] array")
+    modes_body = modes_body_m.group(1)
+
+    i = 0
+    while i < len(modes_body):
+        brace_start = modes_body.find('{', i)
+        if brace_start == -1:
+            break
+        brace_end = match_braces(modes_body, brace_start)
+        if brace_end == -1:
+            break
+        inner = modes_body[brace_start + 1:brace_end]
+        args = split_cpp_args(inner)
+        if len(args) < 13:
+            i = brace_end + 1
+            continue
+
+        type_ident = args[0].strip()
+        mode_val = int(args[1].strip())
+        name = parse_cpp_string(args[2])
+        mode_key_str = parse_cpp_string(args[3])
+        res_bits = eval_res_bits(args[4].strip())
+        slot_mask = int(args[5].strip())
+        seg_layout = args[6].strip() == 'true'
+        test_ui = TEST_UI_MAP.get(args[7].strip(), 0)
+        test_cmds_ref = args[8].strip()
+        test_cmd_count_str = args[9].strip()
+        cost_ident = args[10].strip()
+        pins_ident = args[11].strip()
+        pin_count = int(args[12].strip())
+
+        type_id = type_ids.get(type_ident, -1)
+        if type_id < 0:
+            i = brace_end + 1
+            continue
+
+        # Build OUTPUT_DEFS
         entry = defs.setdefault(str(type_id), {"name": name, "modes": {}})
         pins = {}
-        for pin in pin_sets[pins_name][:int(pin_count)]:
+        for pin in pin_sets.get(pins_ident, [])[:pin_count]:
             pins[pin["slot"]] = {k: v for k, v in pin.items() if k != "slot"}
-        entry["modes"][mode_key(type_id, mode)] = {
+
+        effective_mode_key = mode_key_str if mode_key_str else str(mode_val)
+        entry["modes"][effective_mode_key] = {
             "label": name,
-            "cost": costs[cost_name],
+            "cost": costs.get(cost_ident, {}),
             "pins": pins,
+            "resolutionBits": res_bits,
+            "slotActiveMask": slot_mask,
+            "segmentLayout": seg_layout,
         }
 
-    return "const OUTPUT_DEFS=" + json.dumps(defs, separators=(",", ":")) + ";\n"
+        # Build modeKeyMap
+        type_str = str(type_id)
+        if type_str not in mode_key_map:
+            mode_key_map[type_str] = {}
+        mode_key_map[type_str][str(mode_val)] = effective_mode_key
+
+        # Store test UI per type (use highest number for types with multiple modes)
+        if test_ui > test_ui_per_type[type_id]:
+            test_ui_per_type[type_id] = test_ui
+
+        i = brace_end + 1
+
+    # Parse TYPE_DISPLAY_NAMES
+    display_names = []
+    m = re.search(r"constexpr\s+const\s+char\s*\*\s*TYPE_DISPLAY_NAMES\[\]\s*=\s*\{(.*?)\};", src, re.DOTALL)
+    if m:
+        for match in re.finditer(r'"([^"]+)"', m.group(1)):
+            display_names.append(match.group(1))
+    types_js = {str(i): name for i, name in enumerate(display_names)}
+
+    # Parse per-type metadata arrays
+    def parse_uint16_array(name):
+        m = re.search(rf"constexpr\s+uint16_t\s+{re.escape(name)}\[\]\s*=\s*\{{(.*?)}}\s*;", src, re.DOTALL)
+        if not m:
+            return []
+        body = re.sub(r"//.*", "", m.group(1))
+        return [int(v.strip()) for v in body.split(",") if v.strip()]
+
+    config_labels = []
+    m = re.search(r"constexpr\s+const\s+char\s*\*\s*TYPE_CONFIG_LABELS\[\]\s*=\s*\{(.*?)\};", src, re.DOTALL)
+    if m:
+        for match in re.finditer(r'"([^"]*)"', m.group(1)):
+            config_labels.append(match.group(1))
+
+    channel_counts = parse_uint16_array("TYPE_CHANNEL_COUNTS")
+    byte_counts = parse_uint16_array("TYPE_BYTE_COUNTS")
+
+    # Build resolution options per type from resolution bits
+    res_opts = []
+    for tn in range(19):
+        bits = 0
+        type_str = str(tn)
+        if type_str in defs:
+            for mk, mode_entry in defs[type_str]["modes"].items():
+                bits |= mode_entry.get("resolutionBits", 0)
+        label_set = RES_LABELS_7SEG if tn in (11, 12, 13) else (RES_LABELS_POS if tn == 7 else RES_LABELS_DMX)
+        opts = []
+        for bit_idx in range(6):
+            if bits & (1 << bit_idx):
+                label = label_set[bit_idx]
+                if label:
+                    res_val = [8, 10, 12, 16, 24, 32][bit_idx]
+                    opts.append([res_val, label])
+        res_opts.append(opts if opts else None)
+
+    # Build test commands data per type
+    test_cmds_js = {}
+    for tn in range(19):
+        if tn in test_cmds_by_type:
+            test_cmds_js[str(tn)] = test_cmds_by_type[tn]
+
+    meta = {
+        "configLabels": config_labels if len(config_labels) == 19 else [],
+        "channelCounts": channel_counts if len(channel_counts) == 19 else [],
+        "byteCounts": byte_counts if len(byte_counts) == 19 else [],
+        "modeKeyMap": mode_key_map,
+        "testUi": test_ui_per_type,
+        "testCmds": test_cmds_js,
+        "resOpts": res_opts,
+    }
+
+    return (
+        "const OUTPUT_DEFS=" + json.dumps(defs, separators=(",", ":")) + ";\n"
+        "const TYPES=" + json.dumps(types_js, separators=(",", ":")) + ";\n"
+        "const TYPE_META=" + json.dumps(meta, separators=(",", ":")) + ";\n"
+    )
+
+
+def generate_gpio_js():
+    """Parse gpio_control.h → GPIO_PINS const for JS."""
+    src = read_file(GPIO_CONTROL_PATH)
+
+    def extract_array(name):
+        m = re.search(rf"constexpr\s+uint8_t\s+{re.escape(name)}\[\]\s*=\s*\{{([^}}]+)}}\s*;", src)
+        if not m:
+            raise RuntimeError(f"Cannot find {name}[] in {GPIO_CONTROL_PATH}")
+        return [int(v.strip()) for v in m.group(1).split(",") if v.strip()]
+
+    output_pins = extract_array("OUTPUT_GPIO_PINS")
+    input_pins = extract_array("INPUT_GPIO_PINS")
+    input_only_pins = extract_array("INPUT_ONLY_PINS")
+
+    reserved = []
+    for m in re.finditer(r'\{\s*(\d+)\s*,\s*"([^"]+)"\s*\}', src):
+        # Only match inside RESERVED_ETHERNET_PINS block
+        pin = int(m.group(1))
+        reason = m.group(2)
+        reserved.append({"pin": pin, "reason": reason})
+
+    data = {
+        "output": output_pins,
+        "input": input_pins,
+        "inputOnly": input_only_pins,
+        "reserved": reserved,
+    }
+    return "const GPIO_PINS=" + json.dumps(data, separators=(",", ":")) + ";\n"
+
+
+def generate_source_rules_js():
+    """Parse source_rules.h → SOURCE_DATA const for JS."""
+    src = read_file(SOURCE_RULES_PATH)
+
+    # SOURCE_NAMES array
+    names_match = re.search(r'constexpr\s+const\s+char\s*\*\s*SOURCE_NAMES\[\]\s*=\s*\{(.*?)\}\s*;', src, re.DOTALL)
+    names = []
+    if names_match:
+        for m in re.finditer(r'"([^"]+)"', names_match.group(1)):
+            names.append(m.group(1))
+
+    # ADDRESS_RULES array
+    rules = []
+    for m in re.finditer(
+        r'\{\s*(\d+)\s*,\s*"([^"]+)"\s*,\s*\{\s*\{\s*(0x[0-9A-Fa-f]+|\d+)\s*,\s*(0x[0-9A-Fa-f]+|\d+)\s*\}\s*,\s*\{\s*(0x[0-9A-Fa-f]+|\d+)\s*,\s*(0x[0-9A-Fa-f]+|\d+)\s*\}\s*\}\s*\}',
+        src,
+    ):
+        source = int(m.group(1))
+        label = m.group(2)
+        r1_min = int(m.group(3), 16 if m.group(3).startswith("0x") else 10)
+        r1_max = int(m.group(4), 16 if m.group(4).startswith("0x") else 10)
+        r2_min = int(m.group(5), 16 if m.group(5).startswith("0x") else 10)
+        r2_max = int(m.group(6), 16 if m.group(6).startswith("0x") else 10)
+        ranges = [[r1_min, r1_max]]
+        if r2_min != 0 or r2_max != 0:
+            ranges.append([r2_min, r2_max])
+        rules.append({"source": source, "label": label, "ranges": ranges})
+
+    # Source mask constants from output_defs.h (SRC_GPIO=1, SRC_PCA=2, ...)
+    masks = {}
+    defs_src = read_file(OUTPUT_DEFS_PATH)
+    for m in re.finditer(r'(SRC_\w+)\s*=\s*1\s*<<\s*(\d+)', defs_src):
+        name = m.group(1).replace("SRC_", "")
+        masks[name] = 1 << int(m.group(2))
+
+    data = {
+        "names": names,
+        "addressRules": rules,
+        "masks": masks,
+    }
+    return "const SOURCE_DATA=" + json.dumps(data, separators=(",", ":")) + ";\n"
 
 
 def main():
@@ -187,31 +438,31 @@ def main():
             continue
         html = html.replace(marker, pane_html)
 
-    # Replace per-type config/test markers with all type-N.html files
-    for marker_name, src_dir in [("CONFIG_TYPE_FIELDS", OUTPUT_CONFIG_DIR),
-                                   ("TEST_TYPE_FIELDS", OUTPUT_TEST_DIR)]:
-        marker = f"<!-- {marker_name} -->"
-        if marker not in html:
-            print(f"Warning: marker {marker} not found in shell, skipping")
-            continue
-        type_files = collect_type_files(src_dir)
-        combined = "\n".join(read_file(os.path.join(src_dir, f)) for f in type_files
-                             if os.path.isfile(os.path.join(src_dir, f)))
+    # Replace per-type config markers with all type-N.html files
+    marker = "<!-- CONFIG_TYPE_FIELDS -->"
+    if marker not in html:
+        print(f"Warning: marker {marker} not found in shell, skipping")
+    else:
+        type_files = collect_type_files(OUTPUT_CONFIG_DIR)
+        combined = "\n".join(read_file(os.path.join(OUTPUT_CONFIG_DIR, f)) for f in type_files
+                             if os.path.isfile(os.path.join(OUTPUT_CONFIG_DIR, f)))
         html = html.replace(marker, combined)
 
+    # Replace generic test panel marker
+    test_panel_path = os.path.join(PARTS_DIR, "pane-test.html")
+    if os.path.exists(test_panel_path):
+        html = html.replace("<!-- PANE_TEST -->", read_file(test_panel_path))
+    else:
+        print(f"Warning: {test_panel_path} not found, leaving PANE_TEST marker")
+
     # Embed JS files into <script> tag (generated metadata, main JS, then per-type config/test)
-    js_parts = [generate_output_defs_js()]
+    js_parts = [generate_gpio_js(), generate_source_rules_js(), generate_output_defs_js()]
     for js_file in JS_ORDER:
         js_path = os.path.join(JS_DIR, js_file)
         if not os.path.exists(js_path):
             print(f"Warning: {js_path} not found, skipping")
             continue
         js_parts.append(read_file(js_path))
-
-    for dir_path in [JS_CONFIG_DIR, JS_TEST_DIR]:
-        for js_file in collect_type_files(dir_path):
-            js_path = os.path.join(dir_path, js_file)
-            js_parts.append(read_file(js_path))
 
     combined_js = "\n".join(js_parts)
     html = html.replace("<script>", f"<script>\n{combined_js}\n</script>")

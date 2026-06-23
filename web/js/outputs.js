@@ -8,22 +8,9 @@ let savedOutputsJson = '';
 let currentTestIdx = -1;
 var OUTPUT_IDX = null;
 
-function getConfigModule(t) {
-  const name = 'CONFIG_TYPE_' + parseInt(t);
-  return window[name] || { toggleFields: function(){}, loadFields: function(o){}, saveFields: function(ch){ return ch; } };
-}
-function getTestModule(t) {
-  const name = 'TEST_TYPE_' + parseInt(t);
-  return window[name] || { showTest: function(idx){} };
-}
 function showTypeConfig(t) {
   document.querySelectorAll('.type-config').forEach(function(el) { el.style.display = 'none'; });
   var el = document.getElementById('type-config-' + parseInt(t));
-  if (el) el.style.display = '';
-}
-function showTypeTest(t) {
-  document.querySelectorAll('.type-test').forEach(function(el) { el.style.display = 'none'; });
-  var el = document.getElementById('type-test-' + parseInt(t));
   if (el) el.style.display = '';
 }
 
@@ -130,20 +117,67 @@ async function stopOutputTest(){
 }
 function showOutputTest(idx){
   const o=outputs[idx];
+  const t=parseInt(o.type);
   const p=document.getElementById('out-test-panel');
   document.getElementById('test-title').textContent='#'+(idx+1)+' '+deviceLabel(o);
   OUTPUT_IDX = idx;
-  showTypeTest(o.type);
+  const ui=TYPE_META.testUi[t];
+  ['test-level-group','test-dmx-group','test-led-group','test-stepper-group','test-mp3-group','test-7seg-group','test-motor-group'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display='none';
+  });
+  const groupId={1:'test-level-group',2:'test-dmx-group',3:'test-led-group',4:'test-motor-group',5:'test-stepper-group',6:'test-mp3-group',7:'test-7seg-group'}[ui];
+  const groupEl=document.getElementById(groupId);
+  if(groupEl) groupEl.style.display='';
+  const cmds=TYPE_META.testCmds[t];
+  const btnContainer=document.getElementById('test-buttons');
+  btnContainer.innerHTML='';
+  if(cmds&&cmds.length){
+    cmds.forEach(cmd=>{
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.className='btn bt';
+      btn.textContent=cmd.label;
+      btn.onclick=function(){sendTestCmd(idx,cmd.value);};
+      btnContainer.appendChild(btn);
+    });
+  }
   p.style.display='block';
   p.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function sendTestCmd(idx,val){
+  const o=outputs[idx];
+  const t=parseInt(o.type);
+  const ui=TYPE_META.testUi[t];
+  const dur=testDur();
+  if(ui===1){
+    const max=maxDmxFor(o);
+    const v=Math.max(0,Math.min(max,parseInt(document.getElementById('test_level_num').value)||0));
+    sendOutputTest(idx,valueBytes(v,parseInt(o.mc_resolution||8)),dur);
+  } else if(ui===2){
+    const ch=Math.max(1,Math.min(512,parseInt(document.getElementById('test_dmx_ch').value)||1));
+    const v=Math.max(0,Math.min(255,parseInt(document.getElementById('test_level_num').value)||0));
+    const vals=new Array(512).fill(0); vals[ch-1]=v;
+    sendOutputTest(idx,vals,dur);
+  } else if(ui===3){
+    testLed(idx,val||'all');
+  } else if(ui===5){
+    testStepper(idx,val);
+  } else if(ui===6){
+    testMp3(idx,val);
+  } else if(ui===7){
+    test7Seg(idx);
+  } else {
+    sendOutputTest(idx,[val],dur);
+  }
 }
 function anyStopTest(idx){
   sendOutputTest(parseInt(idx), [], 1000);
 }
 function calcRcCutoff(){
-  const r=parseFloat(document.getElementById('rc_r')?.value);
-  const c=parseFloat(document.getElementById('rc_c')?.value);
-  const fcEl=document.getElementById('rc_fc');
+  const r=parseFloat(cfgEl('rc_r')?.value);
+  const c=parseFloat(cfgEl('rc_c')?.value);
+  const fcEl=cfgEl('rc_fc');
   if(!r||!c||r<1||c<1){fcEl&&(fcEl.textContent='\u2014');return;}
   const fc=1/(2*Math.PI*r*c*1e-9);
   fcEl&&(fcEl.textContent=fc>=1000?fc.toFixed(0):fc.toFixed(1));
@@ -196,7 +230,7 @@ function testSinglePreset(idx,val){
   }
 }
 function testMotor(idx,dir){
-  const o=outputs[idx], res=parseInt(o.mc_resolution||8), max=maxDmxFor(o), speed=Math.max(0,Math.min(255,parseInt(document.getElementById('test_level_num').value)||0));
+  const o=outputs[idx], res=parseInt(o.mc_resolution||8), max=maxDmxFor(o), speed=Math.max(0,Math.min(255,parseInt((document.getElementById('test_motor_num')||document.getElementById('test_level_num')||{}).value)||0));
   const center=Math.floor(max/2), v=dir===0?center:(dir>0?Math.round(center+(speed/255)*(max-center)):Math.round(center-(speed/255)*center));
   sendOutputTest(idx,valueBytes(v,res),testDur());
 }
@@ -234,9 +268,9 @@ function testMp3(idx,action){
 
 function toggleOutFields(){
   const t=parseInt(document.getElementById('no_type').value);
-  const mcMode = parseInt(document.getElementById('mc_mode')?.value||0);
+  const mcMode = parseInt(cfgEl('mc_mode')?.value||0);
   // Helper: safe style access; no-op if element missing
-  const _st=(id,v)=>{const e=document.getElementById(id);if(e)e.style.display=v;};
+  const _st=(id,v)=>{const e=cfgEl(id);if(e)e.style.display=v;};
   if(!document.getElementById('no_source')) renderPinRows();
   const srcSelect=document.getElementById('no_source');
   
@@ -297,14 +331,12 @@ function toggleOutFields(){
   _st('no_ord_grp',(t===3||t===5)?'':'none');
   _st('no_led_proto_grp',(t===3)?'':'none');
   
-  setModeOptions(is7Seg?'7seg':'motor', t);
   _st('no_mc_grp',(isMc||is7Seg||isFuncGen||isPwmDac)?'':'none');
   _st('no_sol_grp',isSolenoid?'':'none');
   _st('no_smoke_grp',isSmoke?'':'none');
   if(isDfPlayer) renderPinRows();
-  if(isMc || is7Seg) setResolutionOptions(isStepper, is7Seg);
   
-  const hMode = parseInt(document.getElementById('mc_homing_mode').value);
+  const hMode = parseInt(cfgEl('mc_homing_mode')?.value||0);
   const colorOrder = parseInt(document.getElementById('no_ord').value||0);
   _st('no_pca_channel2_grp','none');
   _st('no_pca_channel3_grp','none');
@@ -313,11 +345,11 @@ function toggleOutFields(){
   if (isMc || is7Seg || isFuncGen || isPwmDac) {
     _st('mc_mode_grp',(is7Seg || isMotor) ? '' : 'none');
     _st('mc_res_grp',(isMc || isPwmDac || is7Seg) ? '' : 'none');
-    const resLbl = document.getElementById('mc_resolution_lbl');
+    const resLbl = cfgEl('mc_resolution_lbl');
     if(resLbl) resLbl.textContent = is7Seg ? 'Decode Mode' : 'Resolution';
-    const freqGrp = document.getElementById('mc_freq_grp');
-    const freqLbl = document.getElementById('mc_freq_lbl');
-    const pwmDacCalGrp = document.getElementById('pwm_dac_cal_grp');
+    const freqGrp = cfgEl('mc_freq_grp');
+    const freqLbl = cfgEl('mc_freq_lbl');
+    const pwmDacCalGrp = cfgEl('pwm_dac_cal_grp');
     if (isFuncGen || isPwmDac) {
       if(freqGrp) freqGrp.style.display = '';
       if(freqLbl) freqLbl.textContent = "PWM Carrier Frequency (Hz)";
@@ -370,12 +402,12 @@ function toggleOutFields(){
   const pinMapContainer = document.getElementById('pin-mapping-container');
   if(pinMapContainer) pinMapContainer.style.display = '';
   showTypeConfig(t);
-  getConfigModule(t).toggleFields();
 }
 
-document.getElementById('mc_mode').addEventListener('change', toggleOutFields);
-document.getElementById('mc_homing_mode').addEventListener('change', toggleOutFields);
-document.getElementById('no_ord').addEventListener('change', toggleOutFields);
+document.addEventListener('change', function(e){
+  var id=e.target&&e.target.id;
+  if(id==='mc_mode'||id==='mc_homing_mode'||id==='no_ord') toggleOutFields();
+});
 document.getElementById('status_led_pin').addEventListener('change', autoAssignOutputPins);
 document.getElementById('zc_pin').addEventListener('change', autoAssignOutputPins);
 
@@ -389,8 +421,8 @@ function editOutput(idx){
   document.getElementById('no_type').value=o.type;
   toggleOutFields();
   
-  function setVal(id,val){const el=document.getElementById(id);if(el)el.value=val;}
-  function setChk(id,val){const el=document.getElementById(id);if(el)el.checked=val;}
+  function setVal(id,val){const el=cfgEl(id);if(el)el.value=val;}
+  function setChk(id,val){const el=cfgEl(id);if(el)el.checked=val;}
   
   setVal('no_source',o.source??0);
   setVal('no_pin',o.pin);
@@ -404,8 +436,7 @@ function editOutput(idx){
   setVal('no_cnt',o.led_count||170);
   setVal('no_ord',o.color_order||0);
   setVal('no_led_proto',o.led_protocol??0);
-  if(o.type===4||o.type===5||o.type===6||o.type===7||o.type===8||o.type===15) setResolutionOptions(o.type===7);
-  
+
   setVal('no_pin2',o.pin2??255);
   setVal('no_pin3',o.pin3??255);
   setVal('no_pin4',o.pin4??255);
@@ -478,7 +509,6 @@ function editOutput(idx){
     if(invEl) invEl.checked = !!((sinvs >> s) & 1);
   }
   
-  getConfigModule(o.type).loadFields(o);
   document.getElementById('out-add-btn').textContent='Update Channel';
   document.getElementById('out-cancel-btn').style.display='';
   document.getElementById('edit-idx-label').textContent=idx+1;
@@ -558,9 +588,9 @@ function addOrUpdateOutput(){
     pin3_source: gv('no_pin3_source',0),
     pin3_addr: gv('no_pin3_addr',32),
     pin3_channel: gv('no_pin3_channel',255),
-    mc_mode: parseInt(document.getElementById('mc_mode').value),
-    mc_resolution: parseInt(document.getElementById('mc_resolution').value),
-    mc_freq: parseInt(document.getElementById('mc_freq').value),
+    mc_mode: parseInt(cfgEl('mc_mode')?.value||0),
+    mc_resolution: parseInt(cfgEl('mc_resolution')?.value||8),
+    mc_freq: parseInt(cfgEl('mc_freq')?.value||1000),
     pwm_dac_mode: parseInt(document.getElementById('pwm_dac_mode')?.value || 0),
     pwm_dac_min: dutyPctToInt('pwm_dac_min', 0),
     pwm_dac_max: dutyPctToInt('pwm_dac_max', 10000),
@@ -568,17 +598,17 @@ function addOrUpdateOutput(){
     mc_min_us: parseInt(document.getElementById('mc_min_us').value),
     mc_max_us: parseInt(document.getElementById('mc_max_us').value),
     mc_steps_per_rev: parseInt(document.getElementById('mc_steps_per_rev').value),
-    mc_unit_type: parseInt(document.getElementById('mc_unit_type').value),
-    mc_scale_factor: parseFloat(document.getElementById('mc_scale_factor').value),
-    mc_invert: document.getElementById('mc_invert').checked,
-    mc_brake: document.getElementById('mc_brake').checked,
+    mc_unit_type: parseInt(cfgEl('mc_unit_type')?.value||0),
+    mc_scale_factor: parseFloat(cfgEl('mc_scale_factor')?.value||'0'),
+    mc_invert: cfgEl('mc_invert')?.checked||false,
+    mc_brake: cfgEl('mc_brake')?.checked||false,
     mc_enable_active_high: type===7?(document.getElementById('no_pin3_invert')?.checked || false):false,
     mc_dir_invert: type===7?(document.getElementById('no_pin2_invert')?.checked || false):false,
     mc_step_invert: type===7?(document.getElementById('no_pin_invert')?.checked || false):false,
-    mc_homing_mode: parseInt(document.getElementById('mc_homing_mode').value),
-    mc_homing_dir: parseInt(document.getElementById('mc_homing_dir').value),
-    mc_homing_speed: parseInt(document.getElementById('mc_homing_speed').value),
-    mc_homing_timeout: parseInt(document.getElementById('mc_homing_timeout').value),
+    mc_homing_mode: parseInt(cfgEl('mc_homing_mode')?.value||0),
+    mc_homing_dir: parseInt(cfgEl('mc_homing_dir')?.value||0),
+    mc_homing_speed: parseInt(cfgEl('mc_homing_speed')?.value||500),
+    mc_homing_timeout: parseInt(cfgEl('mc_homing_timeout')?.value||5),
     solenoid_mode: 0,
     solenoid_threshold: (type===18) ? parseInt(document.getElementById('smoke_threshold')?.value || 127) : parseInt(document.getElementById('sol_threshold')?.value || 127),
     solenoid_pulse_ms: parseInt(document.getElementById('sol_pulse_ms')?.value || 50),
@@ -590,7 +620,7 @@ function addOrUpdateOutput(){
     shoot_duration_ms: parseInt(document.getElementById('smoke_shoot')?.value || 1000),
     smoke_lockout_ms: parseInt(document.getElementById('smoke_lockout')?.value || 2000),
     seg_pins: (type===12||type===13)? [
-      ((type===12||type===13) && (parseInt(document.getElementById('mc_mode').value)>=6 && parseInt(document.getElementById('mc_mode').value)<=9)) ? gv('no_seg_pin_0', 255) : gv('no_pin', 255),
+      ((type===12||type===13) && (parseInt(cfgEl('mc_mode')?.value||0)>=6 && parseInt(cfgEl('mc_mode')?.value||0)<=9)) ? gv('no_seg_pin_0', 255) : gv('no_pin', 255),
       gv('no_seg_pin_1', 255),
       gv('no_seg_pin_2', 255),
       gv('no_seg_pin_3', 255),
@@ -600,26 +630,26 @@ function addOrUpdateOutput(){
       gv('no_seg_pin_7', 255)
     ] : [255, 255, 255, 255, 255, 255, 255, 255],
     seg_sources: (type===12||type===13)? [0,1,2,3,4,5,6,7].map(s=>{
-      if (s === 0 && !(parseInt(document.getElementById('mc_mode').value)>=6 && parseInt(document.getElementById('mc_mode').value)<=9)) {
+      if (s === 0 && !(parseInt(cfgEl('mc_mode')?.value||0)>=6 && parseInt(cfgEl('mc_mode')?.value||0)<=9)) {
         return parseInt(document.getElementById('no_source').value);
       }
       return gv('no_seg_source_'+s,0);
     }) : [0,0,0,0,0,0,0,0],
     seg_addrs: (type===12||type===13)? [0,1,2,3,4,5,6,7].map(s=>{
-      if (s === 0 && !(parseInt(document.getElementById('mc_mode').value)>=6 && parseInt(document.getElementById('mc_mode').value)<=9)) {
+      if (s === 0 && !(parseInt(cfgEl('mc_mode')?.value||0)>=6 && parseInt(cfgEl('mc_mode')?.value||0)<=9)) {
         return parseInt(document.getElementById('no_pca_addr')?.value||32);
       }
       return gv('no_seg_addr_'+s,32);
     }) : [32,32,32,32,32,32,32,32],
     seg_channels: (type===12||type===13)? [0,1,2,3,4,5,6,7].map(s=>{
-      if (s === 0 && !(parseInt(document.getElementById('mc_mode').value)>=6 && parseInt(document.getElementById('mc_mode').value)<=9)) {
+      if (s === 0 && !(parseInt(cfgEl('mc_mode')?.value||0)>=6 && parseInt(cfgEl('mc_mode')?.value||0)<=9)) {
         const mainSrc = parseInt(document.getElementById('no_source').value);
         return mainSrc !== 0 ? parseInt(document.getElementById('no_pca_channel')?.value||255) : 255;
       }
       return gv('no_seg_channel_'+s,255);
     }) : [255,255,255,255,255,255,255,255],
     seg_inverts: (type===12||type===13) ? [0,1,2,3,4,5,6,7].reduce((acc, s)=>{
-      if (s === 0 && !(parseInt(document.getElementById('mc_mode').value)>=6 && parseInt(document.getElementById('mc_mode').value)<=9)) {
+      if (s === 0 && !(parseInt(cfgEl('mc_mode')?.value||0)>=6 && parseInt(cfgEl('mc_mode')?.value||0)<=9)) {
         const isInv = document.getElementById('no_pin_invert')?.checked || false;
         return acc | (isInv ? (1 << s) : 0);
       }
@@ -627,8 +657,6 @@ function addOrUpdateOutput(){
       return acc | (isInv ? (1 << s) : 0);
     }, 0) : 0
   };
-
-  getConfigModule(type).saveFields(ch);
 
   const statusPin=parseInt(document.getElementById('status_led_pin').value);
   const zcPin=parseInt(document.getElementById('zc_pin').value);

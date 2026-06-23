@@ -52,37 +52,22 @@ async function diagRefreshSysInfo(){
   }
 }
 
-const I2C_DEVICES={
-  '0x20':'MCP23017 / TCA9555 / PCF8574',
-  '0x21':'MCP23017 / TCA9555 / PCF8574',
-  '0x22':'MCP23017 / TCA9555 / PCF8574',
-  '0x23':'MCP23017 / TCA9555 / PCF8574',
-  '0x24':'MCP23017 / TCA9555 / PCF8574',
-  '0x25':'MCP23017 / TCA9555 / PCF8574',
-  '0x26':'MCP23017 / TCA9555 / PCF8574',
-  '0x27':'MCP23017 / TCA9555 / PCF8574',
-  '0x3C':'SSD1306 OLED',
-  '0x3D':'SSD1306 OLED',
-  '0x3F':'PCF8574 LCD Backpack',
-  '0x40':'PCA9685 PWM Driver',
-  '0x41':'PCA9685 PWM Driver',
-  '0x42':'PCA9685 PWM Driver',
-  '0x43':'PCA9685 PWM Driver',
-  '0x44':'PCA9685 PWM Driver',
-  '0x45':'PCA9685 PWM Driver',
-  '0x46':'PCA9685 PWM Driver',
-  '0x47':'PCA9685 PWM Driver',
-  '0x48':'ADS1115 / PCF8591',
-  '0x49':'ADS1115 / PCF8591',
-  '0x4A':'ADS1115 / PCF8591',
-  '0x4B':'ADS1115 / PCF8591',
-  '0x50':'AT24C EEPROM',
-  '0x51':'AT24C EEPROM',
-  '0x57':'AT24C EEPROM',
-  '0x68':'DS3231 RTC / MPU6050',
-  '0x76':'BME280 / BMP280',
-  '0x77':'BME280 / BMP280',
-};
+// I2C device guess table — built from SOURCE_DATA.addressRules + common non-source I2C devices
+const I2C_GUESS_ENTRIES = [
+  ...SOURCE_DATA.addressRules.flatMap(r =>
+    r.ranges.filter(ra => ra[0] !== 0 || ra[1] !== 0).flatMap(ra => {
+      const name = SOURCES[r.source] || 'I2C Device';
+      const addrs = [];
+      for (let a = ra[0]; a <= ra[1]; a++) addrs.push(a);
+      return addrs;
+    }).map(addr => [addr, SOURCES[r.source]])
+  ),
+  [0x3C, 'SSD1306 OLED'],[0x3D, 'SSD1306 OLED'],[0x3F, 'PCF8574 LCD Backpack'],
+  [0x48, 'ADS1115 / PCF8591'],[0x49, 'ADS1115 / PCF8591'],[0x4A, 'ADS1115 / PCF8591'],[0x4B, 'ADS1115 / PCF8591'],
+  [0x50, 'AT24C EEPROM'],[0x51, 'AT24C EEPROM'],[0x57, 'AT24C EEPROM'],
+  [0x68, 'DS3231 RTC / MPU6050'],[0x76, 'BME280 / BMP280'],[0x77, 'BME280 / BMP280'],
+];
+const I2C_DEVICES = Object.fromEntries(I2C_GUESS_ENTRIES);
 async function scanI2c(){
   const resultDiv=document.getElementById('i2c-scan-result');
   resultDiv.innerHTML='<span style="color:#475569">Scanning...</span>';

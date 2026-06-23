@@ -88,10 +88,38 @@ struct ModeCost {
     uint16_t dmxSlots;    // 0 = use dmxValueByteCount(resolution); >0 = fixed
 };
 
+// Resolution bitmask constants
+constexpr uint16_t RES_BIT_8  = 1 << 0;
+constexpr uint16_t RES_BIT_10 = 1 << 1;
+constexpr uint16_t RES_BIT_12 = 1 << 2;
+constexpr uint16_t RES_BIT_16 = 1 << 3;
+constexpr uint16_t RES_BIT_24 = 1 << 4;
+constexpr uint16_t RES_BIT_32 = 1 << 5;
+constexpr uint16_t RES_BITS_8_10_12_16 = RES_BIT_8|RES_BIT_10|RES_BIT_12|RES_BIT_16;
+
+// Test UI template — determines which input controls the test panel shows
+enum TestUiType : uint8_t {
+    TEST_UI_NONE,       // No test panel (not used)
+    TEST_UI_SLIDER,     // 0-255 level slider + preset buttons
+    TEST_UI_DMX,        // Channel selector + level
+    TEST_UI_LED,        // Color picker + pixel selector
+    TEST_UI_MOTOR,      // Speed slider + direction buttons
+    TEST_UI_STEPPER,    // Position + Speed + command buttons
+    TEST_UI_DFPLAYER,   // Track + Volume + Play/Stop
+    TEST_UI_7SEG,       // Number or text input
+};
+
 struct OutputModeDef {
     uint8_t type;
     int8_t mode;
     const char* name;
+    const char* modeKey;
+    uint16_t resolutionBits;
+    uint16_t slotActiveMask;
+    bool segmentLayout;
+    TestUiType testUi;
+    const TypeProtocol::TestCmdDef* testCmds;
+    uint8_t testCmdCount;
     ModeCost cost;
     const PinRule* pins;
     uint8_t pinCount;
@@ -198,6 +226,29 @@ constexpr PinRule PINS_SMOKE[] = {
     {"pin2", "Shoot Valve", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 
+// Web UI display names (1:1 with type IDs 0-18)
+constexpr const char* TYPE_DISPLAY_NAMES[] = {
+    "AC Dimmer",              // 0
+    "DMX Output",             // 1
+    "Relay",                  // 2
+    "RGB LED",                // 3
+    "Single Color LED",       // 4
+    "Analog RGB / RGBW",      // 5
+    "DC Motor",               // 6
+    "Stepper",                // 7
+    "RC Servo",               // 8
+    "Passive Buzzer",         // 9
+    "DFPlayer MP3",           // 10
+    "7-Segment 2-Pin",        // 11
+    "7-Segment DD 7-Pin PWM", // 12
+    "7-Segment DD 8-Pin PWM", // 13
+    "DAC",                    // 14
+    "PWM DAC",                // 15
+    "Function Gen",           // 16
+    "Solenoid Trigger",       // 17
+    "Smoke Shooter"           // 18
+};
+
 constexpr HardwareCost HW_NONE = {0, 0, 0, 0, 0};
 constexpr HardwareCost HW_LEDC_1 = {1, 0, 0, 0, 0};
 constexpr HardwareCost HW_LEDC_2 = {2, 0, 0, 0, 0};
@@ -245,35 +296,102 @@ constexpr ModeCost COST_SOLENOID = modeCost(10, 0, HW_NONE, 0, 0, 1);
 constexpr ModeCost COST_SMOKE = modeCost(25, 0, HW_NONE, 0, 0, 1);
 
 constexpr OutputModeDef OUTPUT_MODES[] = {
-    {TYPE_DIMMER, -1, "Triac dimmer", COST_DIMMER, PINS_DIMMER, 1},
-    {TYPE_DMX, -1, "DMX serial", COST_DMX_SERIAL, PINS_DMX, 1},
-    {TYPE_RELAY, -1, "Relay", COST_RELAY, PINS_RELAY_DIGITAL, 1},
-    {TYPE_LED_STRIP, -1, "RGB/RGBW strip", COST_LED_STRIP_BASE, PINS_LED_STRIP, 1},
-    {TYPE_SINGLE_LED, -1, "Single-color PWM", COST_SINGLE_LED, PINS_PWM, 1},
-    {TYPE_ANALOG_RGB, -1, "Analog RGB/RGBW", COST_ANALOG_RGBW, PINS_ANALOG_RGB, 4},
-    {TYPE_MOTOR, 0, "PWM + DIR", COST_MOTOR_PWM_DIR, PINS_MOTOR_PWM_DIR, 2},
-    {TYPE_MOTOR, 1, "IN1 + IN2", COST_MOTOR_IN1_IN2, PINS_MOTOR_PWM_DIR, 2},
-    {TYPE_MOTOR, 2, "IN1 + IN2 + EN", COST_MOTOR_IN1_IN2_EN, PINS_MOTOR_IN1_IN2_EN, 3},
-    {TYPE_STEPPER, -1, "Stepper", COST_STEPPER, PINS_STEPPER, 4},
-    {TYPE_SERVO, -1, "RC servo", COST_SERVO, PINS_SERVO, 1},
-    {TYPE_BUZZER, -1, "Passive buzzer", COST_BUZZER, PINS_BUZZER, 1},
-    {TYPE_DFPLAYER, -1, "DFPlayer", COST_DFPLAYER, PINS_DFPLAYER, 2},
-    {TYPE_TM1637, -1, "TM1637", COST_TM1637, PINS_TM1637, 2},
-    {TYPE_7SEG_7PIN, -1, "7-seg 7-pin", COST_7SEG_7PIN, PINS_7SEG_DIRECT, 7},
-    {TYPE_7SEG_7PIN, 4, "7-seg 7-pin direct dim CA", COST_7SEG_7PIN, PINS_7SEG_DIMMED, 7},
-    {TYPE_7SEG_7PIN, 5, "7-seg 7-pin direct dim CC", COST_7SEG_7PIN, PINS_7SEG_DIMMED, 7},
-    {TYPE_7SEG_7PIN, 6, "7-seg 7-pin common anode dim", COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
-    {TYPE_7SEG_7PIN, 7, "7-seg 7-pin common cathode dim", COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
-    {TYPE_7SEG_8PIN, -1, "7-seg 8-pin", COST_7SEG_8PIN, PINS_7SEG_DIRECT, 8},
-    {TYPE_7SEG_8PIN, 4, "7-seg 8-pin direct dim CA", COST_7SEG_8PIN, PINS_7SEG_DIMMED, 8},
-    {TYPE_7SEG_8PIN, 5, "7-seg 8-pin direct dim CC", COST_7SEG_8PIN, PINS_7SEG_DIMMED, 8},
-    {TYPE_7SEG_8PIN, 8, "7-seg 8-pin common anode dim", COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
-    {TYPE_7SEG_8PIN, 9, "7-seg 8-pin common cathode dim", COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
-    {TYPE_DAC, -1, "I2C DAC", COST_DAC, PINS_DAC, 1},
-    {TYPE_PWM_DAC, -1, "PWM DAC", COST_PWM_DAC, PINS_PWM_DAC, 1},
-    {TYPE_FUNC_GEN, -1, "Function generator", COST_FUNC_GEN, PINS_FUNC_GEN, 1},
-    {TYPE_SOLENOID, -1, "Solenoid", COST_SOLENOID, PINS_SOLENOID, 1},
-    {TYPE_SMOKE, -1, "Smoke shooter", COST_SMOKE, PINS_SMOKE, 2}
+    {TYPE_DIMMER, -1,    "Triac dimmer",              "default",    0, 1, false, TEST_UI_SLIDER,   Type0::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type0::TEST_COMMANDS),   COST_DIMMER,               PINS_DIMMER, 1},
+    {TYPE_DMX, -1,       "DMX serial",                "default",    0, 1, false, TEST_UI_DMX,      Type1::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type1::TEST_COMMANDS),   COST_DMX_SERIAL,           PINS_DMX, 1},
+    {TYPE_RELAY, -1,     "Relay",                     "default",    0, 1, false, TEST_UI_SLIDER,   Type2::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type2::TEST_COMMANDS),   COST_RELAY,                PINS_RELAY_DIGITAL, 1},
+    {TYPE_LED_STRIP, -1, "RGB/RGBW strip",            "default",    0, 1, false, TEST_UI_LED,      Type3::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type3::TEST_COMMANDS),   COST_LED_STRIP_BASE,       PINS_LED_STRIP, 1},
+    {TYPE_SINGLE_LED, -1,"Single-color PWM",           "default",    RES_BITS_8_10_12_16, 1, false, TEST_UI_SLIDER,     Type4::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type4::TEST_COMMANDS),   COST_SINGLE_LED,           PINS_PWM, 1},
+    {TYPE_ANALOG_RGB, -1,"Analog RGB/RGBW",            "default",    RES_BITS_8_10_12_16, 15, false, TEST_UI_SLIDER,     Type5::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type5::TEST_COMMANDS),   COST_ANALOG_RGBW,          PINS_ANALOG_RGB, 4},
+    {TYPE_MOTOR, 0,      "PWM + DIR",                 "pwmDir",     RES_BITS_8_10_12_16, 3, false, TEST_UI_MOTOR,      Type6::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type6::TEST_COMMANDS),   COST_MOTOR_PWM_DIR,        PINS_MOTOR_PWM_DIR, 2},
+    {TYPE_MOTOR, 1,      "IN1 + IN2",                 "in1In2",     RES_BITS_8_10_12_16, 3, false, TEST_UI_MOTOR,      Type6::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type6::TEST_COMMANDS),   COST_MOTOR_IN1_IN2,        PINS_MOTOR_PWM_DIR, 2},
+    {TYPE_MOTOR, 2,      "IN1 + IN2 + EN",            "in1In2En",   RES_BITS_8_10_12_16, 7, false, TEST_UI_MOTOR,      Type6::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type6::TEST_COMMANDS),   COST_MOTOR_IN1_IN2_EN,     PINS_MOTOR_IN1_IN2_EN, 3},
+    {TYPE_STEPPER, -1,   "Stepper",                   "default",    RES_BIT_8|RES_BIT_10|RES_BIT_12|RES_BIT_16|RES_BIT_24|RES_BIT_32, 15, false, TEST_UI_STEPPER, Type7::TEST_COMMANDS, TYPEPROTO_ARRAY_SIZE(Type7::TEST_COMMANDS), COST_STEPPER, PINS_STEPPER, 4},
+    {TYPE_SERVO, -1,     "RC servo",                  "default",    0, 1, false, TEST_UI_SLIDER,   Type8::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type8::TEST_COMMANDS),   COST_SERVO,                PINS_SERVO, 1},
+    {TYPE_BUZZER, -1,    "Passive buzzer",            "default",    0, 1, false, TEST_UI_SLIDER,   Type9::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type9::TEST_COMMANDS),   COST_BUZZER,               PINS_BUZZER, 1},
+    {TYPE_DFPLAYER, -1,  "DFPlayer",                  "default",    0, 3, false, TEST_UI_DFPLAYER, Type10::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type10::TEST_COMMANDS),  COST_DFPLAYER,             PINS_DFPLAYER, 2},
+    {TYPE_TM1637, -1,    "TM1637",                    "default",    RES_BIT_8|RES_BIT_10, 3, false, TEST_UI_7SEG,     Type11::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type11::TEST_COMMANDS),  COST_TM1637,               PINS_TM1637, 2},
+    {TYPE_7SEG_7PIN, -1, "7-seg 7-pin",               "default",    RES_BIT_8|RES_BIT_10, 127, false, TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_7PIN,            PINS_7SEG_DIRECT, 7},
+    {TYPE_7SEG_7PIN, 4,  "7-seg 7-pin direct dim CA", "directDim",  RES_BIT_8|RES_BIT_10, 127, true,  TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_7PIN,            PINS_7SEG_DIMMED, 7},
+    {TYPE_7SEG_7PIN, 5,  "7-seg 7-pin direct dim CC", "directDim",  RES_BIT_8|RES_BIT_10, 127, true,  TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_7PIN,            PINS_7SEG_DIMMED, 7},
+    {TYPE_7SEG_7PIN, 6,  "7-seg 7-pin common anode dim","commonDim", RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
+    {TYPE_7SEG_7PIN, 7,  "7-seg 7-pin common cathode dim","commonDim",RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
+    {TYPE_7SEG_8PIN, -1, "7-seg 8-pin",               "default",    RES_BIT_8|RES_BIT_10, 255, false, TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_8PIN,            PINS_7SEG_DIRECT, 8},
+    {TYPE_7SEG_8PIN, 4,  "7-seg 8-pin direct dim CA", "directDim",  RES_BIT_8|RES_BIT_10, 255, true,  TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_8PIN,            PINS_7SEG_DIMMED, 8},
+    {TYPE_7SEG_8PIN, 5,  "7-seg 8-pin direct dim CC", "directDim",  RES_BIT_8|RES_BIT_10, 255, true,  TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_8PIN,            PINS_7SEG_DIMMED, 8},
+    {TYPE_7SEG_8PIN, 8,  "7-seg 8-pin common anode dim","commonDim",RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
+    {TYPE_7SEG_8PIN, 9,  "7-seg 8-pin common cathode dim","commonDim",RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
+    {TYPE_DAC, -1,       "I2C DAC",                   "default",    0, 1, false, TEST_UI_SLIDER,   Type14::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type14::TEST_COMMANDS),  COST_DAC,                 PINS_DAC, 1},
+    {TYPE_PWM_DAC, -1,   "PWM DAC",                   "default",    RES_BITS_8_10_12_16, 1, false, TEST_UI_SLIDER,   Type15::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type15::TEST_COMMANDS),  COST_PWM_DAC,             PINS_PWM_DAC, 1},
+    {TYPE_FUNC_GEN, -1,  "Function generator",         "default",    0, 1, false, TEST_UI_SLIDER,   Type16::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type16::TEST_COMMANDS),  COST_FUNC_GEN,           PINS_FUNC_GEN, 1},
+    {TYPE_SOLENOID, -1,  "Solenoid",                   "default",    0, 1, false, TEST_UI_SLIDER,   Type17::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type17::TEST_COMMANDS),  COST_SOLENOID,           PINS_SOLENOID, 1},
+    {TYPE_SMOKE, -1,     "Smoke shooter",              "default",    0, 3, false, TEST_UI_SLIDER,   Type18::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type18::TEST_COMMANDS),  COST_SMOKE,              PINS_SMOKE, 2}
+};
+
+// Per-type metadata arrays (indexed by type ID 0..18, 0 = dynamic/runtime-computed)
+constexpr const char* TYPE_CONFIG_LABELS[] = {
+    "ZC dimmer",              // 0
+    "DMX512 serial",          // 1
+    "Threshold 128",          // 2
+    "",                       // 3 (dynamic: color order + LED count)
+    "",                       // 4 (dynamic: res-bit PWM @ freq Hz)
+    "",                       // 5 (dynamic: RGBW/RGB Analog @ freq Hz)
+    "",                       // 6 (dynamic: mode res-bit)
+    "",                       // 7 (dynamic: res-bit position)
+    "",                       // 8 (dynamic: min-max us)
+    "Passive Buzzer",         // 9
+    "DFPlayer MP3",           // 10
+    "7-Seg TM1637",           // 11
+    "7-Seg DD 7-Pin PWM",    // 12
+    "7-Seg DD 8-Pin PWM",    // 13
+    "I2C DAC",                // 14
+    "",                       // 15 (dynamic: PWM DAC mode @ freq Hz res-bit)
+    "Function Generator",     // 16
+    "Solenoid",               // 17
+    "Smoke Shooter"           // 18
+};
+
+constexpr uint16_t TYPE_CHANNEL_COUNTS[] = {
+    1,    // 0 AC Dimmer
+    512,  // 1 DMX
+    1,    // 2 Relay
+    0,    // 3 LED strip (dynamic)
+    1,    // 4 Single LED
+    0,    // 5 Analog RGB (3 or 4)
+    1,    // 6 DC Motor
+    1,    // 7 Stepper
+    1,    // 8 RC Servo
+    1,    // 9 Buzzer
+    3,    // 10 DFPlayer
+    1,    // 11 TM1637
+    0,    // 12 7-Seg 7-Pin (dynamic)
+    0,    // 13 7-Seg 8-Pin (dynamic)
+    1,    // 14 DAC
+    1,    // 15 PWM DAC
+    5,    // 16 Func Gen
+    1,    // 17 Solenoid
+    1     // 18 Smoke
+};
+
+constexpr uint16_t TYPE_BYTE_COUNTS[] = {
+    1,    // 0 AC Dimmer
+    512,  // 1 DMX
+    1,    // 2 Relay
+    0,    // 3 LED strip (dynamic)
+    0,    // 4 Single LED (dynamic: valueByteCount(resolution))
+    0,    // 5 Analog RGB (dynamic: 3 or 4)
+    0,    // 6 DC Motor (dynamic)
+    0,    // 7 Stepper (dynamic)
+    2,    // 8 Servo
+    2,    // 9 Buzzer
+    3,    // 10 DFPlayer
+    2,    // 11 TM1637
+    0,    // 12 7-Seg 7-Pin (dynamic)
+    0,    // 13 7-Seg 8-Pin (dynamic)
+    2,    // 14 DAC
+    0,    // 15 PWM DAC (dynamic)
+    10,   // 16 Func Gen
+    1,    // 17 Solenoid
+    1     // 18 Smoke
 };
 
 inline const OutputModeDef* modeDef(uint8_t type, uint8_t mode) {
