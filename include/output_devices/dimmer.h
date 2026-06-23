@@ -70,7 +70,7 @@ public:
 
         std::vector<OutputChannel>& chs = outputCtrl.getChannels();
         for (auto& ch : chs) {
-            if (ch.type == OutputDefs::TYPE_DIMMER && ch.dmxBuffer != nullptr) {
+            if (ch.type == OutputDefs::TYPE_DIMMER && ch.dmxBuffer != nullptr && ch.pin != 255) {
                 if (numDimmerChannels < MAX_DIMMER_CHANNELS) {
                     dimmerChannels[numDimmerChannels].pin = ch.pin;
                     dimmerChannels[numDimmerChannels].dmxVal = &ch.dmxBuffer;

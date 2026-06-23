@@ -8,6 +8,7 @@
 
 inline void stepperSetup(OutputChannel& ch, FastAccelStepperEngine& engine, FastAccelStepper** steppers, uint8_t& stepperCount) {
     if (ch.source != 0) return;
+    if (ch.pin == 255) return;
     if (stepperCount >= 8) return;
 
     FastAccelStepper* stepper = engine.stepperConnectToPin(ch.pin);

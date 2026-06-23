@@ -5,6 +5,7 @@
 #include "output_control.h"
 
 inline void solenoidSetup(OutputChannel& ch) {
+    if (ch.pin == 255) return;
     pinMode(ch.pin, OUTPUT);
     digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
     if (ch.solenoid_pulse_ms == 0) ch.solenoid_pulse_ms = 50;

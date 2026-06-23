@@ -6,6 +6,7 @@
 #include "output_control.h"
 
 inline void ledStripSetup(OutputChannel& ch, uint8_t& rmtIdx) {
+    if (ch.pin == 255) return;
     if (ch.pixelStrip != nullptr) {
         delete ch.pixelStrip;
         ch.pixelStrip = nullptr;

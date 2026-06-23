@@ -7,6 +7,7 @@
 #include "ledc_helpers.h"
 
 inline void funcGenSetup(OutputChannel& ch, uint8_t& ledcIdx) {
+    if (ch.pin == 255) return;
     uint8_t pwmChan = allocateLedc(ledcIdx);
     if (pwmChan != 255) {
         ch.funcGen = new FuncGenController();

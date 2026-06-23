@@ -6,6 +6,7 @@
 #include "ledc_helpers.h"
 
 inline void motorSetup(OutputChannel& ch, uint8_t& ledcIdx) {
+    if (ch.pin == 255) return;
     if (ch.mc_mode == 0) {
         if (ch.source == 0) {
             uint8_t pwmFwd = allocateLedc(ledcIdx);

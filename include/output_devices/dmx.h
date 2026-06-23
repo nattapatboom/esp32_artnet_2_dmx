@@ -7,6 +7,7 @@
 #include "output_devices/rmt_dmx.h"
 
 inline void dmxSetup(OutputChannel& ch, bool& uart2Used, bool& uart1Used, uint8_t& rmtIdx) {
+    if (ch.pin == 255) return;
     if (ch.dmxPort != 255) {
         dmx_driver_delete((dmx_port_t)ch.dmxPort);
         ch.dmxPort = 255;

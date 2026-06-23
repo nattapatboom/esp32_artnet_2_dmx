@@ -6,6 +6,7 @@
 #include "ledc_helpers.h"
 
 inline void pwmDacSetup(OutputChannel& ch, uint8_t& ledcIdx) {
+    if (ch.pin == 255) return;
     uint8_t pwmChan = allocateLedc(ledcIdx);
     if (pwmChan != 255) {
         ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
