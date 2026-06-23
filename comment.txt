@@ -1,0 +1,21 @@
+- อยากให้จัดการตัวโค้ดใหม่ให้เป็นระเบียบ เช่น แยกกหน้า define
+ในหน้า define score
+ mode 1 - cpu base cost = xx
+          cpu loop cost = xx
+          ram bass cost = xx
+          hw = usart, rmt
+ mode 2 - cpu base cost = xx
+          cpu loop cost = xx
+          ram bass cost = xx
+          hw = usart, rmt
+
+หน้า define rule
+mode 1 - pin 1 - hw = gpio,pca,i2c expander
+       - pin 2 - hw = gpio,pca,i2c expander
+mode 2 - pin 1 - hw = gpio
+       - pin 2 - hw = gpio,pca,i2c 
+       - pin 3 - hw = gpio,pca,i2c expander
+       - pin 4 - hw = gpio, gpio input, i2c expander
+
+อันนี้ตัวอย่างนะ ดูให้เหมาะสมอีกที อะไรแยยกมาได้ก็พยายามแยกน่ะ
+ใน main.cpp เเริ่มยาวและ ถ้ามีหมวดหมู่ไหนแยกออกมาได้ลองแยกดู

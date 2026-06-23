@@ -1,0 +1,60 @@
+<div id="test-controls">
+  <div class="fg">
+    <div class="f">
+      <label for="test_duration">Duration (seconds)</label>
+      <input type="number" id="test_duration" value="30" min="1" max="300">
+    </div>
+    <div class="f" id="test-level-group" style="display:none">
+      <label for="test_level">Value (0-255)</label>
+      <input type="range" id="test_level" min="0" max="255" value="128" oninput="test_level_num.value=this.value">
+      <input type="number" id="test_level_num" value="128" min="0" max="255" oninput="test_level.value=this.value">
+    </div>
+    <div class="f" id="test-dmx-group" style="display:none">
+      <label for="test_dmx_ch">DMX Channel</label>
+      <input type="number" id="test_dmx_ch" value="1" min="1" max="512">
+      <label for="test_level_num">Value</label>
+      <input type="number" id="test_level_num" value="128" min="0" max="255">
+    </div>
+    <div class="f" id="test-led-group" style="display:none">
+      <label for="test_color">Custom Color</label>
+      <input type="color" id="test_color" value="#ff0000">
+      <div id="test_white_group" style="display:none">
+        <label for="test_white">White</label>
+        <input type="number" id="test_white" value="0" min="0" max="255">
+      </div>
+      <label for="test_pixel">Pixel Number</label>
+      <input type="number" id="test_pixel" value="1" min="1" max="1360">
+    </div>
+    <div class="f" id="test-motor-group" style="display:none">
+      <label>Direction &amp; Speed</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" class="btn bg" style="padding:3px 10px;font-size:0.75rem">Forward</button>
+        <button type="button" class="btn bg" style="padding:3px 10px;font-size:0.75rem">Stop</button>
+        <button type="button" class="btn bg" style="padding:3px 10px;font-size:0.75rem">Reverse</button>
+      </div>
+      <label for="test_motor_speed">Speed (0-255)</label>
+      <input type="range" id="test_motor_speed" min="0" max="255" value="128" oninput="test_motor_num.value=this.value">
+      <input type="number" id="test_motor_num" value="128" min="0" max="255" oninput="test_motor_speed.value=this.value">
+    </div>
+    <div class="f" id="test-stepper-group" style="display:none">
+      <label for="test_step_pos">Position</label>
+      <input type="number" id="test_step_pos" value="128" min="0" max="4294967295">
+      <label for="test_step_speed">Speed</label>
+      <input type="number" id="test_step_speed" value="180" min="0" max="255">
+    </div>
+    <div class="f" id="test-mp3-group" style="display:none">
+      <label for="test_mp3_track">Track (1-255)</label>
+      <input type="number" id="test_mp3_track" value="1" min="0" max="255">
+      <label for="test_mp3_vol">Volume (0-255)</label>
+      <input type="range" id="test_mp3_vol" min="0" max="255" value="200" oninput="test_mp3_vol_num.value=this.value">
+      <input type="number" id="test_mp3_vol_num" value="200" min="0" max="255" oninput="test_mp3_vol.value=this.value">
+    </div>
+    <div class="f" id="test-7seg-group" style="display:none">
+      <label for="test_7seg_num">Number (0-9999)</label>
+      <input type="number" id="test_7seg_num" value="1234" min="0" max="9999">
+      <label for="test_7seg_text">ASCII Text (4 chars)</label>
+      <input type="text" id="test_7seg_text" value="ABCD" maxlength="4">
+    </div>
+  </div>
+  <div id="test-buttons" class="btns"></div>
+</div>
