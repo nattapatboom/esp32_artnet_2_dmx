@@ -238,78 +238,15 @@ async function saveSettings(e){
       if (!obj.hasOwnProperty(k)) obj[k] = false;
     }
   });
-  if(!obj[NET_PROTO.KEY_ARTNET_ENABLED] && !obj[NET_PROTO.KEY_SACN_ENABLED]){
-    alert('Cannot disable both Art-Net and sACN protocols.');
-    return;
-  }
-  if(obj[NET_PROTO.KEY_DEVICE_MODE] === NET_PROTO.MODE_ESPNOW_MASTER && obj[NET_PROTO.KEY_ESPNOW_CHANNEL] === 0){
-    alert('ESP-NOW Master cannot use Auto-Scan channel mode. Please select a fixed channel (1-13).');
-    return;
-  }
-  if(!NET_PROTO.espnowChunkSizeValid(obj[NET_PROTO.KEY_ESPNOW_CHUNK_SIZE])){
-    alert('ESP-NOW Chunk Size must be between ' + NET_PROTO.ESPNOW_CHUNK_SIZE_MIN + ' and ' + NET_PROTO.ESPNOW_CHUNK_SIZE_MAX + ' bytes.');
-    return;
-  }
-  if(obj[NET_PROTO.KEY_STATUS_LED_PIN]!==NET_PROTO.ZC_PIN_DISABLED&&obj[NET_PROTO.KEY_ZC_PIN]!==NET_PROTO.ZC_PIN_DISABLED&&obj[NET_PROTO.KEY_STATUS_LED_PIN]===obj[NET_PROTO.KEY_ZC_PIN]){
-    alert('Status LED GPIO and Zero-Crossing GPIO cannot use the same pin.');
-    return;
-  }
-  const forbiddenSettingsPins=[['Status LED GPIO',obj[NET_PROTO.KEY_STATUS_LED_PIN]],['Zero-Crossing GPIO',obj[NET_PROTO.KEY_ZC_PIN]],['I2C SDA GPIO',obj[NET_PROTO.KEY_I2C_SDA]],['I2C SCL GPIO',obj[NET_PROTO.KEY_I2C_SCL]]];
-  for(const [label,pin] of forbiddenSettingsPins){
-    if(pin!==NET_PROTO.ZC_PIN_DISABLED&&FORBIDDEN_OUTPUT_GPIOS[pin]){
-      alert(label+' '+pin+' is not allowed on WT32-ETH01 ('+FORBIDDEN_OUTPUT_GPIOS[pin]+'). Select another pin.');
-      return;
-    }
-  }
-  if(obj[NET_PROTO.KEY_I2C_SDA]!==NET_PROTO.ZC_PIN_DISABLED&&obj[NET_PROTO.KEY_I2C_SCL]!==NET_PROTO.ZC_PIN_DISABLED&&obj[NET_PROTO.KEY_I2C_SDA]===obj[NET_PROTO.KEY_I2C_SCL]){
-    alert('I2C SDA and SCL pins cannot be the same.');
-    return;
-  }
-  if(obj[NET_PROTO.KEY_STATUS_LED_PIN]!==NET_PROTO.ZC_PIN_DISABLED&&(obj[NET_PROTO.KEY_STATUS_LED_PIN]===obj[NET_PROTO.KEY_I2C_SDA]||obj[NET_PROTO.KEY_STATUS_LED_PIN]===obj[NET_PROTO.KEY_I2C_SCL])){
-    alert('Status LED GPIO cannot overlap with I2C SDA or SCL.');
-    return;
-  }
-  if(obj[NET_PROTO.KEY_ZC_PIN]!==NET_PROTO.ZC_PIN_DISABLED&&(obj[NET_PROTO.KEY_ZC_PIN]===obj[NET_PROTO.KEY_I2C_SDA]||obj[NET_PROTO.KEY_ZC_PIN]===obj[NET_PROTO.KEY_I2C_SCL])){
-    alert('Zero-Crossing GPIO cannot overlap with I2C SDA or SCL.');
-    return;
-  }
-  if(!displayAddressValid(obj[NET_PROTO.KEY_DISPLAY_ENABLED], obj[NET_PROTO.KEY_DISPLAY_I2C_ADDR])){
-    alert('I2C display address is invalid for the selected display type. OLED uses 0x3C/0x3D; PCF8574 LCD uses 0x27/0x3F.');
-    return;
-  }
-  const conflict=outputReservedPinConflict(outputs,obj[NET_PROTO.KEY_STATUS_LED_PIN]);
-  if(conflict>=0){
-    alert('Status LED GPIO '+obj[NET_PROTO.KEY_STATUS_LED_PIN]+' is already used by output channel '+(conflict+1)+'. Disable Status LED or select another GPIO.');
-    return;
-  }
-  const zcConflict=outputReservedPinConflict(outputs,obj[NET_PROTO.KEY_ZC_PIN]);
-  if(zcConflict>=0){
-    alert('Zero-Crossing GPIO '+obj[NET_PROTO.KEY_ZC_PIN]+' is already used by output channel '+(zcConflict+1)+'. Disable Zero-Crossing or select another GPIO.');
-    return;
-  }
-  const sdaConflict=outputReservedPinConflict(outputs,obj[NET_PROTO.KEY_I2C_SDA]);
-  if(sdaConflict>=0){
-    alert('I2C SDA GPIO '+obj[NET_PROTO.KEY_I2C_SDA]+' is already used by output channel '+(sdaConflict+1)+'. Select another GPIO.');
-    return;
-  }
-  const sclConflict=outputReservedPinConflict(outputs,obj[NET_PROTO.KEY_I2C_SCL]);
-  if(sclConflict>=0){
-    alert('I2C SCL GPIO '+obj[NET_PROTO.KEY_I2C_SCL]+' is already used by output channel '+(sclConflict+1)+'. Select another GPIO.');
-    return;
-  }
-  const ipFields=[NET_PROTO.KEY_ETH_IP,NET_PROTO.KEY_ETH_NETMASK,NET_PROTO.KEY_ETH_GATEWAY,NET_PROTO.KEY_ETH_DNS,NET_PROTO.KEY_WIFI_IP,NET_PROTO.KEY_WIFI_NETMASK,NET_PROTO.KEY_WIFI_GATEWAY,NET_PROTO.KEY_WIFI_DNS];
-  for(const field of ipFields){
-    if(!validateIp4(obj[field])){
-      alert('Invalid IP address in '+field+'. Each octet must be 0-255.');
-      return;
-    }
-  }
   const settingsBtn=e.target.querySelector('button[type="submit"]');
   if(settingsBtn){settingsBtn.disabled=true;settingsBtn.textContent='Saving...';}
   try{
     const res=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});
+    let msg='';
+    try{const d=await res.json(); msg=d.message||'';}catch(err){}
     showAlert(res.ok);
     if(res.ok) startRebootCountdown('Saving settings and restarting...', 4);
+    else if(msg) alert(msg);
   }catch(err){showAlert(false);}
   if(settingsBtn){settingsBtn.disabled=false;settingsBtn.textContent='Save & Restart';}
 }

@@ -136,9 +136,9 @@ Total score is calculated from 2 parts:
 1. **Resource Score** — hardware resources each channel uses; contract is in `docs/domain_model.md`, implementation is in `scoring.h:estimateResources()`
 2. **Compute Score** — CPU load each type generates + based on FPS (`scoring.h:channelComputeScore()` + `fpsComputeFactor()`)
 
-Resource Score is a routing-accurate goal: C++ and JS must calculate based on actual source/mode/per-pin routing, including hybrid pins, segment-level routing, and DMX fallback from UART to RMT after DFPlayer reserves UARTs. Hard validation must still check actual interlock/limit separately from score.
+Resource Score is firmware-authoritative and should be routing-accurate based on actual source/mode/per-pin routing, including hybrid pins, segment-level routing, and DMX fallback from UART to RMT after DFPlayer reserves UARTs. The Web UI may display estimates, but must not block saves; hard validation and blocking belong in C++ firmware/API responses.
 
-Known drift to audit next: `include/scoring.h::totalOutputScoreFromJson()` must copy all routing fields from JSON before calling `estimateResources()` and must check parity with `web/index.html::channelScore()`. Web UI `channelScore()` still uses global `outputs` in some paths and reserved-pin validation may miss hybrid GPIO when primary source is not GPIO.
+Known drift to audit next: `include/scoring.h::totalOutputScoreFromJson()` must copy all routing fields from JSON before calling `estimateResources()`.
 
 ### Resource Weights
 
@@ -220,8 +220,7 @@ FPS Factor: `(fps/60) × 5` — at 40fps (default) = 3.33
 
 ### Where Weight/Compute are located
 - **C++:** `scoring.h` — `W_GPIO` etc., `resourceScore()`, `channelComputeScore()`, `fpsComputeFactor()`
-- **JS:** `web/index.html` — `channelScore()`, `channelComputeScore()`, `fpsComputeFactor()`, `totalScoreLimit()`
-- **Important:** if modifying weight, both C++ and JS must be updated to match
+- **Web UI:** generated/display-only resource monitor; do not use JS scoring to block saves
 
 ## Web UI Hardware Monitor
 
@@ -231,7 +230,7 @@ Web UI has a **Hardware Resource Monitor** bar (4 cards) below the Resource Scor
 - **LEDC Channels** (max 16): PWM, Motor, Servo, RGB/RGBW, Buzzer, 7-Seg DD, PWM DAC, Func Gen
 - **Total Score** (max ≈109): resource + compute score
 
-Colors: 🟢 Normal, 🟡 At limit, 🔴 Over limit → Save button auto-disabled
+Colors: 🟢 Normal, 🟡 At limit, 🔴 Over limit → display only; firmware decides save success/failure
 
 ### UART/RMT Counting Logic (JS: `updateScoreBar()`)
 ```js
@@ -246,11 +245,11 @@ rmtUsed = ledCount + dmxRmtUse
 
 ### 1. GPIO Interlock (Pin Conflict Prevention)
 
-| Rule | C++ | JS |
-|------|-----|-----|
-| No duplicate GPIO between channels | main.cpp:1098-1108 | index.html |
-| No pin reuse with Status LED | main.cpp:500-519 | index.html |
-| No pin reuse with ZC pin | main.cpp:1098-1108 | index.html |
+| Rule | Authoritative implementation |
+|------|-----|
+| No duplicate GPIO between channels | C++ API validation in `src/main.cpp` |
+| No pin reuse with Status LED | C++ API validation in `src/main.cpp` |
+| No pin reuse with ZC pin | C++ API validation in `src/main.cpp` |
 
 Warning if AC Dimmer exists but ZC pin = 255 (Disabled) — Web UI `#zc-warning`
 
@@ -261,7 +260,7 @@ Each PCA9685 chip shares the same frequency across the whole chip:
 2. **Motor/PWM types:** use `mc_freq` of the first channel on that chip
 3. **Default:** 1000 Hz
 
-Validation in Web UI: if `mc_freq` differs on the same PCA → show warning on save
+Validation/warning source: C++ firmware/API; Web UI displays firmware responses
 
 ### 3. UART Interlock
 
@@ -280,10 +279,10 @@ IDLE → SMOKE → SETTLE → SHOOT → COOLDOWN → IDLE
 ## Critical Code Patterns — MUST KNOW
 
 1. **i2cMutex** — Every `Wire` operation: `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE`
-2. **Scoring** — C++ `scoring.h` / JS `channelScore()` + `channelComputeScore()` must match. If modifying weight, edit both files
+2. **Scoring** — C++ `scoring.h` is authoritative; Web UI scoring is informational only and must not block saves
 3. **Layout versioning** — `/outputs.json` has `version: 3`, v1→v3 and v2→v3 migration in `loadChannels()`
 4. **PCA frequency interlock** — `getPcaSharedFrequency()` — Servo on chip → forces 50 Hz
-5. **GPIO interlock** — validate both C++ (`main.cpp`) and JS (`index.html`)
+5. **GPIO interlock** — validate in C++ (`main.cpp`); Web UI submits values and displays API errors
 6. **JS falsy trap** — use `o.pin4!==undefined?o.pin4:255` instead of `o.pin4||255` because `0` is falsy
 7. **web/index.html** — edit here, then run `tools/build_web.py` → `include/web_pages.h`
 8. **DFPlayer UART priority** — `setupChannels()` loop finds DFPlayer first, reserves UART before DMX

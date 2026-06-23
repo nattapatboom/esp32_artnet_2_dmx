@@ -206,11 +206,11 @@ Peer route limits universe to `0..32767` and DMX address to `1..512`; slave maps
 
 Responsibilities:
 - Prevent configurations that would crash the firmware, cause peripheral conflicts, or make hardware inoperable.
-- Validate on both the C++ API and Web UI sides.
+- Validate on the C++ API side; the Web UI submits values and displays firmware responses.
 
 Key files:
 - `src/main.cpp`
-- `web/index.html`
+- `include/scoring.h`
 
 Key rules:
 - No duplicate GPIOs allowed.
@@ -221,7 +221,7 @@ Key rules:
 - Source must match the output type.
 - **GPIO12 (MTDI) Caution:** GPIO 12 is a bootstrap pin. It is allowed with warning-only behavior for field compatibility, but new wiring should avoid it and any attached circuit must not pull it HIGH during reset/power-up.
 - **AC Dimmer Zero-Crossing Interlock:** If `zc_pin == 255` (disabled), AC Dimmer output is locked to 0; Web UI must show a ZC Pin Missing Warning
-- **PCA9685 Shared Frequency Conflict (Warning):** If devices with different frequency requirements (servo 50Hz + LED >200Hz) are mixed on the same PCA chip, a warning is logged via Serial (C++) and a `confirm()` dialog is shown in Web UI. Does not block saving.
+- **PCA9685 Shared Frequency Conflict (Warning):** If devices with different frequency requirements (servo 50Hz + LED >200Hz) are mixed on the same PCA chip, a warning is logged by firmware. Does not block saving.
 - **DMX Frame Timeout:** Core 1 loop must not perform any blocking operation that causes DMX Frame Cycle to exceed 50ms; initial FPS is forced to 30-40 FPS
 
 ### Capacity Scoring Context (Refactored v2)
@@ -236,7 +236,6 @@ The scoring system uses **three independent budgets**:
 
 Key files:
 - `include/scoring.h`
-- `web/index.html`
 - `docs/resource_calculator.md`
 
 Key rules:
@@ -581,7 +580,6 @@ Configuration must pass these gates before save/apply:
 
 Known implementation drift (scoring-specific):
 - C++ `totalHardwareFromJson()` may not copy every routing field needed for routing-accurate scoring.
-- Web UI hardware/resource functions use routing-accurate counts from JSON fields directly, but may miss edge cases for hybrid-routed outputs.
 - DMX/DFPlayer UART allocation priority: DFPlayer reserves before DMX; if both UARTs occupied, DMX falls back to RMT for runtime — but scoring always counts worst-case UART (1 per DMX).
 
 ---
@@ -663,7 +661,7 @@ Key files:
 
 - **Single source of truth** for field names, ranges, and defaults — both C++ and JS (auto-generated) reference the same definitions
 - **Adding a new field** only requires editing one `.h` file and the corresponding JS config module
-- **Web UI generation** can use `FieldDef` data to render correct input types and validation without manual HTML
+- **Web UI generation** can use `FieldDef` data to render correct input controls without manual HTML
 - **Self-documenting** — each `type_N.h` is the complete API contract for that output type
 
 ### FieldDef JSON field naming convention
@@ -683,7 +681,7 @@ Base routing fields (`source`, `pin`, `pca_addr`, `pca_channel`, `start_universe
 
 ## GPIO Control Interface (Firmware ↔ Web UI Contract)
 
-`include/gpio_control.h` is the single source of truth for available GPIO pins, reserved pins, and simple pin validation — used by both C++ validation and Web UI GPIO config.
+`include/gpio_control.h` is the single source of truth for available GPIO pins, reserved pins, and simple pin validation. C++ uses it for validation; the Web UI uses generated metadata for option rendering only.
 
 Key data:
 - `OUTPUT_GPIO_PINS[]` — 8 available output GPIOs (4, 12, 14, 15, 2, 17, 32, 33)
@@ -710,7 +708,7 @@ Questions used during the grilling session and answers inferred from the existin
 | What is the main entity? | `OutputChannel` | Documentation/validation should reference the channel as the central concept |
 | Which data is persisted config vs runtime state? | `OutputChannel` includes both groups in a single struct | When adding new fields, be careful about save/load vs runtime-only |
 | Is capacity controlled by channel count or resource score? | User manual says up to 16, code comment says no hard channel limit and uses score/hardware validation | The old resource doc stating max 8 must be corrected |
-| Where is source compatibility defined? | C++ validation and Web UI validation | Adding an output/source requires changes on both sides |
+| Where is source compatibility defined? | C++ validation plus generated metadata for Web UI rendering | Adding an output/source requires updating firmware metadata and validation |
 | Is score a complete hard safety measure? | No, there are also UART/RMT/GPIO/PCA/I2C interlock checks | Do not reduce validation to only score |
 | Where is the Web UI source of truth? | `web/index.html`; `include/web_pages.h` is generated | After editing UI, regenerate web pages |
 | What is the main risk in refactoring? | Large struct, hybrid routing, duplicated JS/C++ validation | Refactor in small steps with build/test every time |
@@ -744,6 +742,4 @@ Questions used during the grilling session and answers inferred from the existin
 ### Known Limitations (accepted, not on roadmap)
 - ADR011 scoring parity drift: **Resolved** — both C++ and JS now use harmonized logic (see ADR011)
 - `OutputChannel` struct combines persisted + runtime fields; splitting risks save/load/pointer lifecycle — postponed
-- Web UI `channelScore()` uses global `outputs` array when scoring candidate `newOutputs` — stale if page unsaved
-- Web UI reserved-pin validation may miss hybrid GPIO pins when primary source is not GPIO
-- Web UI hardware warning counters use simplified counting instead of full routing-accurate approach
+- Web UI resource display is informational only; firmware scoring and API validation are authoritative.

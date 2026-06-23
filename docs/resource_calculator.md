@@ -2,7 +2,7 @@
 
 This document describes how the firmware estimates hardware load and applies hard safety constraints for WT32-ETH01 output configurations.
 
-The scoring contract is in `docs/domain_model.md`. Firmware implementation lives in `include/scoring.h`, with matching JavaScript expected in `web/index.html`.
+The scoring contract is in `docs/domain_model.md`. Firmware implementation lives in `include/scoring.h`; the Web UI may display estimates, but firmware scoring and API validation are authoritative.
 
 ## 1. Peripheral Limits
 
@@ -20,9 +20,9 @@ The ESP32 peripherals are shared by all configured outputs.
 
 The current v3 output types are `0..18`. Actual resource use depends on selected source, mode, and per-pin routing.
 
-Resource scoring is intended to be routing-accurate: firmware and Web UI score calculations should account for selected sources, hybrid GPIO/PCA/expander pins, segment-level routing, and DMX UART-to-RMT fallback after DFPlayer UART allocation. Hard validation remains a separate gate for interlocks and absolute peripheral limits.
+Resource scoring is intended to be routing-accurate in firmware: score calculations should account for selected sources, hybrid GPIO/PCA/expander pins, segment-level routing, and DMX UART-to-RMT fallback after DFPlayer UART allocation. Hard validation remains a separate firmware gate for interlocks and absolute peripheral limits.
 
-Implementation status: this is the domain rule and target behavior. When changing scoring code, audit both `include/scoring.h` and `web/index.html`; the C++ JSON scoring path must copy every routing field it needs from saved/output JSON before estimating resources.
+Implementation status: this is the domain rule and target behavior. When changing scoring code, audit `include/scoring.h` and the C++ JSON scoring path; it must copy every routing field it needs from saved/output JSON before estimating resources. Web UI scoring code must remain display-only and must not block saves.
 
 | Type | Output Type | Typical ESP32 GPIO | RMT | LEDC | UART | Expander / PCA Notes |
 | :---: | :--- | :---: | :---: | :---: | :---: | :--- |
@@ -150,8 +150,7 @@ ramBytes = 512 + peerCount × (chunkSize + 44)
 ```
 
 **Limit:** `max(0, ESP.getFreeHeap() - 150KB)` capped at 64KB. Keeps 150KB free for system/network/runtime.
-At typical 260KB free heap → `260 - 150 = 110KB`, capped to 64KB. Actual limit reported by `/api/scoring`.
-Web UI uses a conservative 48KB as local pre-check.
+At typical 260KB free heap → `260 - 150 = 110KB`, capped to 64KB. Actual limit is enforced by firmware validation.
 
 ### Validation
 
@@ -241,7 +240,7 @@ Because only a small number of general output pins are available, I2C expanders 
 
 ## 6. Hard Validation Rules
 
-The score calculator is not the only gate. Firmware and Web UI validation also enforce these rules:
+The score calculator is not the only gate. Firmware validation enforces these rules:
 
 * GPIO pins cannot duplicate another output pin.
 * Output pins cannot overlap Status LED, Zero-Crossing, I2C SDA, or I2C SCL.
@@ -304,4 +303,4 @@ Since all PCA9685 and digital expanders share a single I2C bus, high FPS updates
 - If I2C transactions take longer than 15ms (leaving <10ms for other processing at 40 FPS), increase per-channel I2C overhead µs.
 
 ### 8.3 Simulation & Mock Validation
-Run the Python offline calculator `tools/load_calculator.py` against boundary configurations to verify interlock validation parity between C++ firmware and JavaScript Web UI.
+Run the Python offline calculator `tools/load_calculator.py` against boundary configurations to cross-check firmware interlock and scoring behavior offline.

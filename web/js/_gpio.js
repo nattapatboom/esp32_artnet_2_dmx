@@ -375,12 +375,6 @@ function sourceAddressRangeLabel(src){
   return SOURCE_ADDRESS_RULES[src]?.label||'Unsupported I2C source';
 }
 
-function validateSourceAddress(src, addr, label){
-  if(sourceAddressValid(src, addr)) return true;
-  alert(label+' has invalid I2C address 0x'+parseInt(addr).toString(16).toUpperCase()+'. '+sourceAddressRangeLabel(src)+'.');
-  return false;
-}
-
 function displayAddressValid(type, addr){
   type=parseInt(type||0); addr=parseInt(addr);
   if(type===0) return true;

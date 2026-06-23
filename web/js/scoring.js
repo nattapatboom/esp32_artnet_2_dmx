@@ -183,8 +183,6 @@ function updateScoreBar(){
   const hwBad=hwBlocked(hw);
   const cpuBad=cpuBlocked(cpu,fps);
   const ramBad=ramBlocked(ram);
-  const budgetBad=hwBad||cpuBad||ramBad;
-
   const cpuPct=Math.min(cpu/cLim*100,100);
   cpuBar.style.width=cpuPct+'%';
   cpuBar.style.background=cpuBad?'#ef4444':cpuPct>80?'#eab308':'#22c55e';
@@ -219,13 +217,5 @@ function updateScoreBar(){
   updateHwCard('hw-dac-val','hw-dac-bar',hw.dac,HW_MAX.dac);
   updateHwCard('hw-timer-val','hw-timer-bar',hw.timer,HW_MAX.timer);
 
-  const saveBtn = document.getElementById('out-save-btn');
-  if (saveBtn) saveBtn.disabled = budgetBad;
-
-  if (budgetBad) {
-    let errMsg = hwBad ? 'Hardware Resource Exceeded' : (cpuBad ? 'CPU Budget Exceeded' : 'RAM Budget Exceeded');
-    setSaveState(errMsg, 'err');
-  } else {
-    setSaveState(outputsDirty ? 'Unsaved changes' : 'Saved', outputsDirty ? 'warn' : 'ok');
-  }
+  setSaveState(outputsDirty ? 'Unsaved changes' : 'Saved', outputsDirty ? 'warn' : 'ok');
 }
