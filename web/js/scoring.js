@@ -4,7 +4,7 @@
 const SCORE_DEFS={
   hwMax:{ledc:16,rmt:8,uart:2,dac:2,timer:4},
   cpu:{baseOverheadUs:500,safetyReserveUs:1500,i2cWriteUs:180,dmxOutputServiceUs:250},
-  ram:{limit:48000,baseChannel:224,dmxBuffer:512,pixelStripObject:256,dfPlayerObject:160,stepperRuntime:512,funcGenObject:1120,rmtDmxDriver:5150*4+32,i2cRoute:32}
+  ram:{limit:48000,baseChannel:224,dmxBuffer:512,rmtDmxDriver:5150*4+32,i2cRoute:32}
 };
 const HW_MAX=SCORE_DEFS.hwMax;
 const RAM_LIMIT=SCORE_DEFS.ram.limit;
@@ -13,10 +13,6 @@ const BASE_OVERHEAD_US=SCORE_DEFS.cpu.baseOverheadUs;
 const SAFETY_RESERVE_US=SCORE_DEFS.cpu.safetyReserveUs;
 const I2C_WRITE_US=SCORE_DEFS.cpu.i2cWriteUs;
 const DMX_BUFFER_RAM=SCORE_DEFS.ram.dmxBuffer;
-const PIXEL_STRIP_OBJECT_RAM=SCORE_DEFS.ram.pixelStripObject;
-const DFPLAYER_OBJECT_RAM=SCORE_DEFS.ram.dfPlayerObject;
-const STEPPER_RUNTIME_RAM=SCORE_DEFS.ram.stepperRuntime;
-const FUNCGEN_OBJECT_RAM=SCORE_DEFS.ram.funcGenObject;
 const RMT_DMX_DRIVER_RAM=SCORE_DEFS.ram.rmtDmxDriver;
 const I2C_ROUTE_RAM=SCORE_DEFS.ram.i2cRoute;
 const DMX_OUTPUT_SERVICE_US=SCORE_DEFS.cpu.dmxOutputServiceUs;
@@ -49,16 +45,15 @@ function channelUsesI2C(o){
 }
 
 function channelCost(o){
-  const t=typeId(o);
-  const ledCount=parseInt(o.led_count||0);
-  let cpu=outputModeCpuUs(t,parseInt(o.mc_mode||0)), ram=BASE_CHANNEL_RAM;
-  const i2cWrites=i2cWriteCount(o);
+  var t=typeId(o);
+  var mode=outputModeDef(t,parseInt(o.mc_mode||0));
+  var ledCount=parseInt(o.led_count||0);
+  var cpu=(mode&&mode.cost&&mode.cost.cpuUs)||0, ram=BASE_CHANNEL_RAM;
   ram+=dmxBufferRam(t,ledCount,parseInt(o.color_order||0),parseInt(o.mc_resolution||8),parseInt(o.mc_mode||0));
+  if(mode&&mode.cost&&mode.cost.extraRam) ram+=mode.cost.extraRam;
   if(t===3) cpu=ledStripServiceUs(ledCount, parseInt(o.color_order||0));
-  if(t===3) ram+=pixelBufferRam(ledCount,parseInt(o.color_order||0))+PIXEL_STRIP_OBJECT_RAM;
-  if(t===7) ram+=STEPPER_RUNTIME_RAM;
-  if(t===10) ram+=DFPLAYER_OBJECT_RAM+100;
-  if(t===16) ram+=FUNCGEN_OBJECT_RAM;
+  if(t===3) ram+=pixelBufferRam(ledCount,parseInt(o.color_order||0));
+  var i2cWrites=i2cWriteCount(o);
   cpu+=i2cWrites*I2C_WRITE_US;
   ram+=i2cWrites*I2C_ROUTE_RAM;
   return {cpu,ram};
@@ -76,10 +71,9 @@ function dmxBufferRam(type,ledCount,colorOrder,resolution=8,mode=0){
   if(type===7) return valueByteCount(resolution)+2;
   if(type===9||type===11) return mode===1?4:2;
   if(type===12||type===13) return (mode===4||mode===5||mode>=6)?2:1;
-  if(type===10) return 3;
-  if(type===16) return 5;
-  if([4,6,8,15].includes(type)) return valueByteCount(resolution);
-  return 1;
+  var def=outputModeDef(type,mode);
+  if(def&&def.cost&&def.cost.dmxSlots>0) return def.cost.dmxSlots;
+  return valueByteCount(resolution);
 }
 
 function pixelBufferRam(ledCount,colorOrder){ return (parseInt(ledCount)||0)*(parseInt(colorOrder||0)>=4?4:3); }
