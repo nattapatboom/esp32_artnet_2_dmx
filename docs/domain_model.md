@@ -137,6 +137,7 @@ Key rules:
 - Motor EN in `IN1+IN2+EN` mode must be ESP32 GPIO or PCA9685 (requires PWM).
 - PCA9685 shares frequency per chip; servo forces 50 Hz.
 - Digital expanders are suitable for digital output only, not PWM timing.
+- Primary source compatibility is declared by `PinRule.sources` in `OUTPUT_MODES[]`; firmware validation must consume this metadata instead of maintaining parallel per-type allow lists.
 - Shared output mapping behavior is declared by `OutputModeDef`/`OUTPUT_MODES[]` metadata. Modes with `startAtFirstUniverse=true` read from channel 1 of `start_universe` instead of applying `start_address`; currently this applies to DMX Output and LED Strip.
 - Every `Wire` (I2C) operation must be protected by `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100))` — including PCA9685, MCP23017, I2C DAC, and display drawing
 - I2C Display task (Core 0) uses a queue to avoid frequent I2C bus contention

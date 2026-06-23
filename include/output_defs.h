@@ -436,6 +436,20 @@ inline const PinRule* pinRule(uint8_t type, uint8_t mode, uint8_t slotIndex) {
     return &def->pins[slotIndex];
 }
 
+inline uint8_t sourceMaskForSourceId(uint8_t source) {
+    if (source == 0) return SRC_GPIO;
+    if (source == 1) return SRC_PCA;
+    if (source >= 2 && source <= 4) return SRC_DIGITAL_EXPANDER;
+    if (source >= 5 && source <= 7) return SRC_I2C_DAC;
+    return 0;
+}
+
+inline bool sourceAllowedForSlot(uint8_t type, uint8_t mode, uint8_t slotIndex, uint8_t source) {
+    const PinRule* rule = pinRule(type, mode, slotIndex);
+    uint8_t sourceMask = sourceMaskForSourceId(source);
+    return rule != nullptr && sourceMask != 0 && (rule->sources & sourceMask);
+}
+
 inline bool pinSlotUsesGpio(uint8_t type, uint8_t mode, uint8_t slotIndex, uint8_t routeSource) {
     const PinRule* rule = pinRule(type, mode, slotIndex);
     return rule != nullptr && routeSource == 0 && (rule->sources & SRC_GPIO);

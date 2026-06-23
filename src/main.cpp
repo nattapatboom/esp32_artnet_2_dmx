@@ -748,25 +748,11 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             return false;
         }
         uint8_t mcMode = output["mc_mode"] | 0;
-        bool pcaOk = (type == 2 || type == 4 || type == 6 || type == 7 || type == 8 || type == OutputDefs::TYPE_ANALOG_RGB || type == 15 || type == 17 || type == 18 || type == 12 || type == 13);
-        bool digitalOk = (type == 2 || type == 17 || type == 18 || ((type == 12 || type == 13) && (mcMode == 2 || mcMode == 3)));
-        if (source == 1 && !pcaOk) {
-            message = "PCA9685 source is not supported by output channel " + String(channelNumber);
-            return false;
-        }
-        if (source >= 2 && source <= 4 && !digitalOk) {
-            message = "Digital GPIO expander source is not supported by output channel " + String(channelNumber);
-            return false;
-        }
-        if (source >= 5 && source <= 7 && type != 14) {
-            message = "I2C DAC source is only supported by DAC output channel " + String(channelNumber);
-            return false;
-        }
-        if (type == 14 && source == 0) {
+        if (type == OutputDefs::TYPE_DAC && source == 0) {
             message = "DAC output does not support ESP32 GPIO (source 0) on WT32-ETH01; use I2C DAC (source 5-7) on channel " + String(channelNumber);
             return false;
         }
-        if (source > 7) {
+        if (!OutputDefs::sourceAllowedForSlot(type, mcMode, 0, source)) {
             message = "Unsupported output source on channel " + String(channelNumber);
             return false;
         }
