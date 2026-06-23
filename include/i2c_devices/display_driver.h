@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include "config.h"
+#include "i2c_devices/i2c_bus.h"
 
 #define DISPLAY_OFF      0
 #define DISPLAY_SSD1306  1
@@ -26,11 +27,11 @@ public:
         _addr = addr;
         if (type == DISPLAY_OFF) return false;
 
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return false;
+        I2cBus::Lock lock;
+        if (!lock.locked()) return false;
 
         Wire.beginTransmission(addr);
         if (Wire.endTransmission() != 0) {
-            if (i2cMutex) xSemaphoreGive(i2cMutex);
             return false;
         }
 
@@ -54,14 +55,14 @@ public:
             _active = true;
         }
 
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
         return _active;
     }
 
     void update(const String& line1, const String& line2, const String& line3, const String& line4) {
         if (!_active) return;
 
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
+        I2cBus::Lock lock;
+        if (!lock.locked()) return;
 
         Wire.beginTransmission(_addr);
         if (Wire.endTransmission() != 0) {
@@ -71,7 +72,6 @@ public:
                 if (_oled) { delete _oled; _oled = nullptr; }
                 if (_lcd) { delete _lcd; _lcd = nullptr; }
             }
-            if (i2cMutex) xSemaphoreGive(i2cMutex);
             return;
         }
         _errorCount = 0;
@@ -95,14 +95,14 @@ public:
             _lcd->print(line4.c_str());
         }
 
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
     }
 
     void setBrightness(uint8_t level) {
         if (!_active) return;
         _brightness = level;
 
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
+        I2cBus::Lock lock;
+        if (!lock.locked()) return;
 
         Wire.beginTransmission(_addr);
         if (Wire.endTransmission() == 0) {
@@ -114,25 +114,25 @@ public:
             }
         }
 
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
     }
 
     void end() {
         if (!_active) return;
 
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
+        {
+            I2cBus::Lock lock;
+            if (!lock.locked()) return;
 
-        Wire.beginTransmission(_addr);
-        if (Wire.endTransmission() == 0) {
-            if (_oled) {
-                _oled->clear();
-            } else if (_lcd) {
-                _lcd->clear();
-                _lcd->noBacklight();
+            Wire.beginTransmission(_addr);
+            if (Wire.endTransmission() == 0) {
+                if (_oled) {
+                    _oled->clear();
+                } else if (_lcd) {
+                    _lcd->clear();
+                    _lcd->noBacklight();
+                }
             }
         }
-
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
 
         if (_oled) { delete _oled; _oled = nullptr; }
         if (_lcd) { delete _lcd; _lcd = nullptr; }
@@ -146,10 +146,13 @@ public:
         if (_active) return true;
         if (_type == DISPLAY_OFF) return false;
 
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return false;
-        Wire.beginTransmission(_addr);
-        bool alive = (Wire.endTransmission() == 0);
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
+        bool alive = false;
+        {
+            I2cBus::Lock lock;
+            if (!lock.locked()) return false;
+            Wire.beginTransmission(_addr);
+            alive = (Wire.endTransmission() == 0);
+        }
 
         if (!alive) return false;
 
