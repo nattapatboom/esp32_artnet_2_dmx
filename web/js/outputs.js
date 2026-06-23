@@ -333,38 +333,39 @@ function toggleOutFields(){
   if(!document.getElementById('no_source')) renderPinRows();
   const srcSelect=document.getElementById('no_source');
   
-  const isDmx = t===1;
-  const isRelay = t===2;
-  const isDimmer = t===0;
-  const isMc = (t>=4 && t<=8);
-  const isPwmDimmer = t===4;
-  const isMotor = t===6;
-  const isStepper = t===7;
-  const isServo = t===8;
-  const isSolenoid = t===17;
-  const isAnalogRgb = t===5;
-  const isBuzzer = t===9;
-  const isSmoke = t===18;
-  const is7Seg = t>=11 && t<=13;
-  const isDfPlayer = t===10;
-  const isPwmDac = t===15;
-  const isFuncGen = t===16;
-  const isDac = t===14;
+  const isDmx = t===T.DMX;
+  const isRelay = t===T.RELAY;
+  const isDimmer = t===T.DIMMER;
+  const isMc = t>=T.SINGLE_LED && t<=T.SERVO;
+  const isPwmDimmer = t===T.SINGLE_LED;
+  const isMotor = t===T.MOTOR;
+  const isStepper = t===T.STEPPER;
+  const isServo = t===T.SERVO;
+  const isSolenoid = t===T.SOLENOID;
+  const isAnalogRgb = t===T.ANALOG_RGB;
+  const isBuzzer = t===T.BUZZER;
+  const isSmoke = t===T.SMOKE;
+  const is7Seg = t>=T.TM1637 && t<=T['7SEG_8PIN'];
+  const isDfPlayer = t===T.DFPLAYER;
+  const isPwmDac = t===T.PWM_DAC;
+  const isFuncGen = t===T.FUNC_GEN;
+  const isDac = t===T.DAC;
   const isCommonDim = is7Seg && mcMode >= 6 && mcMode <= 9;
   const is7SegDD = is7Seg && mcMode >= 2 && mcMode <= 9;
   const is7SegDirectDim = is7Seg && (mcMode === 4 || mcMode === 5);
 
-  const canUsePca = (t===2 || t===4 || t===6 || t===8 || t===5 || t===15 || t===17 || t===18 || is7SegDD);
-  const canUseDigitalExpander = (t===2 || t===17 || t===18 || (is7SegDD && !isCommonDim && !is7SegDirectDim));
-  const isGpioOnly = t===16;
+  const canUsePca = modeAllowsSource(t,mcMode,SRC_PCA);
+  const canUseDigitalExpander = modeAllowsSource(t,mcMode,SRC_DIG);
+  const canUseDac = modeAllowsSource(t,mcMode,SRC_DAC);
+  const isGpioOnly = modeIsGpioOnly(t,mcMode);
   
   if (srcSelect && srcSelect.tagName === 'SELECT') {
     [...srcSelect.options].forEach(opt=>{
       const v=parseInt(opt.value);
-      opt.disabled=(v===1&&!canUsePca)||(v>=2&&v<=4&&!canUseDigitalExpander)||(v>=5&&v<=7&&t!==14);
+      opt.disabled=(v===1&&!canUsePca)||(v>=2&&v<=4&&!canUseDigitalExpander)||(v>=5&&v<=7&&!canUseDac);
     });
     if (srcSelect.options[srcSelect.selectedIndex]?.disabled) srcSelect.value = 0;
-    if (((!canUsePca && !canUseDigitalExpander) && t!==14) || isGpioOnly) {
+    if ((!canUsePca && !canUseDigitalExpander && !canUseDac) || isGpioOnly) {
       srcSelect.value = 0;
       srcSelect.disabled = true;
     } else {
@@ -385,7 +386,7 @@ function toggleOutFields(){
     if(src>=2 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=32;
   }
   
-  _st('no_addr_grp',(isDmx||t===3)?'none':'');
+  _st('no_addr_grp',(isDmx||t===T.LED_STRIP)?'none':'');
   _st('no_mc_grp',(isMc||is7Seg||isFuncGen||isPwmDac)?'':'none');
   _st('no_sol_grp',isSolenoid?'':'none');
   _st('no_smoke_grp',isSmoke?'':'none');

@@ -11,7 +11,6 @@ const SAFETY_RESERVE_US=S.SAFETY_RESERVE_US;
 const I2C_WRITE_US=S.I2C_WRITE_US;
 const DMX_BUFFER_RAM=S.DMX_BUFFER_BYTES;
 const I2C_ROUTE_RAM=S.I2C_ROUTE_BYTES;
-var T=TYPE_META.typeIds;
 
 function channelHardware(o){
   var mode=outputModeDef(typeId(o),parseInt(o.mc_mode||0));

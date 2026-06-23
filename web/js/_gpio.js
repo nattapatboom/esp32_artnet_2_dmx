@@ -17,7 +17,7 @@ function eachSlot(o,fn){
   var t=parseInt(o.type||0);
   var mode=outputModeDef(t,parseInt(o.mc_mode||0));
   if(!mode) return;
-  var is7seg=t===12||t===13;
+  var is7seg=!!mode.segmentLayout;
   var isCommonDim=outputModeKeyForObj(o)==='commonDim';
   var pinDefs=mode.pins||{};
   Object.keys(pinDefs).sort().forEach(function(slot){
@@ -59,6 +59,7 @@ const INPUT_ONLY_GPIOS=GPIO_PINS.inputOnly;
 const FORBIDDEN_OUTPUT_GPIOS=Object.fromEntries(GPIO_PINS.reserved.map(r=>[r.pin,r.reason]));
 const SOURCE_ADDRESS_RULES=Object.fromEntries(SOURCE_DATA.addressRules.map(r=>[r.source,{label:r.label,ranges:r.ranges}]));
 const SRC_GPIO=SOURCE_DATA.masks.GPIO, SRC_PCA=SOURCE_DATA.masks.PCA, SRC_DIG=SOURCE_DATA.masks.DIGITAL_EXPANDER, SRC_DAC=SOURCE_DATA.masks.I2C_DAC;
+var T=TYPE_META.typeIds;
 
 function outputModeKey(type,mode){
   return TYPE_META.modeKeyMap[parseInt(type)]?.[parseInt(mode||0)]||String(mode);
@@ -78,6 +79,21 @@ function outputSegmentPinRule(type,mode,segmentIndex){
 }
 function ruleAllows(rule,sourceFlag,fallback=false){ return rule?!!(rule.sources&sourceFlag):fallback; }
 function outputModeCpuUs(type,mode){ return outputModeDef(type,mode)?.cost?.cpuUs||0; }
+function modeAllowsSource(type,mode,sourceFlag){
+  var def=outputModeDef(type,mode);
+  if(!def) return false;
+  return Object.values(def.pins||{}).some(function(rule){return !!(rule.sources&sourceFlag);});
+}
+function modeIsGpioOnly(type,mode){
+  var def=outputModeDef(type,mode);
+  if(!def) return false;
+  var rules=Object.values(def.pins||{});
+  return rules.length>0&&rules.every(function(rule){return (rule.sources&~SRC_GPIO)===0;});
+}
+function modePrimaryAllowsSource(type,mode,sourceFlag){
+  var primary=outputPinRule(type,mode,'pin1');
+  return !!primary&&!!(primary.sources&sourceFlag);
+}
 
 function cfgEl(id){
   var t=document.getElementById('no_type');
@@ -110,9 +126,9 @@ function ledUniverseCount(o){
 
 function outputChannelCount(o){
   const t=parseInt(o.type);
-  if(t===1) return '512 Ch';
-  if(t===3) return `${o.led_count||170} LEDs / ${ledUniverseCount(o)}U`;
-  if(t===7){
+  if(t===T.DMX) return '512 Ch';
+  if(t===T.LED_STRIP) return `${o.led_count||170} LEDs / ${ledUniverseCount(o)}U`;
+  if(t===T.STEPPER){
     const posBytes=valueByteCount(parseInt(o.mc_resolution||8));
     return `${posBytes+2} Ch (${posBytes} Pos + Speed + Cmd)`;
   }
@@ -121,7 +137,7 @@ function outputChannelCount(o){
 
 function outputByteCount(o){
   const t=parseInt(o.type);
-  if(t===7) return valueByteCount(parseInt(o.mc_resolution||8));
+  if(t===T.STEPPER) return valueByteCount(parseInt(o.mc_resolution||8));
   return TYPE_META.byteCounts[t]??1;
 }
 
@@ -135,7 +151,7 @@ function outputGpios(o){
     if(src===0&&pin!==255&&pins.indexOf(pin)===-1) pins.push(pin);
   });
   var t=parseInt(o.type||0);
-  var isStepper=t===7;
+  var isStepper=t===T.STEPPER;
   if(isStepper&&parseInt(o.mc_homing_mode||0)>0&&parseInt(o.pin4_source||0)!==0){
     var idx=pins.indexOf(parseInt(o.pin4));
     if(idx!==-1) pins.splice(idx,1);
@@ -229,7 +245,6 @@ function renderPinRows(){
     const n=slotNumber(slot);
     const mask=mode?.slotActiveMask??0;
     if(!(mask&(1<<(n-1)))) return false;
-    if(t===6&&n===3) return mcMode===2;
     return true;
   };
   const sourceFor=(field,rule)=>{
@@ -275,7 +290,7 @@ function renderPinRows(){
 
   // 7-segment DD segment pin rows
   if(isSevenSegDD){
-    const numSeg=t===13?8:7;
+    const numSeg=Object.keys(mode.pins||{}).length-(isCommonDim?1:0);
     const firstSegOff=isCommonDim?0:1;
     const segSrc=(seg)=>{
       if(seg===0&&!isCommonDim) return parseInt(saved['no_source']??0);
@@ -444,12 +459,12 @@ function autoAssignOutputPins(){
     return p;
   };
 
-  if(t!==14) setSelectIfOption('no_pin',takeOutput());
+  if(modePrimaryAllowsSource(t,parseInt(cfgEl('mc_mode')?.value||0),SRC_GPIO)) setSelectIfOption('no_pin',takeOutput());
 }
 
 function outputAddressLabel(o){
   const t=typeId(o);
-  if(t===3||t===1) return `U${o.start_universe}`;
+  if(t===T.LED_STRIP||t===T.DMX) return `U${o.start_universe}`;
   return `U${o.start_universe}:CH${o.start_address||1}`;
 }
 
