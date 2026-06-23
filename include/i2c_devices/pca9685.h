@@ -2,7 +2,7 @@
 #define PCA9685_H
 
 #include <Arduino.h>
-#include <Wire.h>
+#include "i2c_devices/i2c_bus.h"
 
 class PCA9685Driver {
 private:
@@ -10,24 +10,11 @@ private:
     uint16_t _lastDuty[16]; // Keep track of the last duty cycle written to each channel (dirty-state check)
 
     void writeRegister(uint8_t reg, uint8_t value) {
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
-        Wire.beginTransmission(_address);
-        Wire.write(reg);
-        Wire.write(value);
-        Wire.endTransmission();
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
+        I2cBus::writeReg8(_address, reg, value);
     }
 
     uint8_t readRegister(uint8_t reg) {
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return 0;
-        Wire.beginTransmission(_address);
-        Wire.write(reg);
-        Wire.endTransmission(false);
-        Wire.requestFrom(_address, (uint8_t)1);
-        uint8_t val = 0;
-        if (Wire.available()) val = Wire.read();
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
-        return val;
+        return I2cBus::readReg8(_address, reg, 0);
     }
 
 public:
@@ -73,33 +60,27 @@ public:
             return;
         }
 
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
-        Wire.beginTransmission(_address);
-        Wire.write(0x06 + 4 * channel); // LEDn_ON_L register
+        uint8_t data[5];
+        data[0] = 0x06 + 4 * channel; // LEDn_ON_L register
 
         if (duty == 4095) {
-            // Full ON: set ON_H to 0x10, OFF_H to 0x00
-            Wire.write(0x00); // ON_L
-            Wire.write(0x10); // ON_H
-            Wire.write(0x00); // OFF_L
-            Wire.write(0x00); // OFF_H
+            data[1] = 0x00; // ON_L
+            data[2] = 0x10; // ON_H
+            data[3] = 0x00; // OFF_L
+            data[4] = 0x00; // OFF_H
         } else if (duty == 0) {
-            // Full OFF: set ON_H to 0x00, OFF_H to 0x10
-            Wire.write(0x00); // ON_L
-            Wire.write(0x00); // ON_H
-            Wire.write(0x00); // OFF_L
-            Wire.write(0x10); // OFF_H
+            data[1] = 0x00; // ON_L
+            data[2] = 0x00; // ON_H
+            data[3] = 0x00; // OFF_L
+            data[4] = 0x10; // OFF_H
         } else {
-            // Standard duty
-            Wire.write(0x00); // ON_L
-            Wire.write(0x00); // ON_H
-            Wire.write(duty & 0xFF); // OFF_L
-            Wire.write((duty >> 8) & 0x0F); // OFF_H
+            data[1] = 0x00; // ON_L
+            data[2] = 0x00; // ON_H
+            data[3] = duty & 0xFF; // OFF_L
+            data[4] = (duty >> 8) & 0x0F; // OFF_H
         }
-        uint8_t err = Wire.endTransmission();
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
 
-        if (err == 0) _lastDuty[channel] = duty;
+        if (I2cBus::writeBytes(_address, data, sizeof(data))) _lastDuty[channel] = duty;
     }
 };
 

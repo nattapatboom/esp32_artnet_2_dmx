@@ -373,6 +373,8 @@ def generate_output_defs_js():
         pins_ident = args[11].strip()
         pin_count = int(args[12].strip())
         start_at_first_universe = len(args) > 13 and args[13].strip() == 'true'
+        segment_count = int(args[14].strip()) if len(args) > 14 else 0
+        primary_route_is_segment = len(args) > 15 and args[15].strip() == 'true'
 
         type_id = type_ids.get(type_ident, -1)
         if type_id < 0:
@@ -394,6 +396,8 @@ def generate_output_defs_js():
             "slotActiveMask": slot_mask,
             "segmentLayout": seg_layout,
             "startAtFirstUniverse": start_at_first_universe,
+            "segmentCount": segment_count,
+            "primaryRouteIsSegment": primary_route_is_segment,
         }
 
         # Build modeKeyMap

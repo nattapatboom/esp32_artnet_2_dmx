@@ -725,6 +725,7 @@ public:
          doc["version"] = 3;
          JsonArray arr = doc["outputs"].to<JsonArray>();
          for (const auto& ch : channels) {
+             const OutputDefs::OutputModeDef* modeDef = OutputDefs::modeDef(ch.type, ch.mc_mode);
              JsonObject item = arr.add<JsonObject>();
              item["type"] = ch.type;
              item["source"] = ch.source;
@@ -800,13 +801,13 @@ public:
                 item["solenoid_threshold"] = ch.solenoid_threshold;
             } else if (ch.type == OutputDefs::TYPE_BUZZER) {
                 item["mc_freq"] = ch.mc_freq;
-            } else if (OutputDefs::isSevenSegmentMode(ch.type, ch.mc_mode)) {
+            } else if (modeDef != nullptr && modeDef->testUi == OutputDefs::TEST_UI_7SEG) {
                 item["pin2"] = ch.pin2;
                 item["pin2_source"] = ch.pin2_source;
                 item["pin2_addr"] = ch.pin2_addr;
                 item["pin2_channel"] = ch.pin2_channel;
                 item["mc_mode"] = ch.mc_mode;
-                if (OutputDefs::directSegmentCount(ch.type, ch.mc_mode) > 0) {
+                if (modeDef->segmentCount > 0) {
                     JsonArray segArr = item["seg_pins"].to<JsonArray>();
                     for (int s = 0; s < 8; s++) {
                         segArr.add(ch.seg_pins[s]);

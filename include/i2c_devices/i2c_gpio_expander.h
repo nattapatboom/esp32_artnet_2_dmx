@@ -2,7 +2,7 @@
 #define I2C_GPIO_EXPANDER_H
 
 #include <Arduino.h>
-#include <Wire.h>
+#include "i2c_devices/i2c_bus.h"
 
 enum DigitalExpanderKind : uint8_t {
     DIG_EXP_MCP23017 = 2,
@@ -18,31 +18,16 @@ private:
     bool _started;
 
     void writeReg8(uint8_t reg, uint8_t value) {
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
-        Wire.beginTransmission(_address);
-        Wire.write(reg);
-        Wire.write(value);
-        Wire.endTransmission();
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
+        I2cBus::writeReg8(_address, reg, value);
     }
 
     void writeReg16(uint8_t reg, uint16_t value) {
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
-        Wire.beginTransmission(_address);
-        Wire.write(reg);
-        Wire.write(value & 0xFF);
-        Wire.write((value >> 8) & 0xFF);
-        Wire.endTransmission();
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
+        I2cBus::writeReg16(_address, reg, value);
     }
 
     void writePcf(uint16_t value) {
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return;
-        Wire.beginTransmission(_address);
-        Wire.write(value & 0xFF);
-        if (value > 0xFF) Wire.write((value >> 8) & 0xFF);
-        Wire.endTransmission();
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
+        uint8_t data[2] = {(uint8_t)(value & 0xFF), (uint8_t)((value >> 8) & 0xFF)};
+        I2cBus::writeBytes(_address, data, value > 0xFF ? 2 : 1);
     }
 
 public:
@@ -95,7 +80,8 @@ public:
         } else if (_kind == DIG_EXP_TCA9555) {
             return regRead16(0x00); // INPUT port
         } else if (_kind == DIG_EXP_PCF857X) {
-            if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return 0xFFFF;
+            I2cBus::Lock lock;
+            if (!lock.locked()) return 0xFFFF;
             Wire.beginTransmission(_address);
             Wire.write(_state & 0xFF);
             Wire.write((_state >> 8) & 0xFF);
@@ -104,7 +90,6 @@ public:
             Wire.requestFrom(_address, (uint8_t)((_state > 0xFF) ? 2 : 1));
             if (Wire.available()) val = Wire.read();
             if (_state > 0xFF && Wire.available()) val |= (uint16_t)Wire.read() << 8;
-            if (i2cMutex) xSemaphoreGive(i2cMutex);
             return val;
         }
         return 0xFFFF;
@@ -138,27 +123,11 @@ public:
 
 private:
     uint8_t regRead8(uint8_t reg) {
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return 0xFF;
-        Wire.beginTransmission(_address);
-        Wire.write(reg);
-        Wire.endTransmission();
-        Wire.requestFrom(_address, (uint8_t)1);
-        uint8_t val = Wire.available() ? Wire.read() : 0xFF;
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
-        return val;
+        return I2cBus::readReg8(_address, reg, 0xFF);
     }
 
     uint16_t regRead16(uint8_t reg) {
-        if (i2cMutex && xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) != pdTRUE) return 0xFFFF;
-        Wire.beginTransmission(_address);
-        Wire.write(reg);
-        Wire.endTransmission();
-        Wire.requestFrom(_address, (uint8_t)2);
-        uint16_t val = 0xFFFF;
-        if (Wire.available()) val = Wire.read();
-        if (Wire.available()) val |= (uint16_t)Wire.read() << 8;
-        if (i2cMutex) xSemaphoreGive(i2cMutex);
-        return val;
+        return I2cBus::readReg16(_address, reg, 0xFFFF);
     }
 };
 

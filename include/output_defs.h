@@ -124,6 +124,8 @@ struct OutputModeDef {
     const PinRule* pins;
     uint8_t pinCount;
     bool startAtFirstUniverse;
+    uint8_t segmentCount;
+    bool primaryRouteIsSegment;
 
     constexpr OutputModeDef(
         uint8_t type,
@@ -139,11 +141,14 @@ struct OutputModeDef {
         ModeCost cost,
         const PinRule* pins,
         uint8_t pinCount,
-        bool startAtFirstUniverse = false
+        bool startAtFirstUniverse = false,
+        uint8_t segmentCount = 0,
+        bool primaryRouteIsSegment = false
     ) : type(type), mode(mode), name(name), modeKey(modeKey), resolutionBits(resolutionBits),
         slotActiveMask(slotActiveMask), segmentLayout(segmentLayout), testUi(testUi),
         testCmds(testCmds), testCmdCount(testCmdCount), cost(cost), pins(pins),
-        pinCount(pinCount), startAtFirstUniverse(startAtFirstUniverse) {}
+        pinCount(pinCount), startAtFirstUniverse(startAtFirstUniverse), segmentCount(segmentCount),
+        primaryRouteIsSegment(primaryRouteIsSegment) {}
 };
 
 constexpr PinRule PINS_GPIO_MAIN[] = {
@@ -331,16 +336,16 @@ constexpr OutputModeDef OUTPUT_MODES[] = {
     {TYPE_BUZZER, -1,    "Passive buzzer",            "default",    0, 1, false, TEST_UI_SLIDER,   Type9::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type9::TEST_COMMANDS),   COST_BUZZER,               PINS_BUZZER, 1},
     {TYPE_DFPLAYER, -1,  "DFPlayer",                  "default",    0, 3, false, TEST_UI_DFPLAYER, Type10::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type10::TEST_COMMANDS),  COST_DFPLAYER,             PINS_DFPLAYER, 2},
     {TYPE_TM1637, -1,    "TM1637",                    "default",    RES_BIT_8|RES_BIT_10, 3, false, TEST_UI_7SEG,     Type11::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type11::TEST_COMMANDS),  COST_TM1637,               PINS_TM1637, 2},
-    {TYPE_7SEG_7PIN, -1, "7-seg 7-pin",               "default",    RES_BIT_8|RES_BIT_10, 127, false, TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_7PIN,            PINS_7SEG_DIRECT, 7},
-    {TYPE_7SEG_7PIN, 4,  "7-seg 7-pin direct dim CA", "directDim",  RES_BIT_8|RES_BIT_10, 127, true,  TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_7PIN,            PINS_7SEG_DIMMED, 7},
-    {TYPE_7SEG_7PIN, 5,  "7-seg 7-pin direct dim CC", "directDim",  RES_BIT_8|RES_BIT_10, 127, true,  TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_7PIN,            PINS_7SEG_DIMMED, 7},
-    {TYPE_7SEG_7PIN, 6,  "7-seg 7-pin common anode dim","commonDim", RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
-    {TYPE_7SEG_7PIN, 7,  "7-seg 7-pin common cathode dim","commonDim",RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8},
-    {TYPE_7SEG_8PIN, -1, "7-seg 8-pin",               "default",    RES_BIT_8|RES_BIT_10, 255, false, TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_8PIN,            PINS_7SEG_DIRECT, 8},
-    {TYPE_7SEG_8PIN, 4,  "7-seg 8-pin direct dim CA", "directDim",  RES_BIT_8|RES_BIT_10, 255, true,  TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_8PIN,            PINS_7SEG_DIMMED, 8},
-    {TYPE_7SEG_8PIN, 5,  "7-seg 8-pin direct dim CC", "directDim",  RES_BIT_8|RES_BIT_10, 255, true,  TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_8PIN,            PINS_7SEG_DIMMED, 8},
-    {TYPE_7SEG_8PIN, 8,  "7-seg 8-pin common anode dim","commonDim",RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
-    {TYPE_7SEG_8PIN, 9,  "7-seg 8-pin common cathode dim","commonDim",RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9},
+    {TYPE_7SEG_7PIN, -1, "7-seg 7-pin",               "default",    RES_BIT_8|RES_BIT_10, 127, false, TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_7PIN,            PINS_7SEG_DIRECT, 7, false, 7, true},
+    {TYPE_7SEG_7PIN, 4,  "7-seg 7-pin direct dim CA", "directDim",  RES_BIT_8|RES_BIT_10, 127, true,  TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_7PIN,            PINS_7SEG_DIMMED, 7, false, 7, true},
+    {TYPE_7SEG_7PIN, 5,  "7-seg 7-pin direct dim CC", "directDim",  RES_BIT_8|RES_BIT_10, 127, true,  TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_7PIN,            PINS_7SEG_DIMMED, 7, false, 7, true},
+    {TYPE_7SEG_7PIN, 6,  "7-seg 7-pin common anode dim","commonDim", RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8, false, 7},
+    {TYPE_7SEG_7PIN, 7,  "7-seg 7-pin common cathode dim","commonDim",RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type12::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type12::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_7PIN, PINS_7SEG_COMMON_DIM, 8, false, 7},
+    {TYPE_7SEG_8PIN, -1, "7-seg 8-pin",               "default",    RES_BIT_8|RES_BIT_10, 255, false, TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_8PIN,            PINS_7SEG_DIRECT, 8, false, 8, true},
+    {TYPE_7SEG_8PIN, 4,  "7-seg 8-pin direct dim CA", "directDim",  RES_BIT_8|RES_BIT_10, 255, true,  TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_8PIN,            PINS_7SEG_DIMMED, 8, false, 8, true},
+    {TYPE_7SEG_8PIN, 5,  "7-seg 8-pin direct dim CC", "directDim",  RES_BIT_8|RES_BIT_10, 255, true,  TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_8PIN,            PINS_7SEG_DIMMED, 8, false, 8, true},
+    {TYPE_7SEG_8PIN, 8,  "7-seg 8-pin common anode dim","commonDim",RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9, false, 8},
+    {TYPE_7SEG_8PIN, 9,  "7-seg 8-pin common cathode dim","commonDim",RES_BIT_8|RES_BIT_10, 255, true, TEST_UI_7SEG,     Type13::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type13::TEST_COMMANDS),  COST_7SEG_COMMON_DIM_8PIN, PINS_7SEG_COMMON_DIM, 9, false, 8},
     {TYPE_DAC, -1,       "I2C DAC",                   "default",    0, 1, false, TEST_UI_SLIDER,   Type14::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type14::TEST_COMMANDS),  COST_DAC,                 PINS_DAC, 1},
     {TYPE_PWM_DAC, -1,   "PWM DAC",                   "default",    RES_BITS_8_10_12_16, 1, false, TEST_UI_SLIDER,   Type15::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type15::TEST_COMMANDS),  COST_PWM_DAC,             PINS_PWM_DAC, 1},
     {TYPE_FUNC_GEN, -1,  "Function generator",         "default",    0, 1, false, TEST_UI_SLIDER,   Type16::TEST_COMMANDS,  TYPEPROTO_ARRAY_SIZE(Type16::TEST_COMMANDS),  COST_FUNC_GEN,           PINS_FUNC_GEN, 1},
@@ -458,24 +463,6 @@ inline bool pinSlotUsesGpio(uint8_t type, uint8_t mode, uint8_t slotIndex, uint8
 inline bool startsAtFirstUniverse(uint8_t type, uint8_t mode = 0) {
     const OutputModeDef* def = modeDef(type, mode);
     return def != nullptr && def->startAtFirstUniverse;
-}
-
-inline bool isSevenSegmentMode(uint8_t type, uint8_t mode = 0) {
-    const OutputModeDef* def = modeDef(type, mode);
-    return def != nullptr && def->testUi == TEST_UI_7SEG;
-}
-
-inline uint8_t directSegmentCount(uint8_t type, uint8_t mode = 0) {
-    const OutputModeDef* def = modeDef(type, mode);
-    if (def == nullptr) return 0;
-    if (def->pins == PINS_7SEG_COMMON_DIM) return def->pinCount > 0 ? (uint8_t)(def->pinCount - 1) : 0;
-    if (def->pins == PINS_7SEG_DIRECT || def->pins == PINS_7SEG_DIMMED) return def->pinCount;
-    return 0;
-}
-
-inline bool primaryRouteIsSegment(uint8_t type, uint8_t mode = 0) {
-    const OutputModeDef* def = modeDef(type, mode);
-    return def != nullptr && (def->pins == PINS_7SEG_DIRECT || def->pins == PINS_7SEG_DIMMED);
 }
 
 // ─────────────────────────────────────

@@ -214,7 +214,8 @@ inline uint32_t dmxBufferRamForChannel(uint8_t type, uint16_t ledCount, uint8_t 
     if (type == OutputDefs::TYPE_ANALOG_RGB) return colorOrder >= 4 ? 4 : 3;
     if (type == OutputDefs::TYPE_STEPPER) return dmxValueByteCount(resolution) + 2;
     if (type == OutputDefs::TYPE_BUZZER || type == OutputDefs::TYPE_TM1637) return signedMode == 1 ? 4 : 2;
-    if (OutputDefs::directSegmentCount(type, mode) > 0) return (signedMode == 4 || signedMode == 5 || signedMode >= 6) ? 2 : 1;
+    const auto* directSegDef = OutputDefs::modeDef(type, mode);
+    if (directSegDef != nullptr && directSegDef->segmentCount > 0) return (signedMode == 4 || signedMode == 5 || signedMode >= 6) ? 2 : 1;
     // Fallback: use dmxSlots from definition, or dmxValueByteCount
     const auto* def = OutputDefs::modeDef(type, mode);
     if (!def) return 1;

@@ -8,9 +8,10 @@
 
 inline void sevenSegSetup(OutputChannel& ch, uint8_t& ledcIdx) {
     int8_t mode = (int8_t)ch.mc_mode;
-    bool isDirectDrive = OutputDefs::directSegmentCount(ch.type, ch.mc_mode) > 0;
+    const OutputDefs::OutputModeDef* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
+    bool isDirectDrive = def != nullptr && def->segmentCount > 0;
     bool isCommonDim = (mode >= 6 && mode <= 9);
-    uint8_t numSeg = OutputDefs::directSegmentCount(ch.type, ch.mc_mode);
+    uint8_t numSeg = def != nullptr ? def->segmentCount : 0;
 
     if (isDirectDrive && ch.pin2_source == 1) {
         pcaManager.getOrCreateDriver(ch.pin2_addr);
@@ -89,7 +90,8 @@ inline void sevenSegSetup(OutputChannel& ch, uint8_t& ledcIdx) {
 
 inline void sevenSegUpdate(OutputChannel& ch) {
     int8_t mode = (int8_t)ch.mc_mode;
-    bool isDirectDrive = OutputDefs::directSegmentCount(ch.type, ch.mc_mode) > 0;
+    const OutputDefs::OutputModeDef* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
+    bool isDirectDrive = def != nullptr && def->segmentCount > 0;
     uint8_t bytes = 0;
     if (isDirectDrive) {
         bytes = (mode == 4 || mode == 5 || mode >= 6) ? 2 : 1;
@@ -107,7 +109,7 @@ inline void sevenSegUpdate(OutputChannel& ch) {
 
     bool isCommonDim = (mode >= 6 && mode <= 9);
     bool isCA = (mode == 6 || mode == 8);
-    uint8_t numSeg = OutputDefs::directSegmentCount(ch.type, ch.mc_mode);
+    uint8_t numSeg = def != nullptr ? def->segmentCount : 0;
     uint8_t segByte = 0;
     if (ch.mc_resolution == 10) {
         uint8_t raw = ch.dmxBuffer[0];
