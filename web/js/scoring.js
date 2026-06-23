@@ -77,11 +77,16 @@ function dmxBufferRam(type,ledCount,colorOrder,resolution=8,mode=0){
   return valueByteCount(resolution);
 }
 
-function pixelBufferRam(ledCount,colorOrder){ return (parseInt(ledCount)||0)*(parseInt(colorOrder||0)>=4?4:3); }
+function pixelBufferRam(ledCount,colorOrder){
+  var cost=outputModeDef(T.LED_STRIP,0)?.cost||{};
+  var bpp=parseInt(colorOrder||0)>=4?4:(cost.ramPerUnit||3);
+  return (parseInt(ledCount)||0)*bpp;
+}
 
 function ledStripServiceUs(ledCount,colorOrder){
-  const bytesPerPixel=parseInt(colorOrder||0)>=4?4:3;
-  return 80+ledCount*(bytesPerPixel===4?4:3);
+  var cost=outputModeDef(T.LED_STRIP,0)?.cost||{};
+  var bpp=parseInt(colorOrder||0)>=4?4:(cost.cpuPerUnit||3);
+  return (cost.cpuUs||80)+ledCount*bpp;
 }
 
 
