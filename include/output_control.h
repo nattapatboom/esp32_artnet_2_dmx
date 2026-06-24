@@ -54,7 +54,7 @@ private:
     NeoPixelBus<NeoRgbFeature, T_Method>* strip = nullptr;
 public:
     PixelStripRmt(uint16_t count, uint8_t pin) {
-        strip = new NeoPixelBus<NeoRgbFeature, T_Method>(count, pin);
+        strip = new (std::nothrow) NeoPixelBus<NeoRgbFeature, T_Method>(count, pin);
     }
     ~PixelStripRmt() override {
         if (strip) {
@@ -83,7 +83,7 @@ private:
     NeoPixelBus<NeoRgbwFeature, T_Method>* strip = nullptr;
 public:
     PixelStripRmtRgbw(uint16_t count, uint8_t pin) {
-        strip = new NeoPixelBus<NeoRgbwFeature, T_Method>(count, pin);
+        strip = new (std::nothrow) NeoPixelBus<NeoRgbwFeature, T_Method>(count, pin);
     }
     ~PixelStripRmtRgbw() override {
         if (strip) {
@@ -476,10 +476,6 @@ public:
             }
         }
 
-        if (updateActiveBuffer && universe == 0) {
-            matched = true;
-        }
-
         return matched;
     }
 
@@ -525,6 +521,7 @@ public:
             defCh.shadowBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);
             if (defCh.shadowBuffer == nullptr) {
                 Serial.println("OOM error allocating default channel shadow buffer!");
+                free(defCh.dmxBuffer);
                 return;
             }
             defCh.pixelStrip = nullptr;
@@ -554,6 +551,12 @@ public:
             defCh.dmxBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);
             if (defCh.dmxBuffer == nullptr) {
                 Serial.println("OOM error allocating default fallback DMX buffer!");
+                return;
+            }
+            defCh.shadowBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);
+            if (defCh.shadowBuffer == nullptr) {
+                Serial.println("OOM error allocating default fallback shadow buffer!");
+                free(defCh.dmxBuffer);
                 return;
             }
             defCh.pixelStrip = nullptr;
@@ -657,9 +660,9 @@ public:
             ch.mc_enable_active_high = item["mc_enable_active_high"] | false;
             ch.mc_dir_invert = item["mc_dir_invert"] | false;
             ch.mc_step_invert = item["mc_step_invert"] | false;
-            ch.pin_invert = item.containsKey("pin_invert") ? item["pin_invert"].as<bool>() : ch.mc_step_invert;
-            ch.pin2_invert = item.containsKey("pin2_invert") ? item["pin2_invert"].as<bool>() : ch.mc_dir_invert;
-            ch.pin3_invert = item.containsKey("pin3_invert") ? item["pin3_invert"].as<bool>() : ch.mc_enable_active_high;
+            ch.pin_invert = item.containsKey("pin_invert") ? item["pin_invert"].as<bool>() : (ch.type == OutputDefs::TYPE_STEPPER ? ch.mc_step_invert : false);
+            ch.pin2_invert = item.containsKey("pin2_invert") ? item["pin2_invert"].as<bool>() : (ch.type == OutputDefs::TYPE_STEPPER ? ch.mc_dir_invert : false);
+            ch.pin3_invert = item.containsKey("pin3_invert") ? item["pin3_invert"].as<bool>() : (ch.type == OutputDefs::TYPE_STEPPER ? ch.mc_enable_active_high : false);
             ch.pin4_invert = item["pin4_invert"] | false;
             ch.solenoid_mode = item["solenoid_mode"] | 0;
             ch.solenoid_threshold = item["solenoid_threshold"] | 127;

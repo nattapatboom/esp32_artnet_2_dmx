@@ -89,6 +89,8 @@ private:
     bool shouldAcceptSource(const uint8_t* cid, uint8_t priority) {
         int freeSlot = -1;
         int existingSlot = -1;
+        int lowestPriSlot = -1;
+        uint8_t lowestPriority = 255;
 
         for (int i = 0; i < SACN_MAX_SOURCES; i++) {
             if (!sources[i].active) {
@@ -101,32 +103,32 @@ private:
                 sources[i].priority = priority;
                 sources[i].lastSeen = millis();
             }
+
+            if (sources[i].priority < lowestPriority) {
+                lowestPriority = sources[i].priority;
+                lowestPriSlot = i;
+            }
         }
 
-        if (existingSlot < 0 && freeSlot >= 0) {
+        if (existingSlot >= 0) return true;
+
+        if (freeSlot >= 0) {
             memcpy(sources[freeSlot].cid, cid, 16);
             sources[freeSlot].priority = priority;
             sources[freeSlot].lastSeen = millis();
             sources[freeSlot].active = true;
-            existingSlot = freeSlot;
-        }
-
-        uint8_t maxPriority = 0;
-        for (int i = 0; i < SACN_MAX_SOURCES; i++) {
-            if (sources[i].active && sources[i].priority > maxPriority) maxPriority = sources[i].priority;
-        }
-
-        if (existingSlot >= 0) return priority >= maxPriority;
-
-        if (priority >= maxPriority) {
-            if (freeSlot >= 0) {
-                memcpy(sources[freeSlot].cid, cid, 16);
-                sources[freeSlot].priority = priority;
-                sources[freeSlot].lastSeen = millis();
-                sources[freeSlot].active = true;
-            }
             return true;
         }
+
+        // All slots full: replace lowest-priority source if this one has higher priority
+        if (priority > lowestPriority && lowestPriSlot >= 0) {
+            memcpy(sources[lowestPriSlot].cid, cid, 16);
+            sources[lowestPriSlot].priority = priority;
+            sources[lowestPriSlot].lastSeen = millis();
+            sources[lowestPriSlot].active = true;
+            return true;
+        }
+
         return false;
     }
 
@@ -213,9 +215,10 @@ public:
         if (len <= 0) return;
 
         if (len > SACN_PACKET_SIZE) len = SACN_PACKET_SIZE;
-        src->read(rxBuf, len);
+        int actualLen = src->read(rxBuf, len);
+        if (actualLen <= 0) return;
 
-        if (!validatePacket(rxBuf, len)) {
+        if (!validatePacket(rxBuf, actualLen)) {
             errorCount++;
             return;
         }
@@ -230,7 +233,7 @@ public:
 
         const uint8_t* dmxData = rxBuf + SACN_DMP_DATA + 1;
         uint16_t dmxLen = readUint16BE(rxBuf, SACN_DMP_PROP_COUNT);
-        if (dmxLen == 0 || SACN_DMP_DATA + dmxLen > len) {
+        if (dmxLen == 0 || SACN_DMP_DATA + dmxLen > actualLen) {
             errorCount++;
             return;
         }

@@ -275,7 +275,7 @@ private:
         memcpy(&packet.totalLength, incomingData + 8, 2);
         memcpy(&packet.length, incomingData + 10, 2);
 
-        if (strncmp(packet.header, "DMX", 3) == 0) {
+        if (memcmp(packet.header, "DMX\0", 4) == 0) {
             if (packet.offset >= 512) return;
             uint16_t available = 512 - packet.offset;
             packet.length = packet.length > available ? available : packet.length;

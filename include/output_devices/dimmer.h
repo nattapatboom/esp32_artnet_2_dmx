@@ -88,6 +88,10 @@ public:
                 dimmerTimer = nullptr;
             }
             dimmerTimer = timerBegin(0, 80, true);
+            if (dimmerTimer == NULL) {
+                Serial.println("Dimmer: timerBegin failed!");
+                return;
+            }
             timerAttachInterrupt(dimmerTimer, &onDimmerTimer, true);
             timerAlarmWrite(dimmerTimer, DIMMER_TICK_US, true);
             timerAlarmEnable(dimmerTimer);

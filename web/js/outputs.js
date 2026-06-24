@@ -353,14 +353,17 @@ function encodeTestValues(o,ui,cmd){
 }
 function showOutputTest(idx){
   const o=outputs[idx];
+  if(!o) return;
   const t=parseInt(o.type);
   const p=document.getElementById('out-test-panel');
-  document.getElementById('test-title').textContent='#'+(idx+1)+' '+deviceLabel(o);
+  const titleEl=document.getElementById('test-title');
+  if(titleEl) titleEl.textContent='#'+(idx+1)+' '+deviceLabel(o);
   OUTPUT_IDX = idx;
   const ui=TYPE_META.testUi[t];
   renderTestFields(ui);
   const cmds=TYPE_META.testCmds[t];
   const btnContainer=document.getElementById('test-buttons');
+  if(!btnContainer) return;
   btnContainer.innerHTML='';
   if(cmds&&cmds.length){
     cmds.forEach(cmd=>{
@@ -372,8 +375,7 @@ function showOutputTest(idx){
       btnContainer.appendChild(btn);
     });
   }
-  p.style.display='block';
-  p.scrollIntoView({behavior:'smooth',block:'nearest'});
+  if(p){ p.style.display='block'; p.scrollIntoView({behavior:'smooth',block:'nearest'}); }
 }
 function sendTestCmd(idx,val){
   const o=outputs[idx];
@@ -396,7 +398,7 @@ function calcRcCutoff(){
 function testDur(){return (parseInt(document.getElementById('test_duration')?.value)||30)*1000;}
 
 function toggleOutFields(){
-  const t=parseInt(document.getElementById('no_type').value);
+  const t=parseInt(document.getElementById('no_type')?.value||0);
   showTypeConfig(t);
   const mcMode = parseInt(cfgEl('mc_mode')?.value||0);
   // Helper: safe style access; no-op if element missing
@@ -421,8 +423,8 @@ function toggleOutFields(){
   const isPwmDac = t===T.PWM_DAC;
   const isFuncGen = t===T.FUNC_GEN;
   const isDac = t===T.DAC;
-  const isCommonDim = is7Seg && mcMode >= 6 && mcMode <= 9;
-  const is7SegDD = is7Seg && mcMode >= 2 && mcMode <= 9;
+  const isCommonDim = is7Seg && outputModeKey(t, mcMode) === 'commonDim';
+  const is7SegDD = is7Seg && outputModeDef(t, mcMode)?.segmentLayout === true;
   const is7SegDirectDim = is7Seg && (mcMode === 4 || mcMode === 5);
 
   const canUsePca = modeAllowsSource(t,mcMode,SRC_PCA);
@@ -534,8 +536,8 @@ document.addEventListener('change', function(e){
   var id=e.target&&e.target.id;
   if(id==='mc_mode'||id==='mc_homing_mode'||id==='color_order') toggleOutFields();
 });
-document.getElementById('status_led_pin').addEventListener('change', autoAssignOutputPins);
-document.getElementById('zc_pin').addEventListener('change', autoAssignOutputPins);
+document.getElementById('status_led_pin')?.addEventListener('change', autoAssignOutputPins);
+document.getElementById('zc_pin')?.addEventListener('change', autoAssignOutputPins);
 
 function editOutput(idx){
   editOutIdx=idx;
@@ -555,7 +557,6 @@ function editOutput(idx){
   writeGeneratedFields(o);
   writeRouteFields(o);
   toggleOutFields();
-  writeRouteFields(o);
   
   document.getElementById('out-add-btn').textContent='Update Channel';
   document.getElementById('out-cancel-btn').style.display='';
@@ -575,10 +576,10 @@ function cancelEditOutput(){
 }
 
 function addOrUpdateOutput(){
-  const type=parseInt(document.getElementById('no_type').value);
+  const type=parseInt(document.getElementById('no_type')?.value||0);
   const ch={
     type:type,
-    start_universe:parseInt(document.getElementById('no_uni').value),
+    start_universe:parseInt(document.getElementById('no_uni')?.value)||0,
     start_address:parseInt(document.getElementById('no_addr').value)||1,
     mc_enable_active_high: false,
     mc_dir_invert: false,

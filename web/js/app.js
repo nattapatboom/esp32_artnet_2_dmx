@@ -95,7 +95,8 @@ async function scanI2c(){
     html+=`</table><div class="hint">Found ${data.length} device(s)</div>`;
     resultDiv.innerHTML=html;
   }catch(e){
-    resultDiv.innerHTML='<span style="color:#dc2626">Scan failed: '+e.message+'</span>';
+    resultDiv.textContent='Scan failed: '+e.message;
+    resultDiv.style.color='#dc2626';
   }
 }
 
@@ -193,6 +194,7 @@ function updateDisplayAddressOptions(){
   const current=parseInt(sel.value||60);
   const addrs=DISPLAY_DATA.addresses?.[type]||DISPLAY_DATA.addresses?.[DISPLAY_DATA.typeIds.SSD1306]||[0x3C];
   const opts=addrs.map((v,i)=>[v,'0x'+v.toString(16).toUpperCase()+(i===0?' (default)':'')]);
+  if(opts.length===0){ sel.innerHTML='<option value="">No addresses</option>'; return; }
   sel.innerHTML=opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   sel.value=opts.some(([v])=>v===current)?current:opts[0][0];
 }
@@ -241,7 +243,7 @@ async function loadSettings(){
     s('display_brightness',d.display_brightness);
     toggleEth(); toggleWifiIp(); updateMdnsPreview();
     autoAssignOutputPins();
-    document.getElementById('mdns_name').addEventListener('input',updateMdnsPreview);
+    document.getElementById('mdns_name')?.addEventListener('input',updateMdnsPreview);
     document.getElementById('device_mode')?.addEventListener('change', updateEspnowChannelVisibility);
     ['status_led_pin', 'zc_pin', 'i2c_sda', 'i2c_scl'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', checkStrappingPin);
@@ -265,8 +267,10 @@ async function saveSettings(e){
       obj[k]=parseInt(v,10);
     else obj[k]=v;
   });
-  if(!document.getElementById('i2c_enabled').checked){ obj[NET_PROTO.KEY_I2C_SDA]=NET_PROTO.ZC_PIN_DISABLED; obj[NET_PROTO.KEY_I2C_SCL]=NET_PROTO.ZC_PIN_DISABLED; }
-  if(!document.getElementById('disp_enable_ck').checked) obj[NET_PROTO.KEY_DISPLAY_ENABLED]=0;
+  const i2cEl=document.getElementById('i2c_enabled');
+  if(i2cEl&&!i2cEl.checked){ obj[NET_PROTO.KEY_I2C_SDA]=NET_PROTO.ZC_PIN_DISABLED; obj[NET_PROTO.KEY_I2C_SCL]=NET_PROTO.ZC_PIN_DISABLED; }
+  const dispEl=document.getElementById('disp_enable_ck');
+  if(dispEl&&!dispEl.checked) obj[NET_PROTO.KEY_DISPLAY_ENABLED]=0;
   [NET_PROTO.KEY_ETH_DHCP,NET_PROTO.KEY_WIFI_DHCP,NET_PROTO.KEY_ARTNET_ENABLED,NET_PROTO.KEY_SACN_ENABLED,NET_PROTO.KEY_SACN_MULTICAST,NET_PROTO.KEY_WIFI_IN_ETH_MODE,NET_PROTO.KEY_AP_IN_ETH_MODE].forEach(k=>{
     if (e.target.querySelector('#' + k)) {
       if (!obj.hasOwnProperty(k)) obj[k] = false;
@@ -349,17 +353,20 @@ async function importConfigFile(input){
 // WiFi Scan
 let scanTimer=null;
 async function startScan(){
-  document.getElementById('scan_results').style.display='block';
-  document.getElementById('scan_results').innerHTML='<option>Scanning...</option>';
+  const scanEl=document.getElementById('scan_results');
+  if(!scanEl) return;
+  scanEl.style.display='block';
+  scanEl.innerHTML='<option>Scanning...</option>';
   if(scanTimer) clearInterval(scanTimer);
-  await fetch('/api/wifi-scan');
+  try{
+    await fetch('/api/wifi-scan');
+  }catch(e){ clearInterval(scanTimer); return; }
   scanTimer=setInterval(async()=>{
     try{
       const d=await(await fetch('/api/wifi-scan')).json();
       if(d.status==='scanning') return;
       clearInterval(scanTimer);
-      const sel=document.getElementById('scan_results');
-      sel.innerHTML='<option value="">-- Select network --</option>';
+      scanEl.innerHTML='<option value="">-- Select network --</option>';
       (d.networks||[]).sort((a,b)=>b.rssi-a.rssi).forEach(n=>{
         const opt=document.createElement('option');
         opt.value=n.ssid;
@@ -370,8 +377,10 @@ async function startScan(){
   },2000);
 }
 function pickSsid(){
-  const v=document.getElementById('scan_results').value;
-  if(v) document.getElementById('wifi_ssid').value=v;
+  const sel=document.getElementById('scan_results');
+  if(!sel) return;
+  const v=sel.value;
+  if(v){ const ssid=document.getElementById('wifi_ssid'); if(ssid) ssid.value=v; }
 }
 
 // OTA

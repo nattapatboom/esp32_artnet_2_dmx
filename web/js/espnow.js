@@ -37,6 +37,7 @@ function renderPeers(){
 }
 function addPeer(){
   const mac=document.getElementById('np_mac').value.trim().toUpperCase();
+  if(!/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac)){ alert('Invalid MAC address format (e.g. AA:BB:CC:DD:EE:FF).'); return; }
   const peer={
     mac:mac,
     start_universe:parseInt(document.getElementById('np_start_uni').value)||0,
@@ -66,10 +67,10 @@ async function savePeers(){
 
 function copyMac(){
   const mac=document.getElementById('board_mac_display').textContent;
+  const btn=event&&event.target?event.target:null;
   if(mac&&mac!=='--:--:--:--:--:--'){
     navigator.clipboard.writeText(mac).then(()=>{
-      const btn=event.target; btn.textContent='Copied!';
-      setTimeout(()=>btn.textContent='Copy',1500);
+      if(btn){ btn.textContent='Copied!'; setTimeout(()=>btn.textContent='Copy',1500); }
     });
   }
 }

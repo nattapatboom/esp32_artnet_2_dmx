@@ -60,19 +60,20 @@ public:
 
     bool ready() const { return rmt_buffer != nullptr && started; }
 
-    void send(uint8_t* dmx_data) {
+    void send(uint8_t* dmx_data, uint16_t data_len = 512) {
         if (!ready()) return;
         if (rmt_wait_tx_done(channel, 0) != ESP_OK) return;
+        if (data_len > 512) data_len = 512;
         size_t item_count = 0;
 
         // 1. Break and MAB
         rmt_buffer[item_count++] = {{{DMX_BREAK_US, 0, DMX_MAB_US, 1}}};
 
-        // 2. Data slots: start code + 512 channel bytes.
+        // 2. Data slots: start code + channel bytes.
         uint8_t byte = 0x00; // Start code
         encodeByte(byte, item_count);
 
-        for (int i = 0; i < 512; i++) {
+        for (uint16_t i = 0; i < data_len; i++) {
             encodeByte(dmx_data[i], item_count);
         }
         

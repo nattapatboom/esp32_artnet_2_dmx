@@ -5,8 +5,8 @@
 const SENTINEL_NONE = 255;
 
 // Routing slot field keys: "pinN" → JSON object property for pin value and source value
-var SLOT_PIN_KEY={pin1:'pin',pin2:'pin2',pin3:'pin3',pin4:'pin4'};
-var SLOT_SRC_KEY={pin1:'source',pin2:'pin2_source',pin3:'pin3_source',pin4:'pin4_source'};
+const SLOT_PIN_KEY={pin1:'pin',pin2:'pin2',pin3:'pin3',pin4:'pin4'};
+const SLOT_SRC_KEY={pin1:'source',pin2:'pin2_source',pin3:'pin3_source',pin4:'pin4_source'};
 
 function outputModeKeyForObj(o){
   var t=parseInt(o.type||0);
@@ -63,12 +63,12 @@ const SRC_GPIO=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.GPIO:1;
 const SRC_PCA=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.PCA:2;
 const SRC_DIG=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.DIGITAL_EXPANDER:4;
 const SRC_DAC=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.I2C_DAC:8;
-var T=TYPE_META.typeIds;
+var T=TYPE_META?.typeIds||{};
 
 function outputModeKey(type,mode){
   return TYPE_META.modeKeyMap[parseInt(type)]?.[parseInt(mode||0)]||String(mode);
 }
-function outputDef(type){ return OUTPUT_DEFS[parseInt(type)]; }
+function outputDef(type){ return (OUTPUT_DEFS||{})[parseInt(type)]; }
 function outputModeDef(type,mode){
   const def=outputDef(type);
   if(!def) return null;
@@ -200,7 +200,7 @@ function renderPinRows(){
   for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_channel_'+s);if(el)saved['no_seg_channel_'+s]=el.value;}
   for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_pin_invert_'+s);if(el)saved['no_seg_pin_invert_'+s]=el.checked;}
 
-  const t=parseInt(document.getElementById('no_type').value);
+  const t=parseInt(document.getElementById('no_type')?.value||0);
   const mcMode=parseInt(cfgEl('mc_mode')?.value||0);
   const hMode=parseInt(cfgEl('mc_homing_mode')?.value||0);
   const colorOrder=parseInt(cfgEl('color_order')?.value||0);
@@ -290,8 +290,8 @@ function renderPinRows(){
       <div class="f" style="flex:1;min-width:100px;margin:0">${p.addrHtml}</div>
       <div class="f" style="flex:1;min-width:100px;margin:0">${p.pinHtml}</div>
       <div class="f" style="flex:0 0 auto;margin:0;padding-bottom:4px;display:flex;align-items:center;gap:4px;${p.invId?'':'visibility:hidden'}">
-        <input type="checkbox" id="${p.invId||''}">
-        <label for="${p.invId||''}" style="font-size:0.75rem;margin:0">Invert</label>
+        <input type="checkbox"${p.invId?' id="'+p.invId+'"':''}>
+        <label${p.invId?' for="'+p.invId+'"':''} style="font-size:0.75rem;margin:0">Invert</label>
       </div>
     </div>`);
 
@@ -434,7 +434,7 @@ function setSelectIfOption(id,value){
 
 function autoAssignOutputPins(){
   if(editOutIdx!==-1) return;
-  const t=parseInt(document.getElementById('no_type').value);
+  const t=parseInt(document.getElementById('no_type')?.value||0);
   ['no_pin','no_pin2','no_pin3','no_pin4'].forEach(id=>setSelectIfOption(id,255));
   for(let s=0; s<=7; s++){setSelectIfOption('no_seg_pin_'+s,255);}
   const picked=[];

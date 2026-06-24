@@ -17,17 +17,17 @@ private:
     uint16_t _state;
     bool _started;
 
-    void writeReg8(uint8_t reg, uint8_t value) {
-        I2cBus::writeReg8(_address, reg, value);
+    bool writeReg8(uint8_t reg, uint8_t value) {
+        return I2cBus::writeReg8(_address, reg, value);
     }
 
-    void writeReg16(uint8_t reg, uint16_t value) {
-        I2cBus::writeReg16(_address, reg, value);
+    bool writeReg16(uint8_t reg, uint16_t value) {
+        return I2cBus::writeReg16(_address, reg, value);
     }
 
-    void writePcf(uint16_t value) {
+    bool writePcf(uint16_t value) {
         uint8_t data[2] = {(uint8_t)(value & 0xFF), (uint8_t)((value >> 8) & 0xFF)};
-        I2cBus::writeBytes(_address, data, value > 0xFF ? 2 : 1);
+        return I2cBus::writeBytes(_address, data, value > 0xFF ? 2 : 1);
     }
 
 public:

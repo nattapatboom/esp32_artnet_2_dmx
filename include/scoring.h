@@ -96,13 +96,22 @@ struct RamBudget {
 // ═══════════════════════════════════════
 
 // Pin index → source field helper: index 0→ch.source, 1→pin2_source, etc.
+// For 7-segment direct-drive types (12,13), all pins map via seg_sources.
 inline uint8_t getPinSource(const OutputChannel& ch, uint8_t pinIndex) {
+    if (ch.type == OutputDefs::TYPE_7SEG_7PIN || ch.type == OutputDefs::TYPE_7SEG_8PIN) {
+        const auto* d = OutputDefs::modeDef(ch.type, ch.mc_mode);
+        if (d && d->segmentCount > 0) {
+            if (d->pinCount > d->segmentCount && pinIndex == 0) return ch.source;
+            uint8_t segIdx = (d->pinCount > d->segmentCount) ? pinIndex - 1 : pinIndex;
+            return (segIdx < 8) ? ch.seg_sources[segIdx] : 0;
+        }
+    }
     switch (pinIndex) {
         case 0: return ch.source;
         case 1: return ch.pin2_source;
         case 2: return ch.pin3_source;
         case 3: return ch.pin4_source;
-        default: return (pinIndex < 12) ? ch.seg_sources[pinIndex - 4] : 0;
+        default: return (pinIndex - 4 < 8) ? ch.seg_sources[pinIndex - 4] : 0;
     }
 }
 
@@ -117,13 +126,15 @@ inline HardwareResource estimateHardware(const OutputChannel& ch) {
     h.timer = def->cost.hardware.timer;
 
     // Per-pin GPIO-driven hardware
+    uint8_t rmtFromPins = 0;
     for (uint8_t i = 0; i < def->pinCount; i++) {
         uint8_t src = getPinSource(ch, i);
         if (src == 0) {
             if (def->pins[i].hwIfGpio == 1) h.ledc++;
-            if (def->pins[i].hwIfGpio == 2 && h.rmt < def->cost.hardware.rmt) h.rmt++;
+            if (def->pins[i].hwIfGpio == 2) rmtFromPins++;
         }
     }
+    h.rmt += rmtFromPins;
 
     // Analog RGB pin4 only counts in RGBW mode (color_order >= 4)
     if (ch.type == OutputDefs::TYPE_ANALOG_RGB && ch.color_order < 4 && ch.pin4_source == 0 && h.ledc > 0) {
@@ -378,6 +389,17 @@ inline RamBudget totalRam(const std::vector<OutputChannel>& chs) {
 // ═══════════════════════════════════════
 
 inline uint8_t getPinSourceFromJson(JsonObjectConst j, uint8_t pinIndex) {
+    uint8_t t = j["type"] | 0;
+    uint8_t mode = j["mc_mode"] | 0;
+    if (t == OutputDefs::TYPE_7SEG_7PIN || t == OutputDefs::TYPE_7SEG_8PIN) {
+        const auto* d = OutputDefs::modeDef(t, mode);
+        if (d && d->segmentCount > 0) {
+            if (d->pinCount > d->segmentCount && pinIndex == 0) return j["source"] | 0;
+            uint8_t segIdx = (d->pinCount > d->segmentCount) ? pinIndex - 1 : pinIndex;
+            JsonArrayConst sa = j["seg_sources"];
+            return (!sa.isNull() && segIdx < sa.size()) ? (uint8_t)(sa[segIdx] | 0) : 0;
+        }
+    }
     switch (pinIndex) {
         case 0: return j["source"] | 0;
         case 1: return j["pin2_source"] | 0;
@@ -403,13 +425,15 @@ inline HardwareResource estimateHardwareFromJson(JsonObjectConst j) {
     h.dac = def->cost.hardware.dac;
     h.timer = def->cost.hardware.timer;
 
+    uint8_t rmtFromPins = 0;
     for (uint8_t i = 0; i < def->pinCount; i++) {
         uint8_t src = getPinSourceFromJson(j, i);
         if (src == 0) {
             if (def->pins[i].hwIfGpio == 1) h.ledc++;
-            if (def->pins[i].hwIfGpio == 2 && h.rmt < def->cost.hardware.rmt) h.rmt++;
+            if (def->pins[i].hwIfGpio == 2) rmtFromPins++;
         }
     }
+    h.rmt += rmtFromPins;
 
     uint8_t colorOrder = j["color_order"] | 0;
     if (t == OutputDefs::TYPE_ANALOG_RGB && colorOrder < 4 && getPinSourceFromJson(j, 3) == 0 && h.ledc > 0) {

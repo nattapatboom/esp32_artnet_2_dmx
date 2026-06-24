@@ -102,10 +102,10 @@ volatile bool i2cScanRequested = false;
 volatile bool i2cScanPending = false;
 QueueHandle_t espNowQueue = NULL;
 DisplayDriver display;
-volatile bool outputTestActive = false;
-volatile bool outputTestClearRequested = false;
-int outputTestIndex = -1;
-unsigned long outputTestUntil = 0;
+std::atomic<bool> outputTestActive{false};
+std::atomic<bool> outputTestClearRequested{false};
+std::atomic<int> outputTestIndex{-1};
+std::atomic<unsigned long> outputTestUntil{0};
 
 // Network functions forward declarations
 void startAP();
@@ -2219,7 +2219,7 @@ void outputTask(void* pvParameters) {
         outputCtrl.loop();
 
         if (outputTestActive) {
-            if ((int32_t)(millis() - outputTestUntil) >= 0) {
+            if ((int32_t)(millis() - outputTestUntil.load()) >= 0) {
                 clearOutputTest();
             } else {
                 outputCtrl.updateLeds();
