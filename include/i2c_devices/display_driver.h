@@ -27,13 +27,10 @@ public:
         _addr = addr;
         if (type == DISPLAY_OFF) return false;
 
+        if (!I2cBus::probe(addr)) return false;
+
         I2cBus::Lock lock;
         if (!lock.locked()) return false;
-
-        Wire.beginTransmission(addr);
-        if (Wire.endTransmission() != 0) {
-            return false;
-        }
 
         if (type == DISPLAY_SSD1306) {
             _oled = new (std::nothrow) SSD1306AsciiWire(Wire);
