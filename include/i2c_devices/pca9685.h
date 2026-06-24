@@ -120,7 +120,8 @@ public:
 
         if (_driverCount >= 8) return nullptr;
 
-        PCA9685Driver* drv = new PCA9685Driver(address);
+        PCA9685Driver* drv = new (std::nothrow) PCA9685Driver(address);
+        if (!drv) return nullptr;
         drv->begin();
         _drivers[_driverCount++] = drv;
         return drv;

@@ -86,6 +86,7 @@ inline void motorUpdate(OutputChannel& ch) {
     uint32_t max_val = getMaxValue(ch.mc_resolution);
     if (max_val == 0) return;
     int32_t center = max_val / 2;
+    if (center == 0) center = 1;
     int32_t offset = (int32_t)val - center;
     bool is_forward = ch.mc_invert ? (offset < 0) : (offset > 0);
     uint32_t abs_offset = abs(offset);

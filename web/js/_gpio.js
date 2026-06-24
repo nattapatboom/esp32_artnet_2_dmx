@@ -52,13 +52,17 @@ function eachSlot(o,fn){
 const ORDERS=['GRB','RGB','BRG','RBG','RGBW','GRBW','BRGW','WRGB'];
 
 // Derive lookup maps from generated data
-const SOURCES=Object.fromEntries(SOURCE_DATA.names.map((n,i)=>[i,n]));
-const OUTPUT_GPIOS=GPIO_PINS.output;
-const INPUT_GPIOS=GPIO_PINS.input;
-const INPUT_ONLY_GPIOS=GPIO_PINS.inputOnly;
-const FORBIDDEN_OUTPUT_GPIOS=Object.fromEntries(GPIO_PINS.reserved.map(r=>[r.pin,r.reason]));
-const SOURCE_ADDRESS_RULES=Object.fromEntries(SOURCE_DATA.addressRules.map(r=>[r.source,{label:r.label,ranges:r.ranges}]));
-const SRC_GPIO=SOURCE_DATA.masks.GPIO, SRC_PCA=SOURCE_DATA.masks.PCA, SRC_DIG=SOURCE_DATA.masks.DIGITAL_EXPANDER, SRC_DAC=SOURCE_DATA.masks.I2C_DAC;
+const SOURCES=SOURCE_DATA?Object.fromEntries(SOURCE_DATA.names.map((n,i)=>[i,n])):{};
+const GPIO_PINS_SAFE=GPIO_PINS||{output:[],input:[],inputOnly:[],reserved:[]};
+const OUTPUT_GPIOS=GPIO_PINS_SAFE.output;
+const INPUT_GPIOS=GPIO_PINS_SAFE.input;
+const INPUT_ONLY_GPIOS=GPIO_PINS_SAFE.inputOnly;
+const FORBIDDEN_OUTPUT_GPIOS=Object.fromEntries(GPIO_PINS_SAFE.reserved.map(r=>[r.pin,r.reason]));
+const SOURCE_ADDRESS_RULES=SOURCE_DATA?Object.fromEntries(SOURCE_DATA.addressRules.map(r=>[r.source,{label:r.label,ranges:r.ranges}])):{};
+const SRC_GPIO=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.GPIO:1;
+const SRC_PCA=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.PCA:2;
+const SRC_DIG=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.DIGITAL_EXPANDER:4;
+const SRC_DAC=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.I2C_DAC:8;
 var T=TYPE_META.typeIds;
 
 function outputModeKey(type,mode){
@@ -121,7 +125,7 @@ function deviceLabel(o){
 function ledUniverseCount(o){
   const bytesPerPixel=(o.color_order||0)>=4?4:3;
   const pixelsPerUniverse=Math.floor(512/bytesPerPixel);
-  return Math.ceil((o.led_count||170)/pixelsPerUniverse);
+  return Math.ceil((o.led_count!==undefined?o.led_count:170)/pixelsPerUniverse);
 }
 
 function outputChannelCount(o){
@@ -153,8 +157,11 @@ function outputGpios(o){
   var t=parseInt(o.type||0);
   var isStepper=t===T.STEPPER;
   if(isStepper&&parseInt(o.mc_homing_mode||0)>0&&parseInt(o.pin4_source||0)!==0){
-    var idx=pins.indexOf(parseInt(o.pin4));
-    if(idx!==-1) pins.splice(idx,1);
+    var p4=parseInt(o.pin4);
+    if(!isNaN(p4)){
+      var idx=pins.indexOf(p4);
+      if(idx!==-1) pins.splice(idx,1);
+    }
   }
   return pins;
 }

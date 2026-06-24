@@ -159,7 +159,8 @@ public:
         }
         if (_deviceCount >= 12) return nullptr;
 
-        DigitalExpanderDevice* dev = new DigitalExpanderDevice(kind, address);
+        DigitalExpanderDevice* dev = new (std::nothrow) DigitalExpanderDevice(kind, address);
+        if (!dev) return nullptr;
         dev->begin();
         _devices[_deviceCount++] = dev;
         return dev;

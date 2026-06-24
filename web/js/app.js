@@ -53,20 +53,24 @@ async function diagRefreshSysInfo(){
 }
 
 // I2C device guess table — built from SOURCE_DATA.addressRules + common non-source I2C devices
-const I2C_GUESS_ENTRIES = [
-  ...SOURCE_DATA.addressRules.flatMap(r =>
+let I2C_GUESS_ENTRIES = [
+  [0x48, 'ADS1115 / PCF8591'],[0x49, 'ADS1115 / PCF8591'],[0x4A, 'ADS1115 / PCF8591'],[0x4B, 'ADS1115 / PCF8591'],
+  [0x50, 'AT24C EEPROM'],[0x51, 'AT24C EEPROM'],[0x57, 'AT24C EEPROM'],
+  [0x68, 'DS3231 RTC / MPU6050'],[0x76, 'BME280 / BMP280'],[0x77, 'BME280 / BMP280'],
+];
+if(SOURCE_DATA&&SOURCE_DATA.addressRules){
+  I2C_GUESS_ENTRIES.unshift(...SOURCE_DATA.addressRules.flatMap(r =>
     r.ranges.filter(ra => ra[0] !== 0 || ra[1] !== 0).flatMap(ra => {
       const name = SOURCES[r.source] || 'I2C Device';
       const addrs = [];
       for (let a = ra[0]; a <= ra[1]; a++) addrs.push(a);
       return addrs;
     }).map(addr => [addr, SOURCES[r.source]])
-  ),
-  ...Object.entries(DISPLAY_DATA.addresses||{}).flatMap(([type,addrs]) => addrs.map(addr => [addr, DISPLAY_DATA.typeNames?.[type]||'I2C Display'])),
-  [0x48, 'ADS1115 / PCF8591'],[0x49, 'ADS1115 / PCF8591'],[0x4A, 'ADS1115 / PCF8591'],[0x4B, 'ADS1115 / PCF8591'],
-  [0x50, 'AT24C EEPROM'],[0x51, 'AT24C EEPROM'],[0x57, 'AT24C EEPROM'],
-  [0x68, 'DS3231 RTC / MPU6050'],[0x76, 'BME280 / BMP280'],[0x77, 'BME280 / BMP280'],
-];
+  ));
+}
+if(DISPLAY_DATA&&DISPLAY_DATA.addresses){
+  I2C_GUESS_ENTRIES.unshift(...Object.entries(DISPLAY_DATA.addresses||{}).flatMap(([type,addrs]) => addrs.map(addr => [addr, DISPLAY_DATA.typeNames?.[type]||'I2C Display'])));
+}
 const I2C_DEVICES = Object.fromEntries(I2C_GUESS_ENTRIES);
 async function scanI2c(){
   const resultDiv=document.getElementById('i2c-scan-result');
@@ -97,6 +101,7 @@ async function scanI2c(){
 
 function showAlert(ok){
   const el=document.getElementById(ok?'alert-ok':'alert-err');
+  if(!el) return;
   el.style.display='block';
   setTimeout(()=>el.style.display='none',3500);
 }
@@ -132,25 +137,41 @@ async function updateTelemetry(){
 
 // Network form toggles
 function toggleEth(){
-  const dhcp=document.getElementById('eth_dhcp').checked;
+  const el=document.getElementById('eth_dhcp');
+  if(!el) return;
+  const dhcp=el.checked;
   document.querySelectorAll('#eth-static input').forEach(i=>i.disabled=dhcp);
 }
 function toggleWifiIp(){
-  const dhcp=document.getElementById('wifi_dhcp').checked;
+  const el=document.getElementById('wifi_dhcp');
+  if(!el) return;
+  const dhcp=el.checked;
   document.querySelectorAll('#wifi-static input').forEach(i=>i.disabled=dhcp);
 }
 function updateMdnsPreview(){
-  const v=document.getElementById('mdns_name').value||'artnet';
-  document.getElementById('mdns_preview').textContent=v;
+  const el=document.getElementById('mdns_name');
+  if(!el) return;
+  const v=el.value||'artnet';
+  const preview=document.getElementById('mdns_preview');
+  if(preview) preview.textContent=v;
 }
 function toggleI2c(){
-  const en=document.getElementById('i2c_enabled').checked;
-  document.getElementById('i2c-config').style.display=en?'':'none';
+  const el=document.getElementById('i2c_enabled');
+  if(!el) return;
+  const en=el.checked;
+  const cfg=document.getElementById('i2c-config');
+  if(cfg) cfg.style.display=en?'':'none';
 }
 function toggleDisplayCfg(){
-  const en=document.getElementById('disp_enable_ck').checked;
-  document.getElementById('display-config').style.display=en?'':'none';
-  if(!en) document.getElementById('display_enabled').value=0;
+  const el=document.getElementById('disp_enable_ck');
+  if(!el) return;
+  const en=el.checked;
+  const cfg=document.getElementById('display-config');
+  if(cfg) cfg.style.display=en?'':'none';
+  if(!en){
+    const de=document.getElementById('display_enabled');
+    if(de) de.value=0;
+  }
   updateDisplayAddressOptions();
 }
 

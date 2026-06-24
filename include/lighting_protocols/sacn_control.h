@@ -149,7 +149,11 @@ private:
     }
 
     void joinMulticast(uint16_t universe) {
-        WiFiUDP* m = new WiFiUDP();
+        WiFiUDP* m = new (std::nothrow) WiFiUDP();
+        if (!m) {
+            Serial.println("[sACN] OOM allocating multicast UDP instance");
+            return;
+        }
         uint8_t hi = (universe >> 8) & 0xFF;
         uint8_t lo = universe & 0xFF;
         IPAddress mcast(239, 255, hi, lo);

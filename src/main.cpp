@@ -2238,7 +2238,7 @@ void outputTask(void* pvParameters) {
                 bool matched = outputCtrl.mapDmxDataToChannels(packet.universe, packet.data, dmxLen, false, packet.offset);
 
                 // Keep the local universe-0 frame buffer available for shared output state.
-                if (packet.universe == 0) {
+                if (packet.universe == 0 && packet.offset + dmxLen <= sizeof(EspNowControl::rxDmxBuffer)) {
                     memcpy(EspNowControl::rxDmxBuffer + packet.offset, packet.data, dmxLen);
                     EspNowControl::rxDmxLength = min((uint16_t)512, packet.totalLength);
                     matched = true;

@@ -36,19 +36,22 @@ public:
         }
 
         if (type == DISPLAY_SSD1306) {
-            _oled = new SSD1306AsciiWire(Wire);
+            _oled = new (std::nothrow) SSD1306AsciiWire(Wire);
+            if (!_oled) return false;
             _oled->begin(&Adafruit128x64, addr);
             _oled->setFont(System5x7);
             _oled->clear();
             _active = true;
         } else if (type == DISPLAY_SH1106) {
-            _oled = new SSD1306AsciiWire(Wire);
+            _oled = new (std::nothrow) SSD1306AsciiWire(Wire);
+            if (!_oled) return false;
             _oled->begin(&SH1106_128x64, addr);
             _oled->setFont(System5x7);
             _oled->clear();
             _active = true;
         } else if (type == DISPLAY_PCF8574) {
-            _lcd = new LiquidCrystal_I2C(addr, 20, 4);
+            _lcd = new (std::nothrow) LiquidCrystal_I2C(addr, 20, 4);
+            if (!_lcd) return false;
             _lcd->init();
             _lcd->backlight();
             _lcd->clear();

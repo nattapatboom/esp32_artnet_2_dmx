@@ -178,7 +178,7 @@ inline void sevenSegUpdate(OutputChannel& ch) {
                     uint32_t duty = ((segByte >> b) & 1) ? brightness : 0;
                     if (ch.seg_sources[b] >= 1 && ch.seg_sources[b] <= 4) {
                         writeSegmentOutput(ch, b, duty > 0);
-                    } else if (ch.dmxPort + b <= 15) {
+                    } else if (ch.dmxPort != 255 && ch.dmxPort + b <= 15) {
                         bool inv = (ch.seg_inverts >> b) & 1;
                         uint32_t active_duty = inv ? (brightness - duty) : duty;
                         ledcWrite(ch.dmxPort + b, active_duty);

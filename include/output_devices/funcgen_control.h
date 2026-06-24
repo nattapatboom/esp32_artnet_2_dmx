@@ -127,8 +127,18 @@ void FuncGenController::rebuild() {
     args.callback = timerCallback;
     args.arg = this;
     args.name = "funcGen";
-    esp_timer_create(&args, &timer);
-    esp_timer_start_periodic(timer, period_us);
+    esp_err_t err = esp_timer_create(&args, &timer);
+    if (err != ESP_OK) {
+        Serial.printf("[funcgen] Failed to create timer: %d\n", err);
+        return;
+    }
+    err = esp_timer_start_periodic(timer, period_us);
+    if (err != ESP_OK) {
+        Serial.printf("[funcgen] Failed to start timer: %d\n", err);
+        esp_timer_delete(timer);
+        timer = nullptr;
+        return;
+    }
     timerRunning = true;
 }
 

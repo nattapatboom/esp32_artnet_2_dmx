@@ -711,6 +711,8 @@ public:
             ch.shadowBuffer = (uint8_t*)calloc(ch.bufferSize, 1);
             if (ch.shadowBuffer == nullptr) {
                 Serial.printf("OOM error allocating shadow buffer for channel type %d!\n", ch.type);
+                free(ch.dmxBuffer);
+                ch.dmxBuffer = nullptr;
                 continue;
             }
             channels.push_back(ch);

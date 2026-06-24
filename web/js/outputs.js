@@ -73,7 +73,9 @@ function readGeneratedFields(ch,type){
 }
 function routeValue(id, fallback){
   var el=document.getElementById(id);
-  return el?parseInt(el.value):fallback;
+  if(!el) return fallback;
+  var v=parseInt(el.value);
+  return isNaN(v)?fallback:v;
 }
 function routeChecked(id, fallback){
   var el=document.getElementById(id);
@@ -316,7 +318,7 @@ function encodeTestValues(o,ui,cmd){
     var hex=String(testValue('test_color','#ff0000'));
     var r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16), w=parseInt(testValue('test_white',0))||0;
     if(o.type===T.ANALOG_RGB) return (parseInt(o.color_order||0)>=4)?[r,g,b,w]:[r,g,b];
-    var count=o.led_count||170, out=[], target=Math.max(1,Math.min(count,parseInt(testValue('test_pixel',1))||1))-1;
+    var count=(o.led_count!==undefined?o.led_count:170), out=[], target=Math.max(1,Math.min(count,parseInt(testValue('test_pixel',1))||1))-1;
     for(var i=0;i<count;i++){
       var on=(cmd||'all')!=='pixel'||i===target;
       out.push(on?r:0,on?g:0,on?b:0);
