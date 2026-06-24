@@ -415,31 +415,9 @@ function toggleOutFields(){
   const t=parseInt(document.getElementById('no_type')?.value||0);
   showTypeConfig(t);
   const mcMode = parseInt(cfgEl('mc_mode')?.value||0);
-  // Helper: safe style access; no-op if element missing
   const _st=(id,v)=>{const e=cfgEl(id);if(e)e.style.display=v;};
   if(!document.getElementById('no_source')) renderPinRows();
   const srcSelect=document.getElementById('no_source');
-  
-  const isDmx = t===T.DMX;
-  const isRelay = t===T.RELAY;
-  const isDimmer = t===T.DIMMER;
-  const isMc = t>=T.SINGLE_LED && t<=T.SERVO;
-  const isPwmDimmer = t===T.SINGLE_LED;
-  const isMotor = t===T.MOTOR;
-  const isStepper = t===T.STEPPER;
-  const isServo = t===T.SERVO;
-  const isSolenoid = t===T.SOLENOID;
-  const isAnalogRgb = t===T.ANALOG_RGB;
-  const isBuzzer = t===T.BUZZER;
-  const isSmoke = t===T.SMOKE;
-  const is7Seg = t>=T.TM1637 && t<=T['7SEG_8PIN'];
-  const isDfPlayer = t===T.DFPLAYER;
-  const isPwmDac = t===T.PWM_DAC;
-  const isFuncGen = t===T.FUNC_GEN;
-  const isDac = t===T.DAC;
-  const isCommonDim = is7Seg && outputModeKey(t, mcMode) === 'commonDim';
-  const is7SegDD = is7Seg && outputUsesSegmentRoutes(t, mcMode);
-  const is7SegDirectDim = is7Seg && (mcMode === 4 || mcMode === 5);
 
   const canUsePca = modeAllowsSource(t,mcMode,SRC_PCA);
   const canUseDigitalExpander = modeAllowsSource(t,mcMode,SRC_DIG);
@@ -473,73 +451,12 @@ function toggleOutFields(){
     if(src>=2 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=32;
   }
   
-  _st('no_addr_grp',(isDmx||t===T.LED_STRIP)?'none':'');
-  _st('no_mc_grp',(isMc||is7Seg||isFuncGen||isPwmDac)?'':'none');
-  _st('no_sol_grp',isSolenoid?'':'none');
-  _st('no_smoke_grp',isSmoke?'':'none');
-  if(isDfPlayer) renderPinRows();
+  _st('no_addr_grp',outputModeDef(t,mcMode)?.startAtFirstUniverse?'none':'');
   
-  const hMode = parseInt(cfgEl('mc_homing_mode')?.value||0);
-  const colorOrder = parseInt(cfgEl('color_order')?.value||0);
   _st('no_pca_channel2_grp','none');
   _st('no_pca_channel3_grp','none');
   _st('no_pca_channel4_grp','none');
-
-  if (isMc || is7Seg || isFuncGen || isPwmDac) {
-    _st('mc_mode_grp',(is7Seg || isMotor) ? '' : 'none');
-    _st('mc_res_grp',(isMc || isPwmDac || is7Seg) ? '' : 'none');
-    const resLbl = cfgEl('mc_resolution_lbl');
-    if(resLbl) resLbl.textContent = is7Seg ? 'Decode Mode' : 'Resolution';
-    const freqGrp = cfgEl('mc_freq_grp');
-    const freqLbl = cfgEl('mc_freq_lbl');
-    const pwmDacCalGrp = cfgEl('pwm_dac_cal_grp');
-    if (isFuncGen || isPwmDac) {
-      if(freqGrp) freqGrp.style.display = '';
-      if(freqLbl) freqLbl.textContent = "PWM Carrier Frequency (Hz)";
-      _st('rc_filter_grp','');
-      if(pwmDacCalGrp) pwmDacCalGrp.style.display = isPwmDac ? '' : 'none';
-      calcRcCutoff();
-    } else if (is7Seg) {
-      if(freqGrp) freqGrp.style.display = (t >= 12) ? '' : 'none';
-      if(freqLbl) freqLbl.textContent = "PWM Frequency (Hz)";
-      _st('rc_filter_grp','none');
-      if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
-    } else if (isPwmDimmer || isMotor) {
-      if(freqGrp) freqGrp.style.display = '';
-      if(freqLbl) freqLbl.textContent = "Frequency (Hz)";
-      _st('rc_filter_grp','none');
-      if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
-    } else if (isStepper) {
-      if(freqGrp) freqGrp.style.display = '';
-      if(freqLbl) freqLbl.textContent = "Speed (Hz)";
-      _st('rc_filter_grp','none');
-      if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
-    } else if (isAnalogRgb) {
-      if(freqGrp) freqGrp.style.display = '';
-      if(freqLbl) freqLbl.textContent = "Frequency (Hz)";
-      _st('rc_filter_grp','none');
-      if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
-    } else {
-      if(freqGrp) freqGrp.style.display = 'none';
-      _st('rc_filter_grp','none');
-      if(pwmDacCalGrp) pwmDacCalGrp.style.display = 'none';
-    }
-    
-    _st('mc_deadband_grp',isMotor ? '' : 'none');
-    _st('mc_min_us_grp',isServo ? '' : 'none');
-    _st('mc_max_us_grp',isServo ? '' : 'none');
-    _st('mc_stepper_scale_grp',isStepper ? '' : 'none');
-    _st('mc_steps_grp',isStepper ? '' : 'none');
-    _st('mc_unit_type_grp',isStepper ? '' : 'none');
-    _st('mc_scale_factor_grp',isStepper ? '' : 'none');
-    _st('mc_stepper_homing_grp',isStepper ? '' : 'none');
-    _st('mc_homing_mode_grp',isStepper ? '' : 'none');
-    _st('mc_homing_dir_grp',isStepper ? '' : 'none');
-    _st('mc_homing_speed_grp',isStepper ? '' : 'none');
-    _st('mc_homing_timeout_grp',(isStepper && hMode === 1) ? '' : 'none');
-    _st('mc_invert_grp',(isMotor || isStepper) ? '' : 'none');
-    _st('mc_brake_grp',(isMotor && (mcMode === 0 || mcMode === 2)) ? '' : 'none');
-  }
+  calcRcCutoff();
   renderPinRows();
   autoAssignOutputPins();
   const pinMapContainer = document.getElementById('pin-mapping-container');
