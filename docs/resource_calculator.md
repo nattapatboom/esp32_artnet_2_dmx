@@ -101,6 +101,16 @@ Higher FPS = less time per frame = smaller budget:
 | Smoke Shooter (18) | 25 | Dual sequence state machine |
 | **I2C write** | **+180 each** | Per active PCA/DAC/expander transaction at typical 400kHz bus speed |
 
+Firmware scoring now follows a common cost pipeline for every output mode:
+
+```text
+Hardware = BaseHardware + RouteHardware + AggregateHardware
+CPU      = BaseCpu + DynamicCpu + I2cRouteCpu + BackgroundCpu + AggregateProtocolCpu
+RAM      = BaseChannelRam + DmxBufferRam + DynamicRuntimeRam + I2cRouteRam + AggregateFallbackRam
+```
+
+`ModeCost.flags` in `include/output_defs.h` declares which optional policies apply. Outputs that do not use a policy simply contribute zero for that stage. Current policy flags cover LED-strip dynamic pixel/universe cost, RGB/RGBW byte count, stepper command bytes, text/7-segment mode bytes, AC dimmer background timing, function-generator ISR timing, DMX UART/RMT aggregate allocation, and UART-reserved devices such as DFPlayer.
+
 ESP-NOW Master overhead (independent of output channels):
 ```
 cpuUs = 500 + peerCount × ceil(512/chunkSize) × 170 + universeCount × 100

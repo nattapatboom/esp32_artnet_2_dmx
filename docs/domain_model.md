@@ -237,6 +237,8 @@ The scoring system uses **three independent budgets**:
 | **CpuBudget** | Output service time: DMX enqueue/copy, WS281x mapping/enqueue, TM1637 bit-bang, active I2C writes, and 500 µs base overhead | `≤ (1,000,000/fps) - 1,500` µs | ✅ Yes |
 | **RamBudget** | Static buffer estimates per type | `≤ 65535` (64 KB) | ✅ Yes |
 
+Each channel uses the same cost pipeline: `BaseCost + DynamicCost + Route/I2C Cost + BackgroundCost`, followed by aggregate policies such as DFPlayer-priority UART allocation, DMX RMT fallback, and ESP-NOW master overhead. Optional dynamic/background/aggregate behavior is declared in `ModeCost.flags`; unused stages contribute zero.
+
 Key files:
 - `include/scoring.h`
 - `docs/resource_calculator.md`

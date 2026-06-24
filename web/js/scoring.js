@@ -13,7 +13,7 @@ const DMX_BUFFER_RAM=S.DMX_BUFFER_BYTES;
 const I2C_ROUTE_RAM=S.I2C_ROUTE_BYTES;
 
 function channelHardware(o){
-  var mode=outputModeDef(typeId(o),parseInt(o.mc_mode||0));
+  var mode=outputModeForObj(o);
   if(!mode) return {ledc:0,rmt:0,uart:0,dac:0,timer:0};
   var hw=(mode.cost&&mode.cost.hardware)||{};
   var ledc=0,rmt=hw.rmt||0,uart=hw.uart||0,dac=hw.dac||0,timer=hw.timer||0,countedW=false;
@@ -21,12 +21,12 @@ function channelHardware(o){
   eachSlot(o,function(slot,pin,src,rule){
     if(src===0){
       if(rule.hwIfGpio===1){ledc++;if(slot==='pin4') countedW=true;}
-      if(rule.hwIfGpio===2&&rmt<(hw.rmt||0)) rmt++;
+      if(rule.hwIfGpio===2) rmt++;
     }
   });
 
-  if(typeId(o)===T.ANALOG_RGB&&(parseInt(o.color_order||0))<4&&countedW) ledc--;
-  if(typeId(o)===T.DAC&&(parseInt(o.source||0))===0) dac=1;
+  if(costHas(mode.cost,'CF_DYN_COLOR_BYTES')&&(parseInt(o.color_order||0))<4&&countedW) ledc--;
+  if(mode?.pins?.pin1?.sources===SRC_DAC&&parseInt(o.source||0)===0) dac=1;
 
   return {ledc,rmt,uart,dac,timer};
 }
@@ -41,13 +41,13 @@ function channelUsesI2C(o){
 
 function channelCost(o){
   var t=typeId(o);
-  var mode=outputModeDef(t,parseInt(o.mc_mode||0));
+  var mode=outputModeForObj(o);
   var ledCount=parseInt(o.led_count||0);
   var cpu=(mode&&mode.cost&&mode.cost.cpuUs)||0, ram=BASE_CHANNEL_RAM;
   ram+=dmxBufferRam(t,ledCount,parseInt(o.color_order||0),parseInt(o.mc_resolution||8),parseInt(o.mc_mode||0));
   if(mode&&mode.cost&&mode.cost.extraRam) ram+=mode.cost.extraRam;
-  if(t===T.LED_STRIP) cpu=ledStripServiceUs(ledCount, parseInt(o.color_order||0));
-  if(t===T.LED_STRIP) ram+=pixelBufferRam(ledCount,parseInt(o.color_order||0));
+  if(costHas(mode?.cost,'CF_DYN_LED_STRIP')) cpu=ledStripServiceUs(mode.cost,ledCount,parseInt(o.color_order||0));
+  if(costHas(mode?.cost,'CF_DYN_LED_STRIP')) ram+=pixelBufferRam(mode.cost,ledCount,parseInt(o.color_order||0));
   var i2cWrites=i2cWriteCount(o);
   cpu+=i2cWrites*I2C_WRITE_US;
   ram+=i2cWrites*I2C_ROUTE_RAM;
@@ -56,29 +56,27 @@ function channelCost(o){
 
 function dmxBufferRam(type,ledCount,colorOrder,resolution=8,mode=0){
   type=parseInt(type); mode=parseInt(mode||0);
-  if(type===T.DMX) return DMX_BUFFER_RAM;
-  if(type===T.LED_STRIP){
+  const def=outputModeDef(type,mode);
+  if(def?.cost?.dmxSlots===S.DMX_BUFFER_BYTES) return S.DMX_BUFFER_BYTES;
+  if(costHas(def?.cost,'CF_DYN_LED_STRIP')){
     var bpp=parseInt(colorOrder||0)>=4?4:3;
     var pixPerUni=Math.floor(S.DMX_BUFFER_BYTES/bpp);
     return Math.max(1,Math.ceil((parseInt(ledCount)||0)/pixPerUni))*S.DMX_BUFFER_BYTES;
   }
-  if(type===T.ANALOG_RGB) return parseInt(colorOrder||0)>=4?4:3;
-  if(type===T.STEPPER) return valueByteCount(resolution)+S.STEPPER_POSITION_BYTES;
-  if(type===T.BUZZER||type===T.TM1637) return mode===1?4:2;
-  if(type===T['7SEG_7PIN']||type===T['7SEG_8PIN']) return (mode===4||mode===5||mode>=6)?2:1;
-  var def=outputModeDef(type,mode);
+  if(costHas(def?.cost,'CF_DYN_COLOR_BYTES')) return parseInt(colorOrder||0)>=4?4:3;
+  if(costHas(def?.cost,'CF_DYN_STEPPER')) return valueByteCount(resolution)+S.STEPPER_POSITION_BYTES;
+  if(costHas(def?.cost,'CF_DYN_TEXT_MODE')) return mode===1?4:2;
+  if(costHas(def?.cost,'CF_DYN_SEGMENT_MODE')) return (mode===4||mode===5||mode>=6)?2:1;
   if(def&&def.cost&&def.cost.dmxSlots>0) return def.cost.dmxSlots;
   return valueByteCount(resolution);
 }
 
-function pixelBufferRam(ledCount,colorOrder){
-  var cost=outputModeDef(T.LED_STRIP,0)?.cost||{};
+function pixelBufferRam(cost,ledCount,colorOrder){
   var bpp=parseInt(colorOrder||0)>=4?4:(cost.ramPerUnit||3);
   return (parseInt(ledCount)||0)*bpp;
 }
 
-function ledStripServiceUs(ledCount,colorOrder){
-  var cost=outputModeDef(T.LED_STRIP,0)?.cost||{};
+function ledStripServiceUs(cost,ledCount,colorOrder){
   var bpp=parseInt(colorOrder||0)>=4?4:(cost.cpuPerUnit||3);
   return (cost.cpuUs||80)+ledCount*bpp;
 }
@@ -100,10 +98,10 @@ function totalHardware(arr){
   arr.forEach(o=>{
     const h=channelHardware(o);
     t.ledc+=h.ledc;t.rmt+=h.rmt;t.uart+=h.uart;t.dac+=h.dac;t.timer+=h.timer;
-    const typ=typeId(o);
-    if(typ===T.DIMMER) hasDimmer=true;
-    if(typ===T.DMX&&parseInt(o.source||0)===0) dmxCount++;
-    else if(typ===T.DFPLAYER) dfPlayerCount++;
+    const cost=outputModeForObj(o)?.cost;
+    if(costHas(cost,'CF_BG_DIMMER')) hasDimmer=true;
+    if(costHas(cost,'CF_AGG_DMX')&&parseInt(o.source||0)===0) dmxCount++;
+    else if(costHas(cost,'CF_AGG_UART_RESERVED')) dfPlayerCount++;
   });
   const freeUarts=Math.max(0,S.MAX_UART-dfPlayerCount);
   const dmxUartUse=Math.min(dmxCount,freeUarts);
@@ -121,8 +119,9 @@ function totalCpu(arr,fps){
   let dimmerCount=0, funcGenCount=0;
   arr.forEach(o=>{
     us+=channelCost(o).cpu;
-    if(typeId(o)===T.DIMMER) dimmerCount++;
-    else if(typeId(o)===T.FUNC_GEN) funcGenCount++;
+    const cost=outputModeForObj(o)?.cost;
+    if(costHas(cost,'CF_BG_DIMMER')) dimmerCount++;
+    else if(costHas(cost,'CF_BG_FUNCGEN')) funcGenCount++;
   });
   us+=acDimmerBackgroundUs(dimmerCount,fps)+funcGenBackgroundUs(funcGenCount,fps);
 
@@ -139,8 +138,9 @@ function totalRam(arr){
   let b=0, dmxCount=0, dfPlayerCount=0;
   arr.forEach(o=>{
     b+=channelCost(o).ram;
-    if(typeId(o)===T.DMX&&parseInt(o.source||0)===0) dmxCount++;
-    else if(typeId(o)===T.DFPLAYER) dfPlayerCount++;
+    const cost=outputModeForObj(o)?.cost;
+    if(costHas(cost,'CF_AGG_DMX')&&parseInt(o.source||0)===0) dmxCount++;
+    else if(costHas(cost,'CF_AGG_UART_RESERVED')) dfPlayerCount++;
   });
   const freeUarts=Math.max(0,S.MAX_UART-dfPlayerCount);
   const dmxRmtUse=Math.max(0,dmxCount-freeUarts);

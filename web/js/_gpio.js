@@ -83,6 +83,14 @@ function outputModeDef(type,mode){
   if(!def) return null;
   return def.modes[outputModeKey(type,mode)]||def.modes.default||null;
 }
+function outputModeForObj(o){ return outputModeDef(typeId(o),parseInt(o.mc_mode||0)); }
+function typeFields(type){ return (TYPE_META.fields&&TYPE_META.fields[String(parseInt(type))])||[]; }
+function typeHasField(type,key){ return typeFields(type).some(function(field){return field.key===key;}); }
+function outputTestUi(o){ return TYPE_META.testUi[typeId(o)]||0; }
+function outputColorByteCount(o){ return parseInt(o.color_order||0)>=4?4:3; }
+function costFlag(name){ return TYPE_META.costFlags?.[name]||0; }
+function costHas(cost,name){ return !!((cost?.flags||0)&costFlag(name)); }
+function outputHasCostFlag(o,name){ return costHas(outputModeForObj(o)?.cost,name); }
 function outputPinRule(type,mode,slot){ return outputModeDef(type,mode)?.pins?.[slot]||null; }
 function outputSegmentPinRule(type,mode,segmentIndex){
   const mk=outputModeKey(type,mode);
@@ -136,26 +144,25 @@ function deviceLabel(o){
 }
 
 function ledUniverseCount(o){
-  const bytesPerPixel=(o.color_order||0)>=4?4:3;
+  const bytesPerPixel=outputColorByteCount(o);
   const pixelsPerUniverse=Math.floor(512/bytesPerPixel);
   return Math.ceil((o.led_count!==undefined?o.led_count:170)/pixelsPerUniverse);
 }
 
 function outputChannelCount(o){
-  const t=parseInt(o.type);
-  if(t===T.DMX) return '512 Ch';
-  if(t===T.LED_STRIP) return `${o.led_count||170} LEDs / ${ledUniverseCount(o)}U`;
-  if(t===T.STEPPER){
+  const def=outputModeForObj(o);
+  if(def?.cost?.dmxSlots===512) return '512 Ch';
+  if(typeHasField(o.type,'led_count')) return `${o.led_count||170} LEDs / ${ledUniverseCount(o)}U`;
+  if(outputTestUi(o)===5){
     const posBytes=valueByteCount(parseInt(o.mc_resolution||8));
     return `${posBytes+2} Ch (${posBytes} Pos + Speed + Cmd)`;
   }
-  return TYPE_META.channelCounts[t]||'1 Ch';
+  return TYPE_META.channelCounts[typeId(o)]||'1 Ch';
 }
 
 function outputByteCount(o){
-  const t=parseInt(o.type);
-  if(t===T.STEPPER) return valueByteCount(parseInt(o.mc_resolution||8));
-  return TYPE_META.byteCounts[t]??1;
+  if(outputTestUi(o)===5) return valueByteCount(parseInt(o.mc_resolution||8));
+  return TYPE_META.byteCounts[typeId(o)]??1;
 }
 
 function gpioPinCount(o){
@@ -167,9 +174,7 @@ function outputGpios(o){
   eachSlot(o,function(slot,pin,src,rule){
     if(src===0&&pin!==255&&pins.indexOf(pin)===-1) pins.push(pin);
   });
-  var t=parseInt(o.type||0);
-  var isStepper=t===T.STEPPER;
-  if(isStepper&&parseInt(o.mc_homing_mode||0)>0&&parseInt(o.pin4_source||0)!==0){
+  if(outputTestUi(o)===5&&parseInt(o.mc_homing_mode||0)>0&&parseInt(o.pin4_source||0)!==0){
     var p4=parseInt(o.pin4);
     if(!isNaN(p4)){
       var idx=pins.indexOf(p4);
@@ -469,8 +474,7 @@ function autoAssignOutputPins(){
 }
 
 function outputAddressLabel(o){
-  const t=typeId(o);
-  if(t===T.LED_STRIP||t===T.DMX) return `U${o.start_universe}`;
+  if(outputModeForObj(o)?.startAtFirstUniverse) return `U${o.start_universe}`;
   return `U${o.start_universe}:CH${o.start_address||1}`;
 }
 

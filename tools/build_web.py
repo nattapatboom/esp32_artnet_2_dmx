@@ -296,6 +296,27 @@ def generate_output_defs_js():
     ):
         hardware[name] = {"ledc": int(ledc), "rmt": int(rmt), "uart": int(uart), "dac": int(dac), "timer": int(timer)}
 
+    cost_flags = {"CF_NONE": 0}
+    for name, value in re.findall(r"(CF_\w+)\s*=\s*1\s*<<\s*(\d+)", src):
+        cost_flags[name] = 1 << int(value)
+
+    def eval_cost_flags(expr):
+        if not expr:
+            return 0
+        total = 0
+        for part in expr.split("|"):
+            token = part.strip()
+            if not token:
+                continue
+            if token in cost_flags:
+                total |= cost_flags[token]
+            else:
+                try:
+                    total |= int(token, 0)
+                except ValueError:
+                    pass
+        return total
+
     # ModeCost constants
     costs = {}
     for name, args_text in re.findall(r"constexpr\s+ModeCost\s+(COST_\w+)\s*=\s*modeCost\((.*?)\)\s*;", src):
@@ -307,6 +328,7 @@ def generate_output_defs_js():
             "cpuPerUnit": int(args[3]) if len(args) > 3 else 0,
             "ramPerUnit": int(args[4]) if len(args) > 4 else 0,
             "dmxSlots": int(args[5]) if len(args) > 5 else 0,
+            "flags": eval_cost_flags(args[6]) if len(args) > 6 else 0,
         }
 
     # PinRule arrays
@@ -476,6 +498,7 @@ def generate_output_defs_js():
         "fields": fields_js,
         "resOpts": res_opts,
         "typeIds": {name.replace("TYPE_", ""): val for name, val in type_ids.items()},
+        "costFlags": cost_flags,
     }
 
     return (

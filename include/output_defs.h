@@ -86,6 +86,20 @@ struct ModeCost {
     uint8_t cpuPerUnit;   // µs per unit (LED = per pixel, DMX = pre-filled)
     uint8_t ramPerUnit;   // bytes per unit (LED = per pixel, DMX = pre-filled)
     uint16_t dmxSlots;    // 0 = use dmxValueByteCount(resolution); >0 = fixed
+    uint16_t flags;
+};
+
+enum CostFlag : uint16_t {
+    CF_NONE              = 0,
+    CF_DYN_LED_STRIP     = 1 << 0,
+    CF_DYN_COLOR_BYTES   = 1 << 1,
+    CF_DYN_STEPPER       = 1 << 2,
+    CF_DYN_TEXT_MODE     = 1 << 3,
+    CF_DYN_SEGMENT_MODE  = 1 << 4,
+    CF_BG_DIMMER         = 1 << 5,
+    CF_BG_FUNCGEN        = 1 << 6,
+    CF_AGG_DMX           = 1 << 7,
+    CF_AGG_UART_RESERVED = 1 << 8
 };
 
 // Resolution bitmask constants
@@ -292,32 +306,33 @@ constexpr ModeCost modeCost(
     HardwareCost hardware = HW_NONE,
     uint8_t cpuPerUnit = 0,
     uint8_t ramPerUnit = 0,
-    uint16_t dmxSlots = 0
+    uint16_t dmxSlots = 0,
+    uint16_t flags = CF_NONE
 ) {
-    return {cpuUs, extraRamBytes, hardware, cpuPerUnit, ramPerUnit, dmxSlots};
+    return {cpuUs, extraRamBytes, hardware, cpuPerUnit, ramPerUnit, dmxSlots, flags};
 }
 
-constexpr ModeCost COST_DIMMER = modeCost(5, 0, HW_NONE, 0, 0, 1);
-constexpr ModeCost COST_DMX_SERIAL = modeCost(250, 0, HW_UART_1, 0, 0, 512);
+constexpr ModeCost COST_DIMMER = modeCost(5, 0, HW_NONE, 0, 0, 1, CF_BG_DIMMER);
+constexpr ModeCost COST_DMX_SERIAL = modeCost(250, 0, HW_UART_1, 0, 0, 512, CF_AGG_DMX);
 constexpr ModeCost COST_RELAY = modeCost(5, 0, HW_NONE, 0, 0, 1);
-constexpr ModeCost COST_LED_STRIP_BASE = modeCost(80, 256, HW_NONE, 4, 4);
+constexpr ModeCost COST_LED_STRIP_BASE = modeCost(80, 256, HW_NONE, 4, 4, 0, CF_DYN_LED_STRIP);
 constexpr ModeCost COST_SINGLE_LED = modeCost(6, 0, HW_LEDC_1);
-constexpr ModeCost COST_ANALOG_RGBW = modeCost(18, 0, HW_LEDC_4);
+constexpr ModeCost COST_ANALOG_RGBW = modeCost(18, 0, HW_LEDC_4, 0, 0, 0, CF_DYN_COLOR_BYTES);
 constexpr ModeCost COST_MOTOR_PWM_DIR = modeCost(35, 0, HW_LEDC_2);
 constexpr ModeCost COST_MOTOR_IN1_IN2 = modeCost(35, 0, HW_LEDC_1);
 constexpr ModeCost COST_MOTOR_IN1_IN2_EN = modeCost(35, 0, HW_LEDC_2);
-constexpr ModeCost COST_STEPPER = modeCost(80, 512, HW_RMT_1);
+constexpr ModeCost COST_STEPPER = modeCost(80, 512, HW_RMT_1, 0, 0, 0, CF_DYN_STEPPER);
 constexpr ModeCost COST_SERVO = modeCost(12, 0, HW_LEDC_1);
-constexpr ModeCost COST_BUZZER = modeCost(35, 0, HW_LEDC_1);
-constexpr ModeCost COST_DFPLAYER = modeCost(30, 260, HW_UART_1, 0, 0, 3);
-constexpr ModeCost COST_TM1637 = modeCost(900);
-constexpr ModeCost COST_7SEG_7PIN = modeCost(30, 0, HW_LEDC_7);
-constexpr ModeCost COST_7SEG_8PIN = modeCost(35, 0, HW_LEDC_8);
-constexpr ModeCost COST_7SEG_COMMON_DIM_7PIN = modeCost(30, 0, HW_LEDC_1);
-constexpr ModeCost COST_7SEG_COMMON_DIM_8PIN = modeCost(35, 0, HW_LEDC_1);
+constexpr ModeCost COST_BUZZER = modeCost(35, 0, HW_LEDC_1, 0, 0, 0, CF_DYN_TEXT_MODE);
+constexpr ModeCost COST_DFPLAYER = modeCost(30, 260, HW_UART_1, 0, 0, 3, CF_AGG_UART_RESERVED);
+constexpr ModeCost COST_TM1637 = modeCost(900, 0, HW_NONE, 0, 0, 0, CF_DYN_TEXT_MODE);
+constexpr ModeCost COST_7SEG_7PIN = modeCost(30, 0, HW_LEDC_7, 0, 0, 0, CF_DYN_SEGMENT_MODE);
+constexpr ModeCost COST_7SEG_8PIN = modeCost(35, 0, HW_LEDC_8, 0, 0, 0, CF_DYN_SEGMENT_MODE);
+constexpr ModeCost COST_7SEG_COMMON_DIM_7PIN = modeCost(30, 0, HW_LEDC_1, 0, 0, 0, CF_DYN_SEGMENT_MODE);
+constexpr ModeCost COST_7SEG_COMMON_DIM_8PIN = modeCost(35, 0, HW_LEDC_1, 0, 0, 0, CF_DYN_SEGMENT_MODE);
 constexpr ModeCost COST_DAC = modeCost(10);
 constexpr ModeCost COST_PWM_DAC = modeCost(6, 0, HW_LEDC_1);
-constexpr ModeCost COST_FUNC_GEN = modeCost(120, 1120, HW_LEDC_1_TIMER_1, 0, 0, 5);
+constexpr ModeCost COST_FUNC_GEN = modeCost(120, 1120, HW_LEDC_1_TIMER_1, 0, 0, 5, CF_BG_FUNCGEN);
 constexpr ModeCost COST_SOLENOID = modeCost(10, 0, HW_NONE, 0, 0, 1);
 constexpr ModeCost COST_SMOKE = modeCost(25, 0, HW_NONE, 0, 0, 1);
 

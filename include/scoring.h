@@ -212,26 +212,20 @@ inline uint32_t funcGenBackgroundUs(uint8_t funcGenCount, uint8_t outputFps) {
 
 inline uint32_t dmxBufferRamForChannel(uint8_t type, uint16_t ledCount, uint8_t colorOrder, uint8_t resolution, uint8_t mode) {
     int8_t signedMode = (int8_t)mode;
-    // DMX: full universe buffer
-    if (type == OutputDefs::TYPE_DMX) return 512;
-    // LED strip: universe-rounded (led_count may span multiple universes)
-    if (type == OutputDefs::TYPE_LED_STRIP) {
+    const auto* def = OutputDefs::modeDef(type, mode);
+    uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
+    if (def != nullptr && def->cost.dmxSlots > 0) return def->cost.dmxSlots;
+    if (flags & OutputDefs::CF_DYN_LED_STRIP) {
         uint8_t bpp = colorOrder >= 4 ? 4 : 3;
         uint16_t pixelsPerUni = 512 / bpp;
         uint16_t universes = (ledCount + pixelsPerUni - 1) / pixelsPerUni;
         if (universes < 1) universes = 1;
         return (uint32_t)universes * 512;
     }
-    // Types where buffer depends on mode/colorOrder (can't be static)
-    if (type == OutputDefs::TYPE_ANALOG_RGB) return colorOrder >= 4 ? 4 : 3;
-    if (type == OutputDefs::TYPE_STEPPER) return dmxValueByteCount(resolution) + 2;
-    if (type == OutputDefs::TYPE_BUZZER || type == OutputDefs::TYPE_TM1637) return signedMode == 1 ? 4 : 2;
-    const auto* directSegDef = OutputDefs::modeDef(type, mode);
-    if (directSegDef != nullptr && directSegDef->segmentCount > 0) return (signedMode == 4 || signedMode == 5 || signedMode >= 6) ? 2 : 1;
-    // Fallback: use dmxSlots from definition, or dmxValueByteCount
-    const auto* def = OutputDefs::modeDef(type, mode);
-    if (!def) return 1;
-    if (def->cost.dmxSlots > 0) return def->cost.dmxSlots;
+    if (flags & OutputDefs::CF_DYN_COLOR_BYTES) return colorOrder >= 4 ? 4 : 3;
+    if (flags & OutputDefs::CF_DYN_STEPPER) return dmxValueByteCount(resolution) + 2;
+    if (flags & OutputDefs::CF_DYN_TEXT_MODE) return signedMode == 1 ? 4 : 2;
+    if (flags & OutputDefs::CF_DYN_SEGMENT_MODE) return (signedMode == 4 || signedMode == 5 || signedMode >= 6) ? 2 : 1;
     return dmxValueByteCount(resolution);
 }
 
@@ -252,8 +246,8 @@ inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(ch.type, ch.led_count, ch.color_order, ch.mc_resolution, ch.mc_mode);
     auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
     if (def) c.ramBytes += def->cost.extraRamBytes;
-    if (ch.type == OutputDefs::TYPE_LED_STRIP) c.cpuUs = ledStripServiceUs(ch.led_count, ch.color_order);
-    if (ch.type == OutputDefs::TYPE_LED_STRIP) c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order);
+    if (def != nullptr && (def->cost.flags & OutputDefs::CF_DYN_LED_STRIP)) c.cpuUs = ledStripServiceUs(ch.led_count, ch.color_order);
+    if (def != nullptr && (def->cost.flags & OutputDefs::CF_DYN_LED_STRIP)) c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order);
     c.cpuUs += (uint16_t)i2cWritesForChannel(ch) * I2C_WRITE_US;
     c.ramBytes += (uint32_t)i2cWritesForChannel(ch) * I2C_ROUTE_RAM;
     return c;
@@ -330,10 +324,12 @@ inline HardwareResource totalHardware(const std::vector<OutputChannel>& chs) {
     uint8_t dmxCount = 0;
     uint8_t dfPlayerCount = 0;
     for (auto& ch : chs) {
+        const auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
         t = t + estimateHardware(ch);
-        if (ch.type == OutputDefs::TYPE_DIMMER) hasDimmer = true;
-        if (ch.type == OutputDefs::TYPE_DMX && ch.source == 0) dmxCount++;
-        else if (ch.type == OutputDefs::TYPE_DFPLAYER) dfPlayerCount++;
+        uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
+        if (flags & OutputDefs::CF_BG_DIMMER) hasDimmer = true;
+        if ((flags & OutputDefs::CF_AGG_DMX) && ch.source == 0) dmxCount++;
+        else if (flags & OutputDefs::CF_AGG_UART_RESERVED) dfPlayerCount++;
     }
     // DFPlayer has UART priority; DMX falls back to RMT when UARTs exhausted
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
@@ -350,9 +346,11 @@ inline CpuBudget totalCpu(const std::vector<OutputChannel>& chs, uint8_t fps = 4
     uint8_t dimmerCount = 0;
     uint8_t funcGenCount = 0;
     for (auto& ch : chs) {
+        const auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
+        uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
         t.usPerFrame += estimateChannelCost(ch).cpuUs;
-        if (ch.type == OutputDefs::TYPE_DIMMER) dimmerCount++;
-        else if (ch.type == OutputDefs::TYPE_FUNC_GEN) funcGenCount++;
+        if (flags & OutputDefs::CF_BG_DIMMER) dimmerCount++;
+        else if (flags & OutputDefs::CF_BG_FUNCGEN) funcGenCount++;
     }
     t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
     t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
@@ -370,9 +368,11 @@ inline RamBudget totalRam(const std::vector<OutputChannel>& chs) {
     uint8_t dmxCount = 0;
     uint8_t dfPlayerCount = 0;
     for (auto& ch : chs) {
+        const auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
+        uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
         t.bytes += estimateChannelCost(ch).ramBytes;
-        if (ch.type == OutputDefs::TYPE_DMX && ch.source == 0) dmxCount++;
-        else if (ch.type == OutputDefs::TYPE_DFPLAYER) dfPlayerCount++;
+        if ((flags & OutputDefs::CF_AGG_DMX) && ch.source == 0) dmxCount++;
+        else if (flags & OutputDefs::CF_AGG_UART_RESERVED) dfPlayerCount++;
     }
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
     uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
@@ -483,8 +483,8 @@ inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
     c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(t, ledCount, colorOrder, j["mc_resolution"] | 8, mode);
     auto* def = OutputDefs::modeDef(t, mode);
     if (def) c.ramBytes += def->cost.extraRamBytes;
-    if (t == OutputDefs::TYPE_LED_STRIP) c.cpuUs = ledStripServiceUs(ledCount, colorOrder);
-    if (t == OutputDefs::TYPE_LED_STRIP) c.ramBytes += pixelBufferRam(ledCount, colorOrder);
+    if (def != nullptr && (def->cost.flags & OutputDefs::CF_DYN_LED_STRIP)) c.cpuUs = ledStripServiceUs(ledCount, colorOrder);
+    if (def != nullptr && (def->cost.flags & OutputDefs::CF_DYN_LED_STRIP)) c.ramBytes += pixelBufferRam(ledCount, colorOrder);
     c.cpuUs += (uint16_t)i2cWritesFromJson(j) * I2C_WRITE_US;
     c.ramBytes += (uint32_t)i2cWritesFromJson(j) * I2C_ROUTE_RAM;
     return c;
@@ -499,9 +499,12 @@ inline HardwareResource totalHardwareFromJson(JsonArrayConst arr) {
         t = t + estimateHardwareFromJson(j);
         uint8_t type = j["type"] | 0;
         uint8_t source = j["source"] | 0;
-        if (type == OutputDefs::TYPE_DMX && source == 0) dmxCount++;
-        else if (type == OutputDefs::TYPE_DFPLAYER) dfPlayerCount++;
-        if (type == OutputDefs::TYPE_DIMMER) hasDimmer = true;
+        uint8_t mode = j["mc_mode"] | 0;
+        const auto* def = OutputDefs::modeDef(type, mode);
+        uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
+        if ((flags & OutputDefs::CF_AGG_DMX) && source == 0) dmxCount++;
+        else if (flags & OutputDefs::CF_AGG_UART_RESERVED) dfPlayerCount++;
+        if (flags & OutputDefs::CF_BG_DIMMER) hasDimmer = true;
     }
     // DFPlayer has UART priority; DMX falls back to RMT when UARTs exhausted
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
@@ -519,9 +522,12 @@ inline CpuBudget totalCpuFromJson(JsonArrayConst arr, uint8_t fps = 40) {
     uint8_t funcGenCount = 0;
     for (JsonObjectConst j : arr) {
         uint8_t type = j["type"] | 0;
+        uint8_t mode = j["mc_mode"] | 0;
+        const auto* def = OutputDefs::modeDef(type, mode);
+        uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
         t.usPerFrame += estimateChannelCostFromJson(j).cpuUs;
-        if (type == OutputDefs::TYPE_DIMMER) dimmerCount++;
-        else if (type == OutputDefs::TYPE_FUNC_GEN) funcGenCount++;
+        if (flags & OutputDefs::CF_BG_DIMMER) dimmerCount++;
+        else if (flags & OutputDefs::CF_BG_FUNCGEN) funcGenCount++;
     }
     t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
     t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
@@ -542,8 +548,11 @@ inline RamBudget totalRamFromJson(JsonArrayConst arr) {
         t.bytes += estimateChannelCostFromJson(j).ramBytes;
         uint8_t type = j["type"] | 0;
         uint8_t source = j["source"] | 0;
-        if (type == OutputDefs::TYPE_DMX && source == 0) dmxCount++;
-        else if (type == OutputDefs::TYPE_DFPLAYER) dfPlayerCount++;
+        uint8_t mode = j["mc_mode"] | 0;
+        const auto* def = OutputDefs::modeDef(type, mode);
+        uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
+        if ((flags & OutputDefs::CF_AGG_DMX) && source == 0) dmxCount++;
+        else if (flags & OutputDefs::CF_AGG_UART_RESERVED) dfPlayerCount++;
     }
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
     uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
