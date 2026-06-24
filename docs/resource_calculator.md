@@ -13,16 +13,16 @@ The ESP32 peripherals are shared by all configured outputs.
 | **RMT Channels** | 8 channels | 1 RMT channel per LED strip. 1 RMT channel per software-based DMX serial output. | LED Strip, DMX Serial fallback |
 | **LEDC PWM** | 16 channels | Channels 0-15. Used to generate PWM signals for dimmers, servos, motors, buzzers, 7-segment direct drive, PWM DAC, and function generator. | Types 4, 5, 6, 8, 9, 12, 13, 15, 16 |
 | **UART Ports** | 2 usable ports | UART0 is reserved for console/debug. UART1 and UART2 are shared by DFPlayer and hardware DMX. DFPlayer has priority; DMX falls back to RMT. | DFPlayer, DMX Serial |
-| **Configured Outputs** | Score-limited | The firmware uses resource score plus hard peripheral validation instead of the old fixed 8-channel capacity rule. | All output types |
+| **Configured Outputs** | Budget-limited | The firmware uses independent hardware, CPU, and RAM budgets instead of the old fixed 8-channel or single-score capacity rule. | All output types |
 | **GPIO Outputs** | About 8 pins | Physical header limitation of WT32-ETH01. Many ESP32 pins are reserved by LAN8720 Ethernet. | Direct-connected outputs |
 
 ## 2. Resource Footprint by Output Type
 
 The current v3 output types are `0..18`. Actual resource use depends on selected source, mode, and per-pin routing.
 
-Resource scoring is intended to be routing-accurate in firmware: score calculations should account for selected sources, hybrid GPIO/PCA/expander pins, segment-level routing, and DMX UART-to-RMT fallback after DFPlayer UART allocation. Hard validation remains a separate firmware gate for interlocks and absolute peripheral limits.
+Resource scoring is routing-accurate in firmware: score calculations account for selected sources, hybrid GPIO/PCA/expander pins, segment-level routing, and DMX UART-to-RMT fallback after DFPlayer UART allocation. Hard validation remains a separate firmware gate for interlocks and absolute peripheral limits.
 
-Implementation status: this is the domain rule and target behavior. When changing scoring code, audit `include/scoring.h` and the C++ JSON scoring path; it must copy every routing field it needs from saved/output JSON before estimating resources. Web UI scoring code must remain display-only and must not block saves.
+Implementation status: C++ runtime scoring, C++ JSON scoring, and Web UI display scoring share the same generated `ModeCost.flags` and `PinRule` metadata. Web UI scoring code remains display-only and must not block saves.
 
 | Type | Output Type | Typical ESP32 GPIO | RMT | LEDC | UART | Expander / PCA Notes |
 | :---: | :--- | :---: | :---: | :---: | :---: | :--- |
@@ -111,6 +111,20 @@ RAM      = BaseChannelRam + DmxBufferRam + DynamicRuntimeRam + I2cRouteRam + Agg
 
 `ModeCost.flags` in `include/output_defs.h` declares which optional policies apply. Outputs that do not use a policy simply contribute zero for that stage. Current policy flags cover LED-strip dynamic pixel/universe cost, RGB/RGBW byte count, stepper command bytes, text/7-segment mode bytes, AC dimmer background timing, function-generator ISR timing, DMX UART/RMT aggregate allocation, and UART-reserved devices such as DFPlayer.
 
+| Flag | Adds | Current users |
+| :--- | :--- | :--- |
+| `CF_DYN_LED_STRIP` | Dynamic CPU `80 + pixels×bytesPerPixel`, universe-rounded DMX RAM, and pixel buffer RAM | RGB/RGBW LED Strip |
+| `CF_DYN_COLOR_BYTES` | DMX buffer width `3` RGB or `4` RGBW | Analog RGB/RGBW |
+| `CF_DYN_STEPPER` | Position bytes by resolution plus speed and command bytes | Stepper |
+| `CF_DYN_TEXT_MODE` | Text/numeric mode buffer width | Buzzer timeout mode, TM1637 ASCII mode |
+| `CF_DYN_SEGMENT_MODE` | 7-segment direct/common-dim buffer width | 7-seg 7-pin/8-pin modes |
+| `CF_BG_DIMMER` | Shared AC dimmer background timer cost and one shared timer | AC Dimmer |
+| `CF_BG_FUNCGEN` | Per-channel function-generator background timer/ISR cost | Function Generator |
+| `CF_AGG_DMX` | Aggregate DFPlayer-priority UART allocation and RMT fallback | DMX Output |
+| `CF_AGG_UART_RESERVED` | Reserves one UART before DMX fallback allocation | DFPlayer |
+
+Adding a new output mode should start by selecting the correct base `ModeCost`, pin rules, and flags. If a required behavior cannot be expressed by existing flags, add a new flag and implement it in both C++ `include/scoring.h` and generated Web UI scoring through `tools/build_web.py`.
+
 ESP-NOW Master overhead (independent of output channels):
 ```
 cpuUs = 500 + peerCount × ceil(512/chunkSize) × 170 + universeCount × 100
@@ -183,7 +197,7 @@ bool ramOk = ramBytes ≤ RamBudget::limit();
 ScoreBlocker blocker = checkScores(hw, cpu, ram, fps);
 ```
 
-This replaces the old single combined `SCORE_LIMIT` (109) approach.
+This replaces the old single combined `SCORE_LIMIT` / `resourceScore` approach.
 
 ## 4. WT32-ETH01 Physical Pin Allocations & Safety
 

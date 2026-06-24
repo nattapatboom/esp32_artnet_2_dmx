@@ -40,8 +40,9 @@ graph TD
 | Source | Origin of a pin/channel: ESP32 GPIO, PCA9685, digital expander, I2C DAC (MCP4725, DAC7571, DAC7573) | `source` fields in `OutputChannel` |
 | DMX Start Universe | The first universe this channel reads from | `start_universe` |
 | DMX Start Address | 1-based DMX address within the universe | `start_address` |
-| Resource Score | Hardware resource usage score | Contract: Configuration Contract; implementation: `estimateResources()`, `resourceScore()` |
-| Compute Score | CPU/runtime load score | `channelComputeScore()`, `fpsComputeFactor()` |
+| HardwareResource | Finite ESP32 peripheral count: LEDC, RMT, UART, DAC, timers | `estimateHardware()`, `totalHardware()` in `include/scoring.h` |
+| CpuBudget | Output service-time estimate in microseconds per frame | `estimateChannelCost()`, `totalCpu()` in `include/scoring.h` |
+| RamBudget | Runtime/static buffer estimate in bytes | `estimateChannelCost()`, `totalRam()` in `include/scoring.h` |
 | Interlock | Rules preventing conflicting or invalid configs | `validateOutputJson()`, `validateSettingsAndOutputs()` |
 | Runtime State | Transient state such as smoke, solenoid, stepper commands | fields in `OutputChannel` |
 
@@ -237,9 +238,10 @@ The scoring system uses **three independent budgets**:
 | **CpuBudget** | Output service time: DMX enqueue/copy, WS281x mapping/enqueue, TM1637 bit-bang, active I2C writes, and 500 µs base overhead | `≤ (1,000,000/fps) - 1,500` µs | ✅ Yes |
 | **RamBudget** | Static buffer estimates per type | `≤ 65535` (64 KB) | ✅ Yes |
 
-Each channel uses the same cost pipeline: `BaseCost + DynamicCost + Route/I2C Cost + BackgroundCost`, followed by aggregate policies such as DFPlayer-priority UART allocation, DMX RMT fallback, and ESP-NOW master overhead. Optional dynamic/background/aggregate behavior is declared in `ModeCost.flags`; unused stages contribute zero.
+Each channel uses the same cost pipeline: `BaseCost + DynamicCost + Route/I2C Cost + BackgroundCost`, followed by aggregate policies such as DFPlayer-priority UART allocation, DMX RMT fallback, and ESP-NOW master overhead. Optional dynamic/background/aggregate behavior is declared in `ModeCost.flags`; unused stages contribute zero. The Web UI receives the same flags through `tools/build_web.py` and uses them for display-only scoring.
 
 Key files:
+- `include/output_defs.h` (`ModeCost`, `CostFlag`, `OUTPUT_MODES[]`)
 - `include/scoring.h`
 - `docs/resource_calculator.md`
 
@@ -584,9 +586,10 @@ Configuration must pass these gates before save/apply:
 - Active I2C routes add 32 bytes per write route; ESP-NOW Master adds `512 + peers×(chunkSize+44)` bytes.
 - Limit: 65535 bytes (64 KB cap), but dynamically `max(0, ESP.getFreeHeap() - 150KB)` at runtime (keeps 150KB free for system/network).
 
-Known implementation drift (scoring-specific):
-- C++ `totalHardwareFromJson()` may not copy every routing field needed for routing-accurate scoring.
-- DMX/DFPlayer UART allocation priority: DFPlayer reserves before DMX; if both UARTs occupied, DMX falls back to RMT for runtime — but scoring always counts worst-case UART (1 per DMX).
+Scoring implementation status:
+- C++ runtime and JSON scoring paths both use `OutputDefs::modeDef()`, `ModeCost.flags`, `PinRule`, and shared aggregate policies.
+- Web UI scoring is generated from the same metadata and remains informational only; firmware validation and scoring are authoritative.
+- DMX/DFPlayer allocation is modeled as an aggregate policy: DFPlayer-like UART-reserved outputs claim UART first, then DMX uses remaining UARTs and falls back to RMT with extra RAM cost.
 
 ---
 
@@ -727,12 +730,12 @@ Questions used during the grilling session and answers inferred from the existin
 | # | Item | Status |
 |---|------|--------|
 | 1 | Boot count threshold: code `>= 3` → spec `>= 5` | ✅ Completed (`bootCount >= 5` at `main.cpp:2252`) |
-| 2 | DAC (source=5) scored as EXP (0.125) instead of DAC (2.0) in `resourceScore()` | ✅ Fixed: sources 5-7 are I2C DAC, counted correctly |
+| 2 | Old single-score DAC weighting treated I2C DAC like EXP instead of DAC | ✅ Fixed: sources 5-7 are I2C DAC and now use I2C route cost in the 3-budget model |
 | 3 | GPIO12 warning-only policy in Web UI and docs | ✅ Completed (`outputsUseForbiddenGpio` no longer blocks GPIO12; Web UI warning remains) |
 | 4 | AC Dimmer ZC pin check in `validateOutputJson()` | ✅ Completed (check at `main.cpp:1066`) |
 | 5 | GPIO34-39 input-only rejection in `validateOutputJson()` | ✅ Completed (`outputsUseForbiddenGpio` checks GPIO34-39) |
 | 6 | Call `validateSettingsAndOutputs()` in `/api/outputs` POST | ✅ Completed (called at `main.cpp:1536`) |
-| 7 | `resourceScoreLimit()` include PCA and EXP terms | ❌ Obsolete (scoring system replaced by 3 independent budgets) |
+| 7 | Old `resourceScoreLimit()` include PCA and EXP terms | ❌ Obsolete (scoring system replaced by 3 independent budgets) |
 | 8 | PCF8574 LCD display type enum in `SystemConfig` | ✅ Completed (defined in `config.h:88`) |
 | 9 | DAC7571 protocol fix (3-byte → correct 2-byte per TI datasheet) | ✅ Completed (`output_devices/dac.h`) |
 | 10 | DAC7573 control byte fix (removed spurious 0x10 base, corrected channel select) | ✅ Completed (`output_devices/dac.h`) |

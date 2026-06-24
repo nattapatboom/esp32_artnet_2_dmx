@@ -346,10 +346,10 @@ Check the I2C Clock Speed tolerance for each chip:
 
 ## 3. Calibration & Verification Guidelines
 
-Score calibration against the real board can be performed via three tests:
+Budget calibration against the real board can be performed via three tests:
 
-1. **Jitter & Latency Test:** Configure outputs near full capacity (score 100-109), send Art-Net at 40 FPS, and measure output frame timing with an oscilloscope or logic analyzer. If frames drop or jitter, the score ceiling or compute weights are too loose.
-2. **I2C Bus Contention Test:** Measure round-trip time for expander writes on the shared I2C bus. If cumulative write time exceeds 15-20 ms, the PCA/Expander weight is too low, causing I2C bus saturation.
+1. **Jitter & Latency Test:** Configure outputs near the CPU budget limit at 40 FPS, send Art-Net, and measure output frame timing with an oscilloscope or logic analyzer. If frames drop or jitter, the CPU budget safety reserve or `ModeCost.flags` dynamic/background estimates are too loose.
+2. **I2C Bus Contention Test:** Measure round-trip time for expander writes on the shared I2C bus. If cumulative write time exceeds 15-20 ms, the per-route I2C write estimate is too low, causing I2C bus saturation.
 3. **RAM Heap Monitoring:** Ensure free RAM stays above 30-40 KB under heavy load, to maintain stability for OTA and network data transfer.
 
 ---
