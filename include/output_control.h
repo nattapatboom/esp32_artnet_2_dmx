@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <atomic>
+#include <new>
 #include <esp_dmx.h>
 #include <NeoPixelBus.h>
 #include "output_devices/rmt_dmx.h"
@@ -985,7 +986,7 @@ inline void OutputControl::setupChannels() {
             smokeShooterSetup(ch);
             Serial.printf("Smoke Shooter init: pin=%d pin2=%d thresh=%d\n", ch.pin, ch.pin2, ch.solenoid_threshold);
         } else if (ch.type == OutputDefs::TYPE_DFPLAYER) {
-            ch.dfPlayer = new DFPlayerController();
+            ch.dfPlayer = new (std::nothrow) DFPlayerController();
             if (!ch.dfPlayer) {
                 Serial.println("Error: DFPlayer malloc failed!");
                 continue;

@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <driver/rmt.h>
+#include <stdlib.h>
 
 #define DMX_BREAK_US 100
 #define DMX_MAB_US 12
@@ -13,20 +14,26 @@ private:
     rmt_channel_t channel;
     uint8_t pin;
     rmt_item32_t* rmt_buffer;
+    bool started;
 
 public:
     RmtDmxDriver(uint8_t rmt_channel, uint8_t gpio_pin) {
         channel = (rmt_channel_t)rmt_channel;
         pin = gpio_pin;
         rmt_buffer = (rmt_item32_t*)malloc(sizeof(rmt_item32_t) * 5150);
+        started = false;
     }
 
     ~RmtDmxDriver() {
         if (rmt_buffer) free(rmt_buffer);
-        rmt_driver_uninstall(channel);
+        if (started) rmt_driver_uninstall(channel);
     }
 
     void begin() {
+        if (rmt_buffer == nullptr) {
+            Serial.printf("RmtDmx: OOM allocating RMT buffer ch=%d\n", channel);
+            return;
+        }
         rmt_config_t config;
         config.rmt_mode = RMT_MODE_TX;
         config.channel = channel;
@@ -46,11 +53,15 @@ public:
         err = rmt_driver_install(channel, 0, 0);
         if (err != ESP_OK) {
             Serial.printf("RmtDmx: rmt_driver_install failed ch=%d err=%d\n", channel, err);
+            return;
         }
+        started = true;
     }
 
+    bool ready() const { return rmt_buffer != nullptr && started; }
+
     void send(uint8_t* dmx_data) {
-        if (!rmt_buffer) return;
+        if (!ready()) return;
         if (rmt_wait_tx_done(channel, 0) != ESP_OK) return;
         size_t item_count = 0;
 

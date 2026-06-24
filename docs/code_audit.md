@@ -66,7 +66,11 @@ Fix: Call exclusively from one core or add mutex. The `networkFramePending` flag
 
 ---
 
-### 1.6 ★★☆ RMT DMX: `malloc(20600)` failure silently ignored
+### ~~1.6 RMT DMX: `malloc(20600)` failure silently ignored~~
+
+**RESOLVED** — `RmtDmxDriver::begin()` now refuses to start without a buffer, `ready()` reports only successfully initialized drivers, and DMX RMT fallback deletes the driver without consuming an RMT slot when allocation/init fails.
+
+Previous finding retained for audit history:
 
 **File:** `include/output_devices/rmt_dmx.h:21`
 
@@ -177,7 +181,11 @@ If both `seg_pins[idx]==255` and `ch.pin==255`, returns `262`. Undefined behavio
 
 ---
 
-### 2.8 ★★☆ DFPlayer `new` allocation never checked
+### ~~2.8 DFPlayer / FuncGen `new` allocation never checked~~
+
+**RESOLVED** — DFPlayer and Function Generator setup now use nothrow allocation and skip setup with a Serial error if allocation fails.
+
+Previous finding retained for audit history:
 
 **File:** `include/output_control.h:965`
 
@@ -185,7 +193,11 @@ If both `seg_pins[idx]==255` and `ch.pin==255`, returns `262`. Undefined behavio
 
 ---
 
-### 2.9 ★★☆ `RmtDmxDriver::begin()` ignores return value
+### ~~2.9 `RmtDmxDriver::begin()` ignores return value~~
+
+**RESOLVED** — `RmtDmxDriver` now tracks successful `rmt_driver_install()` and `dmxSetup()` only keeps/increments RMT fallback allocation when `ready()` is true.
+
+Previous finding retained for audit history:
 
 **File:** `include/output_devices/rmt_dmx.h:41`
 
@@ -434,9 +446,6 @@ Status LED, ZC, I2C SDA/SCL dropdown options are hardcoded, not generated from `
 |---|-------|------|
 | 1.4 | Missing atomics (lastDmxUpdateTime, systemActive) | `main.cpp` |
 | 1.5 | DMX frame timeout not enforced | `output_control.h` |
-| 1.6 | RMT DMX malloc failure silent | `rmt_dmx.h:21` |
-| 2.8 | DFPlayer new not null-checked | `output_control.h:965` |
-| 2.9 | rmt_driver_install return ignored | `rmt_dmx.h:41` |
 | 2.10 | ISR volatile missing | `dimmer.h:27` |
 | 2.11 | dmx_driver_install return ignored | `output_control.h:960` |
 | 3.7 | espnow_channel no range check | `config.h:141` |

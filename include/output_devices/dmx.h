@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <esp_dmx.h>
+#include <new>
 #include "output_control.h"
 #include "output_devices/rmt_dmx.h"
 
@@ -49,8 +50,14 @@ inline void dmxSetup(OutputChannel& ch, bool& uart2Used, bool& uart1Used, uint8_
             Serial.printf("DMX: dmx_set_pin UART1 failed err=%d\n", err);
         }
     } else if (rmtIdx < 8) {
-        ch.rmtDmx = new RmtDmxDriver(rmtIdx, ch.pin);
-        ch.rmtDmx->begin();
+        ch.rmtDmx = new (std::nothrow) RmtDmxDriver(rmtIdx, ch.pin);
+        if (ch.rmtDmx != nullptr) ch.rmtDmx->begin();
+        if (ch.rmtDmx == nullptr || !ch.rmtDmx->ready()) {
+            Serial.printf("DMX: RMT fallback allocation failed ch=%d gpio=%d\n", rmtIdx, ch.pin);
+            delete ch.rmtDmx;
+            ch.rmtDmx = nullptr;
+            return;
+        }
         rmtIdx++;
     }
 }
