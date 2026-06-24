@@ -2230,13 +2230,7 @@ void networkTask(void* pvParameters) {
             JsonArray arr = doc.to<JsonArray>();
             for (uint8_t addr = 1; addr < 128; addr++) {
                 if ((addr & 0x07) == 0 && addr > 1) vTaskDelay(pdMS_TO_TICKS(1));
-                bool found = false;
-                {
-                    I2cBus::Lock lock;
-                    if (!lock.locked()) break;
-                    Wire.beginTransmission(addr);
-                    found = (Wire.endTransmission() == 0);
-                }
+                bool found = I2cBus::probe(addr);
                 if (found) {
                     JsonObject obj = arr.add<JsonObject>();
                     obj["address"] = addr;
