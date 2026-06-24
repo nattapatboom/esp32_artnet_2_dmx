@@ -74,6 +74,8 @@ Test run header to copy into each run file:
 - [ ] Save valid settings and confirm they persist after reboot.
 - [ ] Reject invalid `output_fps` outside `1..44`.
 - [ ] Reject invalid I2C SDA/SCL/status/ZC pin overlaps.
+- [ ] Reject Status LED and I2C SDA/SCL pins that are Ethernet-reserved or input-only.
+- [ ] Reject Zero-Crossing pins that are Ethernet-reserved; input-only GPIOs may be valid for ZC input.
 - [ ] Reject display address that does not match selected display type.
 - [ ] Reject both Art-Net and sACN disabled at the same time.
 - [ ] Confirm changing network-critical settings shows the expected reboot requirement.

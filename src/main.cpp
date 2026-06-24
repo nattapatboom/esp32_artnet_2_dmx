@@ -26,6 +26,7 @@
 #include "scoring.h"
 #include "source_rules.h"
 #include "display_protocol.h"
+#include "gpio_control.h"
 #include "network_protocol.h"
 #include "ota_control.h"
 #include "recovery_control.h"
@@ -658,6 +659,32 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
     uint8_t sclPin = settings[NetworkProtocol::KEY_I2C_SCL].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_I2C_SCL] : sysCfg.i2c_scl;
     uint8_t displayType = settings[NetworkProtocol::KEY_DISPLAY_ENABLED].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_DISPLAY_ENABLED] : sysCfg.display_enabled;
     uint8_t displayAddr = settings[NetworkProtocol::KEY_DISPLAY_I2C_ADDR].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_DISPLAY_I2C_ADDR] : sysCfg.display_i2c_addr;
+
+    auto validateSystemOutputPin = [&](uint8_t pin, const char* label) -> bool {
+        if (pin == 255) return true;
+        if (GpioControl::isReservedEthernetPin(pin)) {
+            message = String(label) + " GPIO " + String(pin) + " is reserved for Ethernet";
+            return false;
+        }
+        if (GpioControl::isInputOnlyPin(pin)) {
+            message = String(label) + " GPIO " + String(pin) + " is input-only";
+            return false;
+        }
+        return true;
+    };
+    auto validateSystemInputPin = [&](uint8_t pin, const char* label) -> bool {
+        if (pin == 255) return true;
+        if (GpioControl::isReservedEthernetPin(pin)) {
+            message = String(label) + " GPIO " + String(pin) + " is reserved for Ethernet";
+            return false;
+        }
+        return true;
+    };
+
+    if (!validateSystemOutputPin(statusPin, "Status LED")) return false;
+    if (!validateSystemInputPin(zcPin, "Zero-Crossing")) return false;
+    if (!validateSystemOutputPin(sdaPin, "I2C SDA")) return false;
+    if (!validateSystemOutputPin(sclPin, "I2C SCL")) return false;
 
     if (statusPin != 255 && zcPin != 255 && statusPin == zcPin) {
         message = "Status LED GPIO and Zero-Crossing GPIO cannot use the same pin";
