@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <atomic>
 #include <map>
+#include <new>
 #include <ETH.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -250,8 +251,13 @@ bool collectRequestBody(AsyncWebServerRequest* request, uint8_t* data, size_t le
         if (request->_tempObject != nullptr) {
             delete static_cast<String*>(request->_tempObject);
         }
-        String* buffer = new String();
-        if (total > 0) buffer->reserve(total);
+        String* buffer = new (std::nothrow) String();
+        if (buffer == nullptr || (total > 0 && !buffer->reserve(total))) {
+            delete buffer;
+            request->_tempObject = nullptr;
+            request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to allocate request buffer\"}");
+            return false;
+        }
         request->_tempObject = buffer;
     }
 
@@ -622,7 +628,7 @@ void applySettingsFromJson(JsonObjectConst doc) {
 bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, String& message) {
     if (settings.containsKey(NetworkProtocol::KEY_OUTPUT_FPS)) {
         int fps = settings[NetworkProtocol::KEY_OUTPUT_FPS] | 0;
-        if (!NetworkProtocol::outputFpsValid((uint8_t)fps)) {
+        if (fps < NetworkProtocol::OUTPUT_FPS_MIN || fps > NetworkProtocol::OUTPUT_FPS_MAX) {
             message = "Global Output FPS must be between " +
                       String(NetworkProtocol::OUTPUT_FPS_MIN) + " and " +
                       String(NetworkProtocol::OUTPUT_FPS_MAX);
@@ -690,7 +696,14 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
 }
 
 bool validateScoresForSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, String& message) {
-    uint8_t fps = settings[NetworkProtocol::KEY_OUTPUT_FPS].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_OUTPUT_FPS] : sysCfg.output_fps;
+    int fpsRaw = settings[NetworkProtocol::KEY_OUTPUT_FPS].is<int>() ? (int)settings[NetworkProtocol::KEY_OUTPUT_FPS] : sysCfg.output_fps;
+    if (fpsRaw < NetworkProtocol::OUTPUT_FPS_MIN || fpsRaw > NetworkProtocol::OUTPUT_FPS_MAX) {
+        message = "Global Output FPS must be between " +
+                  String(NetworkProtocol::OUTPUT_FPS_MIN) + " and " +
+                  String(NetworkProtocol::OUTPUT_FPS_MAX);
+        return false;
+    }
+    uint8_t fps = (uint8_t)fpsRaw;
     uint8_t oldMode = sysCfg.device_mode;
     uint16_t oldChunkSize = sysCfg.espnow_chunk_size;
 
@@ -1520,6 +1533,7 @@ void setupWebServer() {
             }
 
             JsonDocument outDoc;
+            outDoc["version"] = 3;
             JsonArray outArr = outDoc["outputs"].to<JsonArray>();
             for (JsonVariant item : outputs) {
                 outArr.add(item);
@@ -1708,6 +1722,7 @@ void setupWebServer() {
     // API Route: Clear Output Channels (reset to default single LED strip)
     server.on("/api/outputs/clear", HTTP_POST, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
+        doc["version"] = 3;
         JsonArray arr = doc["outputs"].to<JsonArray>();
         JsonObject item = arr.add<JsonObject>();
         item["type"] = 3;
@@ -1740,6 +1755,7 @@ void setupWebServer() {
 
         // Reset outputs to default
         JsonDocument doc;
+        doc["version"] = 3;
         JsonArray arr = doc["outputs"].to<JsonArray>();
         JsonObject item = arr.add<JsonObject>();
         item["type"] = 3;
