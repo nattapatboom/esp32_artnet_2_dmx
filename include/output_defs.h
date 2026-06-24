@@ -300,13 +300,13 @@ constexpr ModeCost modeCost(
 constexpr ModeCost COST_DIMMER = modeCost(5, 0, HW_NONE, 0, 0, 1);
 constexpr ModeCost COST_DMX_SERIAL = modeCost(250, 0, HW_UART_1, 0, 0, 512);
 constexpr ModeCost COST_RELAY = modeCost(5, 0, HW_NONE, 0, 0, 1);
-constexpr ModeCost COST_LED_STRIP_BASE = modeCost(80, 256, HW_RMT_1, 3, 3);
+constexpr ModeCost COST_LED_STRIP_BASE = modeCost(80, 256, HW_NONE, 4, 4);
 constexpr ModeCost COST_SINGLE_LED = modeCost(6, 0, HW_LEDC_1);
 constexpr ModeCost COST_ANALOG_RGBW = modeCost(18, 0, HW_LEDC_4);
 constexpr ModeCost COST_MOTOR_PWM_DIR = modeCost(35, 0, HW_LEDC_2);
 constexpr ModeCost COST_MOTOR_IN1_IN2 = modeCost(35, 0, HW_LEDC_1);
 constexpr ModeCost COST_MOTOR_IN1_IN2_EN = modeCost(35, 0, HW_LEDC_2);
-constexpr ModeCost COST_STEPPER = modeCost(80, 512, HW_RMT_2);
+constexpr ModeCost COST_STEPPER = modeCost(80, 512, HW_RMT_1);
 constexpr ModeCost COST_SERVO = modeCost(12, 0, HW_LEDC_1);
 constexpr ModeCost COST_BUZZER = modeCost(35, 0, HW_LEDC_1);
 constexpr ModeCost COST_DFPLAYER = modeCost(30, 260, HW_UART_1, 0, 0, 3);
