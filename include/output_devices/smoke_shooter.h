@@ -12,7 +12,6 @@ inline void smokeShooterSetup(OutputChannel& ch) {
         digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
         digitalWrite(ch.pin2, ch.pin2_invert ? HIGH : LOW);
     }
-    if (ch.solenoid_threshold == 0) ch.solenoid_threshold = 127;
     ch.smoke_state = 0;
     ch.smoke_prev_trigger = false;
 }

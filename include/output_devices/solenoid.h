@@ -9,7 +9,6 @@ inline void solenoidSetup(OutputChannel& ch) {
     pinMode(ch.pin, OUTPUT);
     digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
     if (ch.solenoid_pulse_ms == 0) ch.solenoid_pulse_ms = 50;
-    if (ch.solenoid_threshold == 0) ch.solenoid_threshold = 127;
 }
 
 inline void solenoidUpdate() {
@@ -20,7 +19,7 @@ inline void solenoidUpdate() {
         bool should_trigger = (ch.dmxBuffer[0] > ch.solenoid_threshold);
         if (now - ch.solenoid_last_trigger < ch.solenoid_post_delay) should_trigger = false;
         if (should_trigger && !ch.solenoid_pulse_active) {
-            if (now >= ch.solenoid_last_trigger + ch.solenoid_post_delay + ch.solenoid_pre_delay) {
+            if (now - ch.solenoid_last_trigger >= ch.solenoid_post_delay + ch.solenoid_pre_delay) {
                 ch.solenoid_pulse_active = true;
                 ch.solenoid_pulse_start = now;
                 writeOutputPin(ch, 1, true);
