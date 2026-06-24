@@ -46,11 +46,11 @@ private:
     std::vector<PeerRoute> peerList;
 
 public:
-    bool channelLocked = false;
+    std::atomic<bool> channelLocked{false};
     std::atomic<bool> reloadPeersPending{false};
     uint8_t currentScanChannel = 1;
     unsigned long lastChannelSwitchTime = 0;
-    unsigned long lastPacketRecvTime = 0;
+    std::atomic<unsigned long> lastPacketRecvTime{0};
 
 private:
     // Parser for "AA:BB:CC:DD:EE:FF" MAC addresses

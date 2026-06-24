@@ -337,27 +337,27 @@ Status LED, ZC, I2C SDA/SCL dropdown options are hardcoded, not generated from `
 
 ## 7. Summary by Priority
 
-All ★★★ and ★★☆ items are now **RESOLVED**. Remaining items:
+All audit items are now **RESOLVED**.
 
 ### ★☆☆ Medium priority
 
-| # | Issue | File |
-|---|-------|------|
-| 1.4 | Missing atomics (lastDmxUpdateTime, systemActive) | `main.cpp` |
-| 1.5 | DMX frame timeout not enforced | `output_control.h` |
-| 1.7 | ESP-NOW callback races with foreground | `espnow_control.h` |
-| 2.11 | dmx_driver_install return ignored | `output_control.h:960` |
-| 4.2 | I2C speed validation defined but never called | `network_protocol.h` |
-| 4.3 | LED count, universe range not validated server-side | `main.cpp` |
-| 4.4 | mDNS name length not validated on either side | — |
-| 5.2 | I2C write count differences (4 types) | `scoring.js` / `scoring.h` |
-| 6.2 | System pin options hardcoded | `pane-network.html` |
+| # | Issue | File | Status |
+|---|-------|------|--------|
+| 1.4 | Missing atomics (lastDmxUpdateTime, systemActive) | `main.cpp` | ✅ Resolved (already `std::atomic`) |
+| 1.5 | DMX frame timeout not enforced | `src/main.cpp` | ✅ Resolved (timeout check in `outputTask`) |
+| 1.7 | ESP-NOW callback races with foreground | `espnow_control.h` | ✅ Resolved (`channelLocked`/`lastPacketRecvTime` now `std::atomic`) |
+| 2.11 | dmx_driver_install return ignored | `output_devices/dmx.h` | ✅ Resolved (already checks `err != ESP_OK` at lines 27, 42) |
+| 4.2 | I2C speed validation defined but never called | `src/main.cpp` | ✅ Resolved (called in `validateSettingsAndOutputs()`) |
+| 4.3 | LED count, universe range not validated server-side | `src/main.cpp` | ✅ Resolved (added in `validateOutputJson()`) |
+| 4.4 | mDNS name length not validated on either side | `src/main.cpp` | ✅ Resolved (added in `validateSettingsAndOutputs()`) |
+| 5.2 | I2C write count differences (4 types) | `scoring.js` / `scoring.h` | ✅ Resolved (metadata refactor made both per-pin; parity confirmed) |
+| 6.2 | System pin options hardcoded | `_gpio.js` / `pane-network.html` | ✅ Resolved (`populateSystemPins()` generates from GPIO arrays) |
 
 ### ℹ️ Maintainability
 
-| # | Issue | File |
-|---|-------|------|
-| 1.8 | Art-Net dead sequence array | `artnet_control.h:20` |
+| # | Issue | File | Status |
+|---|-------|------|--------|
+| 1.8 | Art-Net dead sequence array | `artnet_control.h:20` | ✅ Resolved (`lastSequence[4]` removed) |
 
 ---
 

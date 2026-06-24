@@ -179,6 +179,7 @@ function updateDisplayAddressOptions(){
 // Settings load / save
 async function loadSettings(){
   try{
+    populateSystemPins();
     const d=await(await fetch('/api/settings')).json();
     const s=(id,val)=>{const e=document.getElementById(id);if(e&&val!==undefined)e.value=val};
     const c=(id,val)=>{const e=document.getElementById(id);if(e)e.checked=!!val};

@@ -17,7 +17,6 @@ class ArtNetControl {
 private:
     WiFiUDP udp;
     bool initialized = false;
-    uint8_t lastSequence[4] = {0}; // track sequence per universe (up to 4)
 
     // Buffer for sending ArtPollReply
     struct ArtPollReplyPacket {

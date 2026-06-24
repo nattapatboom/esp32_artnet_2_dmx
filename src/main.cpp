@@ -700,6 +700,14 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
         return false;
     }
 
+    if (settings.containsKey(NetworkProtocol::KEY_I2C_SPEED)) {
+        int i2cSpeed = settings[NetworkProtocol::KEY_I2C_SPEED] | 0;
+        if (!NetworkProtocol::i2cSpeedValid((uint32_t)i2cSpeed)) {
+            message = "I2C speed must be 100000, 400000, or 1000000";
+            return false;
+        }
+    }
+
     uint8_t deviceMode = settings[NetworkProtocol::KEY_DEVICE_MODE].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_DEVICE_MODE] : sysCfg.device_mode;
     uint8_t espnowChan = settings[NetworkProtocol::KEY_ESPNOW_CHANNEL].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_ESPNOW_CHANNEL] : sysCfg.espnow_channel;
     if (deviceMode == MODE_ESPNOW_MASTER && espnowChan == 0) {
@@ -712,6 +720,15 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
     if (!artnetEnabled && !sacnEnabled) {
         message = "Cannot disable both Art-Net and sACN protocols";
         return false;
+    }
+
+    if (settings.containsKey(NetworkProtocol::KEY_MDNS_NAME)) {
+        const char* mdns = settings[NetworkProtocol::KEY_MDNS_NAME];
+        size_t len = strlen(mdns);
+        if (len < 1 || len > NetworkProtocol::MDNS_NAME_MAX_LEN) {
+            message = "mDNS hostname must be 1-" + String(NetworkProtocol::MDNS_NAME_MAX_LEN) + " characters";
+            return false;
+        }
     }
 
     if (outputsUseReservedPin(outputs, statusPin, "Status LED", message)) return false;
@@ -1025,6 +1042,20 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             }
             if (mode > 2) {
                 message = "Unsupported PWM DAC calibration mode on channel " + String(channelNumber);
+                return false;
+            }
+        }
+        {
+            uint16_t uni = output["start_universe"] | 0;
+            if (uni > 32767) {
+                message = "start_universe must be 0-32767 on channel " + String(channelNumber);
+                return false;
+            }
+        }
+        if (type == OutputDefs::TYPE_LED_STRIP) {
+            uint16_t lc = output["led_count"] | 0;
+            if (lc < 1 || lc > 1360) {
+                message = "LED count must be 1-1360 on channel " + String(channelNumber);
                 return false;
             }
         }
@@ -2238,6 +2269,22 @@ void outputTask(void* pvParameters) {
         if ((sysCfg.device_mode == MODE_ARTNET_ETHERNET || sysCfg.device_mode == MODE_ESPNOW_MASTER) && networkFramePending.exchange(false)) {
             // Render local LED strips
             outputCtrl.updateLeds();
+        }
+
+        // DMX frame timeout detection: if no network DMX/ESP-NOW data
+        // has been received for the timeout period, mark system inactive.
+        const unsigned long DMX_FRAME_TIMEOUT_MS = 5000;
+        static unsigned long lastDmxTimeoutLog = 0;
+        unsigned long now = millis();
+        unsigned long lastUpdate = lastDmxUpdateTime.load();
+        if (lastUpdate != 0 && now - lastUpdate > DMX_FRAME_TIMEOUT_MS) {
+            if (systemActive.exchange(false)) {
+                Serial.println("[WARN] DMX frame timeout — no data received for 5 seconds");
+            }
+            if (now - lastDmxTimeoutLog > 30000) {
+                lastDmxTimeoutLog = now;
+                Serial.println("[WARN] DMX timeout persists, outputs holding last state");
+            }
         }
 
         updateStatusLedPattern();

@@ -523,6 +523,31 @@ function setModeOptions(opts, labelText){
   sel.value=opts.some(([v])=>v===current)?current:opts[0][0];
 }
 
+function populateSystemPins() {
+  var specialLabels = {};
+  specialLabels[5] = 'GPIO 5 (LED3 on-board)';
+  specialLabels[17] = 'GPIO 17 (LED4 on-board)';
+  var outGpios = OUTPUT_GPIOS;
+  var inGpios = INPUT_GPIOS;
+
+  function fillSelect(id, list) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    var html = '<option value="255">Disabled</option>';
+    list.forEach(function(p) {
+      var label = 'GPIO ' + p;
+      if (specialLabels[p]) label = specialLabels[p];
+      html += '<option value="' + p + '">' + label + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  fillSelect('status_led_pin', outGpios);
+  fillSelect('i2c_sda', outGpios);
+  fillSelect('i2c_scl', outGpios);
+  fillSelect('zc_pin', inGpios);
+}
+
 function checkStrappingPin() {
   const strapWarn = document.getElementById('strapping-warning');
   if (!strapWarn) return;
