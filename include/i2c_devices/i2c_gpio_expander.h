@@ -15,7 +15,12 @@ private:
     uint8_t _kind;
     uint8_t _address;
     uint16_t _state;
+    uint8_t _pcfWidth;
     bool _started;
+
+    void expandPcfWidthForChannel(uint8_t channel) {
+        if (_kind == DIG_EXP_PCF857X && channel > 7) _pcfWidth = 2;
+    }
 
     bool writeReg8(uint8_t reg, uint8_t value) {
         return I2cBus::writeReg8(_address, reg, value);
@@ -27,12 +32,12 @@ private:
 
     bool writePcf(uint16_t value) {
         uint8_t data[2] = {(uint8_t)(value & 0xFF), (uint8_t)((value >> 8) & 0xFF)};
-        return I2cBus::writeBytes(_address, data, value > 0xFF ? 2 : 1);
+        return I2cBus::writeBytes(_address, data, _pcfWidth);
     }
 
 public:
     DigitalExpanderDevice(uint8_t kind, uint8_t address)
-        : _kind(kind), _address(address), _state(0), _started(false) {}
+        : _kind(kind), _address(address), _state(0), _pcfWidth(1), _started(false) {}
 
     uint8_t getKind() const { return _kind; }
     uint8_t getAddress() const { return _address; }
@@ -57,6 +62,7 @@ public:
 
     void writeChannel(uint8_t channel, bool state, bool force = false) {
         if (channel > 15) return;
+        expandPcfWidthForChannel(channel);
         uint16_t mask = (uint16_t)1 << channel;
         uint16_t next = state ? (_state | mask) : (_state & ~mask);
         if (!force && next == _state) return;
@@ -82,7 +88,7 @@ public:
         } else if (_kind == DIG_EXP_PCF857X) {
             uint8_t tx[2] = {(uint8_t)(_state & 0xFF), (uint8_t)((_state >> 8) & 0xFF)};
             uint8_t rx[2] = {0, 0};
-            uint8_t width = (_state > 0xFF) ? 2 : 1;
+            uint8_t width = _pcfWidth;
             if (!I2cBus::writeThenRead(_address, tx, width, rx, width)) return 0xFFFF;
             uint16_t val = rx[0];
             if (width > 1) val |= (uint16_t)rx[1] << 8;
@@ -93,6 +99,7 @@ public:
 
     void configureInput(uint8_t channel, bool pullUp = true) {
         if (channel > 15) return;
+        expandPcfWidthForChannel(channel);
         if (_kind == DIG_EXP_MCP23017) {
             uint8_t iodirReg = (channel < 8) ? 0x00 : 0x01;
             uint8_t portBit = (uint8_t)1 << (channel & 7);

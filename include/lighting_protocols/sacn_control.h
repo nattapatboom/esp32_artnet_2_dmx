@@ -90,6 +90,7 @@ private:
         int freeSlot = -1;
         int existingSlot = -1;
         int lowestPriSlot = -1;
+        int acceptedSlot = -1;
         uint8_t lowestPriority = 255;
 
         for (int i = 0; i < SACN_MAX_SOURCES; i++) {
@@ -110,26 +111,32 @@ private:
             }
         }
 
-        if (existingSlot >= 0) return true;
-
-        if (freeSlot >= 0) {
+        if (existingSlot >= 0) {
+            acceptedSlot = existingSlot;
+        } else if (freeSlot >= 0) {
             memcpy(sources[freeSlot].cid, cid, 16);
             sources[freeSlot].priority = priority;
             sources[freeSlot].lastSeen = millis();
             sources[freeSlot].active = true;
-            return true;
-        }
-
-        // All slots full: replace lowest-priority source if this one has higher priority
-        if (priority > lowestPriority && lowestPriSlot >= 0) {
+            acceptedSlot = freeSlot;
+        } else if (priority > lowestPriority && lowestPriSlot >= 0) {
+            // All slots full: replace lowest-priority source if this one has higher priority
             memcpy(sources[lowestPriSlot].cid, cid, 16);
             sources[lowestPriSlot].priority = priority;
             sources[lowestPriSlot].lastSeen = millis();
             sources[lowestPriSlot].active = true;
-            return true;
+            acceptedSlot = lowestPriSlot;
+        } else {
+            return false;
         }
 
-        return false;
+        uint8_t highestPriority = 0;
+        for (int i = 0; i < SACN_MAX_SOURCES; i++) {
+            if (sources[i].active && sources[i].priority > highestPriority) {
+                highestPriority = sources[i].priority;
+            }
+        }
+        return sources[acceptedSlot].priority == highestPriority;
     }
 
     void expireSources() {

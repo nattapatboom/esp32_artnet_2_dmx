@@ -371,7 +371,7 @@ async function startScan(){
         const opt=document.createElement('option');
         opt.value=n.ssid;
         opt.textContent=n.ssid+' ('+n.rssi+' dBm'+(n.secure?' secure':' open')+')';
-        sel.appendChild(opt);
+        scanEl.appendChild(opt);
       });
     }catch(e){}
   },2000);

@@ -141,6 +141,20 @@ function writeRouteFields(o){
     setRouteChecked('no_pin3_invert',o.mc_enable_active_high||false);
   }
   var ssrc=o.seg_sources||[], sps=o.seg_pins||[], saddrs=o.seg_addrs||[], sch=o.seg_channels||[], sinvs=o.seg_inverts||0;
+  if(outputUsesSegmentRoutes(typeId(o),parseInt(o.mc_mode||0))&&o.pin2_source){
+    var segCount=mode.segmentCount||8;
+    var commonDim=outputModeKey(typeId(o),parseInt(o.mc_mode||0))==='commonDim';
+    if(!commonDim){
+      setRouteValue('no_source',o.pin2_source);
+      setRouteValue('no_pca_addr',o.pin2_addr);
+      setRouteValue('no_pca_channel',o.pin2_channel);
+    }
+    for(var bs=0;bs<segCount;bs++){
+      ssrc[bs]=o.pin2_source;
+      saddrs[bs]=o.pin2_addr;
+      sch[bs]=(o.pin2_channel!==undefined&&o.pin2_channel!==255)?o.pin2_channel+bs:255;
+    }
+  }
   for(var s=0;s<8;s++){
     setRouteValue('no_seg_source_'+s,ssrc[s]!==undefined?ssrc[s]:0);
     setRouteValue('no_seg_addr_'+s,saddrs[s]!==undefined?saddrs[s]:32);
@@ -162,7 +176,7 @@ function readRouteFields(ch,type){
   var mode=outputModeDef(type,parseInt(cfgEl('mc_mode')?.value||0));
   defaultChannelRoutes(ch);
   Object.keys(mode?.pins||{}).forEach(function(slot){ readRouteSlot(ch,slot); });
-  if(!mode?.segmentLayout) return;
+  if(!outputUsesSegmentRoutes(type,parseInt(cfgEl('mc_mode')?.value||0))) return;
   var commonDim=outputModeKey(type,parseInt(cfgEl('mc_mode')?.value||0))==='commonDim';
   var segCount=Object.keys(mode.pins||{}).length-(commonDim?1:0);
   for(var s=0;s<segCount;s++){
@@ -424,7 +438,7 @@ function toggleOutFields(){
   const isFuncGen = t===T.FUNC_GEN;
   const isDac = t===T.DAC;
   const isCommonDim = is7Seg && outputModeKey(t, mcMode) === 'commonDim';
-  const is7SegDD = is7Seg && outputModeDef(t, mcMode)?.segmentLayout === true;
+  const is7SegDD = is7Seg && outputUsesSegmentRoutes(t, mcMode);
   const is7SegDirectDim = is7Seg && (mcMode === 4 || mcMode === 5);
 
   const canUsePca = modeAllowsSource(t,mcMode,SRC_PCA);

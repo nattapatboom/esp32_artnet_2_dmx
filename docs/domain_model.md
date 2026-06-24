@@ -532,7 +532,7 @@ Fields that must not be treated as persisted domain config:
 
 Configuration must pass these gates before save/apply:
 - type ID must be `0..18`.
-- source must match the output type source contract above.
+- every routed source slot (primary, hybrid pins, and segment pins) must match the output type source contract above.
 - source ID must be `0..7`.
 - global pins must not overlap each other: Status LED, Zero-Crossing, I2C SDA, I2C SCL.
 - any output GPIO, including hybrid GPIO pins and segment GPIO pins, must not overlap global pins.
@@ -542,6 +542,7 @@ Configuration must pass these gates before save/apply:
 - expander channels must not duplicate for the same source/address/channel.
 - every I2C-routed output address must be inside the valid range for that device/source/model.
 - display I2C address must match the selected display type: OLED `0x3C/0x3D`, PCF8574 LCD `0x27/0x3F`.
+- one physical I2C address may not be reused by different device families, and output I2C addresses must not overlap the configured display address.
 - DFPlayer count must be `<= 2`.
 - RMT use from LED strips plus DMX fallback must be `<= 8`.
 - LEDC use must be `<= 16`.

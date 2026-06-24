@@ -249,6 +249,7 @@ The score calculator is not the only gate. Firmware validation enforces these ru
 * I2C SDA and SCL cannot be the same pin.
 * I2C output addresses must match the selected source/model: PCA9685 `0x40..0x47`, MCP23017/TCA9555 `0x20..0x27`, PCF857x `0x20..0x27` or `0x38..0x3F`, MCP4725 `0x60/0x61`, DAC7571 `0x4C/0x4D`, DAC7573 `0x4C..0x5B`.
 * I2C display addresses must match the selected display type: OLED `0x3C/0x3D`, PCF8574 LCD `0x27/0x3F`.
+* A physical I2C address may be assigned to only one device family at a time, and output I2C devices must not reuse the configured display address.
 * DFPlayer channels cannot exceed 2.
 * DFPlayer allocates UART before DMX; DMX uses remaining UARTs and then RMT fallback.
 * RMT usage from LED strips plus DMX fallback cannot exceed 8.

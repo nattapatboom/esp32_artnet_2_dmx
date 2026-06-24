@@ -536,6 +536,72 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
     return false;
 }
 
+uint8_t defaultI2cAddressForSource(uint8_t source) {
+    if (source == 1) return 0x40;
+    if (source == 5) return 0x60;
+    if (source == 6 || source == 7) return 0x4C;
+    return 0x20;
+}
+
+bool outputsHaveI2cAddressConflict(JsonArray outputs, uint8_t displayType, uint8_t displayAddr, String& message) {
+    struct UsedAddress {
+        uint8_t address;
+        uint8_t source;
+        uint8_t outputIndex;
+    };
+    UsedAddress used[32];
+    uint8_t usedCount = 0;
+
+    auto addAddress = [&](uint8_t source, uint8_t address, uint8_t outputIndex) -> bool {
+        if (source == 0) return false;
+        if (displayType != DisplayProtocol::DTYPE_NONE && address == displayAddr) {
+            message = "I2C address 0x" + String(address, HEX) + " on output channel " +
+                      String(outputIndex) + " conflicts with the configured display address";
+            return true;
+        }
+        for (uint8_t i = 0; i < usedCount; i++) {
+            if (used[i].address == address && used[i].source != source) {
+                message = "I2C address 0x" + String(address, HEX) + " is used by incompatible source " +
+                          String(used[i].source) + " on output channel " + String(used[i].outputIndex) +
+                          " and source " + String(source) + " on output channel " + String(outputIndex);
+                return true;
+            }
+        }
+        if (usedCount < 32) used[usedCount++] = {address, source, outputIndex};
+        return false;
+    };
+
+    uint8_t outputIndex = 1;
+    for (JsonObject output : outputs) {
+        uint8_t type = output["type"] | 0;
+        uint8_t mcMode = output["mc_mode"] | 0;
+        const OutputDefs::OutputModeDef* def = OutputDefs::modeDef(type, mcMode);
+        uint8_t source = output["source"] | 0;
+        if (source != 0 && addAddress(source, output["pca_addr"] | defaultI2cAddressForSource(source), outputIndex)) return true;
+
+        uint8_t pin2Source = output["pin2_source"] | 0;
+        uint8_t pin3Source = output["pin3_source"] | 0;
+        uint8_t pin4Source = output["pin4_source"] | 0;
+        if (pin2Source != 0 && addAddress(pin2Source, output["pin2_addr"] | defaultI2cAddressForSource(pin2Source), outputIndex)) return true;
+        if (pin3Source != 0 && addAddress(pin3Source, output["pin3_addr"] | defaultI2cAddressForSource(pin3Source), outputIndex)) return true;
+        if (pin4Source != 0 && addAddress(pin4Source, output["pin4_addr"] | defaultI2cAddressForSource(pin4Source), outputIndex)) return true;
+
+        if (def != nullptr && def->segmentCount > 0 && pin2Source == 0 && output.containsKey("seg_sources")) {
+            JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
+            JsonArrayConst segAddrs = output["seg_addrs"].as<JsonArrayConst>();
+            for (uint8_t s = 0; s < def->segmentCount && s < segSources.size(); s++) {
+                uint8_t segSource = segSources[s] | 0;
+                if (segSource != 0) {
+                    uint8_t segAddr = s < segAddrs.size() ? (uint8_t)(segAddrs[s] | defaultI2cAddressForSource(segSource)) : defaultI2cAddressForSource(segSource);
+                    if (addAddress(segSource, segAddr, outputIndex)) return true;
+                }
+            }
+        }
+        outputIndex++;
+    }
+    return false;
+}
+
 void addSettingsToJson(JsonObject target) {
     target["device_mode"] = sysCfg.device_mode;
     target["eth_dhcp"] = sysCfg.eth_dhcp;
@@ -738,6 +804,7 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
     if (outputsUseForbiddenGpio(outputs, message)) return false;
     if (outputsHaveDuplicateGpio(outputs, message)) return false;
     if (outputsHaveDuplicateExpanderChannel(outputs, message)) return false;
+    if (outputsHaveI2cAddressConflict(outputs, displayType, displayAddr, message)) return false;
     for (JsonObjectConst output : outputs) {
         if ((uint8_t)(output["type"] | 0) == OutputDefs::TYPE_DIMMER && zcPin == 255) {
             message = "Zero-Crossing pin is not configured (GPIO 255). AC Dimmer outputs require a ZC pin to operate.";
@@ -821,18 +888,33 @@ bool validateOutputJson(JsonArray outputs, String& message) {
             message = "DAC output does not support ESP32 GPIO (source 0) on WT32-ETH01; use I2C DAC (source 5-7) on channel " + String(channelNumber);
             return false;
         }
-        if (!OutputDefs::sourceAllowedForSlot(type, mcMode, 0, source)) {
-            message = "Unsupported output source on channel " + String(channelNumber);
+        auto sourceForSlot = [&](uint8_t slotIndex) -> uint8_t {
+            if (def != nullptr && def->segmentCount > 0) {
+                if (def->pinCount > def->segmentCount && slotIndex == 0) return source;
+                uint8_t baseSource = output["pin2_source"] | 0;
+                if (baseSource != 0) return baseSource;
+                uint8_t segIdx = (def->pinCount > def->segmentCount) ? slotIndex - 1 : slotIndex;
+                JsonArrayConst segSources = output["seg_sources"].as<JsonArrayConst>();
+                return (!segSources.isNull() && segIdx < segSources.size()) ? (uint8_t)(segSources[segIdx] | 0) : 0;
+            }
+            if (slotIndex == 0) return source;
+            if (slotIndex == 1) return output["pin2_source"] | 0;
+            if (slotIndex == 2) return output["pin3_source"] | 0;
+            if (slotIndex == 3) return output["pin4_source"] | 0;
+            return 0;
+        };
+        if (def == nullptr) {
+            message = "Invalid output mode on channel " + String(channelNumber);
             return false;
         }
-        auto defaultAddrForSource = [](uint8_t s) -> uint8_t {
-            if (s == 1) return 0x40;
-            if (s == 5) return 0x60;
-            if (s == 6 || s == 7) return 0x4C;
-            return 0x20;
-        };
+        for (uint8_t slot = 0; slot < def->pinCount; slot++) {
+            if (!OutputDefs::sourceAllowedForSlot(type, mcMode, slot, sourceForSlot(slot))) {
+                message = "Unsupported source for " + String(def->pins[slot].label) + " on channel " + String(channelNumber);
+                return false;
+            }
+        }
         if (source != 0 && !(source >= 5 && source <= 7)) {
-            uint8_t addr = output["pca_addr"] | defaultAddrForSource(source);
+            uint8_t addr = output["pca_addr"] | defaultI2cAddressForSource(source);
             if (!SourceRules::validateAddress(source, addr, "Primary I2C source on channel " + String(channelNumber), message)) return false;
             uint8_t pcaChan = output["pca_channel"] | 255;
             if (pcaChan != 255 && pcaChan > 15) {
@@ -855,7 +937,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         if (!checkHybridChan("Pin 3", "pin3_source", "pin3_channel")) return false;
         if (!checkHybridChan("Pin 4", "pin4_source", "pin4_channel")) return false;
         if (type == OutputDefs::TYPE_DAC && source >= 5 && source <= 7) {
-            uint8_t addr = output["pca_addr"] | defaultAddrForSource(source);
+            uint8_t addr = output["pca_addr"] | defaultI2cAddressForSource(source);
             uint8_t dacChannel = output["pca_channel"] | 0;
             if (!SourceRules::addressValid(source, addr)) {
                 message = "I2C DAC source on channel " + String(channelNumber) + " has invalid address 0x" + String(addr, HEX) + ". " + SourceRules::addressRangeLabel(source);
@@ -877,7 +959,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
             if (pin2Source != 0) {
-                uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
+                uint8_t pin2Addr = output["pin2_addr"] | defaultI2cAddressForSource(pin2Source);
                 if (!SourceRules::validateAddress(pin2Source, pin2Addr, "Segment base I2C source on channel " + String(channelNumber), message)) return false;
             }
             if ((mcMode == 4 || mcMode == 5) && pin2Source >= 2 && pin2Source <= 4) {
@@ -908,7 +990,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                         return false;
                     }
                     if (sSrc != 0) {
-                        uint8_t sAddr = (s < segAddrs.size()) ? (uint8_t)(segAddrs[s] | defaultAddrForSource(sSrc)) : defaultAddrForSource(sSrc);
+                        uint8_t sAddr = (s < segAddrs.size()) ? (uint8_t)(segAddrs[s] | defaultI2cAddressForSource(sSrc)) : defaultI2cAddressForSource(sSrc);
                         if (!SourceRules::validateAddress(sSrc, sAddr, "Segment " + String(s + 1) + " I2C source on channel " + String(channelNumber), message)) return false;
                     }
                     if ((mcMode == 4 || mcMode == 5) && sSrc >= 2 && sSrc <= 4) {
@@ -940,15 +1022,15 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
             if (pin2Source != 0) {
-                uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
+                uint8_t pin2Addr = output["pin2_addr"] | defaultI2cAddressForSource(pin2Source);
                 if (!SourceRules::validateAddress(pin2Source, pin2Addr, "Stepper DIR I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (pin3Source != 0) {
-                uint8_t pin3Addr = output["pin3_addr"] | defaultAddrForSource(pin3Source);
+                uint8_t pin3Addr = output["pin3_addr"] | defaultI2cAddressForSource(pin3Source);
                 if (!SourceRules::validateAddress(pin3Source, pin3Addr, "Stepper ENABLE I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (homingMode == 0 && pin4Source != 0) {
-                uint8_t pin4Addr = output["pin4_addr"] | defaultAddrForSource(pin4Source);
+                uint8_t pin4Addr = output["pin4_addr"] | defaultI2cAddressForSource(pin4Source);
                 if (!SourceRules::validateAddress(pin4Source, pin4Addr, "Stepper HOME I2C source on channel " + String(channelNumber), message)) return false;
             }
             if ((pin2Source != 0 && (int)(output["pin2_channel"] | 255) == 255) ||
@@ -971,15 +1053,15 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
             if (pin2Source != 0) {
-                uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
+                uint8_t pin2Addr = output["pin2_addr"] | defaultI2cAddressForSource(pin2Source);
                 if (!SourceRules::validateAddress(pin2Source, pin2Addr, "Analog RGB/RGBW Green I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (pin3Source != 0) {
-                uint8_t pin3Addr = output["pin3_addr"] | defaultAddrForSource(pin3Source);
+                uint8_t pin3Addr = output["pin3_addr"] | defaultI2cAddressForSource(pin3Source);
                 if (!SourceRules::validateAddress(pin3Source, pin3Addr, "Analog RGB/RGBW Blue I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (colorOrder >= 4 && pin4Source != 0) {
-                uint8_t pin4Addr = output["pin4_addr"] | defaultAddrForSource(pin4Source);
+                uint8_t pin4Addr = output["pin4_addr"] | defaultI2cAddressForSource(pin4Source);
                 if (!SourceRules::validateAddress(pin4Source, pin4Addr, "Analog RGB/RGBW White I2C source on channel " + String(channelNumber), message)) return false;
             }
             if ((source == 1 && (int)(output["pca_channel"] | 255) == 255) ||
@@ -997,7 +1079,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
             if (pin2Source != 0) {
-                uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
+                uint8_t pin2Addr = output["pin2_addr"] | defaultI2cAddressForSource(pin2Source);
                 if (!SourceRules::validateAddress(pin2Source, pin2Addr, "Smoke Shooter shoot I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (pin2Source != 0 && (int)(output["pin2_channel"] | 255) == 255) {
@@ -1013,11 +1095,11 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 return false;
             }
             if (pin2Source != 0) {
-                uint8_t pin2Addr = output["pin2_addr"] | defaultAddrForSource(pin2Source);
+                uint8_t pin2Addr = output["pin2_addr"] | defaultI2cAddressForSource(pin2Source);
                 if (!SourceRules::validateAddress(pin2Source, pin2Addr, "Motor IN2/DIR I2C source on channel " + String(channelNumber), message)) return false;
             }
             if (pin3Source != 0) {
-                uint8_t pin3Addr = output["pin3_addr"] | defaultAddrForSource(pin3Source);
+                uint8_t pin3Addr = output["pin3_addr"] | defaultI2cAddressForSource(pin3Source);
                 if (!SourceRules::validateAddress(pin3Source, pin3Addr, "Motor EN I2C source on channel " + String(channelNumber), message)) return false;
             }
         }
@@ -1837,10 +1919,16 @@ void setupWebServer() {
                     return;
                 }
                 obj["mac"] = normalizedMac;
-                uint16_t su = obj["start_universe"] | 0;
+                uint32_t suRaw = obj["start_universe"] | 0;
                 uint16_t sa = obj["start_address"] | 1;
-                uint16_t eu = obj["end_universe"] | su;
+                uint32_t euRaw = obj["end_universe"] | suRaw;
                 uint16_t ea = obj["end_address"] | 512;
+                if (suRaw > 32767 || euRaw > 32767) {
+                    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"ESP-NOW peer universe must be 0-32767\"}");
+                    return;
+                }
+                uint16_t su = (uint16_t)suRaw;
+                uint16_t eu = (uint16_t)euRaw;
                 if (sa < 1 || sa > 512 || ea < 1 || ea > 512 || eu < su || (eu == su && ea < sa)) {
                     request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid peer DMX range\"}");
                     return;

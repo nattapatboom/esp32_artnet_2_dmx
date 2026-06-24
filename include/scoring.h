@@ -102,6 +102,7 @@ inline uint8_t getPinSource(const OutputChannel& ch, uint8_t pinIndex) {
         const auto* d = OutputDefs::modeDef(ch.type, ch.mc_mode);
         if (d && d->segmentCount > 0) {
             if (d->pinCount > d->segmentCount && pinIndex == 0) return ch.source;
+            if (ch.pin2_source != 0) return ch.pin2_source;
             uint8_t segIdx = (d->pinCount > d->segmentCount) ? pinIndex - 1 : pinIndex;
             return (segIdx < 8) ? ch.seg_sources[segIdx] : 0;
         }
@@ -395,6 +396,8 @@ inline uint8_t getPinSourceFromJson(JsonObjectConst j, uint8_t pinIndex) {
         const auto* d = OutputDefs::modeDef(t, mode);
         if (d && d->segmentCount > 0) {
             if (d->pinCount > d->segmentCount && pinIndex == 0) return j["source"] | 0;
+            uint8_t baseSource = j["pin2_source"] | 0;
+            if (baseSource != 0) return baseSource;
             uint8_t segIdx = (d->pinCount > d->segmentCount) ? pinIndex - 1 : pinIndex;
             JsonArrayConst sa = j["seg_sources"];
             return (!sa.isNull() && segIdx < sa.size()) ? (uint8_t)(sa[segIdx] | 0) : 0;

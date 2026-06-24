@@ -17,7 +17,7 @@ function eachSlot(o,fn){
   var t=parseInt(o.type||0);
   var mode=outputModeDef(t,parseInt(o.mc_mode||0));
   if(!mode) return;
-  var is7seg=!!mode.segmentLayout;
+  var is7seg=outputUsesSegmentRoutes(t,parseInt(o.mc_mode||0));
   var isCommonDim=outputModeKeyForObj(o)==='commonDim';
   var pinDefs=mode.pins||{};
   Object.keys(pinDefs).sort().forEach(function(slot){
@@ -65,6 +65,15 @@ const SRC_DIG=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.DIGITAL_EXPANDER:
 const SRC_DAC=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.I2C_DAC:8;
 var T=TYPE_META?.typeIds||{};
 
+function sourceMaskForId(source){
+  source=parseInt(source||0);
+  if(source===0) return SRC_GPIO;
+  if(source===1) return SRC_PCA;
+  if(source>=2&&source<=4) return SRC_DIG;
+  if(source>=5&&source<=7) return SRC_DAC;
+  return 0;
+}
+
 function outputModeKey(type,mode){
   return TYPE_META.modeKeyMap[parseInt(type)]?.[parseInt(mode||0)]||String(mode);
 }
@@ -80,6 +89,10 @@ function outputSegmentPinRule(type,mode,segmentIndex){
   const offset=(mk==='commonDim')?2:1;
   const slot='pin'+(parseInt(segmentIndex)+offset);
   return outputPinRule(type,mode,slot);
+}
+function outputUsesSegmentRoutes(type,mode){
+  const def=outputModeDef(type,mode);
+  return !!(def&&(def.segmentLayout||def.primaryRouteIsSegment));
 }
 function ruleAllows(rule,sourceFlag,fallback=false){ return rule?!!(rule.sources&sourceFlag):fallback; }
 function outputModeCpuUs(type,mode){ return outputModeDef(type,mode)?.cost?.cpuUs||0; }
@@ -237,7 +250,7 @@ function renderPinRows(){
   const chOpts=(allowNone)=>`${allowNone?'<option value="255">None</option>':''}${PIN_CHANS.map(v=>`<option value="${v}">CH ${v}</option>`).join('')}`;
   const dacChOpts=[['0','A'],['1','B'],['2','C'],['3','D']].map(([v,l])=>`<option value="${v}">CH ${l}</option>`).join('');
   const slotNumber=(slot)=>parseInt(slot.replace('pin',''));
-  const isSevenSegDD=!!(mode?.segmentLayout);
+  const isSevenSegDD=outputUsesSegmentRoutes(t,mcMode);
   const isCommonDim=outputModeKey(t,mcMode)==='commonDim';
   const fieldFor=(slot)=>{
     const n=slotNumber(slot);
@@ -256,7 +269,7 @@ function renderPinRows(){
   };
   const sourceFor=(field,rule)=>{
     const current=parseInt(saved[field.source]??0);
-    if(rule.sources&(1<<current)) return current;
+    if(rule.sources&sourceMaskForId(current)) return current;
     const allowed=rule.sources;
     if(allowed&SRC_GPIO) return 0;
     if(allowed&SRC_PCA) return 1;
