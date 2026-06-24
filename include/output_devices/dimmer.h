@@ -17,7 +17,7 @@ extern volatile uint32_t dimmer_tick;
 #define MAX_DIMMER_CHANNELS 8
 struct DimmerCh {
     uint8_t pin;
-    uint8_t** dmxVal;
+    uint8_t* volatile* dmxVal;
 };
 
 extern volatile DimmerCh dimmerChannels[MAX_DIMMER_CHANNELS];

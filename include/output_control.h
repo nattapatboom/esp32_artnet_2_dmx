@@ -414,6 +414,10 @@ private:
     }
 
 public:
+    uint16_t sharedPcaFrequency(uint8_t address) const {
+        return getPcaSharedFrequency(address);
+    }
+
     uint16_t getUniverseCount(const OutputChannel& ch) const {
         if (ch.type == OutputDefs::TYPE_LED_STRIP) { // RGB LED strip (v3)
             uint8_t bytesPerPixel = (ch.color_order >= 4) ? 4 : 3;
@@ -527,7 +531,9 @@ public:
             defCh.dmxPort = 255;
             
             channels.push_back(defCh);
-            saveChannels();
+            if (!saveChannels()) {
+                Serial.println("[config] CRITICAL: Failed to save default output channels!");
+            }
             return;
         }
 
@@ -710,7 +716,9 @@ public:
             channels.push_back(ch);
         }
         if (layoutVersion < 3) {
-            saveChannels();
+            if (!saveChannels()) {
+                Serial.println("[config] CRITICAL: Migration save failed! Output channels may be lost on reboot.");
+            }
         }
         Serial.printf("Loaded %d output channels from /outputs.json\n", channels.size());
     }

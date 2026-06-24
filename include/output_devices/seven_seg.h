@@ -15,7 +15,7 @@ inline void sevenSegSetup(OutputChannel& ch, uint8_t& ledcIdx) {
 
     if (isDirectDrive && ch.pin2_source == 1) {
         pcaManager.getOrCreateDriver(ch.pin2_addr);
-        pcaManager.setFrequency(ch.pin2_addr, ch.mc_freq ? ch.mc_freq : 1000);
+        pcaManager.setFrequency(ch.pin2_addr, outputCtrl.sharedPcaFrequency(ch.pin2_addr));
         for (uint8_t s = 0; s < numSeg; s++) {
             pcaManager.write(ch.pin2_addr, ch.pin2_channel + s, 0);
         }
@@ -63,18 +63,19 @@ inline void sevenSegSetup(OutputChannel& ch, uint8_t& ledcIdx) {
             if (isDirectDrive) {
                 uint8_t baseChan = allocateLedc(ledcIdx);
                 if (baseChan != 255) {
-                    ledcIdx = baseChan + numSeg;
-                    if (ledcIdx > 16) ledcIdx = 16;
+                    uint8_t usedLedc = 0;
                     for (uint8_t s = 0; s < numSeg; s++) {
                         uint8_t segPin = segmentGpio(ch, s);
-                        if (ch.seg_sources[s] == 0 && segPin != 255 && baseChan + s <= 15) {
-                            ledcSetup(baseChan + s, ch.mc_freq ? ch.mc_freq : 1000, 8);
-                            ledcAttachPin(segPin, baseChan + s);
-                            ledcWrite(baseChan + s, 0);
+                        if (ch.seg_sources[s] == 0 && segPin != 255 && baseChan + usedLedc <= 15) {
+                            ledcSetup(baseChan + usedLedc, ch.mc_freq ? ch.mc_freq : 1000, 8);
+                            ledcAttachPin(segPin, baseChan + usedLedc);
+                            ledcWrite(baseChan + usedLedc, 0);
+                            usedLedc++;
                         } else if (ch.seg_sources[s] >= 1 && ch.seg_sources[s] <= 4) {
                             setupSegmentOutput(ch, s, false);
                         }
                     }
+                    ledcIdx = baseChan + usedLedc;
                     ch.dmxPort = baseChan;
                 }
             } else {

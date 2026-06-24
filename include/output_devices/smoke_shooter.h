@@ -5,6 +5,7 @@
 #include "output_control.h"
 
 inline void smokeShooterSetup(OutputChannel& ch) {
+    if (ch.pin == 255) return;
     if (ch.source == 0) {
         pinMode(ch.pin, OUTPUT);
         pinMode(ch.pin2, OUTPUT);

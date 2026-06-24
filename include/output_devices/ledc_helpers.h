@@ -56,7 +56,7 @@ inline void setupSegmentOutput(OutputChannel& ch, uint8_t idx, bool offState) {
     bool active_off = offState ^ inv;
     if (src == 1) {
         pcaManager.getOrCreateDriver(ch.seg_addrs[idx]);
-        pcaManager.setFrequency(ch.seg_addrs[idx], ch.mc_freq ? ch.mc_freq : 1000);
+        pcaManager.setFrequency(ch.seg_addrs[idx], outputCtrl.sharedPcaFrequency(ch.seg_addrs[idx]));
         if (ch.seg_channels[idx] != 255) pcaManager.write(ch.seg_addrs[idx], ch.seg_channels[idx], active_off ? 4095 : 0);
         return;
     }

@@ -42,13 +42,9 @@ The E1.31 packet has a 16-byte ACN transport header (Preamble + Post-AM + ACN ID
 
 ---
 
-### 1.3 ★★☆ `swapBuffers()` cross-core data race
+### ~~1.3 ★★☆ `swapBuffers()` cross-core data race~~
 
-**Files:** `include/output_control.h:478`, `artnet_control.h:105`, `sacn_control.h:237`, `main.cpp:149,2167`
-
-`swapBuffers()` iterates all channels swapping `dmxBuffer`/`shadowBuffer` pointers. Called from both Core 0 (network) and Core 1 (output test). Channel-by-channel swap is not atomic — Core 1 could observe mixed pre/post-swap pointers.
-
-Fix: Call exclusively from one core or add mutex. The `networkFramePending` flag mitigates the normal path, but `clearOutputTest()` at `main.cpp:149` bypasses it.
+**RESOLVED** — `swapBuffers()` now uses `swapMutex` (`xSemaphoreTake`/`xSemaphoreGive`) to protect the pointer swap across cores.
 
 ---
 
@@ -96,88 +92,45 @@ Remove or implement sequence validation.
 
 ## 2. Output Routing & Setup
 
-### 2.1 ★★★ 7-segment LEDC index corruption
+### ~~2.1 ★★★ 7-segment LEDC index corruption~~
 
-**File:** `include/output_devices/seven_seg.h:61-64`
-
-```cpp
-uint8_t baseChan = allocateLedc(ledcIdx);
-if (baseChan != 255) {
-    ledcIdx = baseChan + numSeg;  // OVERWRITES caller's ledcIdx
-    ...
-}
-```
-
-If `baseChan=14` and `numSeg=7`, `ledcIdx` becomes 21 (clamped to 16). **All subsequent LEDC allocations return 255.** Every output type after a direct-dim 7-segment channel loses PWM capability.
-
-Fix: Restore `ledcIdx` properly: `ledcIdx = savedIndex + numSeg` or allocate in a loop.
+**RESOLVED** — `sevenSegSetup()` now tracks `usedLedc` as the number of LEDC channels actually allocated, then sets `ledcIdx = baseChan + usedLedc` instead of blindly writing `baseChan + numSeg`.
 
 ---
 
-### 2.2 ★★★ Stepper array bounds overflow
+### ~~2.2 ★★★ Stepper array bounds overflow~~
 
-**File:** `include/output_devices/stepper.h:28`
-
-```cpp
-FastAccelStepper* steppers[8] = {nullptr};
-steppers[stepperCount] = stepper;  // no bounds check
-```
-
-9+ steppers corrupt adjacent memory in MotionControl (likely `ledcChannelIndex`).
-
-Fix: Add `if (stepperCount >= 8) return;` guard.
+**RESOLVED** — `stepperSetup()` now checks `if (stepperCount >= 8) return;` before accessing the array.
 
 ---
 
-### 2.3 ★★☆ No GPIO pin validation in setup functions
+### ~~2.3 ★★☆ No GPIO pin validation in setup functions~~
 
-**Files:** All `include/output_devices/*.h`
-
-Every setup function calls `pinMode(ch.pin, ...)` or `ledcAttachPin(ch.pin, ...)` without checking `ch.pin != 255`. If pin=255 (bypassed in JSON), undefined behavior on ESP32 GPIO register access.
-
-Fix: Add `if (ch.pin == 255) return;` at the top of every GPIO-routed setup function.
+**RESOLVED** — All GPIO-routed setup functions now guard with `if (ch.pin == 255) return;` at the top (buzzer, dmx, funcgen, led_strip, motor, pwm_dac, relay, servo, single_led, solenoid, stepper, smoke_shooter). `seven_seg.h` relies on per-segment pin validation in `segmentGpio()`/`setupSegmentOutput()` which already check for pin 255.
 
 ---
 
-### 2.4 ★★☆ Analog RGB ignores `mc_resolution`
+### ~~2.4 ★★☆ Analog RGB ignores `mc_resolution`~~
 
-**File:** `include/output_devices/analog_rgb.h:17,26,34,44`
-
-`ledcSetup(rChan, ch.mc_freq, 8)` — hardcoded 8-bit. Web UI allows 10/12/16 bit. Contract (`docs/domain_model.md`) lists mc_resolution support.
+**RESOLVED** — `analog_rgb.h` now uses `ledcResolution(ch)` for `ledcSetup()` and scales output values by `getMaxValue(ch.mc_resolution) / 255`.
 
 ---
 
-### 2.5 ★★☆ Motor update division by zero
+### ~~2.5 ★★☆ Motor update division by zero~~
 
-**File:** `include/output_devices/motor.h:99,161`
-
-```cpp
-uint32_t duty = (abs_offset * 4095) / center;  // center = max_val / 2
-```
-
-If `mc_resolution == 0`, `max_val = 0`, `center = 0`, integer division by zero.
-
-Same pattern: `servo.h:21`, `single_led.h:22`.
+**RESOLVED** — `motorUpdate()`, `servoUpdate()`, `singleLedUpdate()`, and `stepperUpdate()` all check `if (max_val == 0) return;` before division.
 
 ---
 
-### 2.6 ★★☆ PCA9685 frequency override conflict
+### ~~2.6 ★★☆ PCA9685 frequency override conflict~~
 
-**File:** `include/output_control.h:934-937` vs `motor.h:27,53,61`, `seven_seg.h:15`, `ledc_helpers.h:58`
-
-`setupChannels()` computes shared PCA frequency and sets it. Then per-type `setup()` overrides with `mc_freq`. Loses shared-frequency contract.
+**RESOLVED** — Per-type setups no longer call `setFrequency()` for `ch.pca_addr` (handled by `setupChannels()`). For secondary PCA addresses (`pin2_addr`, `pin3_addr`, `seg_addrs[]`), the shared frequency is obtained via `outputCtrl.sharedPcaFrequency()` instead of `ch.mc_freq`.
 
 ---
 
-### 2.7 ★★☆ `segmentGpio()` returns invalid pin
+### ~~2.7 ★★☆ `segmentGpio()` returns invalid pin~~
 
-**File:** `include/output_devices/ledc_helpers.h:49`
-
-```cpp
-return (ch.seg_pins[idx] != 255) ? ch.seg_pins[idx] : (ch.pin + idx);
-```
-
-If both `seg_pins[idx]==255` and `ch.pin==255`, returns `262`. Undefined behavior at `pinMode(262,...)`.
+**RESOLVED** — Added `return (gpio > 39) ? 255 : gpio;` guard after computing the pin value.
 
 ---
 
@@ -205,11 +158,9 @@ Previous finding retained for audit history:
 
 ---
 
-### 2.10 ★☆☆ `dimmer.h` ISR accesses non-volatile state
+### ~~2.10 ★☆☆ `dimmer.h` ISR accesses non-volatile state~~
 
-**File:** `include/output_devices/dimmer.h:27-43`
-
-`dimmerChannels[i].dmxVal` not declared `volatile`. Compiler may optimize reads.
+**RESOLVED** — `DimmerCh::dmxVal` changed from `uint8_t**` to `uint8_t* volatile*` to prevent compiler optimization of repeated reads in the ISR.
 
 ---
 
@@ -223,19 +174,15 @@ Previous finding retained for audit history:
 
 ## 3. Configuration Save/Load
 
-### 3.1 ★★★ NVS save return values all ignored
+### ~~3.1 ★★★ NVS save return values all ignored~~
 
-**File:** `include/config.h:198-238`
-
-`Preferences::begin()` returns bool — ignored. All 30+ `put*()` calls return `size_t` — ignored. **Silent data loss:** HTTP 200 returned, device reboots with old config.
+**RESOLVED** — `saveConfig()` now checks `prefs.begin()` return value, reports `false` on failure, and all callers (settings POST, import, factory-reset) check the return and send 500.
 
 ---
 
-### 3.2 ★★★ LittleFS write failure on migration silently discarded
+### ~~3.2 ★★★ LittleFS write failure on migration silently discarded~~
 
-**File:** `include/output_control.h:712-829` (called at `524,707`)
-
-Internal `saveChannels()` calls (migration path, default-creation) log `Serial.println` but never return error. Migrated config silently lost.
+**RESOLVED** — `saveChannels()` now returns `bool`, and the migration/default-creation callers check the return value with a `CRITICAL` log message on failure.
 
 ---
 
@@ -269,39 +216,27 @@ Struct default is 255. If JSON is missing `pin`, channel activates on unexpected
 
 ---
 
-### 3.5 ★★☆ `ip4Valid()` accepts empty string
+### ~~3.5 ★★☆ `ip4Valid()` accepts empty string~~
 
-**File:** `include/network_protocol.h:178-200`
-
-```cpp
-if (s == nullptr || s[0] == '\0') return true;  // "" === valid!
-```
-
-Empty IP fields stored as empty string → interface starts with zero IP.
+**RESOLVED** — `ip4Valid()` now returns `false` for empty strings.
 
 ---
 
-### 3.6 ★★☆ Factory reset reports success on write failure
+### ~~3.6 ★★☆ Factory reset reports success on write failure~~
 
-**File:** `src/main.cpp:1687-1716`
-
-`prefs.clear()` return ignored. LittleFS write failure returns 200. User believes config is reset.
+**RESOLVED** — Factory reset handler now checks `prefs.begin()` return, validates LittleFS file open, and returns 500 on failure instead of 200.
 
 ---
 
-### 3.7 ★☆☆ `espnow_channel` range not validated on load
+### ~~3.7 ★☆☆ `espnow_channel` range not validated on load~~
 
-**File:** `include/config.h:141`
-
-`getUChar("now_chan", 0)` — no range check. Corrupted NVS (e.g., 255) passed to `esp_wifi_set_channel()`.
+**RESOLVED** — `loadConfig()` now clamps `espnow_channel` to `0..13` after reading from NVS.
 
 ---
 
-### 3.8 ℹ️ Duplicate inline validation in settings handler
+### ~~3.8 ℹ️ Duplicate inline validation in settings handler~~
 
-**File:** `src/main.cpp:1290-1342`, `591-658`
-
-Settings POST handler repeats checks that `validateSettingsAndOutputs()` already does. Maintenance hazard.
+**RESOLVED** — Removed the duplicate validation block (pin overlaps, display address, protocol enable/disable, Master auto-channel) from the settings POST handler. All checks now live in `validateSettingsAndOutputs()` only.
 
 ---
 
@@ -341,9 +276,9 @@ HTML has `min/max` attributes but C++ `validateOutputJson()` never checks `led_c
 
 ## 5. Scoring Parity
 
-### 5.1 ★★☆ Type 6 Mode 0: JS overcounts LEDC
+### ~~5.1 ★★☆ Type 6 Mode 0: JS overcounts LEDC~~
 
-JS `channelHardware()` counts DIR pin as LEDC when GPIO. C++ correctly skips DIR (digital). **Web UI may falsely block configs.**
+**RESOLVED** — JS `channelHardware()` corrected: DIR pin LEDC count changed from `(mc_mode||0)===0` to `(mc_mode||0)!==0`.
 
 ---
 
@@ -366,19 +301,9 @@ JS `channelHardware()` counts DIR pin as LEDC when GPIO. C++ correctly skips DIR
 
 ## 6. GPIO/Pin Validation
 
-### 6.1 ★★☆ JS `outputGpios()` skips `seg_pins`
+### ~~6.1 ★★☆ JS `outputGpios()` skips `seg_pins`~~
 
-**File:** `web/js/_gpio.js:86-97`
-
-`outputGpios()` enumerates `pin`/`pin2`/`pin3`/`pin4` only. 7-segment `seg_pins[8]` are skipped. All JS-side checks using `outputGpios()` are blind to segment GPIOs:
-
-- Forbidden GPIO check
-- Input-only pin check
-- System pin overlap (Status LED, ZC, I2C)
-- Duplicate GPIO check
-- GPIO12 strapping warning
-
-C++ `forEachOutputGpioPin()` correctly includes `seg_pins`. **JS validation is incomplete for 7-segment direct-drive outputs.**
+**RESOLVED** — `outputGpios()` in `_gpio.js` now iterates `seg_pins`/`seg_sources` for types 12/13 and includes GPIO-routed segment pins.
 
 ---
 
@@ -390,11 +315,9 @@ Status LED, ZC, I2C SDA/SCL dropdown options are hardcoded, not generated from `
 
 ---
 
-### 6.3 ★☆☆ Reserved-pin list duplicated in `main.cpp`
+### ~~6.3 ★☆☆ Reserved-pin list duplicated in `main.cpp`~~
 
-**File:** `src/main.cpp:355-358`
-
-`outputsUseForbiddenGpio()` hardcodes 10 Ethernet pins instead of using `GpioControl::isReservedEthernetPin()`. `gpio_control.h` is the source of truth; `main.cpp` is a copy.
+**RESOLVED** — `outputsUseForbiddenGpio()` now uses `GpioControl::isReservedEthernetPin()` and `GpioControl::isInputOnlyPin()` instead of hardcoded pin lists.
 
 ---
 
@@ -414,31 +337,7 @@ Status LED, ZC, I2C SDA/SCL dropdown options are hardcoded, not generated from `
 
 ## 7. Summary by Priority
 
-### ★★★ Must fix (crash/data-loss)
-
-| # | Issue | File |
-|---|-------|------|
-| 1.1 | sACN offsets +16, dead code | `sacn_control.h` |
-| 2.1 | 7-seg LEDC index corruption | `seven_seg.h:61` |
-| 2.2 | Stepper array bounds overflow | `stepper.h:28` |
-| 3.1 | NVS save return values ignored | `config.h:198` |
-| 3.2 | LittleFS migration write failure silent | `output_control.h:712` |
-
-### ★★☆ High priority
-
-| # | Issue | File |
-|---|-------|------|
-| 1.2 | ArtPollReply wrong UDP port | `artnet_control.h:185` |
-| 1.3 | `swapBuffers()` data race | `output_control.h:478` |
-| 2.3 | No pin validation in setup functions | All `output_devices/*.h` |
-| 2.4 | Analog RGB ignores mc_resolution | `analog_rgb.h` |
-| 2.5 | Division by zero (motor/servo) | `motor.h:99` |
-| 2.6 | PCA frequency override conflict | `motor.h` / `setupChannels` |
-| 2.7 | `segmentGpio()` returns invalid pin | `ledc_helpers.h:49` |
-| 3.5 | ip4Valid accepts empty string | `network_protocol.h:178` |
-| 3.6 | Factory reset false success | `main.cpp:1687` |
-| 5.1 | Type 6 Mode 0 LEDC overcount (JS) | `scoring.js` |
-| 6.1 | JS outputGpios skips seg_pins | `_gpio.js:86` |
+All ★★★ and ★★☆ items are now **RESOLVED**. Remaining items:
 
 ### ★☆☆ Medium priority
 
@@ -446,9 +345,11 @@ Status LED, ZC, I2C SDA/SCL dropdown options are hardcoded, not generated from `
 |---|-------|------|
 | 1.4 | Missing atomics (lastDmxUpdateTime, systemActive) | `main.cpp` |
 | 1.5 | DMX frame timeout not enforced | `output_control.h` |
-| 2.10 | ISR volatile missing | `dimmer.h:27` |
+| 1.7 | ESP-NOW callback races with foreground | `espnow_control.h` |
 | 2.11 | dmx_driver_install return ignored | `output_control.h:960` |
-| 3.7 | espnow_channel no range check | `config.h:141` |
+| 4.2 | I2C speed validation defined but never called | `network_protocol.h` |
+| 4.3 | LED count, universe range not validated server-side | `main.cpp` |
+| 4.4 | mDNS name length not validated on either side | — |
 | 5.2 | I2C write count differences (4 types) | `scoring.js` / `scoring.h` |
 | 6.2 | System pin options hardcoded | `pane-network.html` |
 
@@ -457,8 +358,6 @@ Status LED, ZC, I2C SDA/SCL dropdown options are hardcoded, not generated from `
 | # | Issue | File |
 |---|-------|------|
 | 1.8 | Art-Net dead sequence array | `artnet_control.h:20` |
-| 3.8 | Duplicate inline validation | `main.cpp:1290` |
-| 6.3 | Reserved-pin list duplicated | `main.cpp:355` |
 
 ---
 

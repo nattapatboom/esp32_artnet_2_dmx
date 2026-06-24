@@ -25,7 +25,6 @@ inline void motorSetup(OutputChannel& ch, uint8_t& ledcIdx) {
             ch.dmxPort = 255;
             ch.ledc_chan2 = 255;
             pcaManager.getOrCreateDriver(ch.pca_addr);
-            pcaManager.setFrequency(ch.pca_addr, ch.mc_freq ? ch.mc_freq : 1000);
         }
     } else if (ch.mc_mode == 1) {
         if (ch.source == 0) {
@@ -51,7 +50,6 @@ inline void motorSetup(OutputChannel& ch, uint8_t& ledcIdx) {
                 writeOutputPin(ch, 2, false);
             }
             pcaManager.getOrCreateDriver(ch.pca_addr);
-            pcaManager.setFrequency(ch.pca_addr, ch.mc_freq ? ch.mc_freq : 1000);
             pcaManager.write(ch.pca_addr, ch.pca_channel, 0);
         }
     } else if (ch.mc_mode == 2) {
@@ -59,7 +57,7 @@ inline void motorSetup(OutputChannel& ch, uint8_t& ledcIdx) {
         if (ch.pin3_source == 1 || pwmChan != 255) {
             if (ch.pin3_source == 1) {
                 pcaManager.getOrCreateDriver(ch.pin3_addr);
-                pcaManager.setFrequency(ch.pin3_addr, ch.mc_freq ? ch.mc_freq : 1000);
+                pcaManager.setFrequency(ch.pin3_addr, outputCtrl.sharedPcaFrequency(ch.pin3_addr));
                 if (ch.pin3_channel != 255) pcaManager.write(ch.pin3_addr, ch.pin3_channel, 0);
             } else {
                 ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));

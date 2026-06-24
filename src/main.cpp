@@ -384,27 +384,20 @@ bool outputsUseReservedPin(JsonArray outputs, uint8_t reservedPin, const char* l
 // Check for GPIO34,35,36,39 (input-only) and Ethernet/system reserved pins.
 // GPIO12 (MTDI bootstrap) is warning-only in the Web UI because existing field hardware may use it.
 bool outputsUseForbiddenGpio(JsonArray outputs, String& message) {
-    auto isForbiddenOutput = [](int rawPin) -> int8_t {
-        if (rawPin == 255 || rawPin < 0) return -1;
-        uint8_t p = (uint8_t)rawPin;
-        if (p == 34 || p == 35 || p == 36 || p == 39) return (int8_t)p; // input-only on ESP32
-        // Ethernet RMII and PHY power pins (GPIO0, 16, 18, 19, 21, 22, 23, 25, 26, 27)
-        if (p == 0 || p == 16 || p == 18 || p == 19 || p == 21 || p == 22 || p == 23 || p == 25 || p == 26 || p == 27) {
-            return (int8_t)p;
-        }
-        return -1;
-    };
     uint8_t channel = 1;
     for (JsonObject output : outputs) {
         auto forbid = [&](int rawPin, const char* label) -> bool {
-            int8_t p = isForbiddenOutput(rawPin);
-            if (p < 0) return false;
-            if (p == 0 || p == 16 || p == 18 || p == 19 || p == 21 || p == 22 || p == 23 || p == 25 || p == 26 || p == 27) {
+            if (rawPin == 255 || rawPin < 0) return false;
+            uint8_t p = (uint8_t)rawPin;
+            if (GpioControl::isReservedEthernetPin(p)) {
                 message = "GPIO " + String(p) + " is reserved for Ethernet and cannot be used as an output on channel " + String(channel) + label;
-            } else {
-                message = "GPIO " + String(p) + " is input-only and cannot be used as an output on channel " + String(channel) + label;
+                return true;
             }
-            return true;
+            if (GpioControl::isInputOnlyPin(p)) {
+                message = "GPIO " + String(p) + " is input-only and cannot be used as an output on channel " + String(channel) + label;
+                return true;
+            }
+            return false;
         };
 
         if (forEachOutputGpioPin(output, [&](int pin, const char* label) {
@@ -706,6 +699,21 @@ bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, Str
         message = "I2C display address is invalid for the selected display type";
         return false;
     }
+
+    uint8_t deviceMode = settings[NetworkProtocol::KEY_DEVICE_MODE].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_DEVICE_MODE] : sysCfg.device_mode;
+    uint8_t espnowChan = settings[NetworkProtocol::KEY_ESPNOW_CHANNEL].is<int>() ? (uint8_t)(int)settings[NetworkProtocol::KEY_ESPNOW_CHANNEL] : sysCfg.espnow_channel;
+    if (deviceMode == MODE_ESPNOW_MASTER && espnowChan == 0) {
+        message = "ESP-NOW Master cannot use Auto-Scan channel mode";
+        return false;
+    }
+
+    bool artnetEnabled = settings.containsKey(NetworkProtocol::KEY_ARTNET_ENABLED) ? settings[NetworkProtocol::KEY_ARTNET_ENABLED].as<bool>() : sysCfg.artnet_enabled;
+    bool sacnEnabled = settings.containsKey(NetworkProtocol::KEY_SACN_ENABLED) ? settings[NetworkProtocol::KEY_SACN_ENABLED].as<bool>() : sysCfg.sacn_enabled;
+    if (!artnetEnabled && !sacnEnabled) {
+        message = "Cannot disable both Art-Net and sACN protocols";
+        return false;
+    }
+
     if (outputsUseReservedPin(outputs, statusPin, "Status LED", message)) return false;
     if (outputsUseReservedPin(outputs, zcPin, "Zero-Crossing", message)) return false;
     if (outputsUseReservedPin(outputs, sdaPin, "I2C SDA", message)) return false;
@@ -1357,55 +1365,7 @@ void setupWebServer() {
                 return;
             }
 
-            uint8_t requestedStatusPin = doc[NetworkProtocol::KEY_STATUS_LED_PIN].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_STATUS_LED_PIN] : sysCfg.status_led_pin;
-            uint8_t requestedZcPin = doc[NetworkProtocol::KEY_ZC_PIN].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_ZC_PIN] : sysCfg.zc_pin;
-            uint8_t requestedSda = doc[NetworkProtocol::KEY_I2C_SDA].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_I2C_SDA] : sysCfg.i2c_sda;
-            uint8_t requestedScl = doc[NetworkProtocol::KEY_I2C_SCL].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_I2C_SCL] : sysCfg.i2c_scl;
-            uint8_t requestedDisplayType = doc[NetworkProtocol::KEY_DISPLAY_ENABLED].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_DISPLAY_ENABLED] : sysCfg.display_enabled;
-            uint8_t requestedDisplayAddr = doc[NetworkProtocol::KEY_DISPLAY_I2C_ADDR].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_DISPLAY_I2C_ADDR] : sysCfg.display_i2c_addr;
             String validationMessage;
-
-            uint8_t requestedMode = doc[NetworkProtocol::KEY_DEVICE_MODE].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_DEVICE_MODE] : sysCfg.device_mode;
-            uint8_t requestedChan = doc[NetworkProtocol::KEY_ESPNOW_CHANNEL].is<int>() ? (uint8_t)(int)doc[NetworkProtocol::KEY_ESPNOW_CHANNEL] : sysCfg.espnow_channel;
-            if (requestedMode == NetworkProtocol::MODE_ESPNOW_MASTER && requestedChan == 0) {
-                validationMessage = "ESP-NOW Master cannot use Auto-Scan channel mode";
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-
-            bool nextArtnetEnabled = doc.containsKey(NetworkProtocol::KEY_ARTNET_ENABLED) ? doc[NetworkProtocol::KEY_ARTNET_ENABLED].as<bool>() : sysCfg.artnet_enabled;
-            bool nextSacnEnabled = doc.containsKey(NetworkProtocol::KEY_SACN_ENABLED) ? doc[NetworkProtocol::KEY_SACN_ENABLED].as<bool>() : sysCfg.sacn_enabled;
-            if (!nextArtnetEnabled && !nextSacnEnabled) {
-                validationMessage = "Cannot disable both Art-Net and sACN protocols";
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-
-            if (requestedStatusPin != 255 && requestedZcPin != 255 && requestedStatusPin == requestedZcPin) {
-                validationMessage = "Status LED GPIO and Zero-Crossing GPIO cannot use the same pin";
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (requestedSda != 255 && requestedScl != 255 && requestedSda == requestedScl) {
-                validationMessage = "I2C SDA and SCL pins cannot be the same";
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (requestedStatusPin != 255 && (requestedStatusPin == requestedSda || requestedStatusPin == requestedScl)) {
-                validationMessage = "Status LED pin cannot overlap with I2C SDA or SCL";
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (requestedZcPin != 255 && (requestedZcPin == requestedSda || requestedZcPin == requestedScl)) {
-                validationMessage = "Zero-Crossing pin cannot overlap with I2C SDA or SCL";
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
-            if (!DisplayProtocol::addressValid(requestedDisplayType, requestedDisplayAddr)) {
-                validationMessage = "I2C display address is invalid for the selected display type";
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
-                return;
-            }
             JsonDocument outputsDoc;
             JsonArray savedOutputs = outputsDoc["outputs"].to<JsonArray>();
             if (LittleFS.exists("/outputs.json")) {

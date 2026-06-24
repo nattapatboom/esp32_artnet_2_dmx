@@ -140,6 +140,7 @@ inline void loadConfig(SystemConfig& cfg) {
     cfg.ap_pass[sizeof(cfg.ap_pass) - 1] = '\0';
 
     cfg.espnow_channel = prefs.getUChar("now_chan", 0);
+    if (cfg.espnow_channel > 13) cfg.espnow_channel = 0;
     cfg.espnow_chunk_size = prefs.getUShort("now_chunk", 200);
     if (cfg.espnow_chunk_size < 16 || cfg.espnow_chunk_size > 230) cfg.espnow_chunk_size = 200;
     cfg.artnet_enabled = prefs.getBool("art_on", true); // Default to true
