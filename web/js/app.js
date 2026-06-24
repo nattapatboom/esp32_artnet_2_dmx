@@ -154,6 +154,17 @@ function toggleDisplayCfg(){
   updateDisplayAddressOptions();
 }
 
+function updateEspnowChannelVisibility(){
+  const mode=parseInt(document.getElementById('device_mode')?.value||0);
+  const grp=document.getElementById('espnow_channel_grp');
+  const sel=document.getElementById('espnow_channel');
+  if(!grp||!sel) return;
+  grp.style.display=(mode===1||mode===2)?'':'none';
+  const opt0=sel.querySelector('option[value="0"]');
+  if(opt0) opt0.disabled=(mode===1);
+  if(mode===1&&parseInt(sel.value)===0) sel.value=1;
+}
+
 function updateDisplayAddressOptions(){
   const type=parseInt(document.getElementById('display_enabled')?.value||0);
   const sel=document.getElementById('display_i2c_addr');
@@ -172,6 +183,7 @@ async function loadSettings(){
     const s=(id,val)=>{const e=document.getElementById(id);if(e&&val!==undefined)e.value=val};
     const c=(id,val)=>{const e=document.getElementById(id);if(e)e.checked=!!val};
     s('device_mode',d.device_mode);
+    updateEspnowChannelVisibility();
     s('espnow_channel',d.espnow_channel);
     s('espnow_chunk_size',d.espnow_chunk_size);
     s('mdns_name',d.mdns_name);
@@ -208,6 +220,7 @@ async function loadSettings(){
     toggleEth(); toggleWifiIp(); updateMdnsPreview();
     autoAssignOutputPins();
     document.getElementById('mdns_name').addEventListener('input',updateMdnsPreview);
+    document.getElementById('device_mode')?.addEventListener('change', updateEspnowChannelVisibility);
     ['status_led_pin', 'zc_pin', 'i2c_sda', 'i2c_scl'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', checkStrappingPin);
     });
