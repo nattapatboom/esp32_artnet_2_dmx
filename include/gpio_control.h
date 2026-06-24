@@ -15,8 +15,8 @@
 namespace GpioControl {
 
 // ── Available GPIOs on WT32-ETH01 ──
-constexpr uint8_t OUTPUT_GPIO_PINS[] = {4, 12, 14, 15, 2, 17, 32, 33};
-constexpr uint8_t OUTPUT_GPIO_COUNT = 8;
+constexpr uint8_t OUTPUT_GPIO_PINS[] = {4, 12, 14, 15, 2, 17, 32, 33, 5};
+constexpr uint8_t OUTPUT_GPIO_COUNT = 9;
 
 constexpr uint8_t INPUT_GPIO_PINS[] = {36, 39, 34, 35, 32, 33};
 constexpr uint8_t INPUT_GPIO_COUNT = 6;
