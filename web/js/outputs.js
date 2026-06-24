@@ -331,7 +331,7 @@ function encodeTestValues(o,ui,cmd){
   if(ui===3){
     var hex=String(testValue('test_color','#ff0000'));
     var r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16), w=parseInt(testValue('test_white',0))||0;
-    if(o.type===T.ANALOG_RGB) return (parseInt(o.color_order||0)>=4)?[r,g,b,w]:[r,g,b];
+    if(!outputHasCostFlag(o,'CF_DYN_LED_STRIP')) return (parseInt(o.color_order||0)>=4)?[r,g,b,w]:[r,g,b];
     var count=(o.led_count!==undefined?o.led_count:170), out=[], target=Math.max(1,Math.min(count,parseInt(testValue('test_pixel',1))||1))-1;
     for(var i=0;i<count;i++){
       var on=(cmd||'all')!=='pixel'||i===target;

@@ -2132,20 +2132,16 @@ uint16_t activeUniverseMin() {
     uint16_t minU = 0xFFFF;
     bool found = false;
     for (const auto& ch : outputCtrl.getChannels()) {
-        if (ch.type != 3) {
-            uint16_t u = ch.start_universe;
-            if (u < minU) { minU = u; found = true; }
-        }
+        uint16_t u = ch.start_universe;
+        if (u < minU) { minU = u; found = true; }
     }
     return found ? minU : 0;
 }
 uint16_t activeUniverseMax() {
     uint16_t maxU = 0;
     for (const auto& ch : outputCtrl.getChannels()) {
-        if (ch.type != 3) {
-            uint16_t u = ch.start_universe;
-            if (u > maxU) maxU = u;
-        }
+        uint16_t u = ch.start_universe;
+        if (u > maxU) maxU = u;
     }
     return maxU;
 }

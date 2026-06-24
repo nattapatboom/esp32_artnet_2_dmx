@@ -170,9 +170,8 @@ inline uint32_t ledStripServiceUs(uint16_t ledCount, uint8_t colorOrder) {
 }
 
 inline uint8_t sevenSegCount(uint8_t type, uint8_t mode) {
-    if (type == OutputDefs::TYPE_7SEG_8PIN) return 8;
-    if (type == OutputDefs::TYPE_7SEG_7PIN) return 7;
-    return 0;
+    const auto* d = OutputDefs::modeDef(type, (int8_t)mode);
+    return d ? d->segmentCount : 0;
 }
 
 constexpr uint16_t I2C_WRITE_US = ScoringLimits::I2C_WRITE_US;
