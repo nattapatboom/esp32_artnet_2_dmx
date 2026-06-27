@@ -66,7 +66,7 @@ function dmxBufferRam(type,ledCount,colorOrder,resolution=8,mode=0){
   if(costHas(def?.cost,'CF_DYN_COLOR_BYTES')) return parseInt(colorOrder||0)>=4?4:3;
   if(costHas(def?.cost,'CF_DYN_STEPPER')) return valueByteCount(resolution)+S.STEPPER_POSITION_BYTES;
   if(costHas(def?.cost,'CF_DYN_TEXT_MODE')) return mode===1?4:2;
-  if(costHas(def?.cost,'CF_DYN_SEGMENT_MODE')) return (mode===4||mode===5||mode>=6)?2:1;
+  if(costHas(def?.cost,'CF_DYN_SEGMENT_MODE')) return (mode>=0)?2:1;
   if(def&&def.cost&&def.cost.dmxSlots>0) return def.cost.dmxSlots;
   return valueByteCount(resolution);
 }

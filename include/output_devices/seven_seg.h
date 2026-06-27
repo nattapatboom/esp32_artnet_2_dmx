@@ -10,7 +10,8 @@ inline void sevenSegSetup(OutputChannel& ch, uint8_t& ledcIdx) {
     int8_t mode = (int8_t)ch.mc_mode;
     const OutputDefs::OutputModeDef* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
     bool isDirectDrive = def != nullptr && def->segmentCount > 0;
-    bool isCommonDim = (mode >= 6 && mode <= 9);
+    bool isCommonDim = (mode == 2 || mode == 3);
+    bool isCA = (mode == 0 || mode == 2);
     uint8_t numSeg = def != nullptr ? def->segmentCount : 0;
 
     if (isDirectDrive && ch.pin2_source == 1) {
@@ -24,7 +25,7 @@ inline void sevenSegSetup(OutputChannel& ch, uint8_t& ledcIdx) {
             if (pwmChan != 255) {
                 ledcSetup(pwmChan, ch.mc_freq ? ch.mc_freq : 1000, 8);
                 ledcAttachPin(ch.pin, pwmChan);
-                ledcWrite(pwmChan, (mode == 6 || mode == 8) ? 0 : 255);
+                ledcWrite(pwmChan, isCA ? 0 : 255);
                 ch.dmxPort = pwmChan;
             }
         }
@@ -39,7 +40,7 @@ inline void sevenSegSetup(OutputChannel& ch, uint8_t& ledcIdx) {
             if (pwmChan != 255) {
                 ledcSetup(pwmChan, ch.mc_freq ? ch.mc_freq : 1000, 8);
                 ledcAttachPin(ch.pin, pwmChan);
-                ledcWrite(pwmChan, (mode == 6 || mode == 8) ? 0 : 255);
+                ledcWrite(pwmChan, isCA ? 0 : 255);
                 ch.dmxPort = pwmChan;
             }
         }
@@ -52,12 +53,12 @@ inline void sevenSegSetup(OutputChannel& ch, uint8_t& ledcIdx) {
                 if (pwmChan != 255) {
                     ledcSetup(pwmChan, ch.mc_freq ? ch.mc_freq : 1000, 8);
                     ledcAttachPin(ch.pin, pwmChan);
-                    ledcWrite(pwmChan, (mode == 6 || mode == 8) ? 0 : 255);
+                    ledcWrite(pwmChan, isCA ? 0 : 255);
                     ch.dmxPort = pwmChan;
                 }
             }
             for (uint8_t s = 0; s < numSeg; s++) {
-                setupSegmentOutput(ch, s, (mode == 6 || mode == 8));
+                setupSegmentOutput(ch, s, isCA);
             }
         } else {
             if (isDirectDrive) {
@@ -95,7 +96,7 @@ inline void sevenSegUpdate(OutputChannel& ch) {
     bool isDirectDrive = def != nullptr && def->segmentCount > 0;
     uint8_t bytes = 0;
     if (isDirectDrive) {
-        bytes = (mode == 4 || mode == 5 || mode >= 6) ? 2 : 1;
+        bytes = (mode >= 0) ? 2 : 1;
     } else {
         bytes = (mode == 1) ? 4 : 2;
     }
@@ -108,8 +109,8 @@ inline void sevenSegUpdate(OutputChannel& ch) {
     ch.prev_7seg_val = val;
     ch.prev_7seg_valid = true;
 
-    bool isCommonDim = (mode >= 6 && mode <= 9);
-    bool isCA = (mode == 6 || mode == 8);
+    bool isCommonDim = (mode == 2 || mode == 3);
+    bool isCA = (mode == 0 || mode == 2);
     uint8_t numSeg = def != nullptr ? def->segmentCount : 0;
     uint8_t segByte = 0;
     if (ch.mc_resolution == 10) {
@@ -171,7 +172,7 @@ inline void sevenSegUpdate(OutputChannel& ch) {
         } else {
             if (isDirectDrive) {
                 uint8_t brightness = 255;
-                if (mode == 4 || mode == 5) {
+                if (mode == 0 || mode == 1) {
                     brightness = ch.dmxBuffer[1];
                 }
                 for (uint8_t b = 0; b < numSeg; b++) {

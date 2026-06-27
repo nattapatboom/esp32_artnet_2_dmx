@@ -149,7 +149,7 @@ inline uint16_t outputDmxByteCount(const OutputChannel& ch) {
             return mode == 1 ? 4 : 2;
         case 12:
         case 13:
-            return (mode == 4 || mode == 5 || mode >= 6) ? 2 : 1;
+            return (mode >= 0) ? 2 : 1;
         case 10:
             return 3;
         case 16:

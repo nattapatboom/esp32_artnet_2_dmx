@@ -15,11 +15,11 @@ constexpr uint8_t TYPE_ID = 13;
 constexpr const char* TYPE_NAME = "7-Seg 8-Pin PWM";
 
 constexpr const char* MODE_OPTS =
-    "-1:No Dim,4:Direct CA,5:Direct CC,8:Common Anode,9:Common Cathode";
+    "-1:No Dim,0:Direct CA,1:Direct CC,2:Common Anode,3:Common Cathode";
 constexpr const char* RES_OPTS = "8:ASCII / Character,10:Numeric";
 
 constexpr FieldDef EXTRA_FIELDS[] = {
-    {"mc_mode", FT_SELECT, "Dim Mode", -1, 9, -1, MODE_OPTS},
+    {"mc_mode", FT_SELECT, "Dim Mode", -1, 3, -1, MODE_OPTS},
     {"mc_resolution", FT_SELECT, "Decode Mode", 8, 10, 8, RES_OPTS},
     {"mc_freq", FT_NUMBER, "PWM Frequency (Hz)", 1, 40000, 1000, nullptr},
     {"mc_invert", FT_BOOL, "Invert Segments", 0, 1, 0, nullptr}
