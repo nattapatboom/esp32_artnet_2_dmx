@@ -491,21 +491,7 @@ function outputConfigLabel(o){
   return TYPE_META.configLabels[parseInt(o.type)]||`Raw type: ${o.type}`;
 }
 
-function migrateOutput(o){
-  const t = parseInt(o.type);
-  if (t === 4) o.type = 4;
-  else if (t === 5) o.type = 6;
-  else if (t === 6) o.type = 7;
-  else if (t === 7) o.type = 8;
-  else if (t === 8) o.type = 17;
-  else if (t === 9) o.type = 5;
-  else if (t === 10) o.type = 9;
-  else if (t === 11) o.type = 18;
-  else if (t === 12) o.type = 11;
-  else if (t === 13) o.type = 10;
-  else if (t === 15) o.type = 15;
-  return o;
-}
+
 
 function valueByteCount(res){
   res=parseInt(res||8);

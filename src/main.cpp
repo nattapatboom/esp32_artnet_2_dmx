@@ -477,16 +477,21 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
         uint8_t address = output["pca_addr"] | 0x40;
         uint8_t mcMode = output["mc_mode"] | 0;
         const OutputDefs::OutputModeDef* def = OutputDefs::modeDef(type, mcMode);
-        uint8_t colorOrder = output["color_order"] | 0;
         bool primaryIsSevenSegA = def != nullptr && def->primaryRouteIsSegment;
         if (source != 0 && !primaryIsSevenSegA) {
-            if (addChannel(source, address, output["pca_channel"] | 0, outputIndex)) return true;
-            if ((type == OutputDefs::TYPE_MOTOR || type == OutputDefs::TYPE_STEPPER || type == OutputDefs::TYPE_ANALOG_RGB || type == OutputDefs::TYPE_SMOKE) &&
-                addChannel(source, address, output["pca_channel2"] | 255, outputIndex)) return true;
-            if ((type == OutputDefs::TYPE_STEPPER || type == OutputDefs::TYPE_ANALOG_RGB || (type == OutputDefs::TYPE_MOTOR && mcMode == 2)) &&
-                addChannel(source, address, output["pca_channel3"] | 255, outputIndex)) return true;
-            if ((type == OutputDefs::TYPE_ANALOG_RGB && colorOrder >= 4) &&
-                addChannel(source, address, output["pca_channel4"] | 255, outputIndex)) return true;
+            static const char* const pcaChanKeys[] = {"pca_channel","pca_channel2","pca_channel3","pca_channel4"};
+            static const char* const pinSrcKeys[]  = {nullptr,"pin2_source","pin3_source","pin4_source"};
+            static const char* const pinAddrKeys[] = {nullptr,"pin2_addr","pin3_addr","pin4_addr"};
+            uint8_t pinCount = def != nullptr ? def->pinCount : 1;
+            for (uint8_t slot = 0; slot < pinCount && slot < 4; slot++) {
+                const OutputDefs::PinRule* pr = (def != nullptr) ? &def->pins[slot] : nullptr;
+                if (pr == nullptr || !(pr->sources & (OutputDefs::SRC_PCA | OutputDefs::SRC_DIGITAL_EXPANDER))) continue;
+                uint8_t slotSrc  = (slot == 0) ? source : (uint8_t)(output[pinSrcKeys[slot]] | 0);
+                if (slotSrc == 0) continue;
+                uint8_t slotAddr = (slot == 0) ? address : (uint8_t)(output[pinAddrKeys[slot]] | (slotSrc == 1 ? 0x40 : 0x20));
+                int rawCh = output[pcaChanKeys[slot]] | (slot == 0 ? 0 : 255);
+                if (addChannel(slotSrc, slotAddr, rawCh, outputIndex)) return true;
+            }
         }
 
         uint8_t pin2Source = output["pin2_source"] | 0;

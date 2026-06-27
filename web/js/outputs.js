@@ -221,11 +221,7 @@ function markOutputsSaved(){
 async function loadOutputs(){
   try{
     const d=await(await fetch('/api/outputs')).json();
-    if (d.version === 3) {
-      outputs = d.outputs || [];
-    } else {
-      outputs = (d.outputs || []).map(migrateOutput);
-    }
+    outputs = d.outputs || [];
     markOutputsSaved();
     renderOutputs();
     autoAssignOutputPins();
