@@ -93,8 +93,6 @@ struct OutputChannel {
     float mc_scale_factor = 0.0f;
     uint8_t mc_unit_type = 0;
     bool mc_enable_active_high = false;
-    bool mc_dir_invert = false;
-    bool mc_step_invert = false;
     bool pin_invert = false;
     bool pin2_invert = false;
     bool pin3_invert = false;
@@ -455,11 +453,9 @@ public:
             ch.mc_scale_factor = item["mc_scale_factor"] | 0.0f;
             ch.mc_unit_type = item["mc_unit_type"] | 0;
             ch.mc_enable_active_high = item["mc_enable_active_high"] | false;
-            ch.mc_dir_invert = item["mc_dir_invert"] | false;
-            ch.mc_step_invert = item["mc_step_invert"] | false;
-            ch.pin_invert = item.containsKey("pin_invert") ? item["pin_invert"].as<bool>() : (ch.type == OutputDefs::TYPE_STEPPER ? ch.mc_step_invert : false);
-            ch.pin2_invert = item.containsKey("pin2_invert") ? item["pin2_invert"].as<bool>() : (ch.type == OutputDefs::TYPE_STEPPER ? ch.mc_dir_invert : false);
-            ch.pin3_invert = item.containsKey("pin3_invert") ? item["pin3_invert"].as<bool>() : (ch.type == OutputDefs::TYPE_STEPPER ? ch.mc_enable_active_high : false);
+            ch.pin_invert  = item.containsKey("pin_invert")  ? item["pin_invert"].as<bool>()  : (item["mc_step_invert"] | false);
+            ch.pin2_invert = item.containsKey("pin2_invert") ? item["pin2_invert"].as<bool>() : (item["mc_dir_invert"]  | false);
+            ch.pin3_invert = item.containsKey("pin3_invert") ? item["pin3_invert"].as<bool>() : (item["mc_enable_active_high"] | false);
             ch.pin4_invert = item["pin4_invert"] | false;
             ch.solenoid_mode = item["solenoid_mode"] | 0;
             ch.solenoid_threshold = item["solenoid_threshold"] | 127;
@@ -570,8 +566,6 @@ public:
                 }
                 if (ch.type == OutputDefs::TYPE_STEPPER) {
                     item["mc_enable_active_high"] = ch.mc_enable_active_high;
-                    item["mc_dir_invert"] = ch.mc_dir_invert;
-                    item["mc_step_invert"] = ch.mc_step_invert;
                 }
                 item["mc_resolution"] = ch.mc_resolution;
                 item["mc_freq"] = ch.mc_freq;

@@ -412,46 +412,7 @@ function toggleOutFields(){
   showTypeConfig(t);
   const mcMode = parseInt(cfgEl('mc_mode')?.value||0);
   const _st=(id,v)=>{const e=cfgEl(id);if(e)e.style.display=v;};
-  if(!document.getElementById('no_source')) renderPinRows();
-  const srcSelect=document.getElementById('no_source');
-
-  const canUsePca = modeAllowsSource(t,mcMode,SRC_PCA);
-  const canUseDigitalExpander = modeAllowsSource(t,mcMode,SRC_DIG);
-  const canUseDac = modeAllowsSource(t,mcMode,SRC_DAC);
-  const isGpioOnly = modeIsGpioOnly(t,mcMode);
-  
-  if (srcSelect && srcSelect.tagName === 'SELECT') {
-    [...srcSelect.options].forEach(opt=>{
-      const v=parseInt(opt.value);
-      opt.disabled=(v===1&&!canUsePca)||(v>=2&&v<=4&&!canUseDigitalExpander)||(v>=5&&v<=7&&!canUseDac);
-    });
-    if (srcSelect.options[srcSelect.selectedIndex]?.disabled) srcSelect.value = 0;
-    if ((!canUsePca && !canUseDigitalExpander && !canUseDac) || isGpioOnly) {
-      srcSelect.value = 0;
-      srcSelect.disabled = true;
-    } else {
-      srcSelect.disabled = false;
-    }
-  }
-  
-  const src = srcSelect ? parseInt(srcSelect.value||0) : 0;
-  const isPca = src===1;
-  const isExpander = src!==0;
-  const addrSel=document.getElementById('no_pca_addr');
-  if(addrSel){
-    populateExpanderAddresses(addrSel, isExpander ? src : undefined);
-    if(isPca && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=64;
-    if(src===5 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=96;
-    if(src===6 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=76;
-    if(src===7 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=76;
-    if(src>=2 && !addrSel.querySelector('option[value="'+addrSel.value+'"]')) addrSel.value=32;
-  }
-  
   _st('no_addr_grp',outputModeDef(t,mcMode)?.startAtFirstUniverse?'none':'');
-  
-  _st('no_pca_channel2_grp','none');
-  _st('no_pca_channel3_grp','none');
-  _st('no_pca_channel4_grp','none');
   calcRcCutoff();
   renderPinRows();
   autoAssignOutputPins();
@@ -507,21 +468,10 @@ function addOrUpdateOutput(){
   const ch={
     type:type,
     start_universe:parseInt(document.getElementById('no_uni')?.value)||0,
-    start_address:parseInt(document.getElementById('no_addr').value)||1,
-    mc_enable_active_high: false,
-    mc_dir_invert: false,
-    mc_step_invert: false
+    start_address:parseInt(document.getElementById('no_addr').value)||1
   };
   readGeneratedFields(ch,type);
   readRouteFields(ch,type);
-  if(type===T.STEPPER){
-    ch.pin_invert=false;
-    ch.pin2_invert=false;
-    ch.pin3_invert=false;
-    ch.mc_enable_active_high=routeChecked('no_pin3_invert',false);
-    ch.mc_dir_invert=routeChecked('no_pin2_invert',false);
-    ch.mc_step_invert=routeChecked('no_pin_invert',false);
-  }
 
   if(editOutIdx>=0){outputs[editOutIdx]=ch;cancelEditOutput();}
   else {outputs.push(ch); autoAssignOutputPins();}

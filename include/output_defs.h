@@ -336,6 +336,12 @@ constexpr ModeCost COST_FUNC_GEN = modeCost(120, 1120, HW_LEDC_1_TIMER_1, 0, 0, 
 constexpr ModeCost COST_SOLENOID = modeCost(10, 0, HW_NONE, 0, 0, 1);
 constexpr ModeCost COST_SMOKE = modeCost(25, 0, HW_NONE, 0, 0, 1);
 
+// ─────────────────────────────────────────────────────────────────
+//  OUTPUT_MODES — one entry per (type, mode) combination.
+//  Each row: { type, mode, name, modeKey, resBits, slotActiveMask,
+//              segmentLayout, testUi, testCmds, testCmdCount,
+//              cost, pins, pinCount [,startAtFirstUniverse] [,segmentCount] [,primaryRouteIsSegment] }
+// ─────────────────────────────────────────────────────────────────
 constexpr OutputModeDef OUTPUT_MODES[] = {
     {TYPE_DIMMER, -1,    "Triac dimmer",              "default",    0, 1, false, TEST_UI_SLIDER,   Type0::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type0::TEST_COMMANDS),   COST_DIMMER,               PINS_DIMMER, 1},
     {TYPE_DMX, -1,       "DMX serial",                "default",    0, 1, false, TEST_UI_DMX,      Type1::TEST_COMMANDS,   TYPEPROTO_ARRAY_SIZE(Type1::TEST_COMMANDS),   COST_DMX_SERIAL,           PINS_DMX, 1, true},
