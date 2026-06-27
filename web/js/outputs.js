@@ -123,126 +123,18 @@ function defaultChannelRoutes(ch){
   ch.seg_channels=[255,255,255,255,255,255,255,255];
   ch.seg_inverts=0;
 }
-function getDomIdsForSlot(slot, type, modeVal) {
+function getDomIdsForSlot(slot) {
   const n = parseInt(slot.replace('pin',''));
-  const isSevenSeg = outputUsesSegmentRoutes(type, modeVal);
-  const isCommonDim = outputModeKey(type, modeVal) === 'commonDim';
-  
-  if (isSevenSeg && n > 1) {
-    const seg = isCommonDim ? n - 2 : n - 1;
-    return {
-      pin: `no_seg_pin_${seg}`,
-      source: `no_seg_source_${seg}`,
-      addr: `no_seg_addr_${seg}`,
-      channel: `no_seg_channel_${seg}`,
-      invert: `no_seg_pin_invert_${seg}`
-    };
-  } else if (isSevenSeg && n === 1) {
-    if (isCommonDim) {
-      return { pin: 'no_pin', source: 'no_source', addr: 'no_pca_addr', channel: 'no_pca_channel', invert: 'no_pin_invert' };
-    } else {
-      return {
-        pin: 'no_seg_pin_0',
-        source: 'no_seg_source_0',
-        addr: 'no_seg_addr_0',
-        channel: 'no_seg_channel_0',
-        invert: 'no_seg_pin_invert_0'
-      };
-    }
+  if (n === 1) {
+    return { pin: 'no_pin', source: 'no_source', addr: 'no_pca_addr', channel: 'no_pca_channel', invert: 'no_pin_invert' };
   } else {
-    if (n === 1) {
-      return { pin: 'no_pin', source: 'no_source', addr: 'no_pca_addr', channel: 'no_pca_channel', invert: 'no_pin_invert' };
-    } else {
-      return {
-        pin: `no_pin${n}`,
-        source: `no_pin${n}_source`,
-        addr: `no_pin${n}_addr`,
-        channel: `no_pin${n}_channel`,
-        invert: `no_pin${n}_invert`
-      };
-    }
-  }
-}
-
-function getSlotValue(o, slot, type, modeVal) {
-  const n = parseInt(slot.replace('pin',''));
-  const isSevenSeg = outputUsesSegmentRoutes(type, modeVal);
-  const isCommonDim = outputModeKey(type, modeVal) === 'commonDim';
-
-  if (isSevenSeg && n > 1) {
-    const seg = isCommonDim ? n - 2 : n - 1;
     return {
-      pin: parseInt(o.seg_pins?.[seg] ?? 255),
-      source: parseInt(o.seg_sources?.[seg] ?? 0),
-      addr: parseInt(o.seg_addrs?.[seg] ?? 32),
-      channel: parseInt(o.seg_channels?.[seg] ?? 255),
-      invert: !!((o.seg_inverts >> seg) & 1)
+      pin: `no_pin${n}`,
+      source: `no_pin${n}_source`,
+      addr: `no_pin${n}_addr`,
+      channel: `no_pin${n}_channel`,
+      invert: `no_pin${n}_invert`
     };
-  } else if (isSevenSeg && n === 1) {
-    if (isCommonDim) {
-      return {
-        pin: parseInt(o.pin ?? 255),
-        source: parseInt(o.source ?? 0),
-        addr: parseInt(o.pca_addr ?? 64),
-        channel: parseInt(o.pca_channel ?? 0),
-        invert: !!o.pin_invert
-      };
-    } else {
-      return {
-        pin: parseInt(o.seg_pins?.[0] ?? 255),
-        source: parseInt(o.seg_sources?.[0] ?? 0),
-        addr: parseInt(o.seg_addrs?.[0] ?? 32),
-        channel: parseInt(o.seg_channels?.[0] ?? 255),
-        invert: !!(o.seg_inverts & 1)
-      };
-    }
-  } else {
-    const keys = routeKeysForSlot(slot);
-    return {
-      pin: parseInt(o[keys.pin] ?? 255),
-      source: parseInt(o[keys.source] ?? 0),
-      addr: parseInt(o[keys.addr] ?? (keys.addr === 'pca_addr' ? 64 : 32)),
-      channel: parseInt(o[keys.channel] ?? (keys.channel === 'pca_channel' ? 0 : 255)),
-      invert: !!o[keys.invert]
-    };
-  }
-}
-
-function setSlotValue(ch, slot, type, modeVal, val) {
-  const n = parseInt(slot.replace('pin',''));
-  const isSevenSeg = outputUsesSegmentRoutes(type, modeVal);
-  const isCommonDim = outputModeKey(type, modeVal) === 'commonDim';
-
-  if (isSevenSeg && n > 1) {
-    const seg = isCommonDim ? n - 2 : n - 1;
-    ch.seg_pins[seg] = val.pin;
-    ch.seg_sources[seg] = val.source;
-    ch.seg_addrs[seg] = val.addr;
-    ch.seg_channels[seg] = val.channel;
-    if (val.invert) ch.seg_inverts |= (1 << seg);
-    else ch.seg_inverts &= ~(1 << seg);
-  } else if (isSevenSeg && n === 1) {
-    if (isCommonDim) {
-      ch.pin = val.pin;
-      ch.source = val.source;
-      ch.pca_addr = val.addr;
-      ch.pca_channel = val.channel;
-      ch.pin_invert = val.invert;
-    } else {
-      ch.seg_pins[0] = val.pin;
-      ch.seg_sources[0] = val.source;
-      ch.seg_addrs[0] = val.addr;
-      ch.seg_channels[0] = val.channel;
-      if (val.invert) ch.seg_inverts |= 1;
-      else ch.seg_inverts &= ~1;
-    }
-  } else {
-    const keys = routeKeysForSlot(slot);
-    ch[keys.pin] = val.pin;
-    ch[keys.source] = val.source;
-    ch[keys.addr] = val.addr;
-    ch[keys.channel] = val.channel;
-    ch[keys.invert] = val.invert;
   }
 }
 
@@ -253,7 +145,7 @@ function writeRouteFields(o) {
   if (!mode) return;
 
   Object.keys(mode.pins || {}).forEach(function(slot) {
-    const ids = getDomIdsForSlot(slot, t, modeVal);
+    const ids = getDomIdsForSlot(slot);
     const val = getSlotValue(o, slot, t, modeVal);
     setRouteValue(ids.pin, val.pin);
     setRouteValue(ids.source, val.source);
@@ -270,7 +162,7 @@ function readRouteFields(ch, type) {
   if (!mode) return;
 
   Object.keys(mode.pins || {}).forEach(function(slot) {
-    const ids = getDomIdsForSlot(slot, type, modeVal);
+    const ids = getDomIdsForSlot(slot);
     const val = {
       pin: routeValue(ids.pin, 255),
       source: routeValue(ids.source, 0),

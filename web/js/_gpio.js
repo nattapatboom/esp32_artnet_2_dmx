@@ -13,34 +13,92 @@ function outputModeKeyForObj(o){
   var mcMode=parseInt(o.mc_mode||0);
   return outputModeKey(t,mcMode);
 }
+function getSlotValue(o, slot, type, modeVal) {
+  const n = parseInt(slot.replace('pin',''));
+  const isSevenSeg = outputUsesSegmentRoutes(type, modeVal);
+  const isCommonDim = outputModeKey(type, modeVal) === 'commonDim';
+
+  if (isSevenSeg) {
+    let segIdx = 0;
+    if (isCommonDim) {
+      if (n === 1) {
+        return {
+          pin: parseInt(o.pin ?? 255),
+          source: parseInt(o.source ?? 0),
+          addr: parseInt(o.pca_addr ?? 64),
+          channel: parseInt(o.pca_channel ?? 0),
+          invert: !!o.pin_invert
+        };
+      }
+      segIdx = n - 2;
+    } else {
+      segIdx = n - 1;
+    }
+    return {
+      pin: parseInt(o.seg_pins?.[segIdx] ?? 255),
+      source: parseInt(o.seg_sources?.[segIdx] ?? 0),
+      addr: parseInt(o.seg_addrs?.[segIdx] ?? 32),
+      channel: parseInt(o.seg_channels?.[segIdx] ?? 255),
+      invert: !!((o.seg_inverts >> segIdx) & 1)
+    };
+  } else {
+    const keys = routeKeysForSlot(slot);
+    return {
+      pin: parseInt(o[keys.pin] ?? 255),
+      source: parseInt(o[keys.source] ?? 0),
+      addr: parseInt(o[keys.addr] ?? (keys.addr === 'pca_addr' ? 64 : 32)),
+      channel: parseInt(o[keys.channel] ?? (keys.channel === 'pca_channel' ? 0 : 255)),
+      invert: !!o[keys.invert]
+    };
+  }
+}
+
+function setSlotValue(ch, slot, type, modeVal, val) {
+  const n = parseInt(slot.replace('pin',''));
+  const isSevenSeg = outputUsesSegmentRoutes(type, modeVal);
+  const isCommonDim = outputModeKey(type, modeVal) === 'commonDim';
+
+  if (isSevenSeg) {
+    let segIdx = 0;
+    if (isCommonDim) {
+      if (n === 1) {
+        ch.pin = val.pin;
+        ch.source = val.source;
+        ch.pca_addr = val.addr;
+        ch.pca_channel = val.channel;
+        ch.pin_invert = val.invert;
+        return;
+      }
+      segIdx = n - 2;
+    } else {
+      segIdx = n - 1;
+    }
+    ch.seg_pins[segIdx] = val.pin;
+    ch.seg_sources[segIdx] = val.source;
+    ch.seg_addrs[segIdx] = val.addr;
+    ch.seg_channels[segIdx] = val.channel;
+    if (val.invert) ch.seg_inverts |= (1 << segIdx);
+    else ch.seg_inverts &= ~(1 << segIdx);
+  } else {
+    const keys = routeKeysForSlot(slot);
+    ch[keys.pin] = val.pin;
+    ch[keys.source] = val.source;
+    ch[keys.addr] = val.addr;
+    ch[keys.channel] = val.channel;
+    ch[keys.invert] = val.invert;
+  }
+}
+
 function eachSlot(o,fn){
   var t=parseInt(o.type||0);
-  var mode=outputModeDef(t,parseInt(o.mc_mode||0));
+  var modeVal=parseInt(o.mc_mode||0);
+  var mode=outputModeDef(t,modeVal);
   if(!mode) return;
-  var is7seg=outputUsesSegmentRoutes(t,parseInt(o.mc_mode||0));
-  var isCommonDim=outputModeKeyForObj(o)==='commonDim';
   var pinDefs=mode.pins||{};
-  Object.keys(pinDefs).sort().forEach(function(slot){
+  Object.keys(pinDefs).sort((a,b)=>parseInt(a.replace('pin',''))-parseInt(b.replace('pin',''))).forEach(function(slot){
     var rule=pinDefs[slot];
-    var n=parseInt(slot.replace('pin',''));
-    var pin=255,src=0;
-    if(is7seg&&n>1){
-      var seg=isCommonDim?n-2:n-1;
-      pin=parseInt(o.seg_pins?.[seg]??255);
-      src=parseInt(o.seg_sources?.[seg]??0);
-    } else if(is7seg&&n===1){
-      if(isCommonDim){
-        pin=parseInt(o.pin??255);
-        src=parseInt(o.source??0);
-      } else {
-        pin=parseInt(o.seg_pins?.[0]??255);
-        src=parseInt(o.seg_sources?.[0]??0);
-      }
-    } else {
-      pin=parseInt(o[SLOT_PIN_KEY[slot]]??255);
-      src=parseInt(o[SLOT_SRC_KEY[slot]]??0);
-    }
-    fn(slot,pin,src,rule);
+    var val=getSlotValue(o,slot,t,modeVal);
+    fn(slot,val.pin,val.source,rule);
   });
 }
 // Generated constants (from C++ headers via build_web.py):
@@ -210,13 +268,15 @@ function renderPinRows(){
   const container=document.getElementById('pin-mapping-container');
   if(!container) return;
   const saved={};
-  ['no_source','no_pin','no_pca_addr','no_pca_channel','no_pin2','no_pin2_source','no_pin2_addr','no_pin2_channel','no_pin3','no_pin3_source','no_pin3_addr','no_pin3_channel','no_pin4','no_pin4_source','no_pin4_addr','no_pin4_channel'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.value;});
-  ['no_pin_invert','no_pin2_invert','no_pin3_invert','no_pin4_invert'].forEach(id=>{const el=document.getElementById(id);if(el)saved[id]=el.checked;});
-  for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_pin_'+s);if(el)saved['no_seg_pin_'+s]=el.value;}
-  for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_source_'+s);if(el)saved['no_seg_source_'+s]=el.value;}
-  for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_addr_'+s);if(el)saved['no_seg_addr_'+s]=el.value;}
-  for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_channel_'+s);if(el)saved['no_seg_channel_'+s]=el.value;}
-  for(let s=0; s<=7; s++){const el=document.getElementById('no_seg_pin_invert_'+s);if(el)saved['no_seg_pin_invert_'+s]=el.checked;}
+  for (let n = 1; n <= 9; n++) {
+    const suffix = n === 1 ? '' : n;
+    ['no_pin' + suffix, 'no_pin' + suffix + '_source', 'no_pin' + suffix + '_addr', 'no_pin' + suffix + '_channel'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) saved[id] = el.value;
+    });
+    const invEl = document.getElementById('no_pin' + suffix + '_invert');
+    if (invEl) saved['no_pin' + suffix + '_invert'] = invEl.checked;
+  }
 
   const t=parseInt(document.getElementById('no_type')?.value||0);
   const mcMode=parseInt(cfgEl('mc_mode')?.value||0);
@@ -229,9 +289,9 @@ function renderPinRows(){
      let h='';
      if(mask&SRC_GPIO) h+=`<option value="0">ESP32 GPIO</option>`;
      if(mask&SRC_PCA) h+=`<option value="1">PCA9685</option>`;
-    if(mask&SRC_DIG) h+=`<option value="2">MCP23017</option><option value="3">TCA9555</option><option value="4">PCF857x</option>`;
-    if(mask&SRC_DAC) h+=`<option value="5">MCP4725</option><option value="6">DAC7571</option><option value="7">DAC7573</option>`;
-    return h;
+     if(mask&SRC_DIG) h+=`<option value="2">MCP23017</option><option value="3">TCA9555</option><option value="4">PCF857x</option>`;
+     if(mask&SRC_DAC) h+=`<option value="5">MCP4725</option><option value="6">DAC7571</option><option value="7">DAC7573</option>`;
+     return h;
   };
   const mkSel=(id,opts)=>`<select id="${id}" onchange="toggleOutFields()" style="width:100%">${opts}</select>`;
   const addrOpts=(srcFilter)=>{
@@ -255,14 +315,8 @@ function renderPinRows(){
   const chOpts=(allowNone)=>`${allowNone?'<option value="255">None</option>':''}${PIN_CHANS.map(v=>`<option value="${v}">CH ${v}</option>`).join('')}`;
   const dacChOpts=[['0','A'],['1','B'],['2','C'],['3','D']].map(([v,l])=>`<option value="${v}">CH ${l}</option>`).join('');
   const slotNumber=(slot)=>parseInt(slot.replace('pin',''));
-  const isSevenSegDD=outputUsesSegmentRoutes(t,mcMode);
-  const isCommonDim=outputModeKey(t,mcMode)==='commonDim';
   const fieldFor=(slot)=>{
     const n=slotNumber(slot);
-    if(isSevenSegDD&&n>1){
-      const seg=isCommonDim?n-2:n-1;
-      return {source:`no_seg_source_${seg}`,pin:`no_seg_pin_${seg}`,addr:`no_seg_addr_${seg}`,channel:`no_seg_channel_${seg}`,invert:`no_seg_pin_invert_${seg}`,seg};
-    }
     if(n===1) return {source:'no_source',pin:'no_pin',addr:'no_pca_addr',channel:'no_pca_channel',invert:'no_pin_invert'};
     return {source:`no_pin${n}_source`,pin:`no_pin${n}`,addr:`no_pin${n}_addr`,channel:`no_pin${n}_channel`,invert:`no_pin${n}_invert`};
   };
@@ -282,11 +336,11 @@ function renderPinRows(){
     if(allowed&SRC_DAC) return 5;
     return 0;
   };
-  const pinDefs=Object.keys(mode.pins).sort((a,b)=>slotNumber(a)-slotNumber(b)).filter(slot=>!isSevenSegDD||slot==='pin1').filter(slotActive).map((slot)=>{
+  const pinDefs=Object.keys(mode.pins).sort((a,b)=>slotNumber(a)-slotNumber(b)).filter(slotActive).map((slot)=>{
     const rule=mode.pins[slot];
     const field=fieldFor(slot);
     const src=sourceFor(field,rule);
-    const allowNone=slot!=='pin1'||field.seg!==undefined;
+    const allowNone=slot!=='pin1';
     let addrHtml=localBadge(src===0?'ESP32 GPIO':'Select Source');
     let pinHtml='';
     if(rule.sources&SRC_DAC){
@@ -312,44 +366,6 @@ function renderPinRows(){
         <label${p.invId?' for="'+p.invId+'"':''} style="font-size:0.75rem;margin:0">Invert</label>
       </div>
     </div>`);
-
-  // 7-segment DD segment pin rows
-  if(isSevenSegDD){
-    const numSeg=Object.keys(mode.pins||{}).length-(isCommonDim?1:0);
-    const firstSegOff=isCommonDim?0:1;
-    const segSrc=(seg)=>{
-      if(seg===0&&!isCommonDim) return parseInt(saved['no_source']??0);
-      return parseInt(saved['no_seg_source_'+seg]??0);
-    };
-    for(let s=firstSegOff;s<numSeg;s++){
-      const segSrcVal=segSrc(s);
-      const segLabel='Seg '+(s+1);
-      const segDesc=s===0&&!isCommonDim?'Seg A (main pin)':'';
-      const segField={source:'no_seg_source_'+s,pin:'no_seg_pin_'+s,addr:'no_seg_addr_'+s,channel:'no_seg_channel_'+s,invert:'no_seg_pin_invert_'+s};
-      const segPinSlot=isCommonDim?'pin'+(s+2):'pin'+(s+1);
-      const segPinRule=mode.pins[segPinSlot];
-      const segRule={sources:segPinRule?.sources??(SRC_GPIO|SRC_PCA),dir:'out',invert:segPinRule?.invert??true};
-      const src=sourceFor(segField,segRule);
-      let addrHtml=localBadge(src===0?'ESP32 GPIO':'Select Source');
-      let pinHtml='';
-      if(src===0){
-        pinHtml=mkSel(segField.pin,gpioOpts(true));
-      } else {
-        addrHtml=mkSel(segField.addr,addrOpts(src));
-        pinHtml=mkSel(segField.channel,chOpts(true));
-      }
-      rows.push(`<div class="pin-row" style="display:flex;gap:6px;align-items:end;margin-bottom:6px;flex-wrap:wrap">
-        <div style="min-width:44px;padding-bottom:4px"><div style="font-weight:600;font-size:0.82rem;color:#475569">${segLabel}</div><div style="font-size:0.62rem;color:#94a3b8">${segDesc}</div></div>
-        <div class="f" style="flex:1;min-width:120px;margin:0">${mkSel(segField.source,srcOpts(segRule.sources))}</div>
-        <div class="f" style="flex:1;min-width:100px;margin:0">${addrHtml}</div>
-        <div class="f" style="flex:1;min-width:100px;margin:0">${pinHtml}</div>
-        <div class="f" style="flex:0 0 auto;margin:0;padding-bottom:4px;display:flex;align-items:center;gap:4px">
-          <input type="checkbox" id="${segField.invert}">
-          <label for="${segField.invert}" style="font-size:0.75rem;margin:0">Invert</label>
-        </div>
-      </div>`);
-    }
-  }
 
   container.innerHTML=rows.join('');
   Object.keys(saved).forEach(id=>{
