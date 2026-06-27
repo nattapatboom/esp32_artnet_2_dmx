@@ -1,5 +1,5 @@
-#ifndef I2C_DAC_H
-#define I2C_DAC_H
+#ifndef I2C_DEVICES_DAC_H
+#define I2C_DEVICES_DAC_H
 
 #include <Arduino.h>
 #include "i2c_devices/i2c_bus.h"

@@ -1,5 +1,5 @@
-#ifndef ARTNET_CONTROL_H
-#define ARTNET_CONTROL_H
+#ifndef LIGHTING_PROTOCOLS_ARTNET_CONTROL_H
+#define LIGHTING_PROTOCOLS_ARTNET_CONTROL_H
 
 #include <Arduino.h>
 #include <atomic>
@@ -189,4 +189,4 @@ private:
 
 extern ArtNetControl artNetCtrl;
 
-#endif // ARTNET_CONTROL_H
+#endif // LIGHTING_PROTOCOLS_ARTNET_CONTROL_H

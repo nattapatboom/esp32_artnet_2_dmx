@@ -1,5 +1,5 @@
-#ifndef I2C_GPIO_EXPANDER_H
-#define I2C_GPIO_EXPANDER_H
+#ifndef I2C_DEVICES_GPIO_EXPANDER_H
+#define I2C_DEVICES_GPIO_EXPANDER_H
 
 #include <Arduino.h>
 #include "i2c_devices/i2c_bus.h"
@@ -193,4 +193,4 @@ public:
 
 extern DigitalExpanderManager digitalExpanderManager;
 
-#endif // I2C_GPIO_EXPANDER_H
+#endif // I2C_DEVICES_GPIO_EXPANDER_H

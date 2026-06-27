@@ -17,6 +17,7 @@
 #include "i2c_devices/pca9685.h"
 #include "i2c_devices/i2c_gpio_expander.h"
 #include "output_control.h"
+#include "output_impl.h"
 #include "output_devices/dimmer.h"
 #include "motion_control.h"
 #include "espnow_control.h"
@@ -1497,50 +1498,7 @@ void setupWebServer() {
                 return;
             }
 
-            // Apply only fields present in the JSON payload (partial update support)
-            if (doc["device_mode"].is<int>()) sysCfg.device_mode = doc["device_mode"];
-            if (doc["eth_dhcp"].is<bool>()) sysCfg.eth_dhcp = doc["eth_dhcp"];
-            if (doc["eth_ip"].is<const char*>()) copyConfigString(sysCfg.eth_ip, sizeof(sysCfg.eth_ip), doc["eth_ip"]);
-            if (doc["eth_netmask"].is<const char*>()) copyConfigString(sysCfg.eth_netmask, sizeof(sysCfg.eth_netmask), doc["eth_netmask"]);
-            if (doc["eth_gateway"].is<const char*>()) copyConfigString(sysCfg.eth_gateway, sizeof(sysCfg.eth_gateway), doc["eth_gateway"]);
-            if (doc["eth_dns"].is<const char*>()) copyConfigString(sysCfg.eth_dns, sizeof(sysCfg.eth_dns), doc["eth_dns"]);
-            if (doc["ap_ssid"].is<const char*>()) copyConfigString(sysCfg.ap_ssid, sizeof(sysCfg.ap_ssid), doc["ap_ssid"]);
-            if (doc["ap_pass"].is<const char*>()) copyConfigString(sysCfg.ap_pass, sizeof(sysCfg.ap_pass), doc["ap_pass"]);
-            if (doc["espnow_channel"].is<int>()) sysCfg.espnow_channel = doc["espnow_channel"];
-            if (doc["espnow_chunk_size"].is<int>()) {
-                int chunkSize = doc["espnow_chunk_size"];
-                sysCfg.espnow_chunk_size = (chunkSize >= 16 && chunkSize <= 230) ? chunkSize : 200;
-            }
-            if (doc["artnet_enabled"].is<bool>()) sysCfg.artnet_enabled = doc["artnet_enabled"];
-            if (doc["artnet_port"].is<int>()) {
-                int port = doc["artnet_port"];
-                sysCfg.artnet_port = (port > 0 && port <= 65535) ? port : 6454;
-            }
-            if (doc["sacn_enabled"].is<bool>()) sysCfg.sacn_enabled = doc["sacn_enabled"];
-            if (doc["sacn_multicast"].is<bool>()) sysCfg.sacn_multicast = doc["sacn_multicast"];
-            if (doc["sacn_port"].is<int>()) {
-                int port = doc["sacn_port"];
-                sysCfg.sacn_port = (port > 0 && port <= 65535) ? port : 5568;
-            }
-            if (doc["status_led_pin"].is<int>()) sysCfg.status_led_pin = doc["status_led_pin"];
-            if (doc["zc_pin"].is<int>()) sysCfg.zc_pin = doc["zc_pin"];
-            if (doc["i2c_sda"].is<int>()) sysCfg.i2c_sda = doc["i2c_sda"];
-            if (doc["i2c_scl"].is<int>()) sysCfg.i2c_scl = doc["i2c_scl"];
-            if (doc["i2c_speed"].is<int>()) sysCfg.i2c_speed = doc["i2c_speed"];
-            if (doc["output_fps"].is<int>()) sysCfg.output_fps = doc["output_fps"];
-            if (doc["wifi_ssid"].is<const char*>()) copyConfigString(sysCfg.wifi_ssid, sizeof(sysCfg.wifi_ssid), doc["wifi_ssid"]);
-            if (doc["wifi_pass"].is<const char*>()) copyConfigString(sysCfg.wifi_pass, sizeof(sysCfg.wifi_pass), doc["wifi_pass"]);
-            if (doc["wifi_dhcp"].is<bool>()) sysCfg.wifi_dhcp = doc["wifi_dhcp"];
-            if (doc["wifi_ip"].is<const char*>()) copyConfigString(sysCfg.wifi_ip, sizeof(sysCfg.wifi_ip), doc["wifi_ip"]);
-            if (doc["wifi_netmask"].is<const char*>()) copyConfigString(sysCfg.wifi_netmask, sizeof(sysCfg.wifi_netmask), doc["wifi_netmask"]);
-            if (doc["wifi_gateway"].is<const char*>()) copyConfigString(sysCfg.wifi_gateway, sizeof(sysCfg.wifi_gateway), doc["wifi_gateway"]);
-            if (doc["wifi_dns"].is<const char*>()) copyConfigString(sysCfg.wifi_dns, sizeof(sysCfg.wifi_dns), doc["wifi_dns"]);
-            if (doc["wifi_enable_in_eth_mode"].is<bool>()) sysCfg.wifi_enable_in_eth_mode = doc["wifi_enable_in_eth_mode"];
-            if (doc["ap_enable_in_eth_mode"].is<bool>()) sysCfg.ap_enable_in_eth_mode = doc["ap_enable_in_eth_mode"];
-            if (doc["mdns_name"].is<const char*>()) copyConfigString(sysCfg.mdns_name, sizeof(sysCfg.mdns_name), doc["mdns_name"]);
-            if (doc["display_enabled"].is<int>()) sysCfg.display_enabled = doc["display_enabled"];
-            if (doc["display_i2c_addr"].is<int>()) sysCfg.display_i2c_addr = doc["display_i2c_addr"];
-            if (doc["display_brightness"].is<int>()) sysCfg.display_brightness = doc["display_brightness"];
+            applySettingsFromJson(doc.as<JsonObjectConst>());
 
             if (!saveConfig(sysCfg)) {
                 request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to save config to NVS\"}");
@@ -1683,7 +1641,7 @@ void setupWebServer() {
             }
 
             {
-                // Run full pin-conflict validation against current settings
+                // Run full pin-conflict validation + score check against current settings
                 JsonDocument settingsDoc;
                 settingsDoc["output_fps"] = sysCfg.output_fps;
                 settingsDoc["status_led_pin"] = sysCfg.status_led_pin;
@@ -1696,16 +1654,10 @@ void setupWebServer() {
                     request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
                     return;
                 }
-            }
-
-            // Check hardware (source-aware), CPU, and RAM budgets
-            uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
-            ScoreBlocker blocker = checkScoresFromJson(outputs, fps);
-            if (blocker != ScoreBlocker::None) {
-                char msg[96];
-                snprintf(msg, sizeof(msg), "%s at %d FPS. Reduce channels or FPS.", scoreBlockerName(blocker), fps);
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + String(msg) + "\"}");
-                return;
+                if (!validateScoresForSettingsAndOutputs(settingsDoc.as<JsonObjectConst>(), outputs, validationMessage)) {
+                    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"" + validationMessage + "\"}");
+                    return;
+                }
             }
 
             doc["version"] = 3;

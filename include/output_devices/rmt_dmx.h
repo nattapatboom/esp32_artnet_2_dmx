@@ -1,5 +1,5 @@
-#ifndef RMT_DMX_H
-#define RMT_DMX_H
+#ifndef OUTPUT_DEVICES_RMT_DMX_H
+#define OUTPUT_DEVICES_RMT_DMX_H
 
 #include <Arduino.h>
 #include <driver/rmt.h>
@@ -124,4 +124,4 @@ private:
     }
 };
 
-#endif // RMT_DMX_H
+#endif // OUTPUT_DEVICES_RMT_DMX_H

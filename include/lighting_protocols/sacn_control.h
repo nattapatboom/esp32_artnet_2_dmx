@@ -1,5 +1,5 @@
-#ifndef SACN_CONTROL_H
-#define SACN_CONTROL_H
+#ifndef LIGHTING_PROTOCOLS_SACN_CONTROL_H
+#define LIGHTING_PROTOCOLS_SACN_CONTROL_H
 
 /*
  * sacn_control.h - sACN (ANSI E1.31) Protocol Receiver
@@ -269,4 +269,4 @@ public:
 
 extern SACNControl sacnCtrl;
 
-#endif // SACN_CONTROL_H
+#endif // LIGHTING_PROTOCOLS_SACN_CONTROL_H

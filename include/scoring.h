@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include "output_common.h"
 #include "output_control.h"
 #include "scoring_limits.h"
 
@@ -222,10 +223,10 @@ inline uint32_t dmxBufferRamForChannel(uint8_t type, uint16_t ledCount, uint8_t 
         return (uint32_t)universes * 512;
     }
     if (flags & OutputDefs::CF_DYN_COLOR_BYTES) return colorOrder >= 4 ? 4 : 3;
-    if (flags & OutputDefs::CF_DYN_STEPPER) return dmxValueByteCount(resolution) + 2;
+    if (flags & OutputDefs::CF_DYN_STEPPER) return getValueByteCount(resolution) + 2;
     if (flags & OutputDefs::CF_DYN_TEXT_MODE) return signedMode == 1 ? 4 : 2;
     if (flags & OutputDefs::CF_DYN_SEGMENT_MODE) return (signedMode == 4 || signedMode == 5 || signedMode >= 6) ? 2 : 1;
-    return dmxValueByteCount(resolution);
+    return getValueByteCount(resolution);
 }
 
 inline uint32_t pixelBufferRam(uint16_t ledCount, uint8_t colorOrder) {
@@ -290,24 +291,6 @@ inline uint8_t countUniqueUniverses(const std::vector<OutputChannel>& chs) {
         }
         if (!found) {
             unis.push_back(ch.start_universe);
-        }
-    }
-    return unis.size();
-}
-
-inline uint8_t countUniqueUniversesFromJson(JsonArrayConst arr) {
-    std::vector<uint16_t> unis;
-    for (JsonObjectConst j : arr) {
-        uint16_t u = j["start_universe"] | 0;
-        bool found = false;
-        for (uint16_t uni : unis) {
-            if (uni == u) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            unis.push_back(u);
         }
     }
     return unis.size();
@@ -385,183 +368,57 @@ inline RamBudget totalRam(const std::vector<OutputChannel>& chs) {
 }
 
 // ═══════════════════════════════════════
-//  JSON VERSIONS (for Web API validation from raw JSON)
+//  JSON BRIDGE (for Web API validation from raw JSON)
 // ═══════════════════════════════════════
 
-inline uint8_t getPinSourceFromJson(JsonObjectConst j, uint8_t pinIndex) {
-    uint8_t t = j["type"] | 0;
-    uint8_t mode = j["mc_mode"] | 0;
-    if (t == OutputDefs::TYPE_7SEG_7PIN || t == OutputDefs::TYPE_7SEG_8PIN) {
-        const auto* d = OutputDefs::modeDef(t, mode);
-        if (d && d->segmentCount > 0) {
-            if (d->pinCount > d->segmentCount && pinIndex == 0) return j["source"] | 0;
-            uint8_t baseSource = j["pin2_source"] | 0;
-            if (baseSource != 0) return baseSource;
-            uint8_t segIdx = (d->pinCount > d->segmentCount) ? pinIndex - 1 : pinIndex;
-            JsonArrayConst sa = j["seg_sources"];
-            return (!sa.isNull() && segIdx < sa.size()) ? (uint8_t)(sa[segIdx] | 0) : 0;
-        }
+// Build a temporary OutputChannel from a JSON object for scoring.
+// This avoids duplicating every per-type estimation function in a JSON variant.
+inline OutputChannel channelFromJson(JsonObjectConst j) {
+    OutputChannel ch;
+    ch.type = j["type"] | 0;
+    ch.source = j["source"] | 0;
+    ch.pin = j["pin"] | 255;
+    ch.pca_addr = j["pca_addr"] | 0x40;
+    ch.pca_channel = j["pca_channel"] | 0;
+    ch.pin2_source = j["pin2_source"] | 0;
+    ch.pin3_source = j["pin3_source"] | 0;
+    ch.pin4_source = j["pin4_source"] | 0;
+    ch.mc_mode = j["mc_mode"] | 0;
+    ch.mc_resolution = j["mc_resolution"] | 8;
+    ch.led_count = j["led_count"] | 170;
+    ch.color_order = j["color_order"] | 0;
+    ch.start_universe = j["start_universe"] | 0;
+    JsonArrayConst sa = j["seg_sources"];
+    if (!sa.isNull()) {
+        for (uint8_t i = 0; i < 8 && i < sa.size(); i++) ch.seg_sources[i] = sa[i] | 0;
     }
-    switch (pinIndex) {
-        case 0: return j["source"] | 0;
-        case 1: return j["pin2_source"] | 0;
-        case 2: return j["pin3_source"] | 0;
-        case 3: return j["pin4_source"] | 0;
-        default: {
-            JsonArrayConst sa = j["seg_sources"];
-            uint8_t i = pinIndex - 4;
-            return (!sa.isNull() && i < sa.size()) ? (uint8_t)(sa[i] | 0) : 0;
-        }
-    }
+    return ch;
 }
 
-inline HardwareResource estimateHardwareFromJson(JsonObjectConst j) {
-    uint8_t t = j["type"] | 0;
-    uint8_t mode = j["mc_mode"] | 0;
-    const auto* def = OutputDefs::modeDef(t, mode);
-    if (!def) return {};
-    HardwareResource h;
-    h.ledc = 0;
-    h.rmt = def->cost.hardware.rmt;
-    h.uart = def->cost.hardware.uart;
-    h.dac = def->cost.hardware.dac;
-    h.timer = def->cost.hardware.timer;
-
-    uint8_t rmtFromPins = 0;
-    for (uint8_t i = 0; i < def->pinCount; i++) {
-        uint8_t src = getPinSourceFromJson(j, i);
-        if (src == 0) {
-            if (def->pins[i].hwIfGpio == 1) h.ledc++;
-            if (def->pins[i].hwIfGpio == 2) rmtFromPins++;
-        }
-    }
-    h.rmt += rmtFromPins;
-
-    uint8_t colorOrder = j["color_order"] | 0;
-    if (t == OutputDefs::TYPE_ANALOG_RGB && colorOrder < 4 && getPinSourceFromJson(j, 3) == 0 && h.ledc > 0) {
-        h.ledc--;
-    }
-
-    if (t == OutputDefs::TYPE_DAC && (j["source"] | 0) == 0) {
-        h.dac = 1;
-    }
-
-    return h;
+inline std::vector<OutputChannel> channelsFromJson(JsonArrayConst arr) {
+    std::vector<OutputChannel> chs;
+    chs.reserve(arr.size());
+    for (JsonObjectConst j : arr) chs.push_back(channelFromJson(j));
+    return chs;
 }
 
-inline bool usesI2CFromJson(JsonObjectConst j) {
-    uint8_t t = j["type"] | 0;
-    uint8_t mode = j["mc_mode"] | 0;
-    const auto* def = OutputDefs::modeDef(t, mode);
-    if (!def) return false;
-    for (uint8_t i = 0; i < def->pinCount; i++) {
-        if (srcOnI2C(getPinSourceFromJson(j, i))) return true;
-    }
-    return false;
-}
+// Thin JSON wrappers — delegate to the vector version via bridge
+inline uint8_t getPinSourceFromJson(JsonObjectConst j, uint8_t pinIndex) { return getPinSource(channelFromJson(j), pinIndex); }
+inline HardwareResource estimateHardwareFromJson(JsonObjectConst j) { return estimateHardware(channelFromJson(j)); }
+inline bool usesI2CFromJson(JsonObjectConst j) { return usesI2C(channelFromJson(j)); }
+inline uint8_t i2cWritesFromJson(JsonObjectConst j) { return i2cWritesForChannel(channelFromJson(j)); }
+inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) { return estimateChannelCost(channelFromJson(j)); }
 
-inline uint8_t i2cWritesFromJson(JsonObjectConst j) {
-    uint8_t t = j["type"] | 0;
-    uint8_t mode = j["mc_mode"] | 0;
-    const auto* def = OutputDefs::modeDef(t, mode);
-    if (!def) return 0;
-    uint8_t writes = 0;
-    for (uint8_t i = 0; i < def->pinCount; i++) {
-        if (srcOnI2C(getPinSourceFromJson(j, i))) writes++;
-    }
-    return writes;
-}
-
-inline PerChannelCost estimateChannelCostFromJson(JsonObjectConst j) {
-    PerChannelCost c;
-    uint8_t t = j["type"] | 0;
-    uint8_t mode = j["mc_mode"] | 0;
-    uint16_t ledCount = j["led_count"] | 0;
-    uint8_t colorOrder = j["color_order"] | 0;
-    c.cpuUs = OutputDefs::baseCpuUs(t, mode);
-    c.ramBytes = BASE_CHANNEL_RAM + dmxBufferRamForChannel(t, ledCount, colorOrder, j["mc_resolution"] | 8, mode);
-    auto* def = OutputDefs::modeDef(t, mode);
-    if (def) c.ramBytes += def->cost.extraRamBytes;
-    if (def != nullptr && (def->cost.flags & OutputDefs::CF_DYN_LED_STRIP)) c.cpuUs = ledStripServiceUs(ledCount, colorOrder);
-    if (def != nullptr && (def->cost.flags & OutputDefs::CF_DYN_LED_STRIP)) c.ramBytes += pixelBufferRam(ledCount, colorOrder);
-    c.cpuUs += (uint16_t)i2cWritesFromJson(j) * I2C_WRITE_US;
-    c.ramBytes += (uint32_t)i2cWritesFromJson(j) * I2C_ROUTE_RAM;
-    return c;
-}
-
-inline HardwareResource totalHardwareFromJson(JsonArrayConst arr) {
-    HardwareResource t;
-    bool hasDimmer = false;
-    uint8_t dmxCount = 0;
-    uint8_t dfPlayerCount = 0;
-    for (JsonObjectConst j : arr) {
-        t = t + estimateHardwareFromJson(j);
-        uint8_t type = j["type"] | 0;
-        uint8_t source = j["source"] | 0;
-        uint8_t mode = j["mc_mode"] | 0;
-        const auto* def = OutputDefs::modeDef(type, mode);
-        uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
-        if ((flags & OutputDefs::CF_AGG_DMX) && source == 0) dmxCount++;
-        else if (flags & OutputDefs::CF_AGG_UART_RESERVED) dfPlayerCount++;
-        if (flags & OutputDefs::CF_BG_DIMMER) hasDimmer = true;
-    }
-    // DFPlayer has UART priority; DMX falls back to RMT when UARTs exhausted
-    uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
-    uint8_t dmxUartUse = dmxCount < freeUarts ? dmxCount : freeUarts;
-    uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
-    t.uart = dfPlayerCount + dmxUartUse;
-    t.rmt += dmxRmtUse;
-    if (hasDimmer) t.timer += 1;
-    return t;
-}
+inline HardwareResource totalHardwareFromJson(JsonArrayConst arr) { return totalHardware(channelsFromJson(arr)); }
 
 inline CpuBudget totalCpuFromJson(JsonArrayConst arr, uint8_t fps = 40) {
-    CpuBudget t;
-    uint8_t dimmerCount = 0;
-    uint8_t funcGenCount = 0;
-    for (JsonObjectConst j : arr) {
-        uint8_t type = j["type"] | 0;
-        uint8_t mode = j["mc_mode"] | 0;
-        const auto* def = OutputDefs::modeDef(type, mode);
-        uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
-        t.usPerFrame += estimateChannelCostFromJson(j).cpuUs;
-        if (flags & OutputDefs::CF_BG_DIMMER) dimmerCount++;
-        else if (flags & OutputDefs::CF_BG_FUNCGEN) funcGenCount++;
-    }
-    t.usPerFrame += acDimmerBackgroundUs(dimmerCount, fps);
-    t.usPerFrame += funcGenBackgroundUs(funcGenCount, fps);
-
-    if (sysCfg.device_mode == MODE_ESPNOW_MASTER) {
-        uint8_t peerCount = getEspNowPeerCount();
-        uint8_t universeCount = countUniqueUniversesFromJson(arr);
-        t.usPerFrame += espnowMasterCost(peerCount, universeCount, sysCfg.espnow_chunk_size).cpuUs;
-    }
-    return t;
+    auto chs = channelsFromJson(arr);
+    return totalCpu(chs, fps);
 }
 
 inline RamBudget totalRamFromJson(JsonArrayConst arr) {
-    RamBudget t;
-    uint8_t dmxCount = 0;
-    uint8_t dfPlayerCount = 0;
-    for (JsonObjectConst j : arr) {
-        t.bytes += estimateChannelCostFromJson(j).ramBytes;
-        uint8_t type = j["type"] | 0;
-        uint8_t source = j["source"] | 0;
-        uint8_t mode = j["mc_mode"] | 0;
-        const auto* def = OutputDefs::modeDef(type, mode);
-        uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
-        if ((flags & OutputDefs::CF_AGG_DMX) && source == 0) dmxCount++;
-        else if (flags & OutputDefs::CF_AGG_UART_RESERVED) dfPlayerCount++;
-    }
-    uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);
-    uint8_t dmxRmtUse = dmxCount > freeUarts ? (uint8_t)(dmxCount - freeUarts) : 0;
-    t.bytes += (uint32_t)dmxRmtUse * RMT_DMX_DRIVER_RAM;
-
-    if (sysCfg.device_mode == MODE_ESPNOW_MASTER) {
-        uint8_t peerCount = getEspNowPeerCount();
-        t.bytes += espnowMasterCost(peerCount, 0, sysCfg.espnow_chunk_size).ramBytes;
-    }
-    return t;
+    auto chs = channelsFromJson(arr);
+    return totalRam(chs);
 }
 
 // ═══════════════════════════════════════
@@ -570,13 +427,11 @@ inline RamBudget totalRamFromJson(JsonArrayConst arr) {
 
 enum class ScoreBlocker : uint8_t {
     None,
-    HardwareLimit,  // LEDC/RMT/UART/DAC exceeds max (source-based, expander-aware)
-    CpuLimit,       // CPU µs exceeds budget at current FPS
-    RamLimit        // RAM bytes exceeds 64KB
+    HardwareLimit,
+    CpuLimit,
+    RamLimit
 };
 
-// Hardware, CPU, and RAM are independent checks.
-// Hardware counts are source-aware: PCA/EXP channels don't consume ESP32 hardware.
 inline ScoreBlocker checkScores(const HardwareResource& hw, const CpuBudget& cpu, const RamBudget& ram, uint8_t fps) {
     if (!hardwareWithinLimit(hw)) return ScoreBlocker::HardwareLimit;
     if (cpu.usPerFrame > CpuBudget::limit(fps)) return ScoreBlocker::CpuLimit;
@@ -593,7 +448,8 @@ inline const char* scoreBlockerName(ScoreBlocker b) {
     }
 }
 
-// Convenience: check from JSON (as done in POST /api/outputs)
+inline uint8_t countUniqueUniversesFromJson(JsonArrayConst arr) { return countUniqueUniverses(channelsFromJson(arr)); }
+
 inline ScoreBlocker checkScoresFromJson(JsonArrayConst arr, uint8_t fps) {
     HardwareResource hw = totalHardwareFromJson(arr);
     CpuBudget cpu = totalCpuFromJson(arr, fps);

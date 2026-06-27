@@ -1,5 +1,5 @@
-#ifndef I2C_BUS_H
-#define I2C_BUS_H
+#ifndef I2C_DEVICES_BUS_H
+#define I2C_DEVICES_BUS_H
 
 #include <Arduino.h>
 #include <Wire.h>

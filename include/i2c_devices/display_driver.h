@@ -1,5 +1,5 @@
-#ifndef DISPLAY_DRIVER_H
-#define DISPLAY_DRIVER_H
+#ifndef I2C_DEVICES_DISPLAY_DRIVER_H
+#define I2C_DEVICES_DISPLAY_DRIVER_H
 
 #include <Arduino.h>
 #include <Wire.h>

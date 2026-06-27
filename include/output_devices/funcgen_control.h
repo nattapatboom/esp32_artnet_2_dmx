@@ -1,5 +1,5 @@
-#ifndef FUNCGEN_CONTROL_H
-#define FUNCGEN_CONTROL_H
+#ifndef OUTPUT_DEVICES_FUNCGEN_CONTROL_H
+#define OUTPUT_DEVICES_FUNCGEN_CONTROL_H
 
 #include <Arduino.h>
 #include <esp_timer.h>

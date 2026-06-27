@@ -3,7 +3,47 @@
 
 #include <Arduino.h>
 #include <NeoPixelBus.h>
+#include <new>
 #include "output_control.h"
+
+template <typename T_Method>
+class PixelStripRmt : public PixelStripWrapper {
+private:
+    NeoPixelBus<NeoRgbFeature, T_Method>* strip = nullptr;
+public:
+    PixelStripRmt(uint16_t count, uint8_t pin) {
+        strip = new (std::nothrow) NeoPixelBus<NeoRgbFeature, T_Method>(count, pin);
+    }
+    ~PixelStripRmt() override { if (strip) delete strip; }
+    void Begin() override { if (strip) strip->Begin(); }
+    bool CanShow() const override { return strip && strip->CanShow(); }
+    void Show() override { if (strip) strip->Show(); }
+    void SetPixelColor(uint16_t index, RgbColor color) override {
+        if (strip) strip->SetPixelColor(index, color);
+    }
+    bool IsRgbw() const override { return false; }
+};
+
+template <typename T_Method>
+class PixelStripRmtRgbw : public PixelStripWrapper {
+private:
+    NeoPixelBus<NeoRgbwFeature, T_Method>* strip = nullptr;
+public:
+    PixelStripRmtRgbw(uint16_t count, uint8_t pin) {
+        strip = new (std::nothrow) NeoPixelBus<NeoRgbwFeature, T_Method>(count, pin);
+    }
+    ~PixelStripRmtRgbw() override { if (strip) delete strip; }
+    void Begin() override { if (strip) strip->Begin(); }
+    bool CanShow() const override { return strip && strip->CanShow(); }
+    void Show() override { if (strip) strip->Show(); }
+    void SetPixelColor(uint16_t index, RgbColor color) override {
+        if (strip) strip->SetPixelColor(index, RgbwColor(color.R, color.G, color.B, 0));
+    }
+    void SetPixelColorRgbw(uint16_t index, RgbwColor color) override {
+        if (strip) strip->SetPixelColor(index, color);
+    }
+    bool IsRgbw() const override { return true; }
+};
 
 inline void ledStripSetup(OutputChannel& ch, uint8_t& rmtIdx) {
     if (ch.pin == 255) return;
@@ -78,10 +118,8 @@ inline void ledStripUpdate() {
                 posInUniverse = 0;
                 bufOffset = universe * 512;
             }
-
             uint16_t idx = bufOffset + posInUniverse * bytesPerPixel;
             posInUniverse++;
-
             if (idx + bytesPerPixel > bufSize) continue;
 
             uint8_t r = buf[idx];

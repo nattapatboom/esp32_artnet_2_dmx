@@ -6,6 +6,16 @@
 #include "output_control.h"
 #include "ledc_helpers.h"
 
+inline void setStepperDirection(OutputChannel& ch, bool forward) {
+    if (ch.pin2_source == 0) return;
+    writeOutputPin(ch, 2, forward);
+}
+
+inline void setStepperEnable(OutputChannel& ch, bool enabled) {
+    if (ch.pin3_source == 0) return;
+    writeOutputPin(ch, 3, ch.mc_enable_active_high ? enabled : !enabled);
+}
+
 inline void stepperSetup(OutputChannel& ch, FastAccelStepperEngine& engine, FastAccelStepper** steppers, uint8_t& stepperCount) {
     if (ch.source != 0) return;
     if (ch.pin == 255) return;

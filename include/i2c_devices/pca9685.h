@@ -1,5 +1,5 @@
-#ifndef PCA9685_H
-#define PCA9685_H
+#ifndef I2C_DEVICES_PCA9685_H
+#define I2C_DEVICES_PCA9685_H
 
 #include <Arduino.h>
 #include "i2c_devices/i2c_bus.h"
@@ -144,4 +144,4 @@ public:
 
 extern PCA9685Manager pcaManager;
 
-#endif // PCA9685_CONTROL_H
+#endif // I2C_DEVICES_PCA9685_H

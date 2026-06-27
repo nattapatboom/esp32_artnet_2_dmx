@@ -2,6 +2,7 @@
 #define OUTPUT_DEVICES_LEDC_HELPERS_H
 
 #include <Arduino.h>
+#include "output_common.h"
 #include "output_control.h"
 
 inline uint8_t allocateLedc(uint8_t& index) {
@@ -9,16 +10,8 @@ inline uint8_t allocateLedc(uint8_t& index) {
     return index++;
 }
 
-inline uint8_t getValueByteCount(uint8_t resolution) {
-    if (resolution <= 8) return 1;
-    if (resolution <= 16) return 2;
-    if (resolution <= 24) return 3;
-    return 4;
-}
-
-inline uint32_t getMaxValue(uint8_t resolution) {
-    if (resolution >= 32) return 0xFFFFFFFFUL;
-    return ((uint32_t)1 << resolution) - 1;
+inline uint8_t ledcResolution(OutputChannel& ch) {
+    return ch.mc_resolution > 16 ? 16 : ch.mc_resolution;
 }
 
 inline uint32_t getDmxValue(OutputChannel& ch) {
@@ -29,10 +22,6 @@ inline uint32_t getDmxValue(OutputChannel& ch) {
         value = (value << 8) | ch.dmxBuffer[i];
     }
     return value;
-}
-
-inline uint8_t ledcResolution(OutputChannel& ch) {
-    return ch.mc_resolution > 16 ? 16 : ch.mc_resolution;
 }
 
 inline uint32_t calibratedPwmDacDuty(OutputChannel& ch, uint32_t value, uint32_t inputMax, uint32_t outputMax) {
@@ -85,16 +74,6 @@ inline void writeSegmentOutput(OutputChannel& ch, uint8_t idx, bool state) {
     }
     uint8_t pin = segmentGpio(ch, idx);
     if (pin != 255) digitalWrite(pin, active_state ? HIGH : LOW);
-}
-
-inline void setStepperDirection(OutputChannel& ch, bool forward) {
-    if (ch.pin2_source == 0) return;
-    writeOutputPin(ch, 2, forward);
-}
-
-inline void setStepperEnable(OutputChannel& ch, bool enabled) {
-    if (ch.pin3_source == 0) return;
-    writeOutputPin(ch, 3, ch.mc_enable_active_high ? enabled : !enabled);
 }
 
 #endif
