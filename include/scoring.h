@@ -376,21 +376,17 @@ inline RamBudget totalRam(const std::vector<OutputChannel>& chs) {
 inline OutputChannel channelFromJson(JsonObjectConst j) {
     OutputChannel ch;
     ch.type = j["type"] | 0;
-    ch.source = j["source"] | 0;
-    ch.pin = j["pin"] | 255;
-    ch.pca_addr = j["pca_addr"] | 0x40;
-    ch.pca_channel = j["pca_channel"] | 0;
-    ch.pin2_source = j["pin2_source"] | 0;
-    ch.pin3_source = j["pin3_source"] | 0;
-    ch.pin4_source = j["pin4_source"] | 0;
     ch.mc_mode = j["mc_mode"] | 0;
     ch.mc_resolution = j["mc_resolution"] | 8;
     ch.led_count = j["led_count"] | 170;
     ch.color_order = j["color_order"] | 0;
     ch.start_universe = j["start_universe"] | 0;
-    JsonArrayConst sa = j["seg_sources"];
-    if (!sa.isNull()) {
-        for (uint8_t i = 0; i < 8 && i < sa.size(); i++) ch.seg_sources[i] = sa[i] | 0;
+    
+    if (j.containsKey("pins")) {
+        loadChannelPins(ch, j["pins"].as<JsonArrayConst>());
+    } else {
+        JsonArrayConst empty;
+        loadChannelPins(ch, empty);
     }
     return ch;
 }

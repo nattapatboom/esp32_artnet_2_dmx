@@ -13,80 +13,29 @@ function outputModeKeyForObj(o){
   var mcMode=parseInt(o.mc_mode||0);
   return outputModeKey(t,mcMode);
 }
-function getSlotValue(o, slot, type, modeVal) {
+function getSlotValue(o, slot) {
   const n = parseInt(slot.replace('pin',''));
-  const isSevenSeg = outputUsesSegmentRoutes(type, modeVal);
-  const isCommonDim = outputModeKey(type, modeVal) === 'commonDim';
-
-  if (isSevenSeg) {
-    let segIdx = 0;
-    if (isCommonDim) {
-      if (n === 1) {
-        return {
-          pin: parseInt(o.pin ?? 255),
-          source: parseInt(o.source ?? 0),
-          addr: parseInt(o.pca_addr ?? 64),
-          channel: parseInt(o.pca_channel ?? 0),
-          invert: !!o.pin_invert
-        };
-      }
-      segIdx = n - 2;
-    } else {
-      segIdx = n - 1;
-    }
-    return {
-      pin: parseInt(o.seg_pins?.[segIdx] ?? 255),
-      source: parseInt(o.seg_sources?.[segIdx] ?? 0),
-      addr: parseInt(o.seg_addrs?.[segIdx] ?? 32),
-      channel: parseInt(o.seg_channels?.[segIdx] ?? 255),
-      invert: !!((o.seg_inverts >> segIdx) & 1)
-    };
-  } else {
-    const keys = routeKeysForSlot(slot);
-    return {
-      pin: parseInt(o[keys.pin] ?? 255),
-      source: parseInt(o[keys.source] ?? 0),
-      addr: parseInt(o[keys.addr] ?? (keys.addr === 'pca_addr' ? 64 : 32)),
-      channel: parseInt(o[keys.channel] ?? (keys.channel === 'pca_channel' ? 0 : 255)),
-      invert: !!o[keys.invert]
-    };
+  if (!o.pins || !o.pins[n-1]) {
+    return { pin: 255, source: 0, addr: (n === 1 ? 64 : 32), channel: (n === 1 ? 0 : 255), invert: false };
   }
+  const p = o.pins[n-1];
+  return {
+    pin: parseInt(p.pin ?? 255),
+    source: parseInt(p.source ?? 0),
+    addr: parseInt(p.addr ?? (n === 1 ? 64 : 32)),
+    channel: parseInt(p.channel ?? (n === 1 ? 0 : 255)),
+    invert: !!p.invert
+  };
 }
 
-function setSlotValue(ch, slot, type, modeVal, val) {
+function setSlotValue(ch, slot, val) {
   const n = parseInt(slot.replace('pin',''));
-  const isSevenSeg = outputUsesSegmentRoutes(type, modeVal);
-  const isCommonDim = outputModeKey(type, modeVal) === 'commonDim';
-
-  if (isSevenSeg) {
-    let segIdx = 0;
-    if (isCommonDim) {
-      if (n === 1) {
-        ch.pin = val.pin;
-        ch.source = val.source;
-        ch.pca_addr = val.addr;
-        ch.pca_channel = val.channel;
-        ch.pin_invert = val.invert;
-        return;
-      }
-      segIdx = n - 2;
-    } else {
-      segIdx = n - 1;
-    }
-    ch.seg_pins[segIdx] = val.pin;
-    ch.seg_sources[segIdx] = val.source;
-    ch.seg_addrs[segIdx] = val.addr;
-    ch.seg_channels[segIdx] = val.channel;
-    if (val.invert) ch.seg_inverts |= (1 << segIdx);
-    else ch.seg_inverts &= ~(1 << segIdx);
-  } else {
-    const keys = routeKeysForSlot(slot);
-    ch[keys.pin] = val.pin;
-    ch[keys.source] = val.source;
-    ch[keys.addr] = val.addr;
-    ch[keys.channel] = val.channel;
-    ch[keys.invert] = val.invert;
+  if (!ch.pins) {
+    ch.pins = Array.from({length: 9}, () => ({ pin: 255, source: 0, addr: 32, channel: 255, invert: false }));
+    ch.pins[0].addr = 64;
+    ch.pins[0].channel = 0;
   }
+  ch.pins[n-1] = val;
 }
 
 function eachSlot(o,fn){

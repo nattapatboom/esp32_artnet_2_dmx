@@ -89,39 +89,10 @@ function setRouteChecked(id, val){
   var el=document.getElementById(id);
   if(el) el.checked=!!val;
 }
-function routeKeysForSlot(slot){
-  if(slot==='pin1') return {pin:'pin',source:'source',addr:'pca_addr',channel:'pca_channel',invert:'pin_invert'};
-  var n=slot.replace('pin','');
-  return {pin:'pin'+n,source:'pin'+n+'_source',addr:'pin'+n+'_addr',channel:'pin'+n+'_channel',invert:'pin'+n+'_invert'};
-}
-function routeDomForKeys(keys){
-  if(keys.pin==='pin') return {pin:'no_pin',source:'no_source',addr:'no_pca_addr',channel:'no_pca_channel',invert:'no_pin_invert'};
-  var n=keys.pin.replace('pin','');
-  return {pin:'no_pin'+n,source:'no_pin'+n+'_source',addr:'no_pin'+n+'_addr',channel:'no_pin'+n+'_channel',invert:'no_pin'+n+'_invert'};
-}
 function defaultChannelRoutes(ch){
-  ['pin','pin2','pin3','pin4'].forEach(function(k){ ch[k]=255; });
-  ch.source=0;
-  ch.pin2_source=0;
-  ch.pin3_source=0;
-  ch.pin4_source=0;
-  ch.pca_addr=64;
-  ch.pca_channel=0;
-  ch.pin2_addr=32;
-  ch.pin3_addr=32;
-  ch.pin4_addr=32;
-  ch.pin2_channel=255;
-  ch.pin3_channel=255;
-  ch.pin4_channel=255;
-  ch.pin_invert=false;
-  ch.pin2_invert=false;
-  ch.pin3_invert=false;
-  ch.pin4_invert=false;
-  ch.seg_pins=[255,255,255,255,255,255,255,255];
-  ch.seg_sources=[0,0,0,0,0,0,0,0];
-  ch.seg_addrs=[32,32,32,32,32,32,32,32];
-  ch.seg_channels=[255,255,255,255,255,255,255,255];
-  ch.seg_inverts=0;
+  ch.pins = Array.from({length: 9}, () => ({ pin: 255, source: 0, addr: 32, channel: 255, invert: false }));
+  ch.pins[0].addr = 64;
+  ch.pins[0].channel = 0;
 }
 function getDomIdsForSlot(slot) {
   const n = parseInt(slot.replace('pin',''));
@@ -146,7 +117,7 @@ function writeRouteFields(o) {
 
   Object.keys(mode.pins || {}).forEach(function(slot) {
     const ids = getDomIdsForSlot(slot);
-    const val = getSlotValue(o, slot, t, modeVal);
+    const val = getSlotValue(o, slot);
     setRouteValue(ids.pin, val.pin);
     setRouteValue(ids.source, val.source);
     setRouteValue(ids.addr, val.addr);
@@ -170,7 +141,7 @@ function readRouteFields(ch, type) {
       channel: routeValue(ids.channel, 255),
       invert: routeChecked(ids.invert, false)
     };
-    setSlotValue(ch, slot, type, modeVal, val);
+    setSlotValue(ch, slot, val);
   });
 }
 function resetRouteFields(){
