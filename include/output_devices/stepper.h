@@ -11,10 +11,6 @@ inline void setStepperDirection(OutputChannel& ch, bool forward) {
     writeOutputPin(ch, 2, forward);
 }
 
-inline void setStepperEnable(OutputChannel& ch, bool enabled) {
-    if (ch.pin3_source == 0) return;
-    writeOutputPin(ch, 3, ch.mc_enable_active_high ? enabled : !enabled);
-}
 
 inline void stepperSetup(OutputChannel& ch, FastAccelStepperEngine& engine, FastAccelStepper** steppers, uint8_t& stepperCount) {
     if (ch.source != 0) return;
@@ -32,7 +28,7 @@ inline void stepperSetup(OutputChannel& ch, FastAccelStepperEngine& engine, Fast
             stepper->setEnablePin(ch.pin3, !ch.pin3_invert);
             stepper->setAutoEnable(true);
         } else if (ch.pin3_source != 0) {
-            setStepperEnable(ch, true);
+            writeOutputPin(ch, 3, true);
         }
         stepper->setSpeedInHz(ch.mc_freq);
         stepper->setAcceleration(ch.mc_freq * 2);
@@ -138,7 +134,7 @@ inline void stepperUpdate(OutputChannel& ch, FastAccelStepper** steppers, uint8_
         if (ch.pin2_source != 0) {
             setStepperDirection(ch, targetPos >= stepper->getCurrentPosition());
         }
-        setStepperEnable(ch, true);
+        writeOutputPin(ch, 3, true);
         stepper->moveTo(targetPos);
     }
 }

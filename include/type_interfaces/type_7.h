@@ -28,8 +28,7 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"mc_homing_dir",      FT_SELECT, "Homing Direction",    0,  1,  0,   "0:Forward,1:Reverse"},
     {"mc_homing_speed",    FT_NUMBER, "Homing Speed (Hz)",   1,  40000, 500,  nullptr},
     {"mc_homing_timeout",  FT_NUMBER, "Homing Timeout (s)",  1,  100, 5,    nullptr},
-    {"mc_invert",          FT_BOOL,   "Invert Direction",    0,  1,  0,    nullptr},
-    {"mc_enable_active_high", FT_BOOL, "Enable Active High", 0,  1,  0,    nullptr}
+    {"mc_invert",          FT_BOOL,   "Invert Direction",    0,  1,  0,    nullptr}
 };
 
 constexpr TestCmdDef TEST_COMMANDS[] = {
