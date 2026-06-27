@@ -27,10 +27,10 @@ Receives Art-Net via Ethernet (LAN) → controls multiple output types via GPIO,
 
 ### Current State
 - **Board:** 192.168.1.93 (WT32-ETH01) — ONLINE
-- **Build:** Flash ~67.8%, RAM ~17.5%
+- **Build:** Flash ~63.6%, RAM ~17.3%
 - **Layout:** v3 (0-18) — config version 3
 - **Protocols:** Art-Net, sACN E1.31, ESP-NOW bridge
-- **Last Version:** 1.30.00 (7-Segment Decode Mode toggle for 7/8 pin direct drive)
+- **Last Version:** 1.30.00 + header refactor (cleanup duplicates, output_common.h, output_impl.h)
 
 ## Board: WT32-ETH01
 - **CPU:** ESP32 dual-core (Core 0 = network/display, Core 1 = application)
@@ -91,12 +91,18 @@ Receives Art-Net via Ethernet (LAN) → controls multiple output types via GPIO,
 ## Architecture
 
 ### Key Files
-- `include/output_control.h` — Core: `OutputChannel` struct, `setupChannels()`, `loadChannels()`, `saveChannels()`, DMX processing
+- `include/output_common.h` — Shared primitives: SENTINEL_NONE, DMX_BUFFER_SIZE, getValueByteCount, getMaxValue
+- `include/output_control.h` — Core: OutputChannel struct, PixelStripWrapper abstract base, DMX processing, save/load JSON. Declares setupChannels/loop/updateLeds (bodies in output_impl.h)
+- `include/output_impl.h` — Inline bodies of OutputControl::loop/updateLeds/setupChannels; includes device headers; included once by main.cpp
 - `include/motion_control.h` — thin coordinator delegating to `output_devices/` files
 - `include/output_devices/` — one file per output type (17 files total: 0-18)
 - `include/scoring.h` — Resource + Compute scoring (limit ~109pts)
 - `include/output_devices/funcgen_control.h` — Function Generator (Type 16) waveform engine using esp_timer + LEDC
 - `include/output_devices/dfplayer_control.h` — DFPlayer MP3 protocol driver
+- `include/output_devices/seven_seg_digits.h` — SEG_DIGITS[] lookup table + asciiToSegment()
+- `include/output_devices/ledc_helpers.h` — LEDC allocation, DMX value, segment, PWM DAC calibration helpers
+- `include/output_devices/stepper.h` — Stepper setup/update + setStepperDirection/setStepperEnable helpers
+- `include/output_devices/led_strip.h` — PixelStripRmt/PixelStripRmtRgbw concrete classes + ledStripSetup/Update
 - `include/config.h` — System configuration struct
 - `src/main.cpp` — Entry point, HTTP API routes, validation, network tasks
 - `include/web_pages.h` — Embedded HTML/CSS/JS for Web UI (auto-generated from `web/index.html`)
