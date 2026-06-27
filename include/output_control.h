@@ -126,14 +126,81 @@ struct OutputChannel {
     unsigned long solenoid_last_trigger = 0;
     DFPlayerController* dfPlayer = nullptr;
     FuncGenController* funcGen = nullptr;
+    uint8_t getPin(uint8_t idx) const {
+        if (idx == 0) return pin;
+        if (idx == 1) return pin2;
+        if (idx == 2) return pin3;
+        if (idx == 3) return pin4;
+        return 255;
+    }
+    void setPin(uint8_t idx, uint8_t val) {
+        if (idx == 0) pin = val;
+        else if (idx == 1) pin2 = val;
+        else if (idx == 2) pin3 = val;
+        else if (idx == 3) pin4 = val;
+    }
+    uint8_t getSource(uint8_t idx) const {
+        if (idx == 0) return source;
+        if (idx == 1) return pin2_source;
+        if (idx == 2) return pin3_source;
+        if (idx == 3) return pin4_source;
+        return 0;
+    }
+    void setSource(uint8_t idx, uint8_t val) {
+        if (idx == 0) source = val;
+        else if (idx == 1) pin2_source = val;
+        else if (idx == 2) pin3_source = val;
+        else if (idx == 3) pin4_source = val;
+    }
+    uint8_t getAddr(uint8_t idx) const {
+        if (idx == 0) return pca_addr;
+        if (idx == 1) return pin2_addr;
+        if (idx == 2) return pin3_addr;
+        if (idx == 3) return pin4_addr;
+        return 32;
+    }
+    void setAddr(uint8_t idx, uint8_t val) {
+        if (idx == 0) pca_addr = val;
+        else if (idx == 1) pin2_addr = val;
+        else if (idx == 2) pin3_addr = val;
+        else if (idx == 3) pin4 = val;
+    }
+    uint8_t getChannel(uint8_t idx) const {
+        if (idx == 0) return pca_channel;
+        if (idx == 1) return pin2_channel;
+        if (idx == 2) return pin3_channel;
+        if (idx == 3) return pin4_channel;
+        return 255;
+    }
+    void setChannel(uint8_t idx, uint8_t val) {
+        if (idx == 0) pca_channel = val;
+        else if (idx == 1) pin2_channel = val;
+        else if (idx == 2) pin3_channel = val;
+        else if (idx == 3) pin4_channel = val;
+    }
+    bool getInvert(uint8_t idx) const {
+        if (idx == 0) return pin_invert;
+        if (idx == 1) return pin2_invert;
+        if (idx == 2) return pin3_invert;
+        if (idx == 3) return pin4_invert;
+        return false;
+    }
+    void setInvert(uint8_t idx, bool val) {
+        if (idx == 0) pin_invert = val;
+        else if (idx == 1) pin2_invert = val;
+        else if (idx == 2) pin3_invert = val;
+        else if (idx == 3) pin4 = val;
+    }
 };
 
 inline void loadChannelPins(OutputChannel& ch, JsonArrayConst pinsArr) {
-    ch.pin = 255; ch.pin2 = 255; ch.pin3 = 255; ch.pin4 = 255;
-    ch.source = 0; ch.pin2_source = 0; ch.pin3_source = 0; ch.pin4_source = 0;
-    ch.pca_addr = 64; ch.pin2_addr = 32; ch.pin3_addr = 32; ch.pin4_addr = 32;
-    ch.pca_channel = 0; ch.pin2_channel = 255; ch.pin3_channel = 255; ch.pin4_channel = 255;
-    ch.pin_invert = false; ch.pin2_invert = false; ch.pin3_invert = false; ch.pin4_invert = false;
+    for (int i = 0; i < 4; i++) {
+        ch.setPin(i, 255);
+        ch.setSource(i, 0);
+        ch.setAddr(i, i == 0 ? 64 : 32);
+        ch.setChannel(i, i == 0 ? 0 : 255);
+        ch.setInvert(i, false);
+    }
     for (int s = 0; s < 8; s++) {
         ch.seg_pins[s] = 255;
         ch.seg_sources[s] = 0;
@@ -145,180 +212,81 @@ inline void loadChannelPins(OutputChannel& ch, JsonArrayConst pinsArr) {
     int size = pinsArr.size();
     if (size == 0) return;
 
-    bool is7Seg = (ch.type == 11 || ch.type == 12 || ch.type == 13);
-    bool isCommonDim = (ch.type == 12 || ch.type == 13) && (ch.mc_mode == 2 || ch.mc_mode == 3);
+    const OutputDefs::OutputModeDef* modeDef = OutputDefs::modeDef(ch.type, ch.mc_mode);
+    if (modeDef == nullptr) return;
 
-    if (is7Seg) {
-        if (isCommonDim) {
-            if (size > 0) {
-                JsonObjectConst p = pinsArr[0];
-                ch.pin = p["pin"] | 255;
-                ch.source = p["source"] | 0;
-                ch.pca_addr = p["addr"] | 64;
-                ch.pca_channel = p["channel"] | 0;
-                ch.pin_invert = p["invert"] | false;
+    for (uint8_t i = 0; i < modeDef->pinCount && i < size; i++) {
+        JsonObjectConst p = pinsArr[i];
+        bool isSeg = false;
+        if (modeDef->segmentCount > 0) {
+            if (modeDef->primaryRouteIsSegment) {
+                isSeg = true;
+            } else if (i > 0) {
+                isSeg = true;
             }
-            for (int i = 1; i < size && i < 9; i++) {
-                JsonObjectConst p = pinsArr[i];
-                int seg = i - 1;
-                ch.seg_pins[seg] = p["pin"] | 255;
-                ch.seg_sources[seg] = p["source"] | 0;
-                ch.seg_addrs[seg] = p["addr"] | 32;
-                ch.seg_channels[seg] = p["channel"] | 255;
+        }
+
+        if (isSeg) {
+            int s = modeDef->primaryRouteIsSegment ? i : (i - 1);
+            if (s >= 0 && s < 8) {
+                ch.seg_pins[s] = p["pin"] | 255;
+                ch.seg_sources[s] = p["source"] | 0;
+                ch.seg_addrs[s] = p["addr"] | 32;
+                ch.seg_channels[s] = p["channel"] | 255;
                 if (p["invert"] | false) {
-                    ch.seg_inverts |= (1 << seg);
+                    ch.seg_inverts |= (1 << s);
                 }
             }
         } else {
-            for (int i = 0; i < size && i < 8; i++) {
-                JsonObjectConst p = pinsArr[i];
-                ch.seg_pins[i] = p["pin"] | 255;
-                ch.seg_sources[i] = p["source"] | 0;
-                ch.seg_addrs[i] = p["addr"] | 32;
-                ch.seg_channels[i] = p["channel"] | 255;
-                if (p["invert"] | false) {
-                    ch.seg_inverts |= (1 << i);
-                }
+            if (i < 4) {
+                ch.setPin(i, p["pin"] | 255);
+                ch.setSource(i, p["source"] | 0);
+                ch.setAddr(i, p["addr"] | (i == 0 ? 64 : 32));
+                ch.setChannel(i, p["channel"] | (i == 0 ? 0 : 255));
+                ch.setInvert(i, p["invert"] | false);
             }
-        }
-    } else {
-        if (size > 0) {
-            JsonObjectConst p = pinsArr[0];
-            ch.pin = p["pin"] | 255;
-            ch.source = p["source"] | 0;
-            ch.pca_addr = p["addr"] | 64;
-            ch.pca_channel = p["channel"] | 0;
-            ch.pin_invert = p["invert"] | false;
-        }
-        if (size > 1) {
-            JsonObjectConst p = pinsArr[1];
-            ch.pin2 = p["pin"] | 255;
-            ch.pin2_source = p["source"] | 0;
-            ch.pin2_addr = p["addr"] | 32;
-            ch.pin2_channel = p["channel"] | 255;
-            ch.pin2_invert = p["invert"] | false;
-        }
-        if (size > 2) {
-            JsonObjectConst p = pinsArr[2];
-            ch.pin3 = p["pin"] | 255;
-            ch.pin3_source = p["source"] | 0;
-            ch.pin3_addr = p["addr"] | 32;
-            ch.pin3_channel = p["channel"] | 255;
-            ch.pin3_invert = p["invert"] | false;
-        }
-        if (size > 3) {
-            JsonObjectConst p = pinsArr[3];
-            ch.pin4 = p["pin"] | 255;
-            ch.pin4_source = p["source"] | 0;
-            ch.pin4_addr = p["addr"] | 32;
-            ch.pin4_channel = p["channel"] | 255;
-            ch.pin4_invert = p["invert"] | false;
         }
     }
 }
 
 inline void saveChannelPins(const OutputChannel& ch, JsonArray pinsArr) {
-    bool is7Seg = (ch.type == 11 || ch.type == 12 || ch.type == 13);
-    bool isCommonDim = (ch.type == 12 || ch.type == 13) && (ch.mc_mode == 2 || ch.mc_mode == 3);
+    const OutputDefs::OutputModeDef* modeDef = OutputDefs::modeDef(ch.type, ch.mc_mode);
+    if (modeDef == nullptr) return;
 
-    if (is7Seg) {
-        if (isCommonDim) {
-            JsonObject p = pinsArr.add<JsonObject>();
-            p["pin"] = ch.pin;
-            p["source"] = ch.source;
-            p["addr"] = ch.pca_addr;
-            p["channel"] = ch.pca_channel;
-            p["invert"] = ch.pin_invert;
+    for (uint8_t i = 0; i < modeDef->pinCount; i++) {
+        JsonObject p = pinsArr.add<JsonObject>();
+        bool isSeg = false;
+        if (modeDef->segmentCount > 0) {
+            if (modeDef->primaryRouteIsSegment) {
+                isSeg = true;
+            } else if (i > 0) {
+                isSeg = true;
+            }
+        }
 
-            for (int seg = 0; seg < 8; seg++) {
-                JsonObject s = pinsArr.add<JsonObject>();
-                s["pin"] = ch.seg_pins[seg];
-                s["source"] = ch.seg_sources[seg];
-                s["addr"] = ch.seg_addrs[seg];
-                s["channel"] = ch.seg_channels[seg];
-                s["invert"] = (bool)((ch.seg_inverts >> seg) & 1);
+        if (isSeg) {
+            int s = modeDef->primaryRouteIsSegment ? i : (i - 1);
+            if (s >= 0 && s < 8) {
+                p["pin"] = ch.seg_pins[s];
+                p["source"] = ch.seg_sources[s];
+                p["addr"] = ch.seg_addrs[s];
+                p["channel"] = ch.seg_channels[s];
+                p["invert"] = (bool)((ch.seg_inverts >> s) & 1);
             }
         } else {
-            int maxSeg = (ch.type == 11) ? 2 : 8;
-            for (int seg = 0; seg < maxSeg; seg++) {
-                JsonObject s = pinsArr.add<JsonObject>();
-                s["pin"] = ch.seg_pins[seg];
-                s["source"] = ch.seg_sources[seg];
-                s["addr"] = ch.seg_addrs[seg];
-                s["channel"] = ch.seg_channels[seg];
-                s["invert"] = (bool)((ch.seg_inverts >> seg) & 1);
+            if (i < 4) {
+                p["pin"] = ch.getPin(i);
+                p["source"] = ch.getSource(i);
+                p["addr"] = ch.getAddr(i);
+                p["channel"] = ch.getChannel(i);
+                p["invert"] = ch.getInvert(i);
             }
-        }
-    } else {
-        {
-            JsonObject p = pinsArr.add<JsonObject>();
-            p["pin"] = ch.pin;
-            p["source"] = ch.source;
-            p["addr"] = ch.pca_addr;
-            p["channel"] = ch.pca_channel;
-            p["invert"] = ch.pin_invert;
-        }
-        {
-            JsonObject p = pinsArr.add<JsonObject>();
-            p["pin"] = ch.pin2;
-            p["source"] = ch.pin2_source;
-            p["addr"] = ch.pin2_addr;
-            p["channel"] = ch.pin2_channel;
-            p["invert"] = ch.pin2_invert;
-        }
-        {
-            JsonObject p = pinsArr.add<JsonObject>();
-            p["pin"] = ch.pin3;
-            p["source"] = ch.pin3_source;
-            p["addr"] = ch.pin3_addr;
-            p["channel"] = ch.pin3_channel;
-            p["invert"] = ch.pin3_invert;
-        }
-        {
-            JsonObject p = pinsArr.add<JsonObject>();
-            p["pin"] = ch.pin4;
-            p["source"] = ch.pin4_source;
-            p["addr"] = ch.pin4_addr;
-            p["channel"] = ch.pin4_channel;
-            p["invert"] = ch.pin4_invert;
         }
     }
 }
 
 inline uint16_t outputDmxByteCount(const OutputChannel& ch) {
-    int8_t mode = (int8_t)ch.mc_mode;
-    switch (ch.type) {
-        case 1:
-            return DMX_BUFFER_SIZE;
-        case 3: {
-            uint8_t bytesPerPixel = ch.color_order >= 4 ? 4 : 3;
-            uint16_t pixelsPerUniverse = DMX_BUFFER_SIZE / bytesPerPixel;
-            uint16_t universes = (ch.led_count + pixelsPerUniverse - 1) / pixelsPerUniverse;
-            if (universes < 1) universes = 1;
-            return universes * DMX_BUFFER_SIZE;
-        }
-        case 5:
-            return ch.color_order >= 4 ? 4 : 3;
-        case 7:
-            return getValueByteCount(ch.mc_resolution) + 2;
-        case 9:
-        case 11:
-            return mode == 1 ? 4 : 2;
-        case 12:
-        case 13:
-            return (mode >= 0) ? 2 : 1;
-        case 10:
-            return 3;
-        case 16:
-            return 5;
-        case 4:
-        case 6:
-        case 8:
-        case 15:
-            return getValueByteCount(ch.mc_resolution);
-        default:
-            return 1;
-    }
+    return OutputDefs::dmxBufferRamForChannel(ch.type, ch.led_count, ch.color_order, ch.mc_resolution, ch.mc_mode);
 }
 
 inline void writeOutputPin(OutputChannel& ch, uint8_t pinNum, bool state) {
@@ -415,10 +383,12 @@ public:
     }
 
     uint16_t getUniverseCount(const OutputChannel& ch) const {
-        if (ch.type == OutputDefs::TYPE_LED_STRIP) {
-            uint8_t bytesPerPixel = (ch.color_order >= 4) ? 4 : 3;
-            uint16_t pixelsPerUniverse = 512 / bytesPerPixel;
-            return (ch.led_count + pixelsPerUniverse - 1) / pixelsPerUniverse;
+        if (OutputDefs::startsAtFirstUniverse(ch.type, ch.mc_mode)) {
+            if (ch.led_count > 0) {
+                uint8_t bytesPerPixel = (ch.color_order >= 4) ? 4 : 3;
+                uint16_t pixelsPerUniverse = 512 / bytesPerPixel;
+                return (ch.led_count + pixelsPerUniverse - 1) / pixelsPerUniverse;
+            }
         }
         return 1;
     }
@@ -434,7 +404,7 @@ public:
         for (auto& ch : channels) {
             if (ch.shadowBuffer == nullptr) continue;
 
-            if (ch.type == OutputDefs::TYPE_LED_STRIP) {
+            if (OutputDefs::startsAtFirstUniverse(ch.type, ch.mc_mode)) {
                 uint16_t numUniverses = getUniverseCount(ch);
                 if (universe >= ch.start_universe && universe < ch.start_universe + numUniverses) {
                     uint16_t universeOffset = universe - ch.start_universe;
@@ -445,13 +415,6 @@ public:
                         memcpy(ch.shadowBuffer + bufferOffset, data, lenToCopy);
                         matched = true;
                     }
-                }
-            } else if (ch.type == OutputDefs::TYPE_DMX && ch.start_universe == universe) {
-                if (dataOffset < ch.bufferSize) {
-                    uint32_t available = (uint32_t)ch.bufferSize - dataOffset;
-                    uint32_t lenToCopy = min((uint32_t)copyLen, available);
-                    memcpy(ch.shadowBuffer + dataOffset, data, lenToCopy);
-                    matched = true;
                 }
             } else if (ch.start_universe == universe) {
                 uint16_t sourceStart = constrain((int)ch.start_address, 1, DMX_BUFFER_SIZE) - 1;

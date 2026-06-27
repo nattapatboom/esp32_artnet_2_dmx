@@ -2,6 +2,7 @@
 #define OUTPUT_DEFS_H
 
 #include <Arduino.h>
+#include "output_common.h"
 #include "type_protocol.h"
 #include "type_interfaces/type_0.h"
 #include "type_interfaces/type_1.h"
@@ -563,6 +564,25 @@ inline const TypeProtocol::TestCmdDef* typeTestCommands(uint8_t type, uint8_t& c
         case TYPE_SMOKE:     count = TYPEPROTO_ARRAY_SIZE(Type18::TEST_COMMANDS); return Type18::TEST_COMMANDS;
         default: count = 0; return nullptr;
     }
+}
+
+inline uint32_t dmxBufferRamForChannel(uint8_t type, uint16_t ledCount, uint8_t colorOrder, uint8_t resolution, uint8_t mode) {
+    int8_t signedMode = (int8_t)mode;
+    const auto* def = modeDef(type, mode);
+    uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
+    if (def != nullptr && def->cost.dmxSlots > 0) return def->cost.dmxSlots;
+    if (flags & OutputDefs::CF_DYN_LED_STRIP) {
+        uint8_t bpp = colorOrder >= 4 ? 4 : 3;
+        uint16_t pixelsPerUni = 512 / bpp;
+        uint16_t universes = (ledCount + pixelsPerUni - 1) / pixelsPerUni;
+        if (universes < 1) universes = 1;
+        return (uint32_t)universes * 512;
+    }
+    if (flags & OutputDefs::CF_DYN_COLOR_BYTES) return colorOrder >= 4 ? 4 : 3;
+    if (flags & OutputDefs::CF_DYN_STEPPER) return getValueByteCount(resolution) + 2;
+    if (flags & OutputDefs::CF_DYN_TEXT_MODE) return signedMode == 1 ? 4 : 2;
+    if (flags & OutputDefs::CF_DYN_SEGMENT_MODE) return signedMode >= 0 ? 2 : 1;
+    return getValueByteCount(resolution);
 }
 
 }  // namespace OutputDefs

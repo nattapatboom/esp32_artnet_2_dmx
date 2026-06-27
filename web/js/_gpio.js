@@ -28,12 +28,29 @@ function getSlotValue(o, slot) {
   };
 }
 
+function defaultChannelRoutes(ch){
+  const t = parseInt(ch.type || 0);
+  const modeVal = parseInt(ch.mc_mode || 0);
+  const mode = outputModeDef(t, modeVal);
+  const pinSlots = mode ? Object.keys(mode.pins || {}) : ['pin1', 'pin2', 'pin3', 'pin4'];
+  
+  ch.pins = pinSlots.map(function(slot) {
+    const n = parseInt(slot.replace('pin',''));
+    const isFirst = (n === 1);
+    return {
+      pin: 255,
+      source: 0,
+      addr: isFirst ? 64 : 32,
+      channel: isFirst ? 0 : 255,
+      invert: false
+    };
+  });
+}
+
 function setSlotValue(ch, slot, val) {
   const n = parseInt(slot.replace('pin',''));
   if (!ch.pins) {
-    ch.pins = Array.from({length: 9}, () => ({ pin: 255, source: 0, addr: 32, channel: 255, invert: false }));
-    ch.pins[0].addr = 64;
-    ch.pins[0].channel = 0;
+    defaultChannelRoutes(ch);
   }
   ch.pins[n-1] = val;
 }

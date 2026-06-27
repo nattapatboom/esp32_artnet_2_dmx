@@ -211,22 +211,7 @@ inline uint32_t funcGenBackgroundUs(uint8_t funcGenCount, uint8_t outputFps) {
 }
 
 inline uint32_t dmxBufferRamForChannel(uint8_t type, uint16_t ledCount, uint8_t colorOrder, uint8_t resolution, uint8_t mode) {
-    int8_t signedMode = (int8_t)mode;
-    const auto* def = OutputDefs::modeDef(type, mode);
-    uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
-    if (def != nullptr && def->cost.dmxSlots > 0) return def->cost.dmxSlots;
-    if (flags & OutputDefs::CF_DYN_LED_STRIP) {
-        uint8_t bpp = colorOrder >= 4 ? 4 : 3;
-        uint16_t pixelsPerUni = 512 / bpp;
-        uint16_t universes = (ledCount + pixelsPerUni - 1) / pixelsPerUni;
-        if (universes < 1) universes = 1;
-        return (uint32_t)universes * 512;
-    }
-    if (flags & OutputDefs::CF_DYN_COLOR_BYTES) return colorOrder >= 4 ? 4 : 3;
-    if (flags & OutputDefs::CF_DYN_STEPPER) return getValueByteCount(resolution) + 2;
-    if (flags & OutputDefs::CF_DYN_TEXT_MODE) return signedMode == 1 ? 4 : 2;
-    if (flags & OutputDefs::CF_DYN_SEGMENT_MODE) return (signedMode == 4 || signedMode == 5 || signedMode >= 6) ? 2 : 1;
-    return getValueByteCount(resolution);
+    return OutputDefs::dmxBufferRamForChannel(type, ledCount, colorOrder, resolution, mode);
 }
 
 inline uint32_t pixelBufferRam(uint16_t ledCount, uint8_t colorOrder) {

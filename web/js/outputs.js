@@ -89,11 +89,6 @@ function setRouteChecked(id, val){
   var el=document.getElementById(id);
   if(el) el.checked=!!val;
 }
-function defaultChannelRoutes(ch){
-  ch.pins = Array.from({length: 9}, () => ({ pin: 255, source: 0, addr: 32, channel: 255, invert: false }));
-  ch.pins[0].addr = 64;
-  ch.pins[0].channel = 0;
-}
 function getDomIdsForSlot(slot) {
   const n = parseInt(slot.replace('pin',''));
   if (n === 1) {
