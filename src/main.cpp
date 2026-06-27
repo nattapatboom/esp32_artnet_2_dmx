@@ -1691,6 +1691,77 @@ void setupWebServer() {
         }
     );
 
+    // API Route: Calculate resource scores/budgets dynamically
+    server.on("/api/outputs/score", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            String body;
+            if (!collectRequestBody(request, data, len, index, total, body)) return;
+
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc, body);
+            if (error || !doc["outputs"].is<JsonArray>()) {
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid request JSON\"}");
+                return;
+            }
+
+            JsonArrayConst arr = doc["outputs"].as<JsonArrayConst>();
+            int fpsRaw = doc["fps"].is<int>() ? (int)doc["fps"] : (int)sysCfg.output_fps;
+            uint8_t fps = (uint8_t)constrain(fpsRaw, (int)NetworkProtocol::OUTPUT_FPS_MIN, (int)NetworkProtocol::OUTPUT_FPS_MAX);
+
+            // Temporarily swap device mode and chunk size for peer cost calculation
+            uint8_t oldMode = sysCfg.device_mode;
+            uint16_t oldChunkSize = sysCfg.espnow_chunk_size;
+            if (doc["device_mode"].is<int>()) sysCfg.device_mode = doc["device_mode"];
+            if (doc["espnow_chunk_size"].is<int>()) sysCfg.espnow_chunk_size = doc["espnow_chunk_size"];
+
+            HardwareResource hw = totalHardwareFromJson(arr);
+            CpuBudget cpu = totalCpuFromJson(arr, fps);
+            RamBudget ram = totalRamFromJson(arr);
+
+            sysCfg.device_mode = oldMode;
+            sysCfg.espnow_chunk_size = oldChunkSize;
+
+            uint32_t cpuLimit = CpuBudget::limit(fps);
+            uint32_t ramLimit = RamBudget::limit();
+
+            bool hwBad = !hardwareWithinLimit(hw);
+            bool cpuBad = cpu.usPerFrame > cpuLimit;
+            bool ramBad = ram.bytes > ramLimit;
+
+            float cpuPct = cpuLimit > 0 ? ((float)cpu.usPerFrame / cpuLimit) * 100.0f : 0.0f;
+            float ramPct = ramLimit > 0 ? ((float)ram.bytes / ramLimit) * 100.0f : 0.0f;
+
+            JsonDocument responseDoc;
+            responseDoc["status"] = "ok";
+            responseDoc["cpu_us"] = cpu.usPerFrame;
+            responseDoc["cpu_limit"] = cpuLimit;
+            responseDoc["cpu_pct"] = cpuPct;
+            responseDoc["cpu_bad"] = cpuBad;
+            
+            responseDoc["ram_bytes"] = ram.bytes;
+            responseDoc["ram_limit"] = ramLimit;
+            responseDoc["ram_pct"] = ramPct;
+            responseDoc["ram_bad"] = ramBad;
+
+            JsonObject hwObj = responseDoc["hw"].to<JsonObject>();
+            hwObj["ledc"] = hw.ledc;
+            hwObj["ledc_limit"] = ScoringLimits::MAX_LEDC;
+            hwObj["rmt"] = hw.rmt;
+            hwObj["rmt_limit"] = ScoringLimits::MAX_RMT;
+            hwObj["uart"] = hw.uart;
+            hwObj["uart_limit"] = ScoringLimits::MAX_UART;
+            hwObj["dac"] = hw.dac;
+            hwObj["dac_limit"] = ScoringLimits::MAX_DAC;
+            hwObj["timer"] = hw.timer;
+            hwObj["timer_limit"] = ScoringLimits::MAX_TIMER;
+            hwObj["hw_bad"] = hwBad;
+
+            String responseBody;
+            serializeJson(responseDoc, responseBody);
+            request->send(200, "application/json", responseBody);
+        }
+    );
+
     // API Route: Manual Output Test
     server.on("/api/output-test", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
