@@ -135,11 +135,6 @@ function writeRouteSlot(slot,o){
 function writeRouteFields(o){
   var mode=outputModeDef(typeId(o),parseInt(o.mc_mode||0));
   Object.keys(mode?.pins||{}).forEach(function(slot){ writeRouteSlot(slot,o); });
-  if(typeId(o)===T.STEPPER){
-    setRouteChecked('no_pin_invert',o.mc_step_invert||false);
-    setRouteChecked('no_pin2_invert',o.mc_dir_invert||false);
-    setRouteChecked('no_pin3_invert',o.mc_enable_active_high||false);
-  }
   var ssrc=o.seg_sources||[], sps=o.seg_pins||[], saddrs=o.seg_addrs||[], sch=o.seg_channels||[], sinvs=o.seg_inverts||0;
   if(outputUsesSegmentRoutes(typeId(o),parseInt(o.mc_mode||0))&&o.pin2_source){
     var segCount=mode.segmentCount||8;
