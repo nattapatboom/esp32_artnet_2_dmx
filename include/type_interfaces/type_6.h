@@ -27,6 +27,10 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"mc_brake",      FT_BOOL,   "Brake Mode",      0,  1,  0,    nullptr}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_motor_num", FT_NUMBER, "Speed",               0,   255, 128,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Stop",    0, "Stop motor (brake)"},
     {"Forward", 1, "Run forward at slider speed"},

@@ -22,6 +22,10 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"mc_mode",       FT_SELECT, "Waveform",         0,  3,    0,      WAVE_OPTS}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_level_num", FT_NUMBER, "Value",               0,   255, 128,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Start",   0, "Start waveform output"},
     {"Stop",    1, "Stop waveform output"},

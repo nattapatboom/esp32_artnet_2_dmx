@@ -23,6 +23,10 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"smoke_lockout_ms",   FT_NUMBER, "Lockout (ms)",       0,   30000, 2000,  nullptr}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_level_num", FT_NUMBER, "Value",               0,   255, 128,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Fire Full", 0, "Run full smoke → settle → shoot sequence"},
     {"Smoke On",  1, "Turn smoke valve ON"},

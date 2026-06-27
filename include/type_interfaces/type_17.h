@@ -25,6 +25,10 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"solenoid_post_delay", FT_NUMBER, "Post-delay (ms)",    0,  5000,  100,   nullptr}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_level_num", FT_NUMBER, "Value",               0,   255, 128,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Fire",  0, "Fire solenoid pulse"},
     {"On",    1, "Turn solenoid on (toggle)"},

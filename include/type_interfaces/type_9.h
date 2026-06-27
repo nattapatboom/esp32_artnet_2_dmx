@@ -22,6 +22,10 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"mc_mode",       FT_SELECT, "Mode",            0,   1,     0,    "0:Continuous,1:Timeout"}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_level_num", FT_NUMBER, "Value",               0,   255, 128,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Play",  0, "Play tone at selected frequency"},
     {"Stop",  1, "Stop the tone"}

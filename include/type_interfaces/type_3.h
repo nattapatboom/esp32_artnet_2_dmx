@@ -26,6 +26,12 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"led_protocol",  FT_SELECT, "Protocol",        0,  3,    0,     PROTOCOL_OPTS}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_color", FT_COLOR, "Color", 0, 0, 0, nullptr},
+    {"test_white", FT_NUMBER, "White", 0, 255, 0, nullptr},
+    {"test_pixel", FT_NUMBER, "Pixel Number", 1, 1360, 1, nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"All Custom",   0, "Set all LEDs to selected color"},
     {"All Red",      1, "Set all LEDs red"},

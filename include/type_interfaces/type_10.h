@@ -20,6 +20,11 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"mc_mode", FT_SELECT, "Play Mode", 0, 1, 0, MODE_OPTS}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_mp3_track", FT_NUMBER, "Track",               0,   255, 1,    nullptr},
+    {"test_mp3_vol",   FT_NUMBER, "Volume",              0,   255, 200,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Play",     0, "Play track number"},
     {"Stop",     1, "Stop playback"},

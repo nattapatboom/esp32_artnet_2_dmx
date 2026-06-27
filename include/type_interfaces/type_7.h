@@ -31,6 +31,11 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"mc_invert",          FT_BOOL,   "Invert Direction",    0,  1,  0,    nullptr}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_step_pos",   FT_NUMBER, "Position",           0,   999999, 128,  nullptr},
+    {"test_step_speed", FT_NUMBER, "Speed",              0,   255,    180,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Move",    0,   "Move to target position at set speed"},
     {"Stop Cmd", 120, "Send stop command"},

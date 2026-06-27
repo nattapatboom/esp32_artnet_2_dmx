@@ -249,9 +249,18 @@ function setTestState(active,label=''){
     pill.textContent=active?'TEST ACTIVE':'Idle';
   }
 }
-async function sendOutputTest(idx,values,durationMs=30000){
+async function sendOutputTest(idx,cmd,params,durationMs=30000){
   try{
-    const res=await fetch('/api/output-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:idx,values:values,duration_ms:durationMs})});
+    const res=await fetch('/api/output-test',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        index: idx,
+        cmd: cmd,
+        params: params,
+        duration_ms: durationMs
+      })
+    });
     if(res.ok){
       currentTestIdx=idx;
       setTestState(true,`#${idx+1} ${deviceLabel(outputs[idx]||{})}`);
@@ -282,62 +291,10 @@ function renderTestField(field){
   if(field.type==='text') return `<div class="f"><label for="${field.key}">${field.label}</label><input type="text" id="${field.key}" value="${value}" maxlength="${field.max||32}"></div>`;
   return `<div class="f"><label for="${field.key}">${field.label}</label><input type="number" id="${field.key}" value="${value}" min="${field.min}" max="${field.max}"></div>`;
 }
-function renderTestFields(ui){
-  var box=document.getElementById('test-field-container');
-  if(!box) return;
-  box.innerHTML=(TYPE_META.testFields?.[ui]||[]).map(renderTestField).join('');
-}
 function testValue(id,fallback){
   var el=document.getElementById(id);
   if(!el) return fallback;
   return el.type==='text'||el.type==='color'?el.value:parseInt(el.value||fallback);
-}
-function encodeTestValues(o,ui,cmd){
-  if(ui===1){
-    var max=maxDmxFor(o), v=Math.max(0,Math.min(max,parseInt(testValue('test_level_num',128))||0));
-    return valueBytes(v,parseInt(o.mc_resolution||8));
-  }
-  if(ui===2){
-    var ch=Math.max(1,Math.min(512,parseInt(testValue('test_dmx_ch',1))||1));
-    var dmxVal=Math.max(0,Math.min(255,parseInt(testValue('test_level_num',128))||0));
-    var vals=new Array(512).fill(0); vals[ch-1]=dmxVal; return vals;
-  }
-  if(ui===3){
-    var hex=String(testValue('test_color','#ff0000'));
-    var r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16), w=parseInt(testValue('test_white',0))||0;
-    if(!outputHasCostFlag(o,'CF_DYN_LED_STRIP')) return (parseInt(o.color_order||0)>=4)?[r,g,b,w]:[r,g,b];
-    var count=(o.led_count!==undefined?o.led_count:170), out=[], target=Math.max(1,Math.min(count,parseInt(testValue('test_pixel',1))||1))-1;
-    for(var i=0;i<count;i++){
-      var on=(cmd||'all')!=='pixel'||i===target;
-      out.push(on?r:0,on?g:0,on?b:0);
-      if((o.color_order||0)>=4) out.push(on?w:0);
-    }
-    return out;
-  }
-  if(ui===4){
-    var res=parseInt(o.mc_resolution||8), maxMotor=maxDmxFor(o), speed=Math.max(0,Math.min(255,parseInt(testValue('test_motor_num',128))||0));
-    var center=Math.floor(maxMotor/2), dir=parseInt(cmd||0);
-    var mv=dir===0?center:(dir>0?Math.round(center+(speed/255)*(maxMotor-center)):Math.round(center-(speed/255)*center));
-    return valueBytes(mv,res);
-  }
-  if(ui===5){
-    var stepRes=parseInt(o.mc_resolution||8), maxStep=maxDmxFor(o), pos=Math.max(0,Math.min(maxStep,Number(testValue('test_step_pos',128))||0));
-    var stepVals=valueBytes(pos,stepRes);
-    stepVals.push(Math.max(0,Math.min(255,parseInt(testValue('test_step_speed',180))||0)),cmd);
-    return stepVals;
-  }
-  if(ui===6){
-    var track=parseInt(testValue('test_mp3_track',1))||1, vol=parseInt(testValue('test_mp3_vol',200))||200;
-    return parseInt(cmd)===0?[track,vol,0]:parseInt(cmd)===1?[0,vol,0]:parseInt(cmd)===2?[track,vol,2]:parseInt(cmd)===3?[track,vol,1]:parseInt(cmd)===4?[track,vol,2]:[cmd||0,vol,0];
-  }
-  if(ui===7){
-    if(parseInt(o.mc_mode||0)===1){
-      return String(testValue('test_7seg_text','')).padEnd(4,' ').slice(0,4).split('').map(function(c){return c.charCodeAt(0)&255;});
-    }
-    var n=Math.max(0,Math.min(9999,parseInt(testValue('test_7seg_num',1234))||0));
-    return [(n>>8)&255,n&255];
-  }
-  return [cmd];
 }
 function showOutputTest(idx){
   const o=outputs[idx];
@@ -347,8 +304,12 @@ function showOutputTest(idx){
   const titleEl=document.getElementById('test-title');
   if(titleEl) titleEl.textContent='#'+(idx+1)+' '+deviceLabel(o);
   OUTPUT_IDX = idx;
-  const ui=TYPE_META.testUi[t];
-  renderTestFields(ui);
+
+  var box=document.getElementById('test-field-container');
+  if(box) {
+    box.innerHTML=(TYPE_META.testFields?.[t]||[]).map(renderTestField).join('');
+  }
+
   const cmds=TYPE_META.testCmds[t];
   const btnContainer=document.getElementById('test-buttons');
   if(!btnContainer) return;
@@ -358,22 +319,33 @@ function showOutputTest(idx){
       const btn=document.createElement('button');
       btn.type='button';
       btn.className='btn bt';
-      btn.textContent=cmd.label;
-      btn.onclick=function(){sendTestCmd(idx,cmd.value);};
+      btn.textContent=cmd[0];
+      btn.title=cmd[2]||'';
+      btn.onclick=function(){sendTestCmd(idx,cmd[1]);};
       btnContainer.appendChild(btn);
     });
   }
   if(p){ p.style.display='block'; p.scrollIntoView({behavior:'smooth',block:'nearest'}); }
 }
-function sendTestCmd(idx,val){
+function sendTestCmd(idx,cmdVal){
   const o=outputs[idx];
   const t=parseInt(o.type);
-  const ui=TYPE_META.testUi[t];
   const dur=testDur();
-  sendOutputTest(idx,encodeTestValues(o,ui,val),dur);
+  const params={};
+  (TYPE_META.testFields?.[t]||[]).forEach(field=>{
+    if(field.type==='color'){
+      const hex=String(testValue(field.key,'#ff0000'));
+      params.r=parseInt(hex.slice(1,3),16);
+      params.g=parseInt(hex.slice(3,5),16);
+      params.b=parseInt(hex.slice(5,7),16);
+    } else {
+      params[field.key]=testValue(field.key, field.def);
+    }
+  });
+  sendOutputTest(idx,cmdVal,params,dur);
 }
 function anyStopTest(idx){
-  sendOutputTest(parseInt(idx), [], 1000);
+  stopOutputTest();
 }
 function calcRcCutoff(){
   const r=parseFloat(cfgEl('rc_r')?.value);

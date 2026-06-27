@@ -16,6 +16,11 @@ constexpr const char* TYPE_NAME = "DMX Serial";
 // No extra config fields beyond base routing
 constexpr FieldDef EXTRA_FIELDS[] = {};
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_dmx_ch",    FT_NUMBER, "DMX Channel",         1,   512, 1,    nullptr},
+    {"test_level_num", FT_NUMBER, "Value",               0,   255, 128,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Apply",     0, "Set single DMX channel value"},
     {"Min/Off",   1, "Set channel to 0"},

@@ -25,10 +25,14 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"pwm_dac_max",  FT_NUMBER, "Max Duty (x0.01%)", 0, 10000, 10000, nullptr}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_level_num", FT_NUMBER, "Value",               0,   255, 128,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Apply",  0, "Set DAC output level"},
     {"Min",    1, "Set to calibrated minimum"},
-    {"Mid",    2, "Set to 50%"},
+    {"Mid",    2, "Set to calibrated mid-scale"},
     {"Max",    3, "Set to calibrated maximum"}
 };
 

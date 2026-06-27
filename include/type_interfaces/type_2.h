@@ -16,6 +16,8 @@ constexpr const char* TYPE_NAME = "Relay";
 
 constexpr FieldDef EXTRA_FIELDS[] = {};
 
+constexpr FieldDef TEST_FIELDS[] = {};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"On",  1, "Turn relay ON"},
     {"Off", 0, "Turn relay OFF"},

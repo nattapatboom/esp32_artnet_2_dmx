@@ -25,6 +25,11 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"mc_invert", FT_BOOL, "Invert Segments", 0, 1, 0, nullptr}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_7seg_num",  FT_NUMBER, "Number",              0,   9999, 1234, nullptr},
+    {"test_7seg_text", FT_TEXT,   "ASCII Text",          0,   4,    0,    nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Apply Num",  0, "Set numeric value"},
     {"Clear",      1, "Clear all segments"},

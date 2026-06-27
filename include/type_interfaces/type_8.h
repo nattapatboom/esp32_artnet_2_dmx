@@ -20,6 +20,10 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"mc_freq",   FT_NUMBER, "Frequency (Hz)",  1,    40000, 50,   nullptr}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_level_num", FT_NUMBER, "Value",               0,   255, 128,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Apply",   0, "Set servo angle/position"},
     {"Min",     1, "Set to min position"},

@@ -94,38 +94,13 @@ TEST_UI_MAP = {
     "TEST_UI_DFPLAYER": 6, "TEST_UI_7SEG": 7,
 }
 
-TEST_UI_FIELDS = {
-    1: [{"key": "test_level_num", "type": "number", "label": "Value", "min": 0, "max": 255, "def": 128}],
-    2: [
-        {"key": "test_dmx_ch", "type": "number", "label": "DMX Channel", "min": 1, "max": 512, "def": 1},
-        {"key": "test_level_num", "type": "number", "label": "Value", "min": 0, "max": 255, "def": 128},
-    ],
-    3: [
-        {"key": "test_color", "type": "color", "label": "Custom Color", "def": "#ff0000"},
-        {"key": "test_white", "type": "number", "label": "White", "min": 0, "max": 255, "def": 0},
-        {"key": "test_pixel", "type": "number", "label": "Pixel Number", "min": 1, "max": 1360, "def": 1},
-    ],
-    4: [{"key": "test_motor_num", "type": "number", "label": "Speed", "min": 0, "max": 255, "def": 128}],
-    5: [
-        {"key": "test_step_pos", "type": "number", "label": "Position", "min": 0, "max": 4294967295, "def": 128},
-        {"key": "test_step_speed", "type": "number", "label": "Speed", "min": 0, "max": 255, "def": 180},
-    ],
-    6: [
-        {"key": "test_mp3_track", "type": "number", "label": "Track", "min": 0, "max": 255, "def": 1},
-        {"key": "test_mp3_vol", "type": "number", "label": "Volume", "min": 0, "max": 255, "def": 200},
-    ],
-    7: [
-        {"key": "test_7seg_num", "type": "number", "label": "Number", "min": 0, "max": 9999, "def": 1234},
-        {"key": "test_7seg_text", "type": "text", "label": "ASCII Text", "min": 0, "max": 4, "def": "ABCD"},
-    ],
-}
-
 FIELD_TYPE_MAP = {
     "FT_NUMBER": "number",
     "FT_FLOAT": "float",
     "FT_BOOL": "bool",
     "FT_SELECT": "select",
     "FT_COLOR": "color",
+    "FT_TEXT": "text",
 }
 
 RES_LABELS_DMX = ["8-bit (1 DMX Ch)", "10-bit (2 DMX Ch)", "12-bit (2 DMX Ch)", "16-bit (2 DMX Ch)", "24-bit (3 DMX Ch)", "32-bit (4 DMX Ch)"]
@@ -177,6 +152,34 @@ def parse_test_commands_for_type(type_num):
     for label, cmd, desc in entry_re.findall(body):
         cmds.append([label, int(cmd), desc])
     return cmds
+
+
+def parse_test_fields_for_type(type_num):
+    """Parse TEST_FIELDS[] from include/type_interfaces/type_{num}.h."""
+    path = os.path.join("include", "type_interfaces", f"type_{type_num}.h")
+    if not os.path.exists(path):
+        return []
+    src = read_file(path)
+    constants = parse_type_string_constants(src)
+    m = re.search(r"constexpr\s+FieldDef\s+TEST_FIELDS\[\]\s*=\s*\{(.*?)\}\s*;", src, re.DOTALL)
+    if not m:
+        return []
+    body = m.group(1)
+    fields = []
+    entry_re = re.compile(
+        r'\{\s*"([^"]+)"\s*,\s*(FT_\w+)\s*,\s*"([^"]*)"\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*([^}]+?)\s*\}'
+    )
+    for key, field_type, label, min_val, max_val, default, opts_expr in entry_re.findall(body):
+        fields.append({
+            "key": key,
+            "type": FIELD_TYPE_MAP.get(field_type, "number"),
+            "label": label,
+            "min": int(min_val),
+            "max": int(max_val),
+            "def": int(default),
+            "opts": parse_field_options(opts_expr.rstrip(","), constants),
+        })
+    return fields
 
 
 def parse_type_string_constants(src):
@@ -487,13 +490,17 @@ def generate_output_defs_js():
     for tn in range(19):
         fields_js[str(tn)] = fields_by_type.get(tn, [])
 
+    test_fields_js = {}
+    for tn in range(19):
+        test_fields_js[str(tn)] = parse_test_fields_for_type(tn)
+
     meta = {
         "configLabels": config_labels if len(config_labels) == 19 else [],
         "channelCounts": channel_counts if len(channel_counts) == 19 else [],
         "byteCounts": byte_counts if len(byte_counts) == 19 else [],
         "modeKeyMap": mode_key_map,
         "testUi": test_ui_per_type,
-        "testFields": TEST_UI_FIELDS,
+        "testFields": test_fields_js,
         "testCmds": test_cmds_js,
         "fields": fields_js,
         "resOpts": res_opts,

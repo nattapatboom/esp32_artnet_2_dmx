@@ -24,6 +24,11 @@ constexpr FieldDef EXTRA_FIELDS[] = {
     {"color_order", FT_SELECT, "Color Order", 0, 7, 0, COLOR_ORDER_OPTS}
 };
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_color", FT_COLOR, "Color", 0, 0, 0, nullptr},
+    {"test_white", FT_NUMBER, "White", 0, 255, 0, nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Apply",     0, "Set RGB/RGBW levels"},
     {"All Red",   1, "Set R=255, G=0, B=0"},

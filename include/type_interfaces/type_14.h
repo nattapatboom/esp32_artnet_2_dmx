@@ -17,6 +17,10 @@ constexpr const char* TYPE_NAME = "I2C DAC";
 
 constexpr FieldDef EXTRA_FIELDS[] = {};
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_level_num", FT_NUMBER, "Value",               0,   255, 128,  nullptr}
+};
+
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Apply",  0, "Set DAC output value"},
     {"Min",    1, "Set to minimum"},

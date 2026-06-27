@@ -1797,12 +1797,164 @@ void setupWebServer() {
 
             memset(ch.shadowBuffer, 0, ch.bufferSize);
 
-            JsonArray values = doc["values"].as<JsonArray>();
-            uint16_t pos = 0;
-            for (JsonVariant value : values) {
-                if (pos >= ch.bufferSize) break;
-                int v = value.as<int>();
-                ch.shadowBuffer[pos++] = constrain(v, 0, 255);
+            if (doc.containsKey("params")) {
+                uint8_t cmdVal = doc["cmd"] | 0;
+                JsonObjectConst params = doc["params"].as<JsonObjectConst>();
+                
+                switch (ch.type) {
+                    case OutputDefs::TYPE_DIMMER:
+                    case OutputDefs::TYPE_SINGLE_LED:
+                    case OutputDefs::TYPE_SERVO:
+                    case OutputDefs::TYPE_BUZZER:
+                    case OutputDefs::TYPE_DAC:
+                    case OutputDefs::TYPE_PWM_DAC:
+                    case OutputDefs::TYPE_FUNC_GEN:
+                    case OutputDefs::TYPE_SOLENOID:
+                    case OutputDefs::TYPE_SMOKE: {
+                        uint8_t bytes = getValueByteCount(ch.mc_resolution);
+                        uint32_t val = params["test_level_num"] | 128;
+                        uint32_t max_val = getMaxValue(ch.mc_resolution);
+                        
+                        if (ch.type == OutputDefs::TYPE_BUZZER && cmdVal == 1) {
+                            val = 0;
+                        }
+                        if (ch.type == OutputDefs::TYPE_FUNC_GEN) {
+                            if (cmdVal == 1) val = 0;
+                            else if (cmdVal >= 2 && cmdVal <= 5) {
+                                uint8_t wave = cmdVal - 2;
+                                if (ch.bufferSize >= 2) {
+                                    ch.shadowBuffer[1] = wave;
+                                }
+                            }
+                        }
+                        if (ch.type == OutputDefs::TYPE_SOLENOID) {
+                            if (cmdVal == 2) val = 0;
+                            else if (cmdVal == 0 || cmdVal == 1) val = 255;
+                        }
+                        if (ch.type == OutputDefs::TYPE_SMOKE) {
+                            if (cmdVal == 0) val = 255;
+                            else if (cmdVal == 1) { ch.shadowBuffer[0] = 255; val = 0; }
+                            else if (cmdVal == 2) { ch.shadowBuffer[0] = 0; val = 0; }
+                            else if (cmdVal == 3) { ch.shadowBuffer[1] = 255; val = 0; }
+                            else if (cmdVal == 4) { ch.shadowBuffer[1] = 0; val = 0; }
+                        }
+                        
+                        val = constrain(val * max_val / 255, 0UL, max_val);
+                        for (int i = bytes - 1; i >= 0; i--) {
+                            ch.shadowBuffer[i] = (val >> (i * 8)) & 255;
+                        }
+                        break;
+                    }
+                    case OutputDefs::TYPE_DMX: {
+                        int targetCh = params["test_dmx_ch"] | 1;
+                        uint8_t level = params["test_level_num"] | 128;
+                        if (cmdVal == 1) level = 0;
+                        else if (cmdVal == 2) level = 255;
+                        if (targetCh >= 1 && targetCh <= 512) {
+                            ch.shadowBuffer[targetCh - 1] = level;
+                        }
+                        break;
+                    }
+                    case OutputDefs::TYPE_LED_STRIP:
+                    case OutputDefs::TYPE_ANALOG_RGB: {
+                        uint8_t r = params["r"] | 0;
+                        uint8_t g = params["g"] | 0;
+                        uint8_t b = params["b"] | 0;
+                        uint8_t w = params["w"] | 0;
+                        
+                        if (cmdVal == 1) { r = 255; g = 0; b = 0; }
+                        else if (cmdVal == 2) { r = 0; g = 255; b = 0; }
+                        else if (cmdVal == 3) { r = 0; g = 0; b = 255; }
+                        else if (cmdVal == 5) { r = 255; g = 0; b = 0; }
+                        else if (cmdVal == 6) { r = 0; g = 255; b = 0; }
+                        else if (cmdVal == 7) { r = 0; g = 0; b = 255; }
+                        else if (cmdVal == 8) { r = 0; g = 0; b = 0; w = 0; }
+                        
+                        int targetPixel = (params["test_pixel"] | 1) - 1;
+                        bool isPixelMode = (cmdVal >= 4 && cmdVal <= 7);
+                        
+                        uint8_t bpp = ch.color_order >= 4 ? 4 : 3;
+                        uint16_t ledCount = ch.led_count > 0 ? ch.led_count : 170;
+                        for (uint16_t i = 0; i < ledCount; i++) {
+                            uint16_t offset = i * bpp;
+                            if (offset + bpp > ch.bufferSize) break;
+                            bool active = !isPixelMode || (i == targetPixel);
+                            ch.shadowBuffer[offset] = active ? r : 0;
+                            ch.shadowBuffer[offset + 1] = active ? g : 0;
+                            ch.shadowBuffer[offset + 2] = active ? b : 0;
+                            if (bpp == 4) ch.shadowBuffer[offset + 3] = active ? w : 0;
+                        }
+                        break;
+                    }
+                    case OutputDefs::TYPE_MOTOR: {
+                        uint8_t bytes = getValueByteCount(ch.mc_resolution);
+                        uint32_t max_val = getMaxValue(ch.mc_resolution);
+                        uint32_t center = max_val / 2;
+                        uint32_t speed = params["test_motor_num"] | 128;
+                        int32_t dir = 0;
+                        if (cmdVal == 1) dir = 1;
+                        else if (cmdVal == 2) dir = -1;
+                        
+                        uint32_t mv = center;
+                        if (dir > 0) mv = center + (speed * (max_val - center)) / 255;
+                        else if (dir < 0) mv = center - (speed * center) / 255;
+                        
+                        for (int i = bytes - 1; i >= 0; i--) {
+                            ch.shadowBuffer[i] = (mv >> (i * 8)) & 255;
+                        }
+                        break;
+                    }
+                    case OutputDefs::TYPE_STEPPER: {
+                        uint8_t pos_bytes = getValueByteCount(ch.mc_resolution);
+                        uint32_t pos = params["test_step_pos"] | 128;
+                        uint8_t speed = params["test_step_speed"] | 180;
+                        uint8_t rawCmd = cmdVal;
+                        
+                        uint32_t max_val = getMaxValue(ch.mc_resolution);
+                        pos = constrain(pos, 0UL, max_val);
+                        for (int i = pos_bytes - 1; i >= 0; i--) {
+                            ch.shadowBuffer[i] = (pos >> (i * 8)) & 255;
+                        }
+                        ch.shadowBuffer[pos_bytes] = speed;
+                        ch.shadowBuffer[pos_bytes + 1] = rawCmd;
+                        break;
+                    }
+                    case OutputDefs::TYPE_DFPLAYER: {
+                        uint8_t track = params["test_mp3_track"] | 1;
+                        uint8_t vol = params["test_mp3_vol"] | 200;
+                        ch.shadowBuffer[0] = track;
+                        ch.shadowBuffer[1] = vol;
+                        ch.shadowBuffer[2] = cmdVal;
+                        break;
+                    }
+                    case OutputDefs::TYPE_TM1637:
+                    case OutputDefs::TYPE_7SEG_7PIN:
+                    case OutputDefs::TYPE_7SEG_8PIN: {
+                        if (cmdVal == 1) {
+                            const char* text = params["test_7seg_text"] | "";
+                            for (int i = 0; i < 4 && i < (int)ch.bufferSize; i++) {
+                                ch.shadowBuffer[i] = text[i] ? text[i] : ' ';
+                            }
+                        } else if (cmdVal == 0) {
+                            uint16_t num = params["test_7seg_num"] | 1234;
+                            if (ch.bufferSize >= 2) {
+                                ch.shadowBuffer[0] = (num >> 8) & 255;
+                                ch.shadowBuffer[1] = num & 255;
+                            }
+                        } else if (cmdVal == 2) {
+                            memset(ch.shadowBuffer, 0xFF, ch.bufferSize);
+                        }
+                        break;
+                    }
+                }
+            } else if (doc.containsKey("values")) {
+                JsonArray values = doc["values"].as<JsonArray>();
+                uint16_t pos = 0;
+                for (JsonVariant value : values) {
+                    if (pos >= ch.bufferSize) break;
+                    int v = value.as<int>();
+                    ch.shadowBuffer[pos++] = constrain(v, 0, 255);
+                }
             }
 
             outputCtrl.swapBuffers();

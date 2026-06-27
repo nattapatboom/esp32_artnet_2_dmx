@@ -19,7 +19,8 @@ enum FieldType : uint8_t {
     FT_FLOAT,    // decimal input
     FT_BOOL,     // checkbox
     FT_SELECT,   // dropdown
-    FT_COLOR     // hex color
+    FT_COLOR,    // hex color
+    FT_TEXT      // text input
 };
 
 // Single config field definition

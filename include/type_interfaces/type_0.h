@@ -17,6 +17,10 @@ constexpr const char* TYPE_NAME = "AC Dimmer";
 // No extra fields beyond base routing (pin, source, DMX addr)
 constexpr FieldDef EXTRA_FIELDS[] = {};
 
+constexpr FieldDef TEST_FIELDS[] = {
+    {"test_level_num", FT_NUMBER, "Value", 0, 255, 128, nullptr}
+};
+
 // Test: single value slider (0-255 level)
 constexpr TestCmdDef TEST_COMMANDS[] = {
     {"Apply",    0, "Set dimmer level"},
