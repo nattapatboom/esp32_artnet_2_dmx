@@ -17,7 +17,6 @@
 #include "i2c_devices/pwm_expander.h"
 #include "i2c_devices/i2c_gpio_expander.h"
 #include "output_control.h"
-#include "output_impl.h"
 #include "output_devices/dimmer.h"
 #include "motion_control.h"
 #include "espnow_control.h"
@@ -82,13 +81,6 @@ DigitalExpanderManager digitalExpanderManager;
 void updateMotionControl() {
     motionCtrl.update();
 }
-
-// Static member definitions (out-of-class, C++14 compatible)
-unsigned long ArtNetControl::packetCount = 0;
-uint8_t EspNowControl::rxDmxBuffer[512] = {0};
-uint16_t EspNowControl::rxDmxLength = 0;
-unsigned long EspNowControl::lastRxTime = 0;
-std::atomic<bool> EspNowControl::newRxData(false);
 
 AsyncWebServer* serverPtr = nullptr;
 
