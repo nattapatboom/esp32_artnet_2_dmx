@@ -123,15 +123,15 @@ void configureWiFiRadioForBoot() {
 void resetEthernetPhy() {
     pinMode(ETH_PHY_POWER, OUTPUT);
     digitalWrite(ETH_PHY_POWER, LOW);
-    delay(150);
+    vTaskDelay(pdMS_TO_TICKS(150));
     digitalWrite(ETH_PHY_POWER, HIGH);
-    delay(300);
+    vTaskDelay(pdMS_TO_TICKS(300));
 }
 
 void powerDownEthernetPhy() {
     pinMode(ETH_PHY_POWER, OUTPUT);
     digitalWrite(ETH_PHY_POWER, LOW);
-    delay(150);
+    vTaskDelay(pdMS_TO_TICKS(150));
 }
 
 void blinkStatusLed(uint8_t times, uint16_t onMs, uint16_t offMs) {
@@ -139,9 +139,9 @@ void blinkStatusLed(uint8_t times, uint16_t onMs, uint16_t offMs) {
     pinMode(sysCfg.status_led_pin, OUTPUT);
     for (uint8_t i = 0; i < times; i++) {
         digitalWrite(sysCfg.status_led_pin, HIGH);
-        delay(onMs);
+        vTaskDelay(pdMS_TO_TICKS(onMs));
         digitalWrite(sysCfg.status_led_pin, LOW);
-        delay(offMs);
+        vTaskDelay(pdMS_TO_TICKS(offMs));
     }
 }
 
@@ -1350,7 +1350,7 @@ void setupNetwork() {
             hasLink = true;
             break;
         }
-        delay(100);
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 
     // Determine whether to launch wireless services immediately or stay wired-only.
@@ -1369,7 +1369,7 @@ void setupNetwork() {
             while (millis() - wifiStart < 10000) {
                 if (WiFi.isConnected()) break;
                 if (ETH.linkUp()) break;
-                delay(100);
+                vTaskDelay(pdMS_TO_TICKS(100));
             }
             if (WiFi.isConnected()) {
                 Serial.print("Wi-Fi fallback connected. IP: ");
@@ -2564,7 +2564,7 @@ void resetBootCountTask(void *pvParameters) {
 
 void setup() {
     Serial.begin(115200);
-    delay(100);
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     bootCount++;
     Serial.printf("Boot count: %d\n", bootCount);
@@ -2616,7 +2616,7 @@ void setup() {
     }
 
     // Initialize Outputs System after network startup current settles.
-    delay(250);
+    vTaskDelay(pdMS_TO_TICKS(250));
     outputCtrl.begin();
     dimmerCtrl.begin();
     motionCtrl.begin();

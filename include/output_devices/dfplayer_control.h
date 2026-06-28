@@ -61,13 +61,13 @@ public:
     void begin(HardwareSerial& s, uint8_t txPin, uint8_t rxPin) {
         serial = &s;
         serial->begin(9600, SERIAL_8N1, rxPin, txPin);
-        delay(600);
+        vTaskDelay(pdMS_TO_TICKS(600));
         sendCmd(DF_CMD_RESET, 0);
-        delay(200);
+        vTaskDelay(pdMS_TO_TICKS(200));
         sendCmd(DF_CMD_PLAY_SRC, 1);
-        delay(100);
+        vTaskDelay(pdMS_TO_TICKS(100));
         sendCmd(DF_CMD_VOL, 15);
-        delay(100);
+        vTaskDelay(pdMS_TO_TICKS(100));
         initialized = true;
         lastVolume = 15;
     }
