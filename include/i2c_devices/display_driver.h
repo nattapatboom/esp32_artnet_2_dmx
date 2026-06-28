@@ -83,33 +83,26 @@ public:
         }
         _errorCount = 0;
 
-        String lines[4] = {line1, line2, line3, line4};
-        for (int i = 0; i < 4; i++) {
-            if ((uint8_t)lines[i].length() > _cols) {
-                lines[i] = lines[i].substring(0, _cols);
+        String raw[4] = {line1, line2, line3, line4};
+        uint8_t n = _oled ? 4 : (_rows < 4 ? _rows : 4);
+        for (uint8_t i = 0; i < n; i++) {
+            if ((uint8_t)raw[i].length() > _cols) {
+                raw[i] = raw[i].substring(0, _cols);
             }
         }
 
         if (_oled) {
             _oled->clear();
-            _oled->setCursor(0, 0);
-            _oled->print(lines[0].c_str());
-            _oled->setCursor(0, 1);
-            _oled->print(lines[1].c_str());
-            _oled->setCursor(0, 2);
-            _oled->print(lines[2].c_str());
-            _oled->setCursor(0, 3);
-            _oled->print(lines[3].c_str());
+            for (uint8_t i = 0; i < n; i++) {
+                _oled->setCursor(0, i);
+                _oled->print(raw[i].c_str());
+            }
         } else if (_lcd) {
             _lcd->clear();
-            _lcd->setCursor(0, 0);
-            _lcd->print(lines[0].c_str());
-            _lcd->setCursor(0, 1);
-            _lcd->print(lines[1].c_str());
-            _lcd->setCursor(0, 2);
-            _lcd->print(lines[2].c_str());
-            _lcd->setCursor(0, 3);
-            _lcd->print(lines[3].c_str());
+            for (uint8_t i = 0; i < n; i++) {
+                _lcd->setCursor(0, i);
+                _lcd->print(raw[i].c_str());
+            }
         }
 
     }

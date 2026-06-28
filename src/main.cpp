@@ -2438,7 +2438,7 @@ void networkTask(void* pvParameters) {
         if (display.isActive()) {
             static unsigned long lastDisplayUpdate = 0;
             static int scrollOff[4] = {0, 0, 0, 0};
-            static int scrollPhase[4] = {0, 0, 0, 0}; // 0=pause_start, 1=scroll, 2=pause_end
+            static int scrollPhase[4] = {0, 0, 0, 0};
             static unsigned long lastScroll[4] = {0, 0, 0, 0};
             static String prevLine[4] = {"", "", "", ""};
 
@@ -2447,12 +2447,28 @@ void networkTask(void* pvParameters) {
                 lastDisplayUpdate = now;
 
                 uint8_t dcols = display.displayCols();
+                uint8_t drows = display.displayRows();
                 IPAddress ip = ETH.localIP();
                 String lines[4];
-                lines[0] = "IP " + (ethConnected ? ip.toString() : String("--.---.-.--"));
-                lines[1] = ethConnected ? "ETH Link Up" : (WiFi.isConnected() ? "Wi-Fi Connected" : "No Link");
-                lines[2] = "U " + String(activeUniverseMin()) + "-" + String(activeUniverseMax());
-                lines[3] = "FPS " + String(sysCfg.output_fps) + "  Heap " + String(ESP.getFreeHeap() / 1024) + "K";
+
+                if (drows <= 2) {
+                    // Condensed 2-line layout
+                    lines[0] = "IP " + (ethConnected ? ip.toString() : String("--.---.-.--"));
+                    lines[1] = String(activeUniverseMin()) + "-" + String(activeUniverseMax())
+                             + " F" + String(sysCfg.output_fps) + " H" + String(ESP.getFreeHeap() / 1024) + "K";
+                    if ((uint8_t)lines[1].length() > dcols) {
+                        lines[1] = String(activeUniverseMin()) + "-" + String(activeUniverseMax())
+                                 + " " + String(sysCfg.output_fps) + "F " + String(ESP.getFreeHeap() / 1024) + "K";
+                    }
+                    lines[2] = "";
+                    lines[3] = "";
+                } else {
+                    // 4-line layout
+                    lines[0] = "IP " + (ethConnected ? ip.toString() : String("--.---.-.--"));
+                    lines[1] = ethConnected ? "ETH Link Up" : (WiFi.isConnected() ? "Wi-Fi Connected" : "No Link");
+                    lines[2] = "U " + String(activeUniverseMin()) + "-" + String(activeUniverseMax());
+                    lines[3] = "FPS " + String(sysCfg.output_fps) + "  Heap " + String(ESP.getFreeHeap() / 1024) + "K";
+                }
 
                 for (int i = 0; i < 4; i++) {
                     if (prevLine[i] != lines[i]) {
@@ -2710,24 +2726,31 @@ void setup() {
         Serial.printf("Display initialized: type=%d, addr=0x%02X\n", sysCfg.display_enabled, sysCfg.display_i2c_addr);
 
         // Show startup logo
-        uint8_t dcols = display.displayCols();
-        String mac = WiFi.macAddress();
-        mac.replace(":", "");
-        String suffix = mac.substring(mac.length() - 4);
-        suffix.toLowerCase();
-        String s1 = String(sysCfg.artnet_short_name) + suffix;
-        if ((uint8_t)s1.length() > dcols) s1 = s1.substring(0, dcols);
-        String s2 = "WT32-ETH01 Node";
-        if ((uint8_t)s2.length() > dcols) s2 = s2.substring(0, dcols);
-        const char* modeStr = "?";
-        if (sysCfg.device_mode == 0) modeStr = "Art-Net Eth";
-        else if (sysCfg.device_mode == 1) modeStr = "ESP-NOW Master";
-        else if (sysCfg.device_mode == 2) modeStr = "ESP-NOW Slave";
-        String s3 = String(modeStr);
-        if ((uint8_t)s3.length() > dcols) s3 = s3.substring(0, dcols);
-        String s4 = "Booting...";
-        if ((uint8_t)s4.length() > dcols) s4 = s4.substring(0, dcols);
-        display.update(s1, s2, s3, s4);
+        {
+            uint8_t dcols = display.displayCols();
+            uint8_t drows = display.displayRows();
+            String mac = WiFi.macAddress();
+            mac.replace(":", "");
+            String suffix = mac.substring(mac.length() - 4);
+            suffix.toLowerCase();
+            String s1 = String(sysCfg.artnet_short_name) + suffix;
+            if ((uint8_t)s1.length() > dcols) s1 = s1.substring(0, dcols);
+            const char* modeStr = "?";
+            if (sysCfg.device_mode == 0) modeStr = "Art-Net Eth";
+            else if (sysCfg.device_mode == 1) modeStr = "ESP-NOW Master";
+            else if (sysCfg.device_mode == 2) modeStr = "ESP-NOW Slave";
+            String s2 = String(modeStr);
+            if ((uint8_t)s2.length() > dcols) s2 = s2.substring(0, dcols);
+            if (drows <= 2) {
+                display.update(s1, s2, "", "");
+            } else {
+                String s3 = "WT32-ETH01 Node";
+                if ((uint8_t)s3.length() > dcols) s3 = s3.substring(0, dcols);
+                String s4 = "Booting...";
+                if ((uint8_t)s4.length() > dcols) s4 = s4.substring(0, dcols);
+                display.update(s1, s2, s3, s4);
+            }
+        }
         vTaskDelay(pdMS_TO_TICKS(3000));
     }
 
