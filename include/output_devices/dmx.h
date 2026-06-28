@@ -8,7 +8,7 @@
 #include "output_devices/rmt_dmx.h"
 
 inline void dmxSetup(OutputChannel& ch, bool& uart2Used, bool& uart1Used, uint8_t& rmtIdx) {
-    if (ch.pin == 255) return;
+    if (ch.routes[0].pin == 255) return;
     if (ch.dmxPort != 255) {
         dmx_driver_delete((dmx_port_t)ch.dmxPort);
         ch.dmxPort = 255;
@@ -30,7 +30,7 @@ inline void dmxSetup(OutputChannel& ch, bool& uart2Used, bool& uart1Used, uint8_
             uart2Used = false;
             return;
         }
-        err = dmx_set_pin(DMX_NUM_2, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
+        err = dmx_set_pin(DMX_NUM_2, ch.routes[0].pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
         if (err != ESP_OK) {
             Serial.printf("DMX: dmx_set_pin UART2 failed err=%d\n", err);
         }
@@ -45,15 +45,15 @@ inline void dmxSetup(OutputChannel& ch, bool& uart2Used, bool& uart1Used, uint8_
             uart1Used = false;
             return;
         }
-        err = dmx_set_pin(DMX_NUM_1, ch.pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
+        err = dmx_set_pin(DMX_NUM_1, ch.routes[0].pin, DMX_PIN_NO_CHANGE, DMX_PIN_NO_CHANGE);
         if (err != ESP_OK) {
             Serial.printf("DMX: dmx_set_pin UART1 failed err=%d\n", err);
         }
     } else if (rmtIdx < 8) {
-        ch.rmtDmx = new (std::nothrow) RmtDmxDriver(rmtIdx, ch.pin);
+        ch.rmtDmx = new (std::nothrow) RmtDmxDriver(rmtIdx, ch.routes[0].pin);
         if (ch.rmtDmx != nullptr) ch.rmtDmx->begin();
         if (ch.rmtDmx == nullptr || !ch.rmtDmx->ready()) {
-            Serial.printf("DMX: RMT fallback allocation failed ch=%d gpio=%d\n", rmtIdx, ch.pin);
+            Serial.printf("DMX: RMT fallback allocation failed ch=%d gpio=%d\n", rmtIdx, ch.routes[0].pin);
             delete ch.rmtDmx;
             ch.rmtDmx = nullptr;
             return;

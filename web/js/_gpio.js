@@ -233,15 +233,23 @@ const PIN_CHANS=['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14
 function renderPinRows(){
   const container=document.getElementById('pin-mapping-container');
   if(!container) return;
+
+  const slotNumber=(slot)=>parseInt(slot.replace('pin',''));
+  const fieldFor=(slot)=>{
+    const n=slotNumber(slot);
+    if(n===1) return {source:'no_source',pin:'no_pin',addr:'no_pca_addr',channel:'no_pca_channel',invert:'no_pin_invert'};
+    return {source:`no_pin${n}_source`,pin:`no_pin${n}`,addr:`no_pin${n}_addr`,channel:`no_pin${n}_channel`,invert:`no_pin${n}_invert`};
+  };
+
   const saved={};
   for (let n = 1; n <= 9; n++) {
-    const suffix = n === 1 ? '' : n;
-    ['no_pin' + suffix, 'no_pin' + suffix + '_source', 'no_pin' + suffix + '_addr', 'no_pin' + suffix + '_channel'].forEach(id => {
+    const field = fieldFor('pin' + n);
+    [field.source, field.pin, field.addr, field.channel].forEach(id => {
       const el = document.getElementById(id);
       if (el) saved[id] = el.value;
     });
-    const invEl = document.getElementById('no_pin' + suffix + '_invert');
-    if (invEl) saved['no_pin' + suffix + '_invert'] = invEl.checked;
+    const invEl = document.getElementById(field.invert);
+    if (invEl) saved[field.invert] = invEl.checked;
   }
 
   const t=parseInt(document.getElementById('no_type')?.value||0);
@@ -280,12 +288,7 @@ function renderPinRows(){
   const gpioOpts=(allowNone,dir)=>`${allowNone?'<option value="255">None</option>':''}${(dir==='in'?INPUT_GPIOS:PIN_GPIOS).map(v=>`<option value="${v}">GPIO ${v}</option>`).join('')}`;
   const chOpts=(allowNone)=>`${allowNone?'<option value="255">None</option>':''}${PIN_CHANS.map(v=>`<option value="${v}">CH ${v}</option>`).join('')}`;
   const dacChOpts=[['0','A'],['1','B'],['2','C'],['3','D']].map(([v,l])=>`<option value="${v}">CH ${l}</option>`).join('');
-  const slotNumber=(slot)=>parseInt(slot.replace('pin',''));
-  const fieldFor=(slot)=>{
-    const n=slotNumber(slot);
-    if(n===1) return {source:'no_source',pin:'no_pin',addr:'no_pca_addr',channel:'no_pca_channel',invert:'no_pin_invert'};
-    return {source:`no_pin${n}_source`,pin:`no_pin${n}`,addr:`no_pin${n}_addr`,channel:`no_pin${n}_channel`,invert:`no_pin${n}_invert`};
-  };
+
   const slotActive=(slot)=>{
     const n=slotNumber(slot);
     const mask=mode?.slotActiveMask??0;

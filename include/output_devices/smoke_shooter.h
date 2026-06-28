@@ -5,12 +5,12 @@
 #include "output_control.h"
 
 inline void smokeShooterSetup(OutputChannel& ch) {
-    if (ch.pin == 255) return;
-    if (ch.source == 0) {
-        pinMode(ch.pin, OUTPUT);
-        pinMode(ch.pin2, OUTPUT);
-        digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
-        digitalWrite(ch.pin2, ch.pin2_invert ? HIGH : LOW);
+    if (ch.routes[0].pin == 255) return;
+    if (ch.routes[0].source == 0) {
+        pinMode(ch.routes[0].pin, OUTPUT);
+        pinMode(ch.routes[1].pin, OUTPUT);
+        digitalWrite(ch.routes[0].pin, ch.routes[0].invert ? HIGH : LOW);
+        digitalWrite(ch.routes[1].pin, ch.routes[1].invert ? HIGH : LOW);
     }
     ch.smoke_state = 0;
     ch.smoke_prev_trigger = false;

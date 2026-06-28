@@ -8,7 +8,7 @@
 #include "ledc_helpers.h"
 
 inline void funcGenSetup(OutputChannel& ch, uint8_t& ledcIdx) {
-    if (ch.pin == 255) return;
+    if (ch.routes[0].pin == 255) return;
     uint8_t pwmChan = allocateLedc(ledcIdx);
     if (pwmChan != 255) {
         ch.funcGen = new (std::nothrow) FuncGenController();
@@ -16,7 +16,7 @@ inline void funcGenSetup(OutputChannel& ch, uint8_t& ledcIdx) {
             Serial.println("Function Generator allocation failed");
             return;
         }
-        ch.funcGen->begin(ch.pin, pwmChan, ch.mc_freq ? ch.mc_freq : 50000);
+        ch.funcGen->begin(ch.routes[0].pin, pwmChan, ch.mc_freq ? ch.mc_freq : 50000);
         ch.dmxPort = pwmChan;
     }
 }

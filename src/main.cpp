@@ -2421,21 +2421,16 @@ void networkTask(void* pvParameters) {
                     int idx = 0;
                     for (const auto& ch : outputCtrl.getChannels()) {
                         idx++;
-                        if ((ch.source == 1 || (ch.source >= 2 && ch.source <= 4)) && ch.pca_addr == addr) {
-                            if (usedBy.length() > 0) usedBy += ", ";
-                            usedBy += "CH" + String(idx);
-                        }
-                        if (ch.pin2_source >= 1 && ch.pin2_source <= 4 && ch.pin2_addr == addr) {
-                            if (usedBy.length() > 0) usedBy += ", ";
-                            usedBy += "CH" + String(idx) + "(P2)";
-                        }
-                        if (ch.pin3_source >= 1 && ch.pin3_source <= 4 && ch.pin3_addr == addr) {
-                            if (usedBy.length() > 0) usedBy += ", ";
-                            usedBy += "CH" + String(idx) + "(P3)";
-                        }
-                        if (ch.pin4_source >= 2 && ch.pin4_source <= 4 && ch.pin4_addr == addr) {
-                            if (usedBy.length() > 0) usedBy += ", ";
-                            usedBy += "CH" + String(idx) + "(HOM)";
+                        const auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
+                        uint8_t pinCount = def != nullptr ? def->pinCount : 1;
+                        if (pinCount > 9) pinCount = 9;
+                        for (uint8_t r = 0; r < pinCount; r++) {
+                            uint8_t src = ch.routes[r].source;
+                            uint8_t r_addr = ch.routes[r].addr;
+                            if (src >= 1 && src <= 4 && r_addr == addr) {
+                                if (usedBy.length() > 0) usedBy += ", ";
+                                usedBy += "CH" + String(idx) + "(P" + String(r + 1) + ")";
+                            }
                         }
                     }
                     if (usedBy.length() > 0) obj["used_by"] = usedBy;

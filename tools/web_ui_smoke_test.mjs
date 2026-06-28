@@ -199,33 +199,33 @@ async function main() {
         }
 
         setValue('no_type', 12);
-        setTypeMcMode(12, 4);  // Direct Dim mode (segmentLayout=true)
+        setTypeMcMode(12, 0);  // Direct CA Dim mode (segmentLayout=true)
         setValue('no_pin2_source', 0);
         toggleOutFields();
         renderPinRows();
         const pinText = document.getElementById('pin-mapping-container')?.textContent || '';
-        result.sevenSegDirect = !pinText.includes('Segs Src') && !!document.getElementById('no_seg_pin_1');
+        result.sevenSegDirect = !pinText.includes('Segs Src') && !!document.getElementById('no_pin2');
         // Direct dim segments must NOT allow digital expanders (only GPIO/PCA)
-        setValue('no_seg_source_1', 2);
+        setValue('no_pin2_source', 2);
         toggleOutFields();
         renderPinRows();
         // Debug: trace value after last render of sevenSegDirect
-        result.sevenSegMixed = document.getElementById('no_seg_source_1')?.value === '0'
-          && !document.getElementById('no_seg_addr_1')
-          && !document.getElementById('no_seg_channel_1')
-          && !!document.getElementById('no_seg_pin_1');
+        result.sevenSegMixed = document.getElementById('no_pin2_source')?.value === '0'
+          && !document.getElementById('no_pin2_addr')
+          && !document.getElementById('no_pin2_channel')
+          && !!document.getElementById('no_pin2');
         // Verify common dim segments DO allow expanders
-        setTypeMcMode(12, 6);  // Common dim mode
+        setTypeMcMode(12, 2);  // Common dim mode
         setValue('no_pin2_source', 0);
         toggleOutFields();
         renderPinRows();
-        setValue('no_seg_source_0', 2);
+        setValue('no_pin2_source', 2);
         toggleOutFields();
         renderPinRows();
-        result.sevenSegCommonDimExpander = document.getElementById('no_seg_source_0')?.value === '2'
-          && !!document.getElementById('no_seg_addr_0')
-          && !!document.getElementById('no_seg_channel_0')
-          && !document.getElementById('no_seg_pin_0');
+        result.sevenSegCommonDimExpander = document.getElementById('no_pin2_source')?.value === '2'
+          && !!document.getElementById('no_pin2_addr')
+          && !!document.getElementById('no_pin2_channel')
+          && !document.getElementById('no_pin2');
 
         setValue('no_type', 2);
         setValue('no_source', 0);
@@ -249,8 +249,7 @@ async function main() {
         result.analogPcaChannels = !!document.getElementById('no_pca_channel')
           && !!document.getElementById('no_pin2_channel')
           && !!document.getElementById('no_pin3_channel')
-          && !!document.getElementById('no_pin4_channel')
-          && document.getElementById('no_pca_channel2_grp')?.style.display === 'none';
+          && !!document.getElementById('no_pin4_channel');
 
         setValue('no_type', 17);
         setValue('no_source', 1);
@@ -267,8 +266,8 @@ async function main() {
         renderPinRows();
         result.smokeExpander = document.getElementById('no_source')?.value === '2'
           && !!document.getElementById('no_pca_channel')
-          && !!document.getElementById('no_pin2_channel')
-          && document.getElementById('no_pca_channel2_grp')?.style.display === 'none';
+          && !!document.getElementById('no_pin2_channel');
+
 
         setValue('no_type', 6);
         setTypeMcMode(6, 2);  // IN1+IN2+EN mode

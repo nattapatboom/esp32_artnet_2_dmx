@@ -14,75 +14,40 @@ inline void sevenSegSetup(OutputChannel& ch, uint8_t& ledcIdx) {
     bool isCA = (mode == 0 || mode == 2);
     uint8_t numSeg = def != nullptr ? def->segmentCount : 0;
 
-    if (isDirectDrive && ch.pin2_source == 1) {
-        pcaManager.getOrCreateDriver(ch.pin2_addr);
-        pcaManager.setFrequency(ch.pin2_addr, outputCtrl.sharedPcaFrequency(ch.pin2_addr));
-        for (uint8_t s = 0; s < numSeg; s++) {
-            pcaManager.write(ch.pin2_addr, ch.pin2_channel + s, 0);
-        }
-        if (isCommonDim && ch.source == 0) {
+    if (isDirectDrive) {
+        if (isCommonDim && ch.routes[0].source == 0 && ch.routes[0].pin != 255) {
             uint8_t pwmChan = allocateLedc(ledcIdx);
             if (pwmChan != 255) {
                 ledcSetup(pwmChan, ch.mc_freq ? ch.mc_freq : 1000, 8);
-                ledcAttachPin(ch.pin, pwmChan);
+                ledcAttachPin(ch.routes[0].pin, pwmChan);
                 ledcWrite(pwmChan, isCA ? 0 : 255);
                 ch.dmxPort = pwmChan;
             }
         }
-        ch.prev_7seg_val = 0;
-        ch.prev_7seg_valid = false;
-    } else if (isDirectDrive && ch.pin2_source >= 2 && ch.pin2_source <= 4) {
-        for (uint8_t s = 0; s < numSeg; s++) {
-            digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + s, false, true);
-        }
-        if (isCommonDim && ch.source == 0) {
-            uint8_t pwmChan = allocateLedc(ledcIdx);
-            if (pwmChan != 255) {
-                ledcSetup(pwmChan, ch.mc_freq ? ch.mc_freq : 1000, 8);
-                ledcAttachPin(ch.pin, pwmChan);
-                ledcWrite(pwmChan, isCA ? 0 : 255);
-                ch.dmxPort = pwmChan;
-            }
-        }
-        ch.prev_7seg_val = 0;
-        ch.prev_7seg_valid = false;
-    } else if (isDirectDrive && ch.pin2_source == 0) {
+
         if (isCommonDim) {
-            if (ch.source == 0) {
-                uint8_t pwmChan = allocateLedc(ledcIdx);
-                if (pwmChan != 255) {
-                    ledcSetup(pwmChan, ch.mc_freq ? ch.mc_freq : 1000, 8);
-                    ledcAttachPin(ch.pin, pwmChan);
-                    ledcWrite(pwmChan, isCA ? 0 : 255);
-                    ch.dmxPort = pwmChan;
-                }
-            }
             for (uint8_t s = 0; s < numSeg; s++) {
                 setupSegmentOutput(ch, s, isCA);
             }
         } else {
-            if (isDirectDrive) {
-                uint8_t baseChan = allocateLedc(ledcIdx);
-                if (baseChan != 255) {
-                    uint8_t usedLedc = 0;
-                    for (uint8_t s = 0; s < numSeg; s++) {
-                        uint8_t segPin = segmentGpio(ch, s);
-                        if (ch.seg_sources[s] == 0 && segPin != 255 && baseChan + usedLedc <= 15) {
-                            ledcSetup(baseChan + usedLedc, ch.mc_freq ? ch.mc_freq : 1000, 8);
-                            ledcAttachPin(segPin, baseChan + usedLedc);
-                            ledcWrite(baseChan + usedLedc, 0);
-                            usedLedc++;
-                        } else if (ch.seg_sources[s] >= 1 && ch.seg_sources[s] <= 4) {
-                            setupSegmentOutput(ch, s, false);
-                        }
-                    }
-                    ledcIdx = baseChan + usedLedc;
-                    ch.dmxPort = baseChan;
-                }
-            } else {
-                for (uint8_t s = 0; s < numSeg; s++) {
+            uint8_t baseChan = allocateLedc(ledcIdx);
+            bool useLedc = (baseChan != 255);
+            uint8_t usedLedc = 0;
+
+            for (uint8_t s = 0; s < numSeg; s++) {
+                uint8_t routeIdx = segmentRouteIndex(ch, s);
+                if (useLedc && ch.routes[routeIdx].source == 0 && ch.routes[routeIdx].pin != 255 && baseChan + usedLedc <= 15) {
+                    ledcSetup(baseChan + usedLedc, ch.mc_freq ? ch.mc_freq : 1000, 8);
+                    ledcAttachPin(ch.routes[routeIdx].pin, baseChan + usedLedc);
+                    ledcWrite(baseChan + usedLedc, 0);
+                    usedLedc++;
+                } else {
                     setupSegmentOutput(ch, s, false);
                 }
+            }
+            if (useLedc) {
+                ledcIdx = baseChan + usedLedc;
+                ch.dmxPort = baseChan;
             }
         }
         ch.prev_7seg_val = 0;
@@ -124,75 +89,40 @@ inline void sevenSegUpdate(OutputChannel& ch) {
         segByte = asciiToSegment(ch.dmxBuffer[0]);
     }
 
-    if (isDirectDrive && ch.pin2_source == 1) {
-        for (uint8_t b = 0; b < numSeg; b++) {
-            bool bitVal = (segByte >> b) & 1;
-            if (isCommonDim) bitVal = isCA ? !bitVal : bitVal;
-            bool inv = (ch.seg_inverts >> b) & 1;
-            pcaManager.write(ch.pin2_addr, ch.pin2_channel + b, (bitVal ^ inv) ? 4095 : 0);
-        }
+    if (isDirectDrive) {
         if (isCommonDim) {
             uint8_t brightness = ch.dmxBuffer[1];
             uint8_t duty = isCA ? brightness : (255 - brightness);
-            if (ch.source == 1) {
-                pcaManager.write(ch.pca_addr, ch.pca_channel, (duty * 4095) / 255);
-            } else if (ch.source == 0 && ch.dmxPort != 255) {
+            if (ch.routes[0].source == 1) {
+                pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, (duty * 4095) / 255);
+            } else if (ch.routes[0].source == 0 && ch.dmxPort != 255) {
                 ledcWrite(ch.dmxPort, duty);
             }
-        }
-    } else if (isDirectDrive && ch.pin2_source >= 2 && ch.pin2_source <= 4) {
-        for (uint8_t b = 0; b < numSeg; b++) {
-            bool bitVal = (segByte >> b) & 1;
-            if (isCommonDim) bitVal = isCA ? !bitVal : bitVal;
-            bool inv = (ch.seg_inverts >> b) & 1;
-            digitalExpanderManager.write(ch.pin2_source, ch.pin2_addr, ch.pin2_channel + b, bitVal ^ inv);
-        }
-        if (isCommonDim) {
-            uint8_t brightness = ch.dmxBuffer[1];
-            uint8_t duty = isCA ? brightness : (255 - brightness);
-            if (ch.source == 1) {
-                pcaManager.write(ch.pca_addr, ch.pca_channel, (duty * 4095) / 255);
-            } else if (ch.source == 0 && ch.dmxPort != 255) {
-                ledcWrite(ch.dmxPort, duty);
-            }
-        }
-    } else if (isDirectDrive && ch.pin2_source == 0) {
-        if (isCommonDim) {
-            uint8_t brightness = ch.dmxBuffer[1];
-            uint8_t duty = isCA ? brightness : (255 - brightness);
-            if (ch.source == 1) {
-                pcaManager.write(ch.pca_addr, ch.pca_channel, (duty * 4095) / 255);
-            } else if (ch.source == 0 && ch.dmxPort != 255) {
-                ledcWrite(ch.dmxPort, duty);
-            }
+
             for (uint8_t b = 0; b < numSeg; b++) {
                 bool bitVal = (segByte >> b) & 1;
                 writeSegmentOutput(ch, b, isCA ? !bitVal : bitVal);
             }
         } else {
-            if (isDirectDrive) {
-                uint8_t brightness = 255;
-                if (mode == 0 || mode == 1) {
-                    brightness = ch.dmxBuffer[1];
-                }
-                for (uint8_t b = 0; b < numSeg; b++) {
-                    uint32_t duty = ((segByte >> b) & 1) ? brightness : 0;
-                    if (ch.seg_sources[b] >= 1 && ch.seg_sources[b] <= 4) {
-                        writeSegmentOutput(ch, b, duty > 0);
-                    } else if (ch.dmxPort != 255 && ch.dmxPort + b <= 15) {
-                        bool inv = (ch.seg_inverts >> b) & 1;
-                        uint32_t active_duty = inv ? (brightness - duty) : duty;
-                        ledcWrite(ch.dmxPort + b, active_duty);
-                    }
-                }
-            } else {
-                for (uint8_t b = 0; b < numSeg; b++) {
-                    writeSegmentOutput(ch, b, (segByte >> b) & 1);
+            uint8_t brightness = 255;
+            if (mode == 0 || mode == 1) {
+                brightness = ch.dmxBuffer[1];
+            }
+            for (uint8_t b = 0; b < numSeg; b++) {
+                uint8_t routeIdx = segmentRouteIndex(ch, b);
+                uint32_t duty = ((segByte >> b) & 1) ? brightness : 0;
+
+                if (ch.routes[routeIdx].source != 0) {
+                    writeSegmentOutput(ch, b, duty > 0);
+                } else if (ch.dmxPort != 255 && ch.dmxPort + b <= 15) {
+                    bool inv = ch.routes[routeIdx].invert;
+                    uint32_t active_duty = inv ? (brightness - duty) : duty;
+                    ledcWrite(ch.dmxPort + b, active_duty);
                 }
             }
         }
     } else {
-        TM1637Driver tm(ch.pin, ch.pin2);
+        TM1637Driver tm(ch.routes[0].pin, ch.routes[1].pin);
         if (mode == 1) {
             uint8_t segments[4];
             for (uint8_t i = 0; i < 4; i++) {

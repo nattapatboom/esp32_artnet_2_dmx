@@ -7,27 +7,27 @@
 #include "ledc_helpers.h"
 
 inline void setStepperDirection(OutputChannel& ch, bool forward) {
-    if (ch.pin2_source == 0) return;
+    if (ch.routes[1].source == 0) return;
     writeOutputPin(ch, 2, forward);
 }
 
 
 inline void stepperSetup(OutputChannel& ch, FastAccelStepperEngine& engine, FastAccelStepper** steppers, uint8_t& stepperCount) {
-    if (ch.source != 0) return;
-    if (ch.pin == 255) return;
+    if (ch.routes[0].source != 0) return;
+    if (ch.routes[0].pin == 255) return;
     if (stepperCount >= 8) return;
 
-    FastAccelStepper* stepper = engine.stepperConnectToPin(ch.pin);
+    FastAccelStepper* stepper = engine.stepperConnectToPin(ch.routes[0].pin);
     if (stepper) {
-        if (ch.pin2_source == 0 && ch.pin2 != 255) {
-            stepper->setDirectionPin(ch.pin2, ch.pin2_invert);
+        if (ch.routes[1].source == 0 && ch.routes[1].pin != 255) {
+            stepper->setDirectionPin(ch.routes[1].pin, ch.routes[1].invert);
         } else {
             setStepperDirection(ch, true);
         }
-        if (ch.pin3_source == 0 && ch.pin3 != 255) {
-            stepper->setEnablePin(ch.pin3, !ch.pin3_invert);
+        if (ch.routes[2].source == 0 && ch.routes[2].pin != 255) {
+            stepper->setEnablePin(ch.routes[2].pin, !ch.routes[2].invert);
             stepper->setAutoEnable(true);
-        } else if (ch.pin3_source != 0) {
+        } else if (ch.routes[2].source != 0) {
             writeOutputPin(ch, 3, true);
         }
         stepper->setSpeedInHz(ch.mc_freq);
@@ -76,11 +76,11 @@ inline void stepperUpdate(OutputChannel& ch, FastAccelStepper** steppers, uint8_
                 if (h_speed == 0) h_speed = ch.mc_freq / 2;
                 stepper->setSpeedInHz(h_speed);
 
-                if (ch.mc_homing_mode == 0 && ch.pin4 != 255) {
-                    if (ch.pin4_source == 0) {
-                        pinMode(ch.pin4, INPUT_PULLUP);
+                if (ch.mc_homing_mode == 0 && ch.routes[3].pin != 255) {
+                    if (ch.routes[3].source == 0) {
+                        pinMode(ch.routes[3].pin, INPUT_PULLUP);
                     } else {
-                        digitalExpanderManager.configureInput(ch.pin4_source, ch.pin4_addr, ch.pin4_channel, true);
+                        digitalExpanderManager.configureInput(ch.routes[3].source, ch.routes[3].addr, ch.routes[3].channel, true);
                     }
                 }
 
@@ -103,7 +103,7 @@ inline void stepperUpdate(OutputChannel& ch, FastAccelStepper** steppers, uint8_
     if (ch.stepper_cmd_state == 4) {
         bool zero_reached = false;
         if (ch.mc_homing_mode == 0) {
-            if (ch.pin4 != 255 && readOutputPin(ch, 4) == false) {
+            if (ch.routes[3].pin != 255 && readOutputPin(ch, 4) == false) {
                 zero_reached = true;
             }
         } else {
@@ -131,7 +131,7 @@ inline void stepperUpdate(OutputChannel& ch, FastAccelStepper** steppers, uint8_
             targetPos = (int32_t)(((uint64_t)val * ch.mc_steps_per_rev) / max_val);
         }
         if (ch.mc_invert) targetPos = -targetPos;
-        if (ch.pin2_source != 0) {
+        if (ch.routes[1].source != 0) {
             setStepperDirection(ch, targetPos >= stepper->getCurrentPosition());
         }
         writeOutputPin(ch, 3, true);

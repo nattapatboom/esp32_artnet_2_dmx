@@ -46,7 +46,7 @@ public:
 };
 
 inline void ledStripSetup(OutputChannel& ch, uint8_t& rmtIdx) {
-    if (ch.pin == 255) return;
+    if (ch.routes[0].pin == 255) return;
     if (ch.pixelStrip != nullptr) {
         delete ch.pixelStrip;
         ch.pixelStrip = nullptr;
@@ -55,26 +55,26 @@ inline void ledStripSetup(OutputChannel& ch, uint8_t& rmtIdx) {
         auto createStrip = [&]() -> PixelStripWrapper* {
             if (ch.color_order >= 4) {
                 switch (rmtIdx) {
-                    case 0: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt0Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt0Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 1: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt1Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt1Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 2: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt2Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt2Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 3: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt3Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt3Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 4: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt4Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt4Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 5: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt5Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt5Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 6: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt6Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt6Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 7: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt7Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt7Ws2812xMethod>(ch.led_count, ch.pin);
+                    case 0: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt0Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt0Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 1: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt1Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt1Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 2: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt2Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt2Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 3: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt3Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt3Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 4: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt4Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt4Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 5: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt5Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt5Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 6: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt6Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt6Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 7: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt7Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmtRgbw<NeoEsp32Rmt7Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
                     default: return nullptr;
                 }
             } else {
                 switch (rmtIdx) {
-                    case 0: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt0Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt0Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 1: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt1Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt1Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 2: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt2Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt2Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 3: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt3Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt3Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 4: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt4Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt4Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 5: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt5Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt5Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 6: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt6Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt6Ws2812xMethod>(ch.led_count, ch.pin);
-                    case 7: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt7Ws2811Method>(ch.led_count, ch.pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt7Ws2812xMethod>(ch.led_count, ch.pin);
+                    case 0: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt0Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt0Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 1: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt1Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt1Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 2: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt2Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt2Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 3: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt3Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt3Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 4: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt4Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt4Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 5: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt5Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt5Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 6: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt6Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt6Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
+                    case 7: return ch.led_protocol == 1 ? (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt7Ws2811Method>(ch.led_count, ch.routes[0].pin) : (PixelStripWrapper*)new (std::nothrow) PixelStripRmt<NeoEsp32Rmt7Ws2812xMethod>(ch.led_count, ch.routes[0].pin);
                     default: return nullptr;
                 }
             }

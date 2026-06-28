@@ -6,11 +6,11 @@
 #include "ledc_helpers.h"
 
 inline void buzzerSetup(OutputChannel& ch, uint8_t& ledcIdx) {
-    if (ch.pin == 255) return;
+    if (ch.routes[0].pin == 255) return;
     uint8_t pwmChan = allocateLedc(ledcIdx);
     if (pwmChan != 255) {
         ledcSetup(pwmChan, 1000, 8);
-        ledcAttachPin(ch.pin, pwmChan);
+        ledcAttachPin(ch.routes[0].pin, pwmChan);
         ledcWrite(pwmChan, 0);
         ch.dmxPort = pwmChan;
     }

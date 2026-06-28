@@ -431,3 +431,39 @@ async function saveOutputs(){
     startRebootCountdown('Reconnecting and reloading...', 9);
   }
 }
+
+function channelHardware(o) {
+  const def = outputModeForObj(o);
+  const cost = def?.cost || {};
+  let ledc = 0;
+  if (cost.flags) {
+    const isBgDimmer = costHas(cost, 'CF_BG_DIMMER');
+    const isAggDmx = costHas(cost, 'CF_AGG_DMX');
+    if (!isBgDimmer && !isAggDmx) {
+      const pinSlots = def ? Object.keys(def.pins || {}) : ['pin1', 'pin2', 'pin3', 'pin4'];
+      pinSlots.forEach((slot, idx) => {
+        const routeVal = o.pins?.[idx];
+        if (routeVal && routeVal.source === 0 && routeVal.pin !== 255) {
+          ledc++;
+        }
+      });
+    }
+  }
+  return {
+    ledc: ledc,
+    rmt: cost.rmt || 0,
+    uart: cost.uart || 0,
+    dac: cost.dac || 0,
+    timer: cost.timer || 0
+  };
+}
+
+function channelCost(o) {
+  const def = outputModeForObj(o);
+  const cost = def?.cost || {};
+  return {
+    cpu: cost.cpuUs || 0,
+    ram: cost.ramBytes || 0
+  };
+}
+

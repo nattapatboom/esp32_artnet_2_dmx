@@ -34,23 +34,34 @@ inline uint32_t calibratedPwmDacDuty(OutputChannel& ch, uint32_t value, uint32_t
     return minDuty - ((uint64_t)value * (minDuty - maxDuty)) / inputMax;
 }
 
+inline uint8_t segmentRouteIndex(OutputChannel& ch, uint8_t idx) {
+    const OutputDefs::OutputModeDef* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
+    bool primaryIsSeg = def != nullptr && def->primaryRouteIsSegment;
+    return primaryIsSeg ? idx : (idx + 1);
+}
+
 inline uint8_t segmentGpio(OutputChannel& ch, uint8_t idx) {
-    uint8_t gpio = (ch.seg_pins[idx] != 255) ? ch.seg_pins[idx] : (ch.pin + idx);
+    uint8_t routeIdx = segmentRouteIndex(ch, idx);
+    if (routeIdx >= 9) return 255;
+    uint8_t gpio = ch.routes[routeIdx].pin;
     return (gpio > 39) ? 255 : gpio;
 }
 
 inline void setupSegmentOutput(OutputChannel& ch, uint8_t idx, bool offState) {
-    uint8_t src = ch.seg_sources[idx];
-    bool inv = (ch.seg_inverts >> idx) & 1;
+    uint8_t routeIdx = segmentRouteIndex(ch, idx);
+    if (routeIdx >= 9) return;
+
+    uint8_t src = ch.routes[routeIdx].source;
+    bool inv = ch.routes[routeIdx].invert;
     bool active_off = offState ^ inv;
     if (src == 1) {
-        pcaManager.getOrCreateDriver(ch.seg_addrs[idx]);
-        pcaManager.setFrequency(ch.seg_addrs[idx], outputCtrl.sharedPcaFrequency(ch.seg_addrs[idx]));
-        if (ch.seg_channels[idx] != 255) pcaManager.write(ch.seg_addrs[idx], ch.seg_channels[idx], active_off ? 4095 : 0);
+        pcaManager.getOrCreateDriver(ch.routes[routeIdx].addr);
+        pcaManager.setFrequency(ch.routes[routeIdx].addr, outputCtrl.sharedPcaFrequency(ch.routes[routeIdx].addr));
+        if (ch.routes[routeIdx].channel != 255) pcaManager.write(ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_off ? 4095 : 0);
         return;
     }
     if (src >= 2 && src <= 4) {
-        if (ch.seg_channels[idx] != 255) digitalExpanderManager.write(src, ch.seg_addrs[idx], ch.seg_channels[idx], active_off, true);
+        if (ch.routes[routeIdx].channel != 255) digitalExpanderManager.write(src, ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_off, true);
         return;
     }
     uint8_t pin = segmentGpio(ch, idx);
@@ -61,15 +72,18 @@ inline void setupSegmentOutput(OutputChannel& ch, uint8_t idx, bool offState) {
 }
 
 inline void writeSegmentOutput(OutputChannel& ch, uint8_t idx, bool state) {
-    uint8_t src = ch.seg_sources[idx];
-    bool inv = (ch.seg_inverts >> idx) & 1;
+    uint8_t routeIdx = segmentRouteIndex(ch, idx);
+    if (routeIdx >= 9) return;
+
+    uint8_t src = ch.routes[routeIdx].source;
+    bool inv = ch.routes[routeIdx].invert;
     bool active_state = state ^ inv;
     if (src == 1) {
-        if (ch.seg_channels[idx] != 255) pcaManager.write(ch.seg_addrs[idx], ch.seg_channels[idx], active_state ? 4095 : 0);
+        if (ch.routes[routeIdx].channel != 255) pcaManager.write(ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_state ? 4095 : 0);
         return;
     }
     if (src >= 2 && src <= 4) {
-        if (ch.seg_channels[idx] != 255) digitalExpanderManager.write(src, ch.seg_addrs[idx], ch.seg_channels[idx], active_state);
+        if (ch.routes[routeIdx].channel != 255) digitalExpanderManager.write(src, ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_state);
         return;
     }
     uint8_t pin = segmentGpio(ch, idx);

@@ -5,9 +5,9 @@
 #include "output_control.h"
 
 inline void relaySetup(OutputChannel& ch) {
-    if (ch.pin == 255) return;
-    pinMode(ch.pin, OUTPUT);
-    digitalWrite(ch.pin, ch.pin_invert ? HIGH : LOW);
+    if (ch.routes[0].pin == 255) return;
+    pinMode(ch.routes[0].pin, OUTPUT);
+    digitalWrite(ch.routes[0].pin, ch.routes[0].invert ? HIGH : LOW);
 }
 
 inline void relayUpdate() {

@@ -99,22 +99,10 @@ struct RamBudget {
 // Pin index → source field helper: index 0→ch.source, 1→pin2_source, etc.
 // For 7-segment direct-drive types (12,13), all pins map via seg_sources.
 inline uint8_t getPinSource(const OutputChannel& ch, uint8_t pinIndex) {
-    if (ch.type == OutputDefs::TYPE_7SEG_7PIN || ch.type == OutputDefs::TYPE_7SEG_8PIN) {
-        const auto* d = OutputDefs::modeDef(ch.type, ch.mc_mode);
-        if (d && d->segmentCount > 0) {
-            if (d->pinCount > d->segmentCount && pinIndex == 0) return ch.source;
-            if (ch.pin2_source != 0) return ch.pin2_source;
-            uint8_t segIdx = (d->pinCount > d->segmentCount) ? pinIndex - 1 : pinIndex;
-            return (segIdx < 8) ? ch.seg_sources[segIdx] : 0;
-        }
+    if (pinIndex < 9) {
+        return ch.routes[pinIndex].source;
     }
-    switch (pinIndex) {
-        case 0: return ch.source;
-        case 1: return ch.pin2_source;
-        case 2: return ch.pin3_source;
-        case 3: return ch.pin4_source;
-        default: return (pinIndex - 4 < 8) ? ch.seg_sources[pinIndex - 4] : 0;
-    }
+    return 0;
 }
 
 inline HardwareResource estimateHardware(const OutputChannel& ch) {
@@ -139,12 +127,12 @@ inline HardwareResource estimateHardware(const OutputChannel& ch) {
     h.rmt += rmtFromPins;
 
     // Analog RGB pin4 only counts in RGBW mode (color_order >= 4)
-    if (ch.type == OutputDefs::TYPE_ANALOG_RGB && ch.color_order < 4 && ch.pin4_source == 0 && h.ledc > 0) {
+    if (ch.type == OutputDefs::TYPE_ANALOG_RGB && ch.color_order < 4 && ch.routes[3].source == 0 && h.ledc > 0) {
         h.ledc--;
     }
 
     // DAC type 14: source 5-7 is I2C DAC (no internal DAC). Internal DAC=source 0.
-    if (ch.type == OutputDefs::TYPE_DAC && ch.source == 0) {
+    if (ch.type == OutputDefs::TYPE_DAC && ch.routes[0].source == 0) {
         h.dac = 1;
     }
 
@@ -295,7 +283,7 @@ inline HardwareResource totalHardware(const std::vector<OutputChannel>& chs) {
         t = t + estimateHardware(ch);
         uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
         if (flags & OutputDefs::CF_BG_DIMMER) hasDimmer = true;
-        if ((flags & OutputDefs::CF_AGG_DMX) && ch.source == 0) dmxCount++;
+        if ((flags & OutputDefs::CF_AGG_DMX) && ch.routes[0].source == 0) dmxCount++;
         else if (flags & OutputDefs::CF_AGG_UART_RESERVED) dfPlayerCount++;
     }
     // DFPlayer has UART priority; DMX falls back to RMT when UARTs exhausted
@@ -338,7 +326,7 @@ inline RamBudget totalRam(const std::vector<OutputChannel>& chs) {
         const auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
         uint16_t flags = def != nullptr ? def->cost.flags : OutputDefs::CF_NONE;
         t.bytes += estimateChannelCost(ch).ramBytes;
-        if ((flags & OutputDefs::CF_AGG_DMX) && ch.source == 0) dmxCount++;
+        if ((flags & OutputDefs::CF_AGG_DMX) && ch.routes[0].source == 0) dmxCount++;
         else if (flags & OutputDefs::CF_AGG_UART_RESERVED) dfPlayerCount++;
     }
     uint8_t freeUarts = dfPlayerCount >= 2 ? 0 : (uint8_t)(2 - dfPlayerCount);

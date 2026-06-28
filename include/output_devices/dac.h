@@ -6,12 +6,12 @@
 #include "i2c_devices/i2c_dac.h"
 
 inline void dacUpdate(OutputChannel& ch) {
-    if (ch.source == 5) {
-        I2cDac::writeMcp4725(ch.pca_addr, ch.dmxBuffer[0]);
-    } else if (ch.source == 6) {
-        I2cDac::writeDac7571(ch.pca_addr, ch.dmxBuffer[0]);
-    } else if (ch.source == 7) {
-        I2cDac::writeDac7573(ch.pca_addr, ch.pca_channel, ch.dmxBuffer[0]);
+    if (ch.routes[0].source == 5) {
+        I2cDac::writeMcp4725(ch.routes[0].addr, ch.dmxBuffer[0]);
+    } else if (ch.routes[0].source == 6) {
+        I2cDac::writeDac7571(ch.routes[0].addr, ch.dmxBuffer[0]);
+    } else if (ch.routes[0].source == 7) {
+        I2cDac::writeDac7573(ch.routes[0].addr, ch.routes[0].channel, ch.dmxBuffer[0]);
     }
 }
 

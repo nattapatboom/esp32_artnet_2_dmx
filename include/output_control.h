@@ -22,6 +22,9 @@
 extern PCA9685Manager pcaManager;
 extern DigitalExpanderManager digitalExpanderManager;
 
+class OutputControl;
+extern OutputControl outputCtrl;
+
 extern std::atomic<unsigned long> lastDmxUpdateTime;
 extern std::atomic<bool> systemActive;
 extern std::atomic<bool> networkFramePending;
@@ -37,15 +40,27 @@ public:
     virtual bool IsRgbw() const { return false; }
 };
 
-struct OutputChannel {
-    uint8_t type = 0;
-    uint8_t source = 0;
+struct PinRoute {
     uint8_t pin = 255;
-    uint8_t pca_addr = 0x40;
-    uint8_t pca_channel = 0;
-    uint8_t pca_channel2 = 255;
-    uint8_t pca_channel3 = 255;
-    uint8_t pca_channel4 = 255;
+    uint8_t source = 0;
+    uint8_t addr = 32;
+    uint8_t channel = 255;
+    bool invert = false;
+};
+
+struct OutputChannel {
+    OutputChannel() {
+        routes[0].addr = 64;
+        routes[0].channel = 0;
+        for (int i = 1; i < 9; i++) {
+            routes[i].addr = 32;
+            routes[i].channel = 255;
+        }
+    }
+
+    uint8_t type = 0;
+    PinRoute routes[9];
+
     uint16_t start_universe = 0;
     uint16_t start_address = 1;
     uint16_t led_count = 0;
@@ -65,18 +80,6 @@ struct OutputChannel {
     uint32_t prev_7seg_val = 0;
     bool prev_7seg_valid = false;
 
-    uint8_t pin2 = 255;
-    uint8_t pin3 = 255;
-    uint8_t pin4 = 255;
-    uint8_t pin4_source = 0;
-    uint8_t pin4_addr = 0x20;
-    uint8_t pin4_channel = 255;
-    uint8_t pin2_source = 0;
-    uint8_t pin2_addr = 0x20;
-    uint8_t pin2_channel = 255;
-    uint8_t pin3_source = 0;
-    uint8_t pin3_addr = 0x20;
-    uint8_t pin3_channel = 255;
     uint8_t mc_resolution = 8;
     uint16_t mc_freq = 1000;
     uint8_t mc_mode = 0;
@@ -92,10 +95,6 @@ struct OutputChannel {
     uint16_t mc_homing_timeout = 5;
     float mc_scale_factor = 0.0f;
     uint8_t mc_unit_type = 0;
-    bool pin_invert = false;
-    bool pin2_invert = false;
-    bool pin3_invert = false;
-    bool pin4_invert = false;
 
     uint8_t stepper_cmd_state = 0;
     unsigned long stepper_cmd_start_time = 0;
@@ -104,11 +103,6 @@ struct OutputChannel {
     uint8_t ledc_chan2 = 255;
     uint8_t ledc_chan3 = 255;
     uint8_t ledc_chan4 = 255;
-    uint8_t seg_pins[8] = {255,255,255,255,255,255,255,255};
-    uint8_t seg_sources[8] = {0,0,0,0,0,0,0,0};
-    uint8_t seg_addrs[8] = {0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20};
-    uint8_t seg_channels[8] = {255,255,255,255,255,255,255,255};
-    uint8_t seg_inverts = 0;
 
     uint8_t* dmxBuffer = nullptr;
     uint8_t* shadowBuffer = nullptr;
@@ -126,162 +120,42 @@ struct OutputChannel {
     unsigned long solenoid_last_trigger = 0;
     DFPlayerController* dfPlayer = nullptr;
     FuncGenController* funcGen = nullptr;
-    uint8_t getPin(uint8_t idx) const {
-        if (idx == 0) return pin;
-        if (idx == 1) return pin2;
-        if (idx == 2) return pin3;
-        if (idx == 3) return pin4;
-        return 255;
-    }
-    void setPin(uint8_t idx, uint8_t val) {
-        if (idx == 0) pin = val;
-        else if (idx == 1) pin2 = val;
-        else if (idx == 2) pin3 = val;
-        else if (idx == 3) pin4 = val;
-    }
-    uint8_t getSource(uint8_t idx) const {
-        if (idx == 0) return source;
-        if (idx == 1) return pin2_source;
-        if (idx == 2) return pin3_source;
-        if (idx == 3) return pin4_source;
-        return 0;
-    }
-    void setSource(uint8_t idx, uint8_t val) {
-        if (idx == 0) source = val;
-        else if (idx == 1) pin2_source = val;
-        else if (idx == 2) pin3_source = val;
-        else if (idx == 3) pin4_source = val;
-    }
-    uint8_t getAddr(uint8_t idx) const {
-        if (idx == 0) return pca_addr;
-        if (idx == 1) return pin2_addr;
-        if (idx == 2) return pin3_addr;
-        if (idx == 3) return pin4_addr;
-        return 32;
-    }
-    void setAddr(uint8_t idx, uint8_t val) {
-        if (idx == 0) pca_addr = val;
-        else if (idx == 1) pin2_addr = val;
-        else if (idx == 2) pin3_addr = val;
-        else if (idx == 3) pin4 = val;
-    }
-    uint8_t getChannel(uint8_t idx) const {
-        if (idx == 0) return pca_channel;
-        if (idx == 1) return pin2_channel;
-        if (idx == 2) return pin3_channel;
-        if (idx == 3) return pin4_channel;
-        return 255;
-    }
-    void setChannel(uint8_t idx, uint8_t val) {
-        if (idx == 0) pca_channel = val;
-        else if (idx == 1) pin2_channel = val;
-        else if (idx == 2) pin3_channel = val;
-        else if (idx == 3) pin4_channel = val;
-    }
-    bool getInvert(uint8_t idx) const {
-        if (idx == 0) return pin_invert;
-        if (idx == 1) return pin2_invert;
-        if (idx == 2) return pin3_invert;
-        if (idx == 3) return pin4_invert;
-        return false;
-    }
-    void setInvert(uint8_t idx, bool val) {
-        if (idx == 0) pin_invert = val;
-        else if (idx == 1) pin2_invert = val;
-        else if (idx == 2) pin3_invert = val;
-        else if (idx == 3) pin4 = val;
-    }
 };
 
 inline void loadChannelPins(OutputChannel& ch, JsonArrayConst pinsArr) {
-    for (int i = 0; i < 4; i++) {
-        ch.setPin(i, 255);
-        ch.setSource(i, 0);
-        ch.setAddr(i, i == 0 ? 64 : 32);
-        ch.setChannel(i, i == 0 ? 0 : 255);
-        ch.setInvert(i, false);
+    for (int i = 0; i < 9; i++) {
+        ch.routes[i].pin = 255;
+        ch.routes[i].source = 0;
+        ch.routes[i].addr = (i == 0 ? 64 : 32);
+        ch.routes[i].channel = (i == 0 ? 0 : 255);
+        ch.routes[i].invert = false;
     }
-    for (int s = 0; s < 8; s++) {
-        ch.seg_pins[s] = 255;
-        ch.seg_sources[s] = 0;
-        ch.seg_addrs[s] = 32;
-        ch.seg_channels[s] = 255;
-    }
-    ch.seg_inverts = 0;
 
     int size = pinsArr.size();
     if (size == 0) return;
 
-    const OutputDefs::OutputModeDef* modeDef = OutputDefs::modeDef(ch.type, ch.mc_mode);
-    if (modeDef == nullptr) return;
-
-    for (uint8_t i = 0; i < modeDef->pinCount && i < size; i++) {
+    for (int i = 0; i < size && i < 9; i++) {
         JsonObjectConst p = pinsArr[i];
-        bool isSeg = false;
-        if (modeDef->segmentCount > 0) {
-            if (modeDef->primaryRouteIsSegment) {
-                isSeg = true;
-            } else if (i > 0) {
-                isSeg = true;
-            }
-        }
-
-        if (isSeg) {
-            int s = modeDef->primaryRouteIsSegment ? i : (i - 1);
-            if (s >= 0 && s < 8) {
-                ch.seg_pins[s] = p["pin"] | 255;
-                ch.seg_sources[s] = p["source"] | 0;
-                ch.seg_addrs[s] = p["addr"] | 32;
-                ch.seg_channels[s] = p["channel"] | 255;
-                if (p["invert"] | false) {
-                    ch.seg_inverts |= (1 << s);
-                }
-            }
-        } else {
-            if (i < 4) {
-                ch.setPin(i, p["pin"] | 255);
-                ch.setSource(i, p["source"] | 0);
-                ch.setAddr(i, p["addr"] | (i == 0 ? 64 : 32));
-                ch.setChannel(i, p["channel"] | (i == 0 ? 0 : 255));
-                ch.setInvert(i, p["invert"] | false);
-            }
-        }
+        ch.routes[i].pin = p["pin"] | 255;
+        ch.routes[i].source = p["source"] | 0;
+        ch.routes[i].addr = p["addr"] | (i == 0 ? 64 : 32);
+        ch.routes[i].channel = p["channel"] | (i == 0 ? 0 : 255);
+        ch.routes[i].invert = p["invert"] | false;
     }
 }
 
 inline void saveChannelPins(const OutputChannel& ch, JsonArray pinsArr) {
     const OutputDefs::OutputModeDef* modeDef = OutputDefs::modeDef(ch.type, ch.mc_mode);
-    if (modeDef == nullptr) return;
+    uint8_t pinCount = modeDef != nullptr ? modeDef->pinCount : 1;
+    if (pinCount > 9) pinCount = 9;
 
-    for (uint8_t i = 0; i < modeDef->pinCount; i++) {
+    for (uint8_t i = 0; i < pinCount; i++) {
         JsonObject p = pinsArr.add<JsonObject>();
-        bool isSeg = false;
-        if (modeDef->segmentCount > 0) {
-            if (modeDef->primaryRouteIsSegment) {
-                isSeg = true;
-            } else if (i > 0) {
-                isSeg = true;
-            }
-        }
-
-        if (isSeg) {
-            int s = modeDef->primaryRouteIsSegment ? i : (i - 1);
-            if (s >= 0 && s < 8) {
-                p["pin"] = ch.seg_pins[s];
-                p["source"] = ch.seg_sources[s];
-                p["addr"] = ch.seg_addrs[s];
-                p["channel"] = ch.seg_channels[s];
-                p["invert"] = (bool)((ch.seg_inverts >> s) & 1);
-            }
-        } else {
-            if (i < 4) {
-                p["pin"] = ch.getPin(i);
-                p["source"] = ch.getSource(i);
-                p["addr"] = ch.getAddr(i);
-                p["channel"] = ch.getChannel(i);
-                p["invert"] = ch.getInvert(i);
-            }
-        }
+        p["pin"] = ch.routes[i].pin;
+        p["source"] = ch.routes[i].source;
+        p["addr"] = ch.routes[i].addr;
+        p["channel"] = ch.routes[i].channel;
+        p["invert"] = ch.routes[i].invert;
     }
 }
 
@@ -289,75 +163,6 @@ inline uint16_t outputDmxByteCount(const OutputChannel& ch) {
     return OutputDefs::dmxBufferRamForChannel(ch.type, ch.led_count, ch.color_order, ch.mc_resolution, ch.mc_mode);
 }
 
-inline void writeOutputPin(OutputChannel& ch, uint8_t pinNum, bool state) {
-    uint8_t source = 0;
-    uint8_t address = 0x20;
-    uint8_t channel = 255;
-    uint8_t gpio = 255;
-    bool inv = false;
-
-    if (pinNum == 1) {
-        source = ch.source; address = ch.pca_addr; channel = ch.pca_channel;
-        gpio = ch.pin; inv = ch.pin_invert;
-    } else if (pinNum == 2) {
-        source = ch.pin2_source; address = ch.pin2_addr; channel = ch.pin2_channel;
-        gpio = ch.pin2; inv = ch.pin2_invert;
-        if (source == 0 && ch.source != 0 && ch.pca_channel2 != 255) {
-            source = ch.source; address = ch.pca_addr; channel = ch.pca_channel2; gpio = 255;
-        }
-    } else if (pinNum == 3) {
-        source = ch.pin3_source; address = ch.pin3_addr; channel = ch.pin3_channel;
-        gpio = ch.pin3; inv = ch.pin3_invert;
-        if (source == 0 && ch.source != 0 && ch.pca_channel3 != 255) {
-            source = ch.source; address = ch.pca_addr; channel = ch.pca_channel3; gpio = 255;
-        }
-    } else if (pinNum == 4) {
-        source = ch.pin4_source; address = ch.pin4_addr; channel = ch.pin4_channel;
-        gpio = ch.pin4; inv = ch.pin4_invert;
-        if (source == 0 && ch.source != 0 && ch.pca_channel4 != 255) {
-            source = ch.source; address = ch.pca_addr; channel = ch.pca_channel4; gpio = 255;
-        }
-    }
-
-    if (gpio == 255 && channel == 255) return;
-    if (source == 0) {
-        if (gpio != 255) digitalWrite(gpio, (state ^ inv) ? HIGH : LOW);
-    } else if (source == 1) {
-        if (channel != 255) pcaManager.write(address, channel, (state ^ inv) ? 4095 : 0);
-    } else if (source >= 2 && source <= 4) {
-        if (channel != 255) digitalExpanderManager.write(source, address, channel, state ^ inv);
-    }
-}
-
-inline bool readOutputPin(OutputChannel& ch, uint8_t pinNum) {
-    uint8_t source = 0;
-    uint8_t address = 0x20;
-    uint8_t channel = 255;
-    uint8_t gpio = 255;
-    bool inv = false;
-
-    if (pinNum == 1) {
-        source = ch.source; address = ch.pca_addr; channel = ch.pca_channel;
-        gpio = ch.pin; inv = ch.pin_invert;
-    } else if (pinNum == 2) {
-        source = ch.pin2_source; address = ch.pin2_addr; channel = ch.pin2_channel;
-        gpio = ch.pin2; inv = ch.pin2_invert;
-    } else if (pinNum == 3) {
-        source = ch.pin3_source; address = ch.pin3_addr; channel = ch.pin3_channel;
-        gpio = ch.pin3; inv = ch.pin3_invert;
-    } else if (pinNum == 4) {
-        source = ch.pin4_source; address = ch.pin4_addr; channel = ch.pin4_channel;
-        gpio = ch.pin4; inv = ch.pin4_invert;
-    }
-
-    bool val = false;
-    if (source == 0) {
-        if (gpio != 255) val = digitalRead(gpio) == HIGH;
-    } else if (source >= 2 && source <= 4) {
-        if (channel != 255) val = digitalExpanderManager.digitalRead(source, address, channel);
-    }
-    return val ^ inv;
-}
 
 class OutputControl {
 private:
@@ -366,12 +171,15 @@ private:
     uint16_t getPcaSharedFrequency(uint8_t address) const {
         uint16_t firstConfiguredFreq = 0;
         for (const auto& candidate : channels) {
-            if (candidate.source != 1 || candidate.pca_addr != address) continue;
-            if (candidate.type == OutputDefs::TYPE_SERVO) return 50;
-            if ((candidate.type == OutputDefs::TYPE_SINGLE_LED || candidate.type == OutputDefs::TYPE_MOTOR ||
-                 candidate.type == OutputDefs::TYPE_ANALOG_RGB || candidate.type == OutputDefs::TYPE_SMOKE ||
-                 candidate.type == OutputDefs::TYPE_PWM_DAC) && firstConfiguredFreq == 0) {
-                firstConfiguredFreq = candidate.mc_freq;
+            for (int r = 0; r < 9; r++) {
+                if (candidate.routes[r].source == 1 && candidate.routes[r].addr == address) {
+                    if (candidate.type == OutputDefs::TYPE_SERVO) return 50;
+                    if ((candidate.type == OutputDefs::TYPE_SINGLE_LED || candidate.type == OutputDefs::TYPE_MOTOR ||
+                         candidate.type == OutputDefs::TYPE_ANALOG_RGB || candidate.type == OutputDefs::TYPE_SMOKE ||
+                         candidate.type == OutputDefs::TYPE_PWM_DAC) && firstConfiguredFreq == 0) {
+                        firstConfiguredFreq = candidate.mc_freq;
+                    }
+                }
             }
         }
         return firstConfiguredFreq > 0 ? firstConfiguredFreq : 1000;
@@ -465,7 +273,7 @@ public:
             Serial.println("/outputs.json not found. Creating default output channel...");
             OutputChannel defCh;
             defCh.type = 3;
-            defCh.pin = DEFAULT_LED_DATA_PIN;
+            defCh.routes[0].pin = DEFAULT_LED_DATA_PIN;
             defCh.start_universe = 0;
             defCh.start_address = 1;
             defCh.led_count = 170;
@@ -497,7 +305,7 @@ public:
             Serial.println("Failed to read outputs.json. Using fallback default.");
             OutputChannel defCh;
             defCh.type = 3;
-            defCh.pin = DEFAULT_LED_DATA_PIN;
+            defCh.routes[0].pin = DEFAULT_LED_DATA_PIN;
             defCh.start_universe = 0;
             defCh.start_address = 1;
             defCh.led_count = 170;
@@ -697,6 +505,48 @@ public:
 
     std::vector<OutputChannel>& getChannels() { return channels; }
 };
+
+inline void writeOutputPin(OutputChannel& ch, uint8_t pinNum, bool state) {
+    uint8_t idx = pinNum - 1;
+    if (idx >= 9) return;
+
+    uint8_t source = ch.routes[idx].source;
+    uint8_t address = ch.routes[idx].addr;
+    uint8_t channel = ch.routes[idx].channel;
+    uint8_t gpio = ch.routes[idx].pin;
+    bool inv = ch.routes[idx].invert;
+
+    bool activeState = state ^ inv;
+
+    if (source == 0) {
+        if (gpio != 255) digitalWrite(gpio, activeState ? HIGH : LOW);
+    } else if (source == 1) {
+        pcaManager.getOrCreateDriver(address);
+        pcaManager.setFrequency(address, outputCtrl.sharedPcaFrequency(address));
+        if (channel != 255) pcaManager.write(address, channel, activeState ? 4095 : 0);
+    } else if (source >= 2 && source <= 4) {
+        if (channel != 255) digitalExpanderManager.write(source, address, channel, activeState, true);
+    }
+}
+
+inline bool readOutputPin(OutputChannel& ch, uint8_t pinNum) {
+    uint8_t idx = pinNum - 1;
+    if (idx >= 9) return false;
+
+    uint8_t source = ch.routes[idx].source;
+    uint8_t address = ch.routes[idx].addr;
+    uint8_t channel = ch.routes[idx].channel;
+    uint8_t gpio = ch.routes[idx].pin;
+    bool inv = ch.routes[idx].invert;
+
+    bool val = false;
+    if (source == 0) {
+        if (gpio != 255) val = digitalRead(gpio) == HIGH;
+    } else if (source >= 2 && source <= 4) {
+        if (channel != 255) val = digitalExpanderManager.digitalRead(source, address, channel);
+    }
+    return val ^ inv;
+}
 
 extern OutputControl outputCtrl;
 

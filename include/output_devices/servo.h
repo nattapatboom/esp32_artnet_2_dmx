@@ -6,11 +6,11 @@
 #include "ledc_helpers.h"
 
 inline void servoSetup(OutputChannel& ch, uint8_t& ledcIdx) {
-    if (ch.pin == 255) return;
+    if (ch.routes[0].pin == 255) return;
     uint8_t pwmChan = allocateLedc(ledcIdx);
     if (pwmChan != 255) {
         ledcSetup(pwmChan, 50, 16);
-        ledcAttachPin(ch.pin, pwmChan);
+        ledcAttachPin(ch.routes[0].pin, pwmChan);
         ledcWrite(pwmChan, 0);
         ch.dmxPort = pwmChan;
     }
@@ -22,9 +22,9 @@ inline void servoUpdate(OutputChannel& ch) {
     if (ch.mc_max_us <= ch.mc_min_us) return;
     uint32_t val = getDmxValue(ch);
     uint32_t pulse_us = ch.mc_min_us + (val * (ch.mc_max_us - ch.mc_min_us)) / max_val;
-    if (ch.source == 1) {
+    if (ch.routes[0].source == 1) {
         uint32_t ticks = (pulse_us * 4096) / 20000;
-        pcaManager.write(ch.pca_addr, ch.pca_channel, ticks > 4095 ? 4095 : ticks);
+        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, ticks > 4095 ? 4095 : ticks);
     } else if (ch.dmxPort != 255) {
         uint32_t duty = (pulse_us * 65535) / 20000;
         ledcWrite(ch.dmxPort, duty);
