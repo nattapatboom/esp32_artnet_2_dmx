@@ -97,6 +97,11 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
   - `artnet_control.h` — Art-Net UDP listener
   - `sacn_control.h` — sACN E1.31 listener
 - `src/main.cpp` — setup, HTTP API, validation, network/display tasks
+- `src/output_control.cpp` — OutputControl loop/load/save/begin/swapBuffers/clearChannels + free functions loadChannelPins/saveChannelPins/outputDmxByteCount/writeOutputPin/readOutputPin
+- `src/motion_control.cpp` — MotionControl begin/update
+- `src/espnow_control.cpp` — EspNowControl begin/loop/loadPeers/sendDmx + static data definitions
+- `src/artnet_control.cpp` — ArtNetControl begin/loop/parseArtDmx/sendArtPollReply + static packetCount
+- `src/sacn_control.cpp` — SACNControl begin/process/validation + helper methods
 - `web/index.html` — Web UI source; edit this file, then run `tools/build_web.py`
 - `include/web_pages.h` — generated embedded Web UI; do not edit directly
 - `include/type_protocol.h` — shared types for the firmware↔Web UI interface contract (`FieldDef`, `TestCmdDef`)

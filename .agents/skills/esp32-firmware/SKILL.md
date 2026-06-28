@@ -30,7 +30,7 @@ Receives Art-Net via Ethernet (LAN) → controls multiple output types via GPIO,
 - **Build:** Flash ~63.6%, RAM ~17.3%
 - **Layout:** v3 (0-18) — config version 3
 - **Protocols:** Art-Net, sACN E1.31, ESP-NOW bridge
-- **Last Version:** 1.30.00 + header refactor (cleanup duplicates, output_common.h, output_impl.h)
+- **Last Version:** 1.30.00 + header refactor (cleanup duplicates, output_common.h, output_impl.h → *.cpp split)
 
 ## Board: WT32-ETH01
 - **CPU:** ESP32 dual-core (Core 0 = network/display, Core 1 = application)
@@ -92,8 +92,7 @@ Receives Art-Net via Ethernet (LAN) → controls multiple output types via GPIO,
 
 ### Key Files
 - `include/output_common.h` — Shared primitives: SENTINEL_NONE, DMX_BUFFER_SIZE, getValueByteCount, getMaxValue
-- `include/output_control.h` — Core: OutputChannel struct, PixelStripWrapper abstract base, DMX processing, save/load JSON. Declares setupChannels/loop/updateLeds (bodies in output_impl.h)
-- `include/output_impl.h` — Inline bodies of OutputControl::loop/updateLeds/setupChannels; includes device headers; included once by main.cpp
+- `include/output_control.h` — Core: OutputChannel struct, PixelStripWrapper abstract base, DMX processing, save/load JSON. Declares setupChannels/loop/updateLeds (bodies in output_control.cpp)
 - `include/motion_control.h` — thin coordinator delegating to `output_devices/` files
 - `include/output_devices/` — one file per output type (17 files total: 0-18)
 - `include/scoring.h` — Resource + Compute scoring (limit ~109pts)
@@ -105,6 +104,11 @@ Receives Art-Net via Ethernet (LAN) → controls multiple output types via GPIO,
 - `include/output_devices/led_strip.h` — PixelStripRmt/PixelStripRmtRgbw concrete classes + ledStripSetup/Update
 - `include/config.h` — System configuration struct
 - `src/main.cpp` — Entry point, HTTP API routes, validation, network tasks
+- `src/output_control.cpp` — OutputControl loop/load/save/begin/swapBuffers/clearChannels + setupChannels + free functions loadChannelPins/saveChannelPins/outputDmxByteCount/writeOutputPin/readOutputPin
+- `src/motion_control.cpp` — MotionControl begin/update
+- `src/espnow_control.cpp` — EspNowControl begin/loop/loadPeers/sendDmx + static data definitions
+- `src/artnet_control.cpp` — ArtNetControl begin/loop/parseArtDmx/sendArtPollReply + static packetCount
+- `src/sacn_control.cpp` — SACNControl begin/process/validation + helper methods
 - `include/web_pages.h` — Embedded HTML/CSS/JS for Web UI (auto-generated from `web/index.html`)
 - `web/index.html` — Edit this file, run `tools/build_web.py` to regenerate `web_pages.h`
 
