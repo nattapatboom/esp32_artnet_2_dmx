@@ -64,6 +64,26 @@ public:
 
     uint8_t displayCols() const { return _cols; }
     uint8_t displayRows() const { return _rows; }
+    bool isOled() const { return _oled != nullptr; }
+
+    void showBitmap(const uint8_t* bitmap, uint16_t len) {
+        if (!_active || !_oled) return;
+        I2cBus::Lock lock;
+        if (!lock.locked()) return;
+        Wire.beginTransmission(_addr);
+        Wire.write((uint8_t)0x00);
+        Wire.write((uint8_t)0x21); Wire.write(0); Wire.write(127);
+        Wire.write((uint8_t)0x22); Wire.write(0); Wire.write(7);
+        Wire.endTransmission();
+        for (uint16_t i = 0; i < len; i += 16) {
+            Wire.beginTransmission(_addr);
+            Wire.write((uint8_t)0x40);
+            for (uint8_t j = 0; j < 16; j++) {
+                Wire.write(pgm_read_byte(&bitmap[i + j]));
+            }
+            Wire.endTransmission();
+        }
+    }
 
     void update(const String& line1, const String& line2, const String& line3, const String& line4) {
         if (!_active) return;

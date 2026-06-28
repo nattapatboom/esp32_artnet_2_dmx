@@ -31,6 +31,7 @@
 #include "network_protocol.h"
 #include "ota_control.h"
 #include "recovery_control.h"
+#include "logo_chal.h"
 
 // Scroll timing for display overflow lines
 #define SCROLL_SPEED_MS  300
@@ -2727,28 +2728,32 @@ void setup() {
 
         // Show startup logo
         {
-            uint8_t dcols = display.displayCols();
-            uint8_t drows = display.displayRows();
-            String mac = WiFi.macAddress();
-            mac.replace(":", "");
-            String suffix = mac.substring(mac.length() - 4);
-            suffix.toLowerCase();
-            String s1 = String(sysCfg.artnet_short_name) + suffix;
-            if ((uint8_t)s1.length() > dcols) s1 = s1.substring(0, dcols);
-            const char* modeStr = "?";
-            if (sysCfg.device_mode == 0) modeStr = "Art-Net Eth";
-            else if (sysCfg.device_mode == 1) modeStr = "ESP-NOW Master";
-            else if (sysCfg.device_mode == 2) modeStr = "ESP-NOW Slave";
-            String s2 = String(modeStr);
-            if ((uint8_t)s2.length() > dcols) s2 = s2.substring(0, dcols);
-            if (drows <= 2) {
-                display.update(s1, s2, "", "");
+            if (display.isOled()) {
+                display.showBitmap(CHAL_LOGO_128x64, sizeof(CHAL_LOGO_128x64));
             } else {
-                String s3 = "WT32-ETH01 Node";
-                if ((uint8_t)s3.length() > dcols) s3 = s3.substring(0, dcols);
-                String s4 = "Booting...";
-                if ((uint8_t)s4.length() > dcols) s4 = s4.substring(0, dcols);
-                display.update(s1, s2, s3, s4);
+                uint8_t dcols = display.displayCols();
+                uint8_t drows = display.displayRows();
+                String mac = WiFi.macAddress();
+                mac.replace(":", "");
+                String suffix = mac.substring(mac.length() - 4);
+                suffix.toLowerCase();
+                String s1 = String(sysCfg.artnet_short_name) + suffix;
+                if ((uint8_t)s1.length() > dcols) s1 = s1.substring(0, dcols);
+                const char* modeStr = "?";
+                if (sysCfg.device_mode == 0) modeStr = "Art-Net Eth";
+                else if (sysCfg.device_mode == 1) modeStr = "ESP-NOW Master";
+                else if (sysCfg.device_mode == 2) modeStr = "ESP-NOW Slave";
+                String s2 = String(modeStr);
+                if ((uint8_t)s2.length() > dcols) s2 = s2.substring(0, dcols);
+                if (drows <= 2) {
+                    display.update(s1, s2, "", "");
+                } else {
+                    String s3 = "WT32-ETH01 Node";
+                    if ((uint8_t)s3.length() > dcols) s3 = s3.substring(0, dcols);
+                    String s4 = "Booting...";
+                    if ((uint8_t)s4.length() > dcols) s4 = s4.substring(0, dcols);
+                    display.update(s1, s2, s3, s4);
+                }
             }
         }
         vTaskDelay(pdMS_TO_TICKS(3000));
