@@ -38,6 +38,11 @@
           <input type="number" id="espnow_chunk_size" name="espnow_chunk_size" value="200" min="16" max="230" oninput="updateScoreBar()">
           <div class="hint">Payload size per wireless packet (16 to 230 bytes). Default is 200.</div>
         </div>
+        <div class="f" id="espnow_queue_depth_grp">
+          <label for="espnow_queue_depth">ESP-NOW Queue Depth</label>
+          <input type="number" id="espnow_queue_depth" name="espnow_queue_depth" value="16" min="4" max="64">
+          <div class="hint">Max DMX packets queued for processing (Slave mode). Increase if packets are dropped under high traffic. Default 16.</div>
+        </div>
         <div class="f">
           <label for="mdns_name">mDNS Hostname</label>
           <input type="text" id="mdns_name" name="mdns_name" placeholder="artnet">
@@ -146,6 +151,11 @@
           <div class="cb"><input type="checkbox" id="wifi_enable_in_eth_mode" name="wifi_enable_in_eth_mode"><label for="wifi_enable_in_eth_mode">Allow Wi-Fi STA in Art-Net Ethernet mode</label></div>
           <div class="hint">Default ON after power supply validation. Turn off if Wi-Fi radio startup causes brownout.</div>
         </div>
+        <div class="f" style="flex-basis:100%">
+          <label for="wifi_reconnect_interval">Wi-Fi Reconnect Interval (ms)</label>
+          <input type="number" id="wifi_reconnect_interval" name="wifi_reconnect_interval" value="10000" min="1000" max="60000">
+          <div class="hint">How often to retry Wi-Fi connection after disconnection. Default 10000ms (10s).</div>
+        </div>
       </div>
       </div>
 
@@ -249,6 +259,11 @@
           <label for="display_refresh_ms">Refresh Interval (ms)</label>
           <input type="number" id="display_refresh_ms" name="display_refresh_ms" value="500" min="100" max="10000">
           <div class="hint">How often the display updates. Increase to reduce I2C bus load. Default 500ms.</div>
+        </div>
+        <div class="f">
+          <label for="display_recover_ms">Recovery Probe Interval (ms)</label>
+          <input type="number" id="display_recover_ms" name="display_recover_ms" value="5000" min="1000" max="60000">
+          <div class="hint">How often to re-check the display if it disconnects. Default 5000ms (5s).</div>
         </div>
         <div class="f" id="display-lcd-dimensions" style="display:none">
           <label for="display_cols">LCD Columns</label>
