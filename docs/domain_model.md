@@ -143,7 +143,7 @@ Key rules:
 - Every `Wire` (I2C) operation must be protected by `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100))` — including PCA9685, MCP23017, I2C DAC, and display drawing
 - I2C device families must use a common base architecture for mutex handling, address/source metadata, route lookup, and manager/device lifecycle. PCA9685, I2C DACs, and digital expanders should differ only in chip-specific register/data transactions, so adding a future I2C IC is a metadata + driver extension instead of a new parallel subsystem.
 - I2C Display task (Core 0) uses a queue to avoid frequent I2C bus contention
-- **Non-Blocking Peripheral I/O Rule:** Never use `delay()` in any FreeRTOS task. All peripheral wait periods (chip wake-up, prescale settle, UART flush, etc.) must use `vTaskDelay(pdMS_TO_TICKS(N))` so the scheduler can yield CPU to other tasks during the wait. The Arduino `Wire` I2C and UART HAL are inherently synchronous (blocking per-byte), which is acceptable for short transactions (~50–200 µs per register write at 400 kHz); the dirty-state cache on `PwmExpanderDriver` minimises unnecessary writes. For future high-throughput peripherals (bulk DMA transfers, RMT pixel streams), prefer DMA-backed or interrupt-driven drivers that return immediately and signal completion via a semaphore or callback, keeping the calling task free to do other work while the peripheral transfers in the background.
+- **Non-Blocking Peripheral I/O Rule:** Never use `delay()` in any FreeRTOS task. All peripheral wait periods (chip wake-up, prescale settle, UART flush, etc.) must use `vTaskDelay(pdMS_TO_TICKS(N))` so the scheduler can yield CPU to other tasks during the wait. The Arduino `Wire` I2C and UART HAL are inherently synchronous (blocking per-byte), which is acceptable for short transactions; the dirty-state cache on `PwmExpanderDriver` minimises unnecessary writes. The actual I2C write cost scales with the configured bus speed (`sysCfg.i2c_speed`, default 400 kHz): ~180 µs at 400 kHz, ~380 µs at 100 kHz, ~130 µs at 1 MHz (dominated by ~100 µs Arduino Wire software overhead). For future high-throughput peripherals (bulk DMA transfers, RMT pixel streams), prefer DMA-backed or interrupt-driven drivers that return immediately and signal completion via a semaphore or callback, keeping the calling task free to do other work while the peripheral transfers in the background.
 
 ### Protocol Input Context
 
@@ -248,7 +248,7 @@ Key files:
 
 Key rules:
 - **GPIO is NOT counted** — expanders (I2C) can substitute for GPIO pins. Active I2C transactions are reflected in CpuBudget.
-- **PCA9685 / digital expander channels are NOT counted as hardware** — they consume I2C bus time, added as `+180 µs` per active write transaction.
+- **PCA9685 / digital expander channels are NOT counted as hardware** — they consume I2C bus time, added as an I2C write transaction cost. At the default 400 kHz bus speed this is ~180 µs per write; at 100 kHz it is ~380 µs. The scoring engine in `scoring.h` uses the runtime `sysCfg.i2c_speed` to calculate the actual cost.
 - **ESP-NOW Master overhead** is a separate CPU/RAM cost: `cpuUs = 500 + peers×ceil(512/chunkSize)×170 + universes×100`, `ramBytes = 512 + peers×(chunkSize+44)`.
 - All three budgets are checked independently; CPU and RAM **block saving**, hardware is **source-aware block** (types using PCA9685 or expander bypass the count).
 
@@ -275,7 +275,7 @@ Per-type active-frame service-time estimates in µs per frame. RAM includes `224
 | 16 Func Gen | 120 + background timer cost | 1349 | Parameter update + esp_timer ISR reserve; RAM includes waveform tables |
 | 17 Solenoid | 10 | 225 | Pulse state machine |
 | 18 Smoke | 25 | 225 | Dual sequence state machine |
-| I2C write | +180 each | — | Per active PCA/DAC/expander transaction |
+| I2C write | ~180 each (400 kHz) / ~380 each (100 kHz) | — | Per active PCA/DAC/expander transaction; scales with `sysCfg.i2c_speed` |
 | I2C route RAM | — | +32 each | Per active I2C write route bookkeeping estimate |
 
 #### ESP-NOW Master Overhead
@@ -569,7 +569,7 @@ Configuration must pass these gates before save/apply:
 - Every channel has an active-frame service cost in µs (e.g., DMX enqueue service, RGB LED CPU mapping/enqueue time, TM1637 900 µs).
 - The output loop itself adds `BASE_OVERHEAD_US = 500` µs per frame (flag checks, channel iteration, RTOS overhead).
 - AC Dimmer and Function Generator add per-frame equivalent background timer/ISR cost even when DMX values do not change.
-- Each active I2C write adds +180 µs; multi-pin outputs add multiple transactions.
+- Each active I2C write adds bus-time cost (~180 µs at 400 kHz, ~380 µs at 100 kHz); multi-pin outputs add multiple transactions. The scoring engine uses `sysCfg.i2c_speed` to calculate the actual per-write cost.
 - ESP-NOW Master adds `500 + peers×ceil(512/chunkSize)×170 + universes×100` µs overhead.
 - Limit scales with FPS: `(1,000,000 / fps) - 1,500` µs. Higher FPS = less time per frame = smaller budget.
 

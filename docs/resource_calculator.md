@@ -99,7 +99,7 @@ Higher FPS = less time per frame = smaller budget:
 | Func Gen (16) | 120 + background timer cost | Waveform parameter update + esp_timer ISR reserve; consumes 1 timer-like slot |
 | Solenoid (17) | 10 | Pulse state machine |
 | Smoke Shooter (18) | 25 | Dual sequence state machine |
-| **I2C write** | **+180 each** | Per active PCA/DAC/expander transaction at typical 400kHz bus speed |
+| **I2C write** | **~180 each (400 kHz) / ~380 each (100 kHz)** | Per active PCA/DAC/expander transaction; scales with `sysCfg.i2c_speed` |
 
 Firmware scoring now follows a common cost pipeline for every output mode:
 
