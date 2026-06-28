@@ -128,7 +128,7 @@ Key files:
 - `include/output_control.h`
 - `include/motion_control.h` — thin coordinator delegating to per-type files
 - `include/output_devices/` — one file per output type: `dimmer.h`, `dmx.h`, `relay.h`, `led_strip.h`, `single_led.h`, `analog_rgb.h`, `motor.h`, `stepper.h`, `servo.h`, `buzzer.h`, `dfplayer.h`, `seven_seg.h`, `dac.h`, `pwm_dac.h`, `funcgen.h`, `solenoid.h`, `smoke_shooter.h`
-- `include/i2c_devices/pca9685.h`
+- `include/i2c_devices/pwm_expander.h`
 - `include/i2c_devices/i2c_gpio_expander.h`
 - `include/output_devices/funcgen_control.h`
 - `include/output_devices/dfplayer_control.h`

@@ -13,7 +13,7 @@
 #include "output_common.h"
 #include "config.h"
 #include "output_devices/dfplayer_control.h"
-#include "i2c_devices/pca9685.h"
+#include "i2c_devices/pwm_expander.h"
 #include "i2c_devices/i2c_gpio_expander.h"
 #include "output_devices/funcgen_control.h"
 #include "output_defs.h"

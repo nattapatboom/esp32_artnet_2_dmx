@@ -1,5 +1,5 @@
-#ifndef I2C_DEVICES_PCA9685_H
-#define I2C_DEVICES_PCA9685_H
+#ifndef I2C_DEVICES_PWM_EXPANDER_H
+#define I2C_DEVICES_PWM_EXPANDER_H
 
 #include <Arduino.h>
 #include "i2c_devices/i2c_bus.h"
@@ -32,7 +32,7 @@ public:
         if (_source == 8) {
             // Wake PCA9635 (MODE1 sleep bit is bit 4, wake is bit 4 = 0)
             writeRegister(0x00, 0x80); // Register 0x00 is MODE1, bit 7 is ALLCALL
-            delay(5);
+            vTaskDelay(pdMS_TO_TICKS(5));
             // Set all 16 pins to PWM mode: LEDOUT0 to LEDOUT3 (registers 0x14-0x17)
             writeRegister(0x14, 0xAA);
             writeRegister(0x15, 0xAA);
@@ -41,7 +41,7 @@ public:
         } else if (_source == 9) {
             // Wake SN3218 (Register 0x00 = 0x01)
             writeRegister(0x00, 0x01);
-            delay(5);
+            vTaskDelay(pdMS_TO_TICKS(5));
             // Enable all 18 channels (LED Control registers 0x13, 0x14, 0x15 = 0x3F each)
             writeRegister(0x13, 0x3F);
             writeRegister(0x14, 0x3F);
@@ -53,11 +53,11 @@ public:
             writeRegister(0x12, 0x00); // LEDOUT Port 1
             writeRegister(0x02, 0x00); // Config Port 0: all output
             writeRegister(0x03, 0x00); // Config Port 1: all output
-            delay(5);
+            vTaskDelay(pdMS_TO_TICKS(5));
         } else {
             // Wake PCA9685, enable register Auto-Increment for multi-byte writes
             writeRegister(0x00, 0x20); // MODE1 with AI bit set
-            delay(5);
+            vTaskDelay(pdMS_TO_TICKS(5));
         }
     }
 
@@ -78,7 +78,7 @@ public:
         writeRegister(0xFE, prescale); // Write prescale value
         writeRegister(0x00, oldmode); // Restore previous mode
 
-        delay(5);
+        vTaskDelay(pdMS_TO_TICKS(5));
         writeRegister(0x00, oldmode | 0x80); // Auto-increment and restart
     }
 
@@ -155,7 +155,7 @@ public:
     }
 };
 
-// Global management for PCA9685 devices
+// Global management for PWM expander devices (PCA9685, PCA9635, SN3218, AW9523)
 class PCA9685Manager {
 private:
     PCA9685Driver* _drivers[8];
@@ -215,4 +215,4 @@ public:
 
 extern PCA9685Manager pcaManager;
 
-#endif // I2C_DEVICES_PCA9685_H
+#endif // I2C_DEVICES_PWM_EXPANDER_H

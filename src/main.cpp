@@ -14,7 +14,7 @@
 #include "config.h"
 #include "web_pages.h"
 #include "i2c_devices/i2c_bus.h"
-#include "i2c_devices/pca9685.h"
+#include "i2c_devices/pwm_expander.h"
 #include "i2c_devices/i2c_gpio_expander.h"
 #include "output_control.h"
 #include "output_impl.h"

@@ -90,7 +90,7 @@ $ip = (Get-Content test_device_ip.txt | Select-String "^IP=" | ForEach-Object { 
 - `include/i2c_devices/` — one file per I2C device type:
   - `i2c_dac.h` — MCP4725, DAC7571, DAC7573 inline write functions
   - `i2c_gpio_expander.h` — DigitalExpanderManager (MCP23017, TCA9555, PCF857x)
-  - `pca9685.h` — PCA9685Driver/PCA9685Manager (16-ch PWM)
+  - `pwm_expander.h` — PCA9685Driver/PCA9685Manager for I2C PWM expanders (PCA9685, PCA9635, SN3218, AW9523)
   - `display_driver.h` — DisplayDriver (SSD1306, SH1106, PCF8574 LCD)
   - (old `i2c_gpio_expander.h` and `pca9685_control.h` in `include/` root removed)
 - `include/lighting_protocols/` — protocol receiver headers:
