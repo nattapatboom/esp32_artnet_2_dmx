@@ -440,7 +440,7 @@ function channelHardware(o) {
     const isBgDimmer = costHas(cost, 'CF_BG_DIMMER');
     const isAggDmx = costHas(cost, 'CF_AGG_DMX');
     if (!isBgDimmer && !isAggDmx) {
-      const pinSlots = def ? Object.keys(def.pins || {}) : ['pin1', 'pin2', 'pin3', 'pin4'];
+      const pinSlots = def ? Object.keys(def.pins || {}) : [];
       pinSlots.forEach((slot, idx) => {
         const routeVal = o.pins?.[idx];
         if (routeVal && routeVal.source === 0 && routeVal.pin !== 255) {

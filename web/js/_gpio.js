@@ -4,10 +4,6 @@
 
 const SENTINEL_NONE = 255;
 
-// Routing slot field keys: "pinN" → JSON object property for pin value and source value
-const SLOT_PIN_KEY={pin1:'pin',pin2:'pin2',pin3:'pin3',pin4:'pin4'};
-const SLOT_SRC_KEY={pin1:'source',pin2:'pin2_source',pin3:'pin3_source',pin4:'pin4_source'};
-
 function outputModeKeyForObj(o){
   var t=parseInt(o.type||0);
   var mcMode=parseInt(o.mc_mode||0);
@@ -32,7 +28,7 @@ function defaultChannelRoutes(ch){
   const t = parseInt(ch.type || 0);
   const modeVal = parseInt(ch.mc_mode || 0);
   const mode = outputModeDef(t, modeVal);
-  const pinSlots = mode ? Object.keys(mode.pins || {}) : ['pin1', 'pin2', 'pin3', 'pin4'];
+  const pinSlots = mode ? Object.keys(mode.pins || {}) : [];
   
   ch.pins = pinSlots.map(function(slot) {
     const n = parseInt(slot.replace('pin',''));
