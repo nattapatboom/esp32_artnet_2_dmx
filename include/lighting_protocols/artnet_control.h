@@ -144,8 +144,8 @@ private:
         String macStr = WiFi.macAddress();
         macStr.replace(":", "");
         String suffix = macStr.substring(macStr.length() - 4);
-        String shortName = String("CHAL Node-") + suffix;
-        String longName = String("CHAL WT32-ETH01 Converter - ") + suffix;
+        String shortName = String(sysCfg.artnet_short_name) + suffix;
+        String longName = String(sysCfg.artnet_long_name) + suffix;
 
         strncpy(reply.shortName, shortName.c_str(), sizeof(reply.shortName) - 1);
         reply.shortName[sizeof(reply.shortName) - 1] = '\0';

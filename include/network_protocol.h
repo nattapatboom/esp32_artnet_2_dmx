@@ -84,6 +84,28 @@ constexpr const char* KEY_ZC_PIN             = "zc_pin";
 constexpr const char* KEY_DISPLAY_ENABLED    = "display_enabled";
 constexpr const char* KEY_DISPLAY_I2C_ADDR   = "display_i2c_addr";
 constexpr const char* KEY_DISPLAY_BRIGHTNESS = "display_brightness";
+constexpr const char* KEY_DISPLAY_REFRESH_MS = "display_refresh_ms";
+constexpr const char* KEY_DISPLAY_RECOVER_MS = "display_recover_ms";
+constexpr const char* KEY_DISPLAY_COLS       = "display_cols";
+constexpr const char* KEY_DISPLAY_ROWS       = "display_rows";
+
+// Web Server
+constexpr const char* KEY_WEB_PORT           = "web_port";
+
+// ESP-NOW
+constexpr const char* KEY_ESPNOW_QUEUE_DEPTH = "espnow_queue_depth";
+
+// Wi-Fi
+constexpr const char* KEY_WIFI_RECONNECT_MS  = "wifi_reconnect_interval";
+
+// Default output channel
+constexpr const char* KEY_DEFAULT_OUT_TYPE   = "default_output_type";
+constexpr const char* KEY_DEFAULT_OUT_PIN    = "default_output_pin";
+constexpr const char* KEY_DEFAULT_LED_COUNT  = "default_led_count";
+
+// Art-Net identity
+constexpr const char* KEY_ARTNET_SHORT_NAME  = "artnet_short_name";
+constexpr const char* KEY_ARTNET_LONG_NAME   = "artnet_long_name";
 
 // ── Field limits & defaults ──
 // Ethernet
@@ -148,6 +170,40 @@ constexpr uint8_t  DISPLAY_I2C_ADDR_DEFAULT  = 0x3C;
 constexpr uint8_t  DISPLAY_BRIGHTNESS_DEFAULT = 128;
 constexpr uint8_t  DISPLAY_BRIGHTNESS_MIN    = 0;
 constexpr uint8_t  DISPLAY_BRIGHTNESS_MAX    = 255;
+constexpr uint16_t DISPLAY_REFRESH_MS_DEFAULT = 500;
+constexpr uint16_t DISPLAY_REFRESH_MS_MIN     = 100;
+constexpr uint16_t DISPLAY_REFRESH_MS_MAX     = 10000;
+constexpr uint16_t DISPLAY_RECOVER_MS_DEFAULT = 5000;
+constexpr uint16_t DISPLAY_RECOVER_MS_MIN     = 1000;
+constexpr uint16_t DISPLAY_RECOVER_MS_MAX     = 60000;
+constexpr uint8_t  DISPLAY_COLS_DEFAULT       = 20;
+constexpr uint8_t  DISPLAY_COLS_MIN           = 16;
+constexpr uint8_t  DISPLAY_COLS_MAX           = 40;
+constexpr uint8_t  DISPLAY_ROWS_DEFAULT       = 4;
+constexpr uint8_t  DISPLAY_ROWS_MIN           = 2;
+constexpr uint8_t  DISPLAY_ROWS_MAX           = 4;
+
+// Web Server
+constexpr uint16_t WEB_PORT_DEFAULT           = 80;
+constexpr uint16_t WEB_PORT_MIN               = 1;
+constexpr uint16_t WEB_PORT_MAX               = 65535;
+
+// ESP-NOW queue depth
+constexpr uint8_t  ESPNOW_QUEUE_DEPTH_DEFAULT = 16;
+constexpr uint8_t  ESPNOW_QUEUE_DEPTH_MIN     = 4;
+constexpr uint8_t  ESPNOW_QUEUE_DEPTH_MAX     = 64;
+
+// Wi-Fi reconnect interval
+constexpr uint16_t WIFI_RECONNECT_MS_DEFAULT  = 10000;
+constexpr uint16_t WIFI_RECONNECT_MS_MIN      = 1000;
+constexpr uint16_t WIFI_RECONNECT_MS_MAX      = 60000;
+
+// Default output channel
+constexpr uint8_t  DEFAULT_OUT_TYPE_DEFAULT   = 3;    // TYPE_LED_STRIP
+constexpr uint8_t  DEFAULT_OUT_PIN_DEFAULT    = 4;    // DEFAULT_LED_DATA_PIN
+constexpr uint16_t DEFAULT_LED_COUNT_DEFAULT  = 170;
+constexpr uint16_t DEFAULT_LED_COUNT_MIN      = 1;
+constexpr uint16_t DEFAULT_LED_COUNT_MAX      = 1000;
 
 // ── Validation helpers ──
 

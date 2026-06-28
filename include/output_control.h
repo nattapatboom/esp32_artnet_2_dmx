@@ -272,11 +272,11 @@ public:
         if (!file) {
             Serial.println("/outputs.json not found. Creating default output channel...");
             OutputChannel defCh;
-            defCh.type = 3;
-            defCh.routes[0].pin = DEFAULT_LED_DATA_PIN;
+            defCh.type = sysCfg.default_output_type;
+            defCh.routes[0].pin = sysCfg.default_output_pin;
             defCh.start_universe = 0;
             defCh.start_address = 1;
-            defCh.led_count = 170;
+            defCh.led_count = sysCfg.default_led_count;
             defCh.color_order = COLOR_GRB;
             defCh.bufferSize = outputDmxByteCount(defCh);
             defCh.dmxBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);
@@ -304,11 +304,11 @@ public:
         if (error) {
             Serial.println("Failed to read outputs.json. Using fallback default.");
             OutputChannel defCh;
-            defCh.type = 3;
-            defCh.routes[0].pin = DEFAULT_LED_DATA_PIN;
+            defCh.type = sysCfg.default_output_type;
+            defCh.routes[0].pin = sysCfg.default_output_pin;
             defCh.start_universe = 0;
             defCh.start_address = 1;
-            defCh.led_count = 170;
+            defCh.led_count = sysCfg.default_led_count;
             defCh.color_order = COLOR_GRB;
             defCh.bufferSize = outputDmxByteCount(defCh);
             defCh.dmxBuffer = (uint8_t*)calloc(defCh.bufferSize, 1);

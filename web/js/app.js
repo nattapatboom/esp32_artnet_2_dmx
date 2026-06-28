@@ -174,6 +174,7 @@ function toggleDisplayCfg(){
     if(de) de.value=0;
   }
   updateDisplayAddressOptions();
+  toggleLcdDimensions();
 }
 
 function updateEspnowChannelVisibility(){
@@ -185,6 +186,13 @@ function updateEspnowChannelVisibility(){
   const opt0=sel.querySelector('option[value="0"]');
   if(opt0) opt0.disabled=(mode===1);
   if(mode===1&&parseInt(sel.value)===0) sel.value=1;
+}
+
+function toggleLcdDimensions(){
+  const de=document.getElementById('display_enabled');
+  const lcd=document.getElementById('display-lcd-dimensions');
+  if(!de||!lcd) return;
+  lcd.style.display=de.value==='3'?'':'none';
 }
 
 function updateDisplayAddressOptions(){
@@ -241,6 +249,13 @@ async function loadSettings(){
     s('display_i2c_addr',d.display_i2c_addr);
     updateDisplayAddressOptions();
     s('display_brightness',d.display_brightness);
+    s('display_refresh_ms',d.display_refresh_ms);
+    s('display_cols',d.display_cols);
+    s('display_rows',d.display_rows);
+    toggleLcdDimensions();
+    s('web_port',d.web_port);
+    s('artnet_short_name',d.artnet_short_name);
+    s('artnet_long_name',d.artnet_long_name);
     toggleEth(); toggleWifiIp(); updateMdnsPreview();
     autoAssignOutputPins();
     document.getElementById('mdns_name')?.addEventListener('input',updateMdnsPreview);
@@ -261,7 +276,10 @@ async function saveSettings(e){
     const intKeys=[NET_PROTO.KEY_DEVICE_MODE,NET_PROTO.KEY_ESPNOW_CHANNEL,NET_PROTO.KEY_ESPNOW_CHUNK_SIZE,NET_PROTO.KEY_STATUS_LED_PIN,NET_PROTO.KEY_ZC_PIN,NET_PROTO.KEY_ETH_DHCP,NET_PROTO.KEY_WIFI_DHCP,
                    NET_PROTO.KEY_ARTNET_PORT,NET_PROTO.KEY_SACN_PORT,
                    NET_PROTO.KEY_OUTPUT_FPS,NET_PROTO.KEY_I2C_SDA,NET_PROTO.KEY_I2C_SCL,NET_PROTO.KEY_I2C_SPEED,
-                   NET_PROTO.KEY_DISPLAY_ENABLED,NET_PROTO.KEY_DISPLAY_I2C_ADDR,NET_PROTO.KEY_DISPLAY_BRIGHTNESS];
+                   NET_PROTO.KEY_DISPLAY_ENABLED,NET_PROTO.KEY_DISPLAY_I2C_ADDR,NET_PROTO.KEY_DISPLAY_BRIGHTNESS,
+                   NET_PROTO.KEY_DISPLAY_REFRESH_MS,NET_PROTO.KEY_DISPLAY_COLS,NET_PROTO.KEY_DISPLAY_ROWS,
+                   NET_PROTO.KEY_WEB_PORT,NET_PROTO.KEY_ESPNOW_QUEUE_DEPTH,NET_PROTO.KEY_WIFI_RECONNECT_MS,
+                   NET_PROTO.KEY_DEFAULT_OUT_TYPE,NET_PROTO.KEY_DEFAULT_OUT_PIN,NET_PROTO.KEY_DEFAULT_LED_COUNT];
     if(boolKeys.includes(k)) obj[k]=true;
     else if(intKeys.includes(k))
       obj[k]=parseInt(v,10);

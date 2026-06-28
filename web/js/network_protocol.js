@@ -54,6 +54,23 @@ const NET_PROTO = Object.freeze({
   KEY_DISPLAY_ENABLED:    'display_enabled',
   KEY_DISPLAY_I2C_ADDR:   'display_i2c_addr',
   KEY_DISPLAY_BRIGHTNESS: 'display_brightness',
+  KEY_DISPLAY_REFRESH_MS: 'display_refresh_ms',
+  KEY_DISPLAY_RECOVER_MS: 'display_recover_ms',
+  KEY_DISPLAY_COLS:       'display_cols',
+  KEY_DISPLAY_ROWS:       'display_rows',
+
+  KEY_WEB_PORT:           'web_port',
+
+  KEY_ESPNOW_QUEUE_DEPTH: 'espnow_queue_depth',
+
+  KEY_WIFI_RECONNECT_MS:  'wifi_reconnect_interval',
+
+  KEY_DEFAULT_OUT_TYPE:   'default_output_type',
+  KEY_DEFAULT_OUT_PIN:    'default_output_pin',
+  KEY_DEFAULT_LED_COUNT:  'default_led_count',
+
+  KEY_ARTNET_SHORT_NAME:  'artnet_short_name',
+  KEY_ARTNET_LONG_NAME:   'artnet_long_name',
 
   // ── Field limits & defaults ──
   ETH_DHCP_DEFAULT:          true,
@@ -101,11 +118,41 @@ const NET_PROTO = Object.freeze({
   STATUS_LED_PIN_DEFAULT:    5,
   ZC_PIN_DISABLED:           255,
 
-  DISPLAY_ENABLED_DEFAULT:   0,
-  DISPLAY_I2C_ADDR_DEFAULT:  0x3C,
-  DISPLAY_BRIGHTNESS_DEFAULT: 128,
-  DISPLAY_BRIGHTNESS_MIN:    0,
-  DISPLAY_BRIGHTNESS_MAX:    255,
+  DISPLAY_ENABLED_DEFAULT:     0,
+  DISPLAY_I2C_ADDR_DEFAULT:    0x3C,
+  DISPLAY_BRIGHTNESS_DEFAULT:  128,
+  DISPLAY_BRIGHTNESS_MIN:      0,
+  DISPLAY_BRIGHTNESS_MAX:      255,
+  DISPLAY_REFRESH_MS_DEFAULT:  500,
+  DISPLAY_REFRESH_MS_MIN:      100,
+  DISPLAY_REFRESH_MS_MAX:      10000,
+  DISPLAY_RECOVER_MS_DEFAULT:  5000,
+  DISPLAY_RECOVER_MS_MIN:      1000,
+  DISPLAY_RECOVER_MS_MAX:      60000,
+  DISPLAY_COLS_DEFAULT:        20,
+  DISPLAY_COLS_MIN:            16,
+  DISPLAY_COLS_MAX:            40,
+  DISPLAY_ROWS_DEFAULT:        4,
+  DISPLAY_ROWS_MIN:            2,
+  DISPLAY_ROWS_MAX:            4,
+
+  WEB_PORT_DEFAULT:            80,
+  WEB_PORT_MIN:                1,
+  WEB_PORT_MAX:                65535,
+
+  ESPNOW_QUEUE_DEPTH_DEFAULT:  16,
+  ESPNOW_QUEUE_DEPTH_MIN:      4,
+  ESPNOW_QUEUE_DEPTH_MAX:      64,
+
+  WIFI_RECONNECT_MS_DEFAULT:   10000,
+  WIFI_RECONNECT_MS_MIN:       1000,
+  WIFI_RECONNECT_MS_MAX:       60000,
+
+  DEFAULT_OUT_TYPE_DEFAULT:    3,
+  DEFAULT_OUT_PIN_DEFAULT:     4,
+  DEFAULT_LED_COUNT_DEFAULT:   170,
+  DEFAULT_LED_COUNT_MIN:       1,
+  DEFAULT_LED_COUNT_MAX:       1000,
 
   // ── Validation helpers ──
   artnetPortValid(port) {

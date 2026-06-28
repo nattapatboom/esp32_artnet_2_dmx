@@ -89,13 +89,34 @@ struct SystemConfig {
     uint8_t display_enabled;    // 0=off, 1=SSD1306 OLED, 2=SH1106 OLED, 3=PCF8574 LCD
     uint8_t display_i2c_addr;   // I2C address (default 0x3C for SSD1306)
     uint8_t display_brightness; // 0-255
+    uint16_t display_refresh_ms; // display update interval (default 500ms)
+    uint16_t display_recover_ms; // I2C display recovery probe interval (default 5000ms)
+    uint8_t display_cols;        // LCD character columns (default 20)
+    uint8_t display_rows;        // LCD character rows (default 4)
+
+    // Web Server
+    uint16_t web_port;           // HTTP server port (default 80)
+
+    // ESP-NOW slave queue depth
+    uint8_t espnow_queue_depth;  // FreeRTOS queue depth (default 16)
+
+    // Wi-Fi reconnect interval
+    uint16_t wifi_reconnect_interval; // ms between reconnect attempts (default 10000)
+
+    // Default output channel (used when /outputs.json does not exist)
+    uint8_t default_output_type;
+    uint8_t default_output_pin;
+    uint16_t default_led_count;
+
+    // Art-Net identity
+    char artnet_short_name[32];
+    char artnet_long_name[64];
 };
 
 // Global config instance
 extern SystemConfig sysCfg;
 
 // Setup pins default definitions
-#define DEFAULT_DMX_TX_PIN       17 // UART2 TX (LED4 on WT32-ETH01 blinks on DMX traffic)
 #define DEFAULT_LED_DATA_PIN     4  // Default pixel data pin (User pins: 4, 12, 14, 15)
 #define DEFAULT_STATUS_LED_PIN   5  // UART2 RX (LED3 on WT32-ETH01 used as status indicator hack)
 
@@ -193,6 +214,32 @@ inline void loadConfig(SystemConfig& cfg) {
     cfg.display_enabled = prefs.getUChar("disp_en", 0);
     cfg.display_i2c_addr = prefs.getUChar("disp_addr", 0x3C);
     cfg.display_brightness = prefs.getUChar("disp_brt", 128);
+    cfg.display_refresh_ms = prefs.getUShort("disp_ref", 500);
+    cfg.display_recover_ms = prefs.getUShort("disp_rcv", 5000);
+    cfg.display_cols = prefs.getUChar("disp_col", 20);
+    cfg.display_rows = prefs.getUChar("disp_row", 4);
+
+    cfg.web_port = prefs.getUShort("web_port", 80);
+    if (cfg.web_port == 0) cfg.web_port = 80;
+
+    cfg.espnow_queue_depth = prefs.getUChar("now_qdep", 16);
+    if (cfg.espnow_queue_depth == 0) cfg.espnow_queue_depth = 16;
+
+    cfg.wifi_reconnect_interval = prefs.getUShort("wf_recnn", 10000);
+    if (cfg.wifi_reconnect_interval < 1000) cfg.wifi_reconnect_interval = 1000;
+
+    cfg.default_output_type = prefs.getUChar("def_type", 3);
+    cfg.default_output_pin = prefs.getUChar("def_pin", DEFAULT_LED_DATA_PIN);
+    cfg.default_led_count = prefs.getUShort("def_led", 170);
+    if (cfg.default_led_count == 0) cfg.default_led_count = 170;
+
+    String shortName = prefs.getString("art_sname", "CHAL Node-");
+    strncpy(cfg.artnet_short_name, shortName.c_str(), sizeof(cfg.artnet_short_name) - 1);
+    cfg.artnet_short_name[sizeof(cfg.artnet_short_name) - 1] = '\0';
+
+    String longName = prefs.getString("art_lname", "CHAL WT32-ETH01 Converter - ");
+    strncpy(cfg.artnet_long_name, longName.c_str(), sizeof(cfg.artnet_long_name) - 1);
+    cfg.artnet_long_name[sizeof(cfg.artnet_long_name) - 1] = '\0';
 
     prefs.end();
 }
@@ -238,6 +285,23 @@ inline bool saveConfig(const SystemConfig& cfg) {
     prefs.putUChar("disp_en", cfg.display_enabled);
     prefs.putUChar("disp_addr", cfg.display_i2c_addr);
     prefs.putUChar("disp_brt", cfg.display_brightness);
+    prefs.putUShort("disp_ref", cfg.display_refresh_ms);
+    prefs.putUShort("disp_rcv", cfg.display_recover_ms);
+    prefs.putUChar("disp_col", cfg.display_cols);
+    prefs.putUChar("disp_row", cfg.display_rows);
+
+    prefs.putUShort("web_port", cfg.web_port);
+
+    prefs.putUChar("now_qdep", cfg.espnow_queue_depth);
+
+    prefs.putUShort("wf_recnn", cfg.wifi_reconnect_interval);
+
+    prefs.putUChar("def_type", cfg.default_output_type);
+    prefs.putUChar("def_pin", cfg.default_output_pin);
+    prefs.putUShort("def_led", cfg.default_led_count);
+
+    prefs.putString("art_sname", String(cfg.artnet_short_name));
+    prefs.putString("art_lname", String(cfg.artnet_long_name));
 
     prefs.end();
     return true;

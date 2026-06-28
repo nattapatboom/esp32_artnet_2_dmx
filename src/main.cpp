@@ -85,7 +85,7 @@ uint16_t EspNowControl::rxDmxLength = 0;
 unsigned long EspNowControl::lastRxTime = 0;
 std::atomic<bool> EspNowControl::newRxData(false);
 
-AsyncWebServer server(80);
+AsyncWebServer* serverPtr = nullptr;
 
 // Network state trackers
 bool ethConnected = false;
@@ -228,7 +228,7 @@ void reconnectWiFiClient(bool force = false) {
     if (sysCfg.device_mode == MODE_ARTNET_ETHERNET && (ethConnected || ETH.linkUp())) return;
 
     unsigned long now = millis();
-    if (!force && now - lastWifiReconnectAttempt < 10000) return;
+    if (!force && now - lastWifiReconnectAttempt < sysCfg.wifi_reconnect_interval) return;
     lastWifiReconnectAttempt = now;
 
     wl_status_t status = WiFi.status();
@@ -646,6 +646,18 @@ void addSettingsToJson(JsonObject target) {
     target["display_enabled"] = sysCfg.display_enabled;
     target["display_i2c_addr"] = sysCfg.display_i2c_addr;
     target["display_brightness"] = sysCfg.display_brightness;
+    target["display_refresh_ms"] = sysCfg.display_refresh_ms;
+    target["display_recover_ms"] = sysCfg.display_recover_ms;
+    target["display_cols"] = sysCfg.display_cols;
+    target["display_rows"] = sysCfg.display_rows;
+    target["web_port"] = sysCfg.web_port;
+    target["espnow_queue_depth"] = sysCfg.espnow_queue_depth;
+    target["wifi_reconnect_interval"] = sysCfg.wifi_reconnect_interval;
+    target["default_output_type"] = sysCfg.default_output_type;
+    target["default_output_pin"] = sysCfg.default_output_pin;
+    target["default_led_count"] = sysCfg.default_led_count;
+    target["artnet_short_name"] = sysCfg.artnet_short_name;
+    target["artnet_long_name"] = sysCfg.artnet_long_name;
 }
 
 void applySettingsFromJson(JsonObjectConst doc) {
@@ -692,6 +704,42 @@ void applySettingsFromJson(JsonObjectConst doc) {
     if (doc["display_enabled"].is<int>()) sysCfg.display_enabled = doc["display_enabled"];
     if (doc["display_i2c_addr"].is<int>()) sysCfg.display_i2c_addr = doc["display_i2c_addr"];
     if (doc["display_brightness"].is<int>()) sysCfg.display_brightness = doc["display_brightness"];
+    if (doc["display_refresh_ms"].is<int>()) {
+        int v = doc["display_refresh_ms"];
+        if (v >= 100 && v <= 10000) sysCfg.display_refresh_ms = v;
+    }
+    if (doc["display_recover_ms"].is<int>()) {
+        int v = doc["display_recover_ms"];
+        if (v >= 1000 && v <= 60000) sysCfg.display_recover_ms = v;
+    }
+    if (doc["display_cols"].is<int>()) {
+        int v = doc["display_cols"];
+        if (v >= 16 && v <= 40) sysCfg.display_cols = v;
+    }
+    if (doc["display_rows"].is<int>()) {
+        int v = doc["display_rows"];
+        if (v >= 2 && v <= 4) sysCfg.display_rows = v;
+    }
+    if (doc["web_port"].is<int>()) {
+        int v = doc["web_port"];
+        if (v >= 1 && v <= 65535) sysCfg.web_port = v;
+    }
+    if (doc["espnow_queue_depth"].is<int>()) {
+        int v = doc["espnow_queue_depth"];
+        if (v >= 4 && v <= 64) sysCfg.espnow_queue_depth = v;
+    }
+    if (doc["wifi_reconnect_interval"].is<int>()) {
+        int v = doc["wifi_reconnect_interval"];
+        if (v >= 1000 && v <= 60000) sysCfg.wifi_reconnect_interval = v;
+    }
+    if (doc["default_output_type"].is<int>()) sysCfg.default_output_type = doc["default_output_type"];
+    if (doc["default_output_pin"].is<int>()) sysCfg.default_output_pin = doc["default_output_pin"];
+    if (doc["default_led_count"].is<int>()) {
+        int v = doc["default_led_count"];
+        if (v >= 1 && v <= 1000) sysCfg.default_led_count = v;
+    }
+    if (doc["artnet_short_name"].is<const char*>()) copyConfigString(sysCfg.artnet_short_name, sizeof(sysCfg.artnet_short_name), doc["artnet_short_name"]);
+    if (doc["artnet_long_name"].is<const char*>()) copyConfigString(sysCfg.artnet_long_name, sizeof(sysCfg.artnet_long_name), doc["artnet_long_name"]);
 }
 
 bool validateSettingsAndOutputs(JsonObjectConst settings, JsonArray outputs, String& message) {
@@ -1423,15 +1471,18 @@ void startRecoveryMode() {
 }
 
 void setupWebServer() {
+    if (!serverPtr) {
+        serverPtr = new AsyncWebServer(sysCfg.web_port);
+    }
     // Serve Setup UI Page
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
         AsyncWebServerResponse* response = request->beginResponse_P(200, "text/html; charset=utf-8", CONFIG_HTML_GZ, CONFIG_HTML_GZ_LEN);
         response->addHeader("Content-Encoding", "gzip");
         request->send(response);
     });
 
     // API Route: Get Config settings
-    server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
         doc["device_mode"] = sysCfg.device_mode;
         doc["eth_dhcp"] = sysCfg.eth_dhcp;
@@ -1476,7 +1527,7 @@ void setupWebServer() {
     });
 
     // API Route: Save Config settings
-    server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, 
+    serverPtr->on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, 
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             String body;
             if (!collectRequestBody(request, data, len, index, total, body)) return;
@@ -1524,7 +1575,7 @@ void setupWebServer() {
     );
 
     // API Route: Get Dynamic Output Channels
-    server.on("/api/outputs", HTTP_GET, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/outputs", HTTP_GET, [](AsyncWebServerRequest *request) {
         if (!LittleFS.exists("/outputs.json")) {
             request->send(200, "application/json", "{\"outputs\":[{\"type\":3,\"pin\":4,\"start_universe\":0,\"start_address\":1,\"led_count\":170,\"color_order\":0}]}");
             return;
@@ -1533,7 +1584,7 @@ void setupWebServer() {
     });
 
     // API Route: Export Settings + Outputs as one backup JSON file
-    server.on("/api/config/backup", HTTP_GET, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/config/backup", HTTP_GET, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
         doc["device_model"] = "WT32-ETH01";
         doc["firmware_version"] = getFirmwareVersion();
@@ -1571,7 +1622,7 @@ void setupWebServer() {
     });
 
     // API Route: Import Settings + Outputs from one backup JSON payload
-    server.on("/api/config/import", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+    serverPtr->on("/api/config/import", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             String body;
             if (!collectRequestBody(request, data, len, index, total, body)) return;
@@ -1631,7 +1682,7 @@ void setupWebServer() {
     );
 
     // API Route: Save Dynamic Output Channels
-    server.on("/api/outputs", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+    serverPtr->on("/api/outputs", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             String body;
             if (!collectRequestBody(request, data, len, index, total, body)) return;
@@ -1696,7 +1747,7 @@ void setupWebServer() {
     );
 
     // API Route: Calculate resource scores/budgets dynamically
-    server.on("/api/outputs/score", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+    serverPtr->on("/api/outputs/score", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             String body;
             if (!collectRequestBody(request, data, len, index, total, body)) return;
@@ -1767,7 +1818,7 @@ void setupWebServer() {
     );
 
     // API Route: Manual Output Test
-    server.on("/api/output-test", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+    serverPtr->on("/api/output-test", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             String body;
             if (!collectRequestBody(request, data, len, index, total, body)) return;
@@ -1977,7 +2028,7 @@ void setupWebServer() {
     );
 
     // API Route: Get Wi-Fi Scan Results
-    server.on("/api/wifi-scan", HTTP_GET, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/wifi-scan", HTTP_GET, [](AsyncWebServerRequest *request) {
         int n = WiFi.scanComplete();
         if (n == -2) {
             WiFi.scanNetworks(true); // Start asynchronous scan
@@ -2004,7 +2055,7 @@ void setupWebServer() {
 
 
     // API Route: Clear Output Channels (reset to default single LED strip)
-    server.on("/api/outputs/clear", HTTP_POST, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/outputs/clear", HTTP_POST, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
         doc["version"] = 3;
         JsonArray arr = doc["outputs"].to<JsonArray>();
@@ -2027,7 +2078,7 @@ void setupWebServer() {
     });
 
     // API Route: Factory Reset (all settings + outputs)
-    server.on("/api/config/factory-reset", HTTP_POST, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/config/factory-reset", HTTP_POST, [](AsyncWebServerRequest *request) {
         // Clear all preferences
         Preferences prefs;
         if (!prefs.begin("system", false)) {
@@ -2066,7 +2117,7 @@ void setupWebServer() {
     });
 
     // API Route: Get ESP-NOW Peers
-    server.on("/api/espnow-peers", HTTP_GET, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/espnow-peers", HTTP_GET, [](AsyncWebServerRequest *request) {
         if (!LittleFS.exists("/espnow_peers.json")) {
             request->send(200, "application/json", "{\"peers\":[]}");
             return;
@@ -2075,7 +2126,7 @@ void setupWebServer() {
     });
 
     // API Route: Save ESP-NOW Peers
-    server.on("/api/espnow-peers", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+    serverPtr->on("/api/espnow-peers", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             String body;
             if (!collectRequestBody(request, data, len, index, total, body)) return;
@@ -2135,7 +2186,7 @@ void setupWebServer() {
     );
 
     // API Route: Get Telemetry Live Status
-    server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
         doc["device_mode"] = sysCfg.device_mode;
         
@@ -2184,7 +2235,7 @@ void setupWebServer() {
     });
 
     // API Route: sACN Protocol Status
-    server.on("/api/sacn/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/sacn/status", HTTP_GET, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
         doc["enabled"] = sysCfg.sacn_enabled;
         doc["multicast_mode"] = sysCfg.sacn_multicast;
@@ -2199,7 +2250,7 @@ void setupWebServer() {
     });
 
     // API Route: I2C Bus Scan (Async, queue-based on Core 0)
-    server.on("/api/i2c-scan", HTTP_GET, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/i2c-scan", HTTP_GET, [](AsyncWebServerRequest *request) {
         if (i2cScanPending) {
             request->send(202, "application/json", "{\"status\":\"scanning\"}");
             return;
@@ -2218,7 +2269,7 @@ void setupWebServer() {
     });
 
     // API Route: Hardware + CPU + RAM budget report
-    server.on("/api/scoring", HTTP_GET, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/api/scoring", HTTP_GET, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
         std::vector<OutputChannel>& chs = outputCtrl.getChannels();
         uint8_t fps = sysCfg.output_fps > 0 ? sysCfg.output_fps : 40;
@@ -2261,7 +2312,7 @@ void setupWebServer() {
     });
 
     // API Route: OTA Web Update Post Handler
-    server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
+    serverPtr->on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
         bool shouldReboot = otaUpdateOk && !Update.hasError();
         AsyncWebServerResponse *response = request->beginResponse(
             shouldReboot ? 200 : 500,
@@ -2307,7 +2358,7 @@ void setupWebServer() {
     });
 
     // Start Server
-    server.begin();
+    serverPtr->begin();
     Serial.println("Async Web Server started");
 }
 
@@ -2383,7 +2434,7 @@ void networkTask(void* pvParameters) {
         if (display.isActive()) {
             static unsigned long lastDisplayUpdate = 0;
             unsigned long now = millis();
-            if (now - lastDisplayUpdate >= 500) {
+            if (now - lastDisplayUpdate >= sysCfg.display_refresh_ms) {
                 lastDisplayUpdate = now;
 
                 // Build display lines
@@ -2399,7 +2450,7 @@ void networkTask(void* pvParameters) {
             // Attempt periodic recovery if display was deactivated by I2C errors (ADR004)
             static unsigned long lastDisplayRecover = 0;
             unsigned long now = millis();
-            if (now - lastDisplayRecover >= 5000) {
+            if (now - lastDisplayRecover >= sysCfg.display_recover_ms) {
                 lastDisplayRecover = now;
                 display.tryRecover();
             }
@@ -2609,7 +2660,7 @@ void setup() {
     swapMutex = xSemaphoreCreateMutex();
 
     // Initialize I2C Display
-    display.begin(sysCfg.display_enabled, sysCfg.display_i2c_addr);
+    display.begin(sysCfg.display_enabled, sysCfg.display_i2c_addr, sysCfg.display_cols, sysCfg.display_rows);
     if (display.isActive()) {
         display.setBrightness(sysCfg.display_brightness);
         Serial.printf("Display initialized: type=%d, addr=0x%02X\n", sysCfg.display_enabled, sysCfg.display_i2c_addr);
@@ -2623,7 +2674,7 @@ void setup() {
 
     // Initialize ESP-NOW wireless transceiver if device mode requires it.
     if (sysCfg.device_mode == MODE_ESPNOW_MASTER || sysCfg.device_mode == MODE_ESPNOW_SLAVE) {
-        espNowQueue = xQueueCreate(16, sizeof(EspNowDmxPacket));
+        espNowQueue = xQueueCreate(sysCfg.espnow_queue_depth, sizeof(EspNowDmxPacket));
         espNowCtrl.begin();
     }
 

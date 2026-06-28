@@ -43,6 +43,11 @@
           <input type="text" id="mdns_name" name="mdns_name" placeholder="artnet">
           <div class="hint">Access via http://<span id="mdns_preview">artnet</span>.local (requires reboot)</div>
         </div>
+        <div class="f">
+          <label for="web_port">Web Server Port</label>
+          <input type="number" id="web_port" name="web_port" value="80" min="1" max="65535">
+          <div class="hint">HTTP port for the web UI. Default 80. Reboot required.</div>
+        </div>
       </div>
       </div>
 
@@ -60,6 +65,16 @@
               <label for="artnet_port">UDP Port</label>
               <input type="number" id="artnet_port" name="artnet_port" value="6454" min="1" max="65535">
               <div class="hint">Standard Art-Net port is 6454. Change only if the sender uses a custom port. Reboot required.</div>
+            </div>
+            <div class="f" style="flex-basis:100%">
+              <label for="artnet_short_name">Art-Net Short Name</label>
+              <input type="text" id="artnet_short_name" name="artnet_short_name" value="CHAL Node-" maxlength="31">
+              <div class="hint">Node identity sent in ArtPollReply. MAC suffix appended automatically.</div>
+            </div>
+            <div class="f" style="flex-basis:100%">
+              <label for="artnet_long_name">Art-Net Long Name</label>
+              <input type="text" id="artnet_long_name" name="artnet_long_name" value="CHAL WT32-ETH01 Converter - " maxlength="63">
+              <div class="hint">Long description sent in ArtPollReply. MAC suffix appended automatically.</div>
             </div>
           </div>
         </div>
@@ -211,7 +226,7 @@
       <div id="display-config" class="fg">
         <div class="f">
           <label for="display_enabled">Display Type</label>
-            <select id="display_enabled" name="display_enabled" onchange="updateDisplayAddressOptions()">
+            <select id="display_enabled" name="display_enabled" onchange="updateDisplayAddressOptions();toggleLcdDimensions()">
             <option value="0">Disabled</option>
             <option value="1">SSD1306 OLED (128x64)</option>
             <option value="2">SH1106 OLED (128x64)</option>
@@ -229,6 +244,21 @@
         <div class="f">
           <label for="display_brightness">Brightness (0-255)</label>
           <input type="number" id="display_brightness" name="display_brightness" value="128" min="0" max="255">
+        </div>
+        <div class="f">
+          <label for="display_refresh_ms">Refresh Interval (ms)</label>
+          <input type="number" id="display_refresh_ms" name="display_refresh_ms" value="500" min="100" max="10000">
+          <div class="hint">How often the display updates. Increase to reduce I2C bus load. Default 500ms.</div>
+        </div>
+        <div class="f" id="display-lcd-dimensions" style="display:none">
+          <label for="display_cols">LCD Columns</label>
+          <input type="number" id="display_cols" name="display_cols" value="20" min="16" max="40">
+          <label for="display_rows" style="margin-top:4px">LCD Rows</label>
+          <select id="display_rows" name="display_rows">
+            <option value="2">2</option>
+            <option value="4" selected>4</option>
+          </select>
+          <div class="hint">Character dimensions for PCF8574 LCD. Reboot required.</div>
         </div>
       </div>
       </div>

@@ -21,7 +21,7 @@ class DisplayDriver {
 public:
     DisplayDriver() {}
 
-    bool begin(uint8_t type, uint8_t addr) {
+    bool begin(uint8_t type, uint8_t addr, uint8_t cols = 20, uint8_t rows = 4) {
         end();
         _type = type;
         _addr = addr;
@@ -47,7 +47,7 @@ public:
             _oled->clear();
             _active = true;
         } else if (type == DISPLAY_PCF8574) {
-            _lcd = new (std::nothrow) LiquidCrystal_I2C(addr, 20, 4);
+            _lcd = new (std::nothrow) LiquidCrystal_I2C(addr, cols, rows);
             if (!_lcd) return false;
             _lcd->init();
             _lcd->backlight();
