@@ -1,5 +1,7 @@
 # WT32-ETH01 Art-Net / sACN DMX Lighting Node
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/D1S322765N)
+
 Firmware for a WT32-ETH01 ESP32 Ethernet board that receives lighting data over Art-Net, sACN E1.31, or ESP-NOW and drives physical outputs for stage lighting, props, and effects.
 
 The project includes the embedded firmware, a browser-based configuration UI, metadata-driven output definitions, safety validation, and resource scoring for ESP32 peripherals.
