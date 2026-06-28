@@ -54,8 +54,6 @@ public:
             writeRegister(0x02, 0x00); // Config Port 0: all output
             writeRegister(0x03, 0x00); // Config Port 1: all output
             delay(5);
-        } else if (_source == 11) {
-            // TLC5940 is SPI-based. Stub only.
         } else {
             // Wake PCA9685, enable register Auto-Increment for multi-byte writes
             writeRegister(0x00, 0x20); // MODE1 with AI bit set
@@ -64,7 +62,7 @@ public:
     }
 
     void setFrequency(uint16_t freq) {
-        if (_source == 8 || _source == 9 || _source == 10 || _source == 11) return;
+        if (_source == 8 || _source == 9 || _source == 10) return;
 
         if (freq < 24) freq = 24;
         if (freq > 1526) freq = 1526;
@@ -123,9 +121,6 @@ public:
 
             // PWM register on AW9523 is 0x20 + channel
             writeRegister(0x20 + channel, duty8);
-            return;
-        } else if (_source == 11) {
-            // TLC5940 (SPI) stub write
             return;
         }
 
