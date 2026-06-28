@@ -556,29 +556,30 @@ def generate_source_rules_js():
         for m in re.finditer(r'"([^"]+)"', names_match.group(1)):
             names.append(m.group(1))
 
+    # Source mask constants (SRC_GPIO=1, SRC_PCA=2, ...)
+    masks = {}
+    for m in re.finditer(r'(SRC_\w+)\s*=\s*1\s*<<\s*(\d+)', src):
+        name = m.group(1).replace("SRC_", "")
+        masks[name] = 1 << int(m.group(2))
+
     # ADDRESS_RULES array
     rules = []
     for m in re.finditer(
-        r'\{\s*(\d+)\s*,\s*"([^"]+)"\s*,\s*\{\s*\{\s*(0x[0-9A-Fa-f]+|\d+)\s*,\s*(0x[0-9A-Fa-f]+|\d+)\s*\}\s*,\s*\{\s*(0x[0-9A-Fa-f]+|\d+)\s*,\s*(0x[0-9A-Fa-f]+|\d+)\s*\}\s*\}\s*\}',
+        r'\{\s*(\d+)\s*,\s*(SRC_\w+)\s*,\s*"([^"]+)"\s*,\s*\{\s*\{\s*(0x[0-9A-Fa-f]+|\d+)\s*,\s*(0x[0-9A-Fa-f]+|\d+)\s*\}\s*,\s*\{\s*(0x[0-9A-Fa-f]+|\d+)\s*,\s*(0x[0-9A-Fa-f]+|\d+)\s*\}\s*\}\s*\}',
         src,
     ):
         source = int(m.group(1))
-        label = m.group(2)
-        r1_min = int(m.group(3), 16 if m.group(3).startswith("0x") else 10)
-        r1_max = int(m.group(4), 16 if m.group(4).startswith("0x") else 10)
-        r2_min = int(m.group(5), 16 if m.group(5).startswith("0x") else 10)
-        r2_max = int(m.group(6), 16 if m.group(6).startswith("0x") else 10)
+        mask_name = m.group(2).replace("SRC_", "")
+        mask_val = masks.get(mask_name, 0)
+        label = m.group(3)
+        r1_min = int(m.group(4), 16 if m.group(4).startswith("0x") else 10)
+        r1_max = int(m.group(5), 16 if m.group(5).startswith("0x") else 10)
+        r2_min = int(m.group(6), 16 if m.group(6).startswith("0x") else 10)
+        r2_max = int(m.group(7), 16 if m.group(7).startswith("0x") else 10)
         ranges = [[r1_min, r1_max]]
         if r2_min != 0 or r2_max != 0:
             ranges.append([r2_min, r2_max])
-        rules.append({"source": source, "label": label, "ranges": ranges})
-
-    # Source mask constants from output_defs.h (SRC_GPIO=1, SRC_PCA=2, ...)
-    masks = {}
-    defs_src = read_file(OUTPUT_DEFS_PATH)
-    for m in re.finditer(r'(SRC_\w+)\s*=\s*1\s*<<\s*(\d+)', defs_src):
-        name = m.group(1).replace("SRC_", "")
-        masks[name] = 1 << int(m.group(2))
+        rules.append({"source": source, "mask": mask_val, "label": label, "ranges": ranges})
 
     data = {
         "names": names,

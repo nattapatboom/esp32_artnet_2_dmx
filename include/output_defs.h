@@ -24,14 +24,16 @@
 #include "type_interfaces/type_17.h"
 #include "type_interfaces/type_18.h"
 
+#include "source_rules.h"
+
 namespace OutputDefs {
 
-enum SourceMask : uint8_t {
-    SRC_GPIO = 1 << 0,
-    SRC_PCA = 1 << 1,
-    SRC_DIGITAL_EXPANDER = 1 << 2,
-    SRC_I2C_DAC = 1 << 3
-};
+using SourceRules::SourceMask;
+using SourceRules::SRC_GPIO;
+using SourceRules::SRC_PCA;
+using SourceRules::SRC_DIGITAL_EXPANDER;
+using SourceRules::SRC_I2C_DAC;
+
 
 constexpr uint8_t TYPE_DIMMER       = 0;
 constexpr uint8_t TYPE_DMX          = 1;
@@ -465,9 +467,9 @@ inline const PinRule* pinRule(uint8_t type, uint8_t mode, uint8_t slotIndex) {
 
 inline uint8_t sourceMaskForSourceId(uint8_t source) {
     if (source == 0) return SRC_GPIO;
-    if (source == 1) return SRC_PCA;
-    if (source >= 2 && source <= 4) return SRC_DIGITAL_EXPANDER;
-    if (source >= 5 && source <= 7) return SRC_I2C_DAC;
+    for (const auto& rule : SourceRules::ADDRESS_RULES) {
+        if (rule.source == source) return rule.mask;
+    }
     return 0;
 }
 

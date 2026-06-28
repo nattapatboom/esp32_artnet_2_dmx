@@ -88,10 +88,8 @@ var T=TYPE_META?.typeIds||{};
 function sourceMaskForId(source){
   source=parseInt(source||0);
   if(source===0) return SRC_GPIO;
-  if(source===1) return SRC_PCA;
-  if(source>=2&&source<=4) return SRC_DIG;
-  if(source>=5&&source<=7) return SRC_DAC;
-  return 0;
+  const rule = SOURCE_DATA?.addressRules?.find(r => r.source === source);
+  return rule ? rule.mask : 0;
 }
 
 function outputModeKey(type,mode){

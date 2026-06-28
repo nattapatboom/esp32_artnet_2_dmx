@@ -11,6 +11,15 @@
 //  SOURCE_ADDRESS_RULES in web/js/_gpio.js).
 // ─────────────────────────────────────────────
 
+namespace SourceRules {
+
+enum SourceMask : uint8_t {
+    SRC_GPIO = 1 << 0,
+    SRC_PCA = 1 << 1,
+    SRC_DIGITAL_EXPANDER = 1 << 2,
+    SRC_I2C_DAC = 1 << 3
+};
+
 struct AddressRange {
     uint8_t min;
     uint8_t max;
@@ -18,20 +27,19 @@ struct AddressRange {
 
 struct SourceAddressRule {
     uint8_t source;
+    uint8_t mask;
     const char* label;
     AddressRange ranges[2];  // second range is {0,0} if unused
 };
 
-namespace SourceRules {
-
 constexpr SourceAddressRule ADDRESS_RULES[] = {
-    {1, "PCA9685 address must be 0x40-0x47", {{0x40, 0x47}, {0, 0}}},
-    {2, "MCP23017 address must be 0x20-0x27", {{0x20, 0x27}, {0, 0}}},
-    {3, "TCA9555 address must be 0x20-0x27", {{0x20, 0x27}, {0, 0}}},
-    {4, "PCF857x address must be 0x20-0x27 or 0x38-0x3F", {{0x20, 0x27}, {0x38, 0x3F}}},
-    {5, "MCP4725 address must be 0x60 or 0x61", {{0x60, 0x61}, {0, 0}}},
-    {6, "DAC7571 address must be 0x4C or 0x4D", {{0x4C, 0x4D}, {0, 0}}},
-    {7, "DAC7573 address must be 0x4C-0x5B", {{0x4C, 0x5B}, {0, 0}}}
+    {1, SRC_PCA, "PCA9685 address must be 0x40-0x47", {{0x40, 0x47}, {0, 0}}},
+    {2, SRC_DIGITAL_EXPANDER, "MCP23017 address must be 0x20-0x27", {{0x20, 0x27}, {0, 0}}},
+    {3, SRC_DIGITAL_EXPANDER, "TCA9555 address must be 0x20-0x27", {{0x20, 0x27}, {0, 0}}},
+    {4, SRC_DIGITAL_EXPANDER, "PCF857x address must be 0x20-0x27 or 0x38-0x3F", {{0x20, 0x27}, {0x38, 0x3F}}},
+    {5, SRC_I2C_DAC, "MCP4725 address must be 0x60 or 0x61", {{0x60, 0x61}, {0, 0}}},
+    {6, SRC_I2C_DAC, "DAC7571 address must be 0x4C or 0x4D", {{0x4C, 0x4D}, {0, 0}}},
+    {7, SRC_I2C_DAC, "DAC7573 address must be 0x4C-0x5B", {{0x4C, 0x5B}, {0, 0}}}
 };
 constexpr uint8_t ADDRESS_RULES_COUNT = 7;
 
