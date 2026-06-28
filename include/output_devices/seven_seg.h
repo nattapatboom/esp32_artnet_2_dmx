@@ -94,7 +94,7 @@ inline void sevenSegUpdate(OutputChannel& ch) {
             uint8_t brightness = ch.dmxBuffer[1];
             uint8_t duty = isCA ? brightness : (255 - brightness);
             if (OutputDefs::isPwmExpanderSource(ch.routes[0].source)) {
-                pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, (duty * 4095) / 255, false, ch.routes[0].source);
+                pwmExpanderManager.write(ch.routes[0].addr, ch.routes[0].channel, (duty * 4095) / 255, false, ch.routes[0].source);
             } else if (ch.routes[0].source == 0 && ch.dmxPort != 255) {
                 ledcWrite(ch.dmxPort, duty);
             }

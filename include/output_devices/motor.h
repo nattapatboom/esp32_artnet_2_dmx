@@ -24,7 +24,7 @@ inline void motorSetup(OutputChannel& ch, uint8_t& ledcIdx) {
         } else {
             ch.dmxPort = 255;
             ch.ledc_chan2 = 255;
-            pcaManager.getOrCreateDriver(ch.routes[0].addr, ch.routes[0].source);
+            pwmExpanderManager.getOrCreateDriver(ch.routes[0].addr, ch.routes[0].source);
         }
     } else if (ch.mc_mode == 1) {
         if (ch.routes[0].source == 0) {
@@ -49,16 +49,16 @@ inline void motorSetup(OutputChannel& ch, uint8_t& ledcIdx) {
             } else {
                 writeOutputPin(ch, 2, false);
             }
-            pcaManager.getOrCreateDriver(ch.routes[0].addr, ch.routes[0].source);
-            pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, 0, false, ch.routes[0].source);
+            pwmExpanderManager.getOrCreateDriver(ch.routes[0].addr, ch.routes[0].source);
+            pwmExpanderManager.write(ch.routes[0].addr, ch.routes[0].channel, 0, false, ch.routes[0].source);
         }
     } else if (ch.mc_mode == 2) {
         uint8_t pwmChan = OutputDefs::isPwmExpanderSource(ch.routes[2].source) ? 255 : allocateLedc(ledcIdx);
         if (OutputDefs::isPwmExpanderSource(ch.routes[2].source) || pwmChan != 255) {
             if (OutputDefs::isPwmExpanderSource(ch.routes[2].source)) {
-                pcaManager.getOrCreateDriver(ch.routes[2].addr, ch.routes[2].source);
-                pcaManager.setFrequency(ch.routes[2].addr, outputCtrl.sharedPcaFrequency(ch.routes[2].addr), ch.routes[2].source);
-                if (ch.routes[2].channel != 255) pcaManager.write(ch.routes[2].addr, ch.routes[2].channel, 0, false, ch.routes[2].source);
+                pwmExpanderManager.getOrCreateDriver(ch.routes[2].addr, ch.routes[2].source);
+                pwmExpanderManager.setFrequency(ch.routes[2].addr, outputCtrl.sharedPcaFrequency(ch.routes[2].addr), ch.routes[2].source);
+                if (ch.routes[2].channel != 255) pwmExpanderManager.write(ch.routes[2].addr, ch.routes[2].channel, 0, false, ch.routes[2].source);
             } else {
                 ledcSetup(pwmChan, ch.mc_freq, ledcResolution(ch));
                 ledcAttachPin(ch.routes[2].pin, pwmChan);
@@ -102,15 +102,15 @@ inline void motorUpdate(OutputChannel& ch) {
         if (abs_offset == 0) {
             uint16_t offVal = ch.mc_brake ? 4095 : 0;
             if (ch.mc_mode == 0) {
-                if (ch.routes[0].channel != 255) pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, offVal, false, ch.routes[0].source);
-                if (ch.routes[1].channel != 255) pcaManager.write(ch.routes[1].addr, ch.routes[1].channel, offVal, false, ch.routes[1].source);
+                if (ch.routes[0].channel != 255) pwmExpanderManager.write(ch.routes[0].addr, ch.routes[0].channel, offVal, false, ch.routes[0].source);
+                if (ch.routes[1].channel != 255) pwmExpanderManager.write(ch.routes[1].addr, ch.routes[1].channel, offVal, false, ch.routes[1].source);
             } else if (ch.mc_mode == 1) {
-                if (ch.routes[0].channel != 255) pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, 0, false, ch.routes[0].source);
+                if (ch.routes[0].channel != 255) pwmExpanderManager.write(ch.routes[0].addr, ch.routes[0].channel, 0, false, ch.routes[0].source);
             } else if (ch.mc_mode == 2) {
                 writeOutputPin(ch, 1, ch.mc_brake);
                 writeOutputPin(ch, 2, ch.mc_brake);
                 if (OutputDefs::isPwmExpanderSource(ch.routes[2].source) && ch.routes[2].channel != 255) {
-                    pcaManager.write(ch.routes[2].addr, ch.routes[2].channel, ch.mc_brake ? 4095 : 0, false, ch.routes[2].source);
+                    pwmExpanderManager.write(ch.routes[2].addr, ch.routes[2].channel, ch.mc_brake ? 4095 : 0, false, ch.routes[2].source);
                 } else {
                     writeOutputPin(ch, 3, ch.mc_brake);
                 }
@@ -118,20 +118,20 @@ inline void motorUpdate(OutputChannel& ch) {
         } else {
             if (ch.mc_mode == 0) {
                 if (is_forward) {
-                    if (ch.routes[0].channel != 255) pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, duty, false, ch.routes[0].source);
-                    if (ch.routes[1].channel != 255) pcaManager.write(ch.routes[1].addr, ch.routes[1].channel, 0, false, ch.routes[1].source);
+                    if (ch.routes[0].channel != 255) pwmExpanderManager.write(ch.routes[0].addr, ch.routes[0].channel, duty, false, ch.routes[0].source);
+                    if (ch.routes[1].channel != 255) pwmExpanderManager.write(ch.routes[1].addr, ch.routes[1].channel, 0, false, ch.routes[1].source);
                 } else {
-                    if (ch.routes[0].channel != 255) pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, 0, false, ch.routes[0].source);
-                    if (ch.routes[1].channel != 255) pcaManager.write(ch.routes[1].addr, ch.routes[1].channel, duty, false, ch.routes[1].source);
+                    if (ch.routes[0].channel != 255) pwmExpanderManager.write(ch.routes[0].addr, ch.routes[0].channel, 0, false, ch.routes[0].source);
+                    if (ch.routes[1].channel != 255) pwmExpanderManager.write(ch.routes[1].addr, ch.routes[1].channel, duty, false, ch.routes[1].source);
                 }
             } else if (ch.mc_mode == 1) {
                 writeOutputPin(ch, 2, is_forward);
-                if (ch.routes[0].channel != 255) pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, duty, false, ch.routes[0].source);
+                if (ch.routes[0].channel != 255) pwmExpanderManager.write(ch.routes[0].addr, ch.routes[0].channel, duty, false, ch.routes[0].source);
             } else if (ch.mc_mode == 2) {
                 writeOutputPin(ch, 1, is_forward);
                 writeOutputPin(ch, 2, !is_forward);
                 if (OutputDefs::isPwmExpanderSource(ch.routes[2].source) && ch.routes[2].channel != 255) {
-                    pcaManager.write(ch.routes[2].addr, ch.routes[2].channel, duty, false, ch.routes[2].source);
+                    pwmExpanderManager.write(ch.routes[2].addr, ch.routes[2].channel, duty, false, ch.routes[2].source);
                 } else {
                     writeOutputPin(ch, 3, duty > 2048);
                 }
@@ -151,7 +151,7 @@ inline void motorUpdate(OutputChannel& ch) {
                 writeOutputPin(ch, 1, ch.mc_brake);
                 writeOutputPin(ch, 2, ch.mc_brake);
                 if (OutputDefs::isPwmExpanderSource(ch.routes[2].source)) {
-                    if (ch.routes[2].channel != 255) pcaManager.write(ch.routes[2].addr, ch.routes[2].channel, ch.mc_brake ? 4095 : 0, false, ch.routes[2].source);
+                    if (ch.routes[2].channel != 255) pwmExpanderManager.write(ch.routes[2].addr, ch.routes[2].channel, ch.mc_brake ? 4095 : 0, false, ch.routes[2].source);
                 } else {
                     if (ch.dmxPort != 255) ledcWrite(ch.dmxPort, ch.mc_brake ? max_val : 0);
                 }
@@ -172,7 +172,7 @@ inline void motorUpdate(OutputChannel& ch) {
                 writeOutputPin(ch, 1, is_forward);
                 writeOutputPin(ch, 2, !is_forward);
                 if (OutputDefs::isPwmExpanderSource(ch.routes[2].source)) {
-                    if (ch.routes[2].channel != 255) pcaManager.write(ch.routes[2].addr, ch.routes[2].channel, (uint32_t)duty * 4095 / max_val, false, ch.routes[2].source);
+                    if (ch.routes[2].channel != 255) pwmExpanderManager.write(ch.routes[2].addr, ch.routes[2].channel, (uint32_t)duty * 4095 / max_val, false, ch.routes[2].source);
                 } else {
                     if (ch.dmxPort != 255) ledcWrite(ch.dmxPort, duty);
                 }

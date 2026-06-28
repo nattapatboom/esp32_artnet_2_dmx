@@ -7,8 +7,8 @@
 
 inline void singleLedSetup(OutputChannel& ch, uint8_t& ledcIdx) {
     if (OutputDefs::isPwmExpanderSource(ch.routes[0].source)) {
-        pcaManager.getOrCreateDriver(ch.routes[0].addr, ch.routes[0].source);
-        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, 0, false, ch.routes[0].source);
+        pwmExpanderManager.getOrCreateDriver(ch.routes[0].addr, ch.routes[0].source);
+        pwmExpanderManager.write(ch.routes[0].addr, ch.routes[0].channel, 0, false, ch.routes[0].source);
         return;
     }
     if (ch.routes[0].pin == 255) return;
@@ -27,7 +27,7 @@ inline void singleLedUpdate(OutputChannel& ch) {
     uint32_t val = getDmxValue(ch);
     if (OutputDefs::isPwmExpanderSource(ch.routes[0].source)) {
         uint16_t duty = (uint32_t)((uint64_t)val * 4095) / max_val;
-        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, duty, false, ch.routes[0].source);
+        pwmExpanderManager.write(ch.routes[0].addr, ch.routes[0].channel, duty, false, ch.routes[0].source);
     } else if (ch.dmxPort != 255) {
         ledcWrite(ch.dmxPort, val);
     }

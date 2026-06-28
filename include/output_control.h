@@ -19,7 +19,7 @@
 #include "output_defs.h"
 #include "output_devices/rmt_dmx.h"
 
-extern PCA9685Manager pcaManager;
+extern PwmExpanderManager pwmExpanderManager;
 extern DigitalExpanderManager digitalExpanderManager;
 
 class OutputControl;
@@ -521,9 +521,9 @@ inline void writeOutputPin(OutputChannel& ch, uint8_t pinNum, bool state) {
     if (source == 0) {
         if (gpio != 255) digitalWrite(gpio, activeState ? HIGH : LOW);
     } else if (OutputDefs::isPwmExpanderSource(source)) {
-        pcaManager.getOrCreateDriver(address, source);
-        pcaManager.setFrequency(address, outputCtrl.sharedPcaFrequency(address), source);
-        if (channel != 255) pcaManager.write(address, channel, activeState ? 4095 : 0, false, source);
+        pwmExpanderManager.getOrCreateDriver(address, source);
+        pwmExpanderManager.setFrequency(address, outputCtrl.sharedPcaFrequency(address), source);
+        if (channel != 255) pwmExpanderManager.write(address, channel, activeState ? 4095 : 0, false, source);
     } else if (OutputDefs::isDigitalExpanderSource(source)) {
         if (channel != 255) digitalExpanderManager.write(source, address, channel, activeState, true);
     }

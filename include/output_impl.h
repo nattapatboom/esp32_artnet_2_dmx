@@ -34,7 +34,7 @@ inline void OutputControl::updateLeds() {
 inline void OutputControl::setupChannels() {
     uint8_t rmtIdx = 0;
     uint8_t dmxIdx = 0;
-    pcaManager.clear();
+    pwmExpanderManager.clear();
     digitalExpanderManager.clear();
     bool uart2Used = false;
     bool uart1Used = false;
@@ -63,8 +63,8 @@ inline void OutputControl::setupChannels() {
                 }
                 if (!alreadyInitialized) {
                     uint16_t freq = getPcaSharedFrequency(addr);
-                    pcaManager.getOrCreateDriver(addr, src);
-                    pcaManager.setFrequency(addr, freq, src);
+                    pwmExpanderManager.getOrCreateDriver(addr, src);
+                    pwmExpanderManager.setFrequency(addr, freq, src);
                     if (pcaAddrCount < 8) pcaAddrs[pcaAddrCount++] = addr;
                     Serial.printf("%s initialized at 0x%02X: freq=%dHz type=%d\n", src == 8 ? "PCA9635" : "PCA9685", addr, freq, ch.type);
                 }

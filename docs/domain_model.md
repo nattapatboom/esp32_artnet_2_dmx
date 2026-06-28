@@ -143,6 +143,7 @@ Key rules:
 - Every `Wire` (I2C) operation must be protected by `xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100))` — including PCA9685, MCP23017, I2C DAC, and display drawing
 - I2C device families must use a common base architecture for mutex handling, address/source metadata, route lookup, and manager/device lifecycle. PCA9685, I2C DACs, and digital expanders should differ only in chip-specific register/data transactions, so adding a future I2C IC is a metadata + driver extension instead of a new parallel subsystem.
 - I2C Display task (Core 0) uses a queue to avoid frequent I2C bus contention
+- **Non-Blocking Peripheral I/O Rule:** Never use `delay()` in any FreeRTOS task. All peripheral wait periods (chip wake-up, prescale settle, UART flush, etc.) must use `vTaskDelay(pdMS_TO_TICKS(N))` so the scheduler can yield CPU to other tasks during the wait. The Arduino `Wire` I2C and UART HAL are inherently synchronous (blocking per-byte), which is acceptable for short transactions (~50–200 µs per register write at 400 kHz); the dirty-state cache on `PwmExpanderDriver` minimises unnecessary writes. For future high-throughput peripherals (bulk DMA transfers, RMT pixel streams), prefer DMA-backed or interrupt-driven drivers that return immediately and signal completion via a semaphore or callback, keeping the calling task free to do other work while the peripheral transfers in the background.
 
 ### Protocol Input Context
 

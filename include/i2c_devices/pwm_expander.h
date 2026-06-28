@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include "i2c_devices/i2c_bus.h"
 
-class PCA9685Driver {
+class PwmExpanderDriver {
 private:
     uint8_t _address;
     uint8_t _source;
@@ -19,7 +19,7 @@ private:
     }
 
 public:
-    PCA9685Driver(uint8_t address = 0x40, uint8_t source = 1) : _address(address), _source(source) {
+    PwmExpanderDriver(uint8_t address = 0x40, uint8_t source = 1) : _address(address), _source(source) {
         for (int i = 0; i < 16; i++) {
             _lastDuty[i] = 9999; // Force update on first write
         }
@@ -156,19 +156,19 @@ public:
 };
 
 // Global management for PWM expander devices (PCA9685, PCA9635, SN3218, AW9523)
-class PCA9685Manager {
+class PwmExpanderManager {
 private:
-    PCA9685Driver* _drivers[8];
+    PwmExpanderDriver* _drivers[8];
     uint8_t _driverCount;
 
 public:
-    PCA9685Manager() : _driverCount(0) {
+    PwmExpanderManager() : _driverCount(0) {
         for (int i = 0; i < 8; i++) {
             _drivers[i] = nullptr;
         }
     }
 
-    ~PCA9685Manager() {
+    ~PwmExpanderManager() {
         clear();
     }
 
@@ -182,7 +182,7 @@ public:
         _driverCount = 0;
     }
 
-    PCA9685Driver* getOrCreateDriver(uint8_t address, uint8_t source = 1) {
+    PwmExpanderDriver* getOrCreateDriver(uint8_t address, uint8_t source = 1) {
         for (int i = 0; i < _driverCount; i++) {
             if (_drivers[i] && _drivers[i]->getAddress() == address) {
                 return _drivers[i];
@@ -191,7 +191,7 @@ public:
 
         if (_driverCount >= 8) return nullptr;
 
-        PCA9685Driver* drv = new (std::nothrow) PCA9685Driver(address, source);
+        PwmExpanderDriver* drv = new (std::nothrow) PwmExpanderDriver(address, source);
         if (!drv) return nullptr;
         drv->begin();
         _drivers[_driverCount++] = drv;
@@ -199,20 +199,20 @@ public:
     }
 
     void write(uint8_t address, uint8_t channel, uint16_t duty, bool force = false, uint8_t source = 1) {
-        PCA9685Driver* drv = getOrCreateDriver(address, source);
+        PwmExpanderDriver* drv = getOrCreateDriver(address, source);
         if (drv) {
             drv->writeChannel(channel, duty, force);
         }
     }
 
     void setFrequency(uint8_t address, uint16_t freq, uint8_t source = 1) {
-        PCA9685Driver* drv = getOrCreateDriver(address, source);
+        PwmExpanderDriver* drv = getOrCreateDriver(address, source);
         if (drv) {
             drv->setFrequency(freq);
         }
     }
 };
 
-extern PCA9685Manager pcaManager;
+extern PwmExpanderManager pwmExpanderManager;
 
 #endif // I2C_DEVICES_PWM_EXPANDER_H

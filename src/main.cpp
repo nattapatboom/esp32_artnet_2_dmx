@@ -71,7 +71,7 @@ volatile DimmerCh dimmerChannels[MAX_DIMMER_CHANNELS];
 volatile uint8_t numDimmerChannels = 0;
 volatile bool dimmerEnabled = false;
 
-PCA9685Manager pcaManager;
+PwmExpanderManager pwmExpanderManager;
 DigitalExpanderManager digitalExpanderManager;
 
 void updateMotionControl() {
