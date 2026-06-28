@@ -485,7 +485,7 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
             uint8_t pinCount = def != nullptr ? def->pinCount : 1;
             for (uint8_t slot = 0; slot < pinCount && slot < 4; slot++) {
                 const OutputDefs::PinRule* pr = (def != nullptr) ? &def->pins[slot] : nullptr;
-                if (pr == nullptr || !(pr->sources & (OutputDefs::SRC_PCA | OutputDefs::SRC_DIGITAL_EXPANDER))) continue;
+                if (pr == nullptr || !(pr->sources & (OutputDefs::SRC_PWM_EXPANDER | OutputDefs::SRC_DIGITAL_EXPANDER))) continue;
                 uint8_t slotSrc  = (slot == 0) ? source : (uint8_t)(output[pinSrcKeys[slot]] | 0);
                 if (slotSrc == 0) continue;
                 uint8_t slotAddr = (slot == 0) ? address : (uint8_t)(output[pinAddrKeys[slot]] | (slotSrc == 1 ? 0x40 : 0x20));

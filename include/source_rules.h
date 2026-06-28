@@ -15,7 +15,7 @@ namespace SourceRules {
 
 enum SourceMask : uint8_t {
     SRC_GPIO = 1 << 0,
-    SRC_PCA = 1 << 1,
+    SRC_PWM_EXPANDER = 1 << 1,
     SRC_DIGITAL_EXPANDER = 1 << 2,
     SRC_I2C_DAC = 1 << 3
 };
@@ -33,7 +33,7 @@ struct SourceAddressRule {
 };
 
 constexpr SourceAddressRule ADDRESS_RULES[] = {
-    {1, SRC_PCA, "PCA9685 address must be 0x40-0x47", {{0x40, 0x47}, {0, 0}}},
+    {1, SRC_PWM_EXPANDER, "PCA9685 address must be 0x40-0x47", {{0x40, 0x47}, {0, 0}}},
     {2, SRC_DIGITAL_EXPANDER, "MCP23017 address must be 0x20-0x27", {{0x20, 0x27}, {0, 0}}},
     {3, SRC_DIGITAL_EXPANDER, "TCA9555 address must be 0x20-0x27", {{0x20, 0x27}, {0, 0}}},
     {4, SRC_DIGITAL_EXPANDER, "PCF857x address must be 0x20-0x27 or 0x38-0x3F", {{0x20, 0x27}, {0x38, 0x3F}}},

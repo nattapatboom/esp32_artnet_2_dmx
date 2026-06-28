@@ -30,7 +30,7 @@ namespace OutputDefs {
 
 using SourceRules::SourceMask;
 using SourceRules::SRC_GPIO;
-using SourceRules::SRC_PCA;
+using SourceRules::SRC_PWM_EXPANDER;
 using SourceRules::SRC_DIGITAL_EXPANDER;
 using SourceRules::SRC_I2C_DAC;
 
@@ -178,40 +178,40 @@ constexpr PinRule PINS_DMX[] = {
     {"pin1", "DMX TX", SRC_GPIO, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_RELAY_DIGITAL[] = {
-    {"pin1", "Relay", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
+    {"pin1", "Relay", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_LED_STRIP[] = {
     {"pin1", "Data", SRC_GPIO, PIN_OUTPUT, true, 2}
 };
 constexpr PinRule PINS_PWM[] = {
-    {"pin1", "PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
+    {"pin1", "PWM", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_SERVO[] = {
-    {"pin1", "Servo PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
+    {"pin1", "Servo PWM", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_BUZZER[] = {
     {"pin1", "Tone PWM", SRC_GPIO, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_PWM_DAC[] = {
-    {"pin1", "PWM Out", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
+    {"pin1", "PWM Out", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_FUNC_GEN[] = {
     {"pin1", "Wave Out", SRC_GPIO, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_ANALOG_RGB[] = {
-    {"pin1", "Red", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin2", "Green", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin3", "Blue", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin4", "White", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
+    {"pin1", "Red", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin2", "Green", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin3", "Blue", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin4", "White", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_MOTOR_PWM_DIR[] = {
-    {"pin1", "PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin2", "DIR", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
+    {"pin1", "PWM", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin2", "DIR", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_MOTOR_IN1_IN2_EN[] = {
-    {"pin1", "IN1", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin2", "IN2", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
-    {"pin3", "EN PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
+    {"pin1", "IN1", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin2", "IN2", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin3", "EN PWM", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_STEPPER[] = {
     {"pin1", "STEP", SRC_GPIO, PIN_OUTPUT, true, 2},
@@ -228,45 +228,45 @@ constexpr PinRule PINS_TM1637[] = {
     {"pin2", "DIO", SRC_GPIO, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_7SEG_DIRECT[] = {
-    {"pin1", "Segment A", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
-    {"pin2", "Segment B", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
-    {"pin3", "Segment C", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
-    {"pin4", "Segment D", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
-    {"pin5", "Segment E", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
-    {"pin6", "Segment F", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
-    {"pin7", "Segment G", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
-    {"pin8", "Segment DP", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1}
+    {"pin1", "Segment A", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin2", "Segment B", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin3", "Segment C", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin4", "Segment D", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin5", "Segment E", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin6", "Segment F", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin7", "Segment G", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin8", "Segment DP", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_7SEG_DIMMED[] = {
-    {"pin1", "Segment A", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin2", "Segment B", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin3", "Segment C", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin4", "Segment D", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin5", "Segment E", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin6", "Segment F", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin7", "Segment G", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin8", "Segment DP", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1}
+    {"pin1", "Segment A", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin2", "Segment B", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin3", "Segment C", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin4", "Segment D", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin5", "Segment E", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin6", "Segment F", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin7", "Segment G", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin8", "Segment DP", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1}
 };
 constexpr PinRule PINS_7SEG_COMMON_DIM[] = {
-    {"pin1", "Common PWM", SRC_GPIO | SRC_PCA, PIN_OUTPUT, true, 1},
-    {"pin2", "Segment A", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
-    {"pin3", "Segment B", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
-    {"pin4", "Segment C", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
-    {"pin5", "Segment D", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
-    {"pin6", "Segment E", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
-    {"pin7", "Segment F", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
-    {"pin8", "Segment G", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
-    {"pin9", "Segment DP", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
+    {"pin1", "Common PWM", SRC_GPIO | SRC_PWM_EXPANDER, PIN_OUTPUT, true, 1},
+    {"pin2", "Segment A", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin3", "Segment B", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin4", "Segment C", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin5", "Segment D", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin6", "Segment E", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin7", "Segment F", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin8", "Segment G", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin9", "Segment DP", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_DAC[] = {
     {"pin1", "I2C DAC", SRC_I2C_DAC, PIN_OUTPUT, false, 0}
 };
 constexpr PinRule PINS_SOLENOID[] = {
-    {"pin1", "Solenoid", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
+    {"pin1", "Solenoid", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 constexpr PinRule PINS_SMOKE[] = {
-    {"pin1", "Smoke Valve", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
-    {"pin2", "Shoot Valve", SRC_GPIO | SRC_PCA | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
+    {"pin1", "Smoke Valve", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0},
+    {"pin2", "Shoot Valve", SRC_GPIO | SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, PIN_OUTPUT, true, 0}
 };
 
 // Web UI display names (1:1 with type IDs 0-18)

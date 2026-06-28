@@ -71,7 +71,7 @@ def split_cpp_args(text):
 def parse_source_mask(expr):
     values = {
         "SRC_GPIO": 1,
-        "SRC_PCA": 2,
+        "SRC_PWM_EXPANDER": 2,
         "SRC_DIGITAL_EXPANDER": 4,
         "SRC_I2C_DAC": 8,
     }

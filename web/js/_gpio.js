@@ -80,7 +80,7 @@ const INPUT_ONLY_GPIOS=GPIO_PINS_SAFE.inputOnly;
 const FORBIDDEN_OUTPUT_GPIOS=Object.fromEntries(GPIO_PINS_SAFE.reserved.map(r=>[r.pin,r.reason]));
 const SOURCE_ADDRESS_RULES=SOURCE_DATA?Object.fromEntries(SOURCE_DATA.addressRules.map(r=>[r.source,{label:r.label,ranges:r.ranges}])):{};
 const SRC_GPIO=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.GPIO:1;
-const SRC_PCA=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.PCA:2;
+const SRC_PWM_EXPANDER=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.PWM_EXPANDER:2;
 const SRC_DIG=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.DIGITAL_EXPANDER:4;
 const SRC_DAC=SOURCE_DATA&&SOURCE_DATA.masks?SOURCE_DATA.masks.I2C_DAC:8;
 var T=TYPE_META?.typeIds||{};
@@ -256,7 +256,7 @@ function renderPinRows(){
    const srcOpts=(mask)=>{
      let h='';
      if(mask&SRC_GPIO) h+=`<option value="0">ESP32 GPIO</option>`;
-     if(mask&SRC_PCA) h+=`<option value="1">PCA9685</option>`;
+     if(mask&SRC_PWM_EXPANDER) h+=`<option value="1">PCA9685</option>`;
      if(mask&SRC_DIG) h+=`<option value="2">MCP23017</option><option value="3">TCA9555</option><option value="4">PCF857x</option>`;
      if(mask&SRC_DAC) h+=`<option value="5">MCP4725</option><option value="6">DAC7571</option><option value="7">DAC7573</option>`;
      return h;
@@ -294,7 +294,7 @@ function renderPinRows(){
     if(rule.sources&sourceMaskForId(current)) return current;
     const allowed=rule.sources;
     if(allowed&SRC_GPIO) return 0;
-    if(allowed&SRC_PCA) return 1;
+    if(allowed&SRC_PWM_EXPANDER) return 1;
     if(allowed&SRC_DIG) return 2;
     if(allowed&SRC_DAC) return 5;
     return 0;
