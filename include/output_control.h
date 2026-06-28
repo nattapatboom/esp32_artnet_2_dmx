@@ -172,7 +172,7 @@ private:
         uint16_t firstConfiguredFreq = 0;
         for (const auto& candidate : channels) {
             for (int r = 0; r < 9; r++) {
-                if (candidate.routes[r].source == 1 && candidate.routes[r].addr == address) {
+                if (OutputDefs::isPwmExpanderSource(candidate.routes[r].source) && candidate.routes[r].addr == address) {
                     if (candidate.type == OutputDefs::TYPE_SERVO) return 50;
                     if ((candidate.type == OutputDefs::TYPE_SINGLE_LED || candidate.type == OutputDefs::TYPE_MOTOR ||
                          candidate.type == OutputDefs::TYPE_ANALOG_RGB || candidate.type == OutputDefs::TYPE_SMOKE ||
@@ -520,10 +520,10 @@ inline void writeOutputPin(OutputChannel& ch, uint8_t pinNum, bool state) {
 
     if (source == 0) {
         if (gpio != 255) digitalWrite(gpio, activeState ? HIGH : LOW);
-    } else if (source == 1) {
-        pcaManager.getOrCreateDriver(address);
-        pcaManager.setFrequency(address, outputCtrl.sharedPcaFrequency(address));
-        if (channel != 255) pcaManager.write(address, channel, activeState ? 4095 : 0);
+    } else if (OutputDefs::isPwmExpanderSource(source)) {
+        pcaManager.getOrCreateDriver(address, source);
+        pcaManager.setFrequency(address, outputCtrl.sharedPcaFrequency(address), source);
+        if (channel != 255) pcaManager.write(address, channel, activeState ? 4095 : 0, false, source);
     } else if (source >= 2 && source <= 4) {
         if (channel != 255) digitalExpanderManager.write(source, address, channel, activeState, true);
     }

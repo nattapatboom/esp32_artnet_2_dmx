@@ -59,27 +59,27 @@ inline void analogRgbUpdate(OutputChannel& ch) {
 
     if (ch.routes[0].source == 0) {
         if (ch.dmxPort != 255) ledcWrite(ch.dmxPort, (r * max_val) / 255);
-    } else if (ch.routes[0].source == 1) {
-        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, (r * 4095) / 255);
+    } else if (OutputDefs::isPwmExpanderSource(ch.routes[0].source)) {
+        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, (r * 4095) / 255, false, ch.routes[0].source);
     }
 
     if (ch.routes[1].source == 0) {
         if (ch.ledc_chan2 != 255) ledcWrite(ch.ledc_chan2, (g * max_val) / 255);
-    } else if (ch.routes[1].source == 1) {
-        pcaManager.write(ch.routes[1].addr, ch.routes[1].channel, (g * 4095) / 255);
+    } else if (OutputDefs::isPwmExpanderSource(ch.routes[1].source)) {
+        pcaManager.write(ch.routes[1].addr, ch.routes[1].channel, (g * 4095) / 255, false, ch.routes[1].source);
     }
 
     if (ch.routes[2].source == 0) {
         if (ch.ledc_chan3 != 255) ledcWrite(ch.ledc_chan3, (b * max_val) / 255);
-    } else if (ch.routes[2].source == 1) {
-        pcaManager.write(ch.routes[2].addr, ch.routes[2].channel, (b * 4095) / 255);
+    } else if (OutputDefs::isPwmExpanderSource(ch.routes[2].source)) {
+        pcaManager.write(ch.routes[2].addr, ch.routes[2].channel, (b * 4095) / 255, false, ch.routes[2].source);
     }
 
     if (ch.color_order >= 4) {
         if (ch.routes[3].source == 0) {
             if (ch.ledc_chan4 != 255) ledcWrite(ch.ledc_chan4, (w * max_val) / 255);
-        } else if (ch.routes[3].source == 1) {
-            pcaManager.write(ch.routes[3].addr, ch.routes[3].channel, (w * 4095) / 255);
+        } else if (OutputDefs::isPwmExpanderSource(ch.routes[3].source)) {
+            pcaManager.write(ch.routes[3].addr, ch.routes[3].channel, (w * 4095) / 255, false, ch.routes[3].source);
         }
     }
 }

@@ -473,6 +473,10 @@ inline uint8_t sourceMaskForSourceId(uint8_t source) {
     return 0;
 }
 
+inline bool isPwmExpanderSource(uint8_t source) {
+    return sourceMaskForSourceId(source) == SRC_PWM_EXPANDER;
+}
+
 inline bool sourceAllowedForSlot(uint8_t type, uint8_t mode, uint8_t slotIndex, uint8_t source) {
     const PinRule* rule = pinRule(type, mode, slotIndex);
     uint8_t sourceMask = sourceMaskForSourceId(source);

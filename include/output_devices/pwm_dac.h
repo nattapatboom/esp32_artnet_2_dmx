@@ -19,9 +19,9 @@ inline void pwmDacSetup(OutputChannel& ch, uint8_t& ledcIdx) {
 inline void pwmDacUpdate(OutputChannel& ch) {
     uint32_t max_val = getMaxValue(ch.mc_resolution);
     uint32_t val = getDmxValue(ch);
-    if (ch.routes[0].source == 1) {
+    if (OutputDefs::isPwmExpanderSource(ch.routes[0].source)) {
         uint16_t duty = calibratedPwmDacDuty(ch, val, max_val, 4095);
-        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, duty);
+        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, duty, false, ch.routes[0].source);
     } else if (ch.dmxPort != 255) {
         ledcWrite(ch.dmxPort, calibratedPwmDacDuty(ch, val, max_val, max_val));
     }

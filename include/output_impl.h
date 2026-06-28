@@ -56,17 +56,17 @@ inline void OutputControl::setupChannels() {
         for (uint8_t r = 0; r < pinCount; r++) {
             uint8_t src = ch.routes[r].source;
             uint8_t addr = ch.routes[r].addr;
-            if (src == 1) {
+            if (OutputDefs::isPwmExpanderSource(src)) {
                 bool alreadyInitialized = false;
                 for (uint8_t i = 0; i < pcaAddrCount; i++) {
                     if (pcaAddrs[i] == addr) { alreadyInitialized = true; break; }
                 }
                 if (!alreadyInitialized) {
                     uint16_t freq = getPcaSharedFrequency(addr);
-                    pcaManager.getOrCreateDriver(addr);
-                    pcaManager.setFrequency(addr, freq);
+                    pcaManager.getOrCreateDriver(addr, src);
+                    pcaManager.setFrequency(addr, freq, src);
                     if (pcaAddrCount < 8) pcaAddrs[pcaAddrCount++] = addr;
-                    Serial.printf("PCA9685 initialized at 0x%02X: freq=%dHz type=%d\n", addr, freq, ch.type);
+                    Serial.printf("%s initialized at 0x%02X: freq=%dHz type=%d\n", src == 8 ? "PCA9635" : "PCA9685", addr, freq, ch.type);
                 }
             } else if (src >= 2 && src <= 4) {
                 writeOutputPin(ch, r + 1, false);

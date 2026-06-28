@@ -22,9 +22,9 @@ inline void servoUpdate(OutputChannel& ch) {
     if (ch.mc_max_us <= ch.mc_min_us) return;
     uint32_t val = getDmxValue(ch);
     uint32_t pulse_us = ch.mc_min_us + (val * (ch.mc_max_us - ch.mc_min_us)) / max_val;
-    if (ch.routes[0].source == 1) {
+    if (OutputDefs::isPwmExpanderSource(ch.routes[0].source)) {
         uint32_t ticks = (pulse_us * 4096) / 20000;
-        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, ticks > 4095 ? 4095 : ticks);
+        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, ticks > 4095 ? 4095 : ticks, false, ch.routes[0].source);
     } else if (ch.dmxPort != 255) {
         uint32_t duty = (pulse_us * 65535) / 20000;
         ledcWrite(ch.dmxPort, duty);

@@ -6,9 +6,9 @@
 #include "ledc_helpers.h"
 
 inline void singleLedSetup(OutputChannel& ch, uint8_t& ledcIdx) {
-    if (ch.routes[0].source == 1) {
-        pcaManager.getOrCreateDriver(ch.routes[0].addr);
-        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, 0);
+    if (OutputDefs::isPwmExpanderSource(ch.routes[0].source)) {
+        pcaManager.getOrCreateDriver(ch.routes[0].addr, ch.routes[0].source);
+        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, 0, false, ch.routes[0].source);
         return;
     }
     if (ch.routes[0].pin == 255) return;
@@ -25,9 +25,9 @@ inline void singleLedUpdate(OutputChannel& ch) {
     uint32_t max_val = getMaxValue(ch.mc_resolution);
     if (max_val == 0) return;
     uint32_t val = getDmxValue(ch);
-    if (ch.routes[0].source == 1) {
+    if (OutputDefs::isPwmExpanderSource(ch.routes[0].source)) {
         uint16_t duty = (uint32_t)((uint64_t)val * 4095) / max_val;
-        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, duty);
+        pcaManager.write(ch.routes[0].addr, ch.routes[0].channel, duty, false, ch.routes[0].source);
     } else if (ch.dmxPort != 255) {
         ledcWrite(ch.dmxPort, val);
     }

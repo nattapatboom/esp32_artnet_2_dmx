@@ -54,10 +54,10 @@ inline void setupSegmentOutput(OutputChannel& ch, uint8_t idx, bool offState) {
     uint8_t src = ch.routes[routeIdx].source;
     bool inv = ch.routes[routeIdx].invert;
     bool active_off = offState ^ inv;
-    if (src == 1) {
-        pcaManager.getOrCreateDriver(ch.routes[routeIdx].addr);
-        pcaManager.setFrequency(ch.routes[routeIdx].addr, outputCtrl.sharedPcaFrequency(ch.routes[routeIdx].addr));
-        if (ch.routes[routeIdx].channel != 255) pcaManager.write(ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_off ? 4095 : 0);
+    if (OutputDefs::isPwmExpanderSource(src)) {
+        pcaManager.getOrCreateDriver(ch.routes[routeIdx].addr, src);
+        pcaManager.setFrequency(ch.routes[routeIdx].addr, outputCtrl.sharedPcaFrequency(ch.routes[routeIdx].addr), src);
+        if (ch.routes[routeIdx].channel != 255) pcaManager.write(ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_off ? 4095 : 0, false, src);
         return;
     }
     if (src >= 2 && src <= 4) {
@@ -78,8 +78,8 @@ inline void writeSegmentOutput(OutputChannel& ch, uint8_t idx, bool state) {
     uint8_t src = ch.routes[routeIdx].source;
     bool inv = ch.routes[routeIdx].invert;
     bool active_state = state ^ inv;
-    if (src == 1) {
-        if (ch.routes[routeIdx].channel != 255) pcaManager.write(ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_state ? 4095 : 0);
+    if (OutputDefs::isPwmExpanderSource(src)) {
+        if (ch.routes[routeIdx].channel != 255) pcaManager.write(ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_state ? 4095 : 0, false, src);
         return;
     }
     if (src >= 2 && src <= 4) {

@@ -7,6 +7,7 @@
 class PCA9685Driver {
 private:
     uint8_t _address;
+    uint8_t _source;
     uint16_t _lastDuty[16]; // Keep track of the last duty cycle written to each channel (dirty-state check)
 
     void writeRegister(uint8_t reg, uint8_t value) {
@@ -18,21 +19,35 @@ private:
     }
 
 public:
-    PCA9685Driver(uint8_t address = 0x40) : _address(address) {
+    PCA9685Driver(uint8_t address = 0x40, uint8_t source = 1) : _address(address), _source(source) {
         for (int i = 0; i < 16; i++) {
             _lastDuty[i] = 9999; // Force update on first write
         }
     }
 
     uint8_t getAddress() const { return _address; }
+    uint8_t getSource() const { return _source; }
 
     void begin() {
-        // Wake PCA9685, enable register Auto-Increment for multi-byte writes
-        writeRegister(0x00, 0x20); // MODE1 with AI bit set
-        delay(5);
+        if (_source == 8) {
+            // Wake PCA9635 (MODE1 sleep bit is bit 4, wake is bit 4 = 0)
+            writeRegister(0x00, 0x80); // Register 0x00 is MODE1, bit 7 is ALLCALL
+            delay(5);
+            // Set all 16 pins to PWM mode: LEDOUT0 to LEDOUT3 (registers 0x14-0x17)
+            writeRegister(0x14, 0xAA);
+            writeRegister(0x15, 0xAA);
+            writeRegister(0x16, 0xAA);
+            writeRegister(0x17, 0xAA);
+        } else {
+            // Wake PCA9685, enable register Auto-Increment for multi-byte writes
+            writeRegister(0x00, 0x20); // MODE1 with AI bit set
+            delay(5);
+        }
     }
 
     void setFrequency(uint16_t freq) {
+        if (_source == 8) return; // PCA9635 has a fixed internal oscillator (typically Fm+ Speed)
+
         if (freq < 24) freq = 24;
         if (freq > 1526) freq = 1526;
         
@@ -53,6 +68,21 @@ public:
 
     void writeChannel(uint8_t channel, uint16_t duty, bool force = false) {
         if (channel > 15) return;
+
+        if (_source == 8) {
+            // Map 12-bit duty (0..4095) to PCA9635 8-bit duty (0..255)
+            uint8_t duty8 = (uint8_t)((duty * 255) / 4095);
+
+            if (!force && _lastDuty[channel] == duty8) {
+                return;
+            }
+            _lastDuty[channel] = duty8;
+
+            // PWM register on PCA9635 is 0x02 + channel
+            writeRegister(0x02 + channel, duty8);
+            return;
+        }
+
         if (duty > 4095) duty = 4095;
 
         // Dirty-state check to minimize I2C traffic
@@ -111,7 +141,7 @@ public:
         _driverCount = 0;
     }
 
-    PCA9685Driver* getOrCreateDriver(uint8_t address) {
+    PCA9685Driver* getOrCreateDriver(uint8_t address, uint8_t source = 1) {
         for (int i = 0; i < _driverCount; i++) {
             if (_drivers[i] && _drivers[i]->getAddress() == address) {
                 return _drivers[i];
@@ -120,22 +150,22 @@ public:
 
         if (_driverCount >= 8) return nullptr;
 
-        PCA9685Driver* drv = new (std::nothrow) PCA9685Driver(address);
+        PCA9685Driver* drv = new (std::nothrow) PCA9685Driver(address, source);
         if (!drv) return nullptr;
         drv->begin();
         _drivers[_driverCount++] = drv;
         return drv;
     }
 
-    void write(uint8_t address, uint8_t channel, uint16_t duty, bool force = false) {
-        PCA9685Driver* drv = getOrCreateDriver(address);
+    void write(uint8_t address, uint8_t channel, uint16_t duty, bool force = false, uint8_t source = 1) {
+        PCA9685Driver* drv = getOrCreateDriver(address, source);
         if (drv) {
             drv->writeChannel(channel, duty, force);
         }
     }
 
-    void setFrequency(uint8_t address, uint16_t freq) {
-        PCA9685Driver* drv = getOrCreateDriver(address);
+    void setFrequency(uint8_t address, uint16_t freq, uint8_t source = 1) {
+        PCA9685Driver* drv = getOrCreateDriver(address, source);
         if (drv) {
             drv->setFrequency(freq);
         }

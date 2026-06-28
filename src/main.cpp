@@ -544,6 +544,7 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
 
 uint8_t defaultI2cAddressForSource(uint8_t source) {
     if (source == 1) return 0x40;
+    if (source == 8) return 0x10;
     if (source == 5) return 0x60;
     if (source == 6 || source == 7) return 0x4C;
     return 0x20;
@@ -1070,11 +1071,11 @@ bool validateOutputJson(JsonArray outputs, String& message) {
                 uint8_t pin4Addr = output["pin4_addr"] | defaultI2cAddressForSource(pin4Source);
                 if (!SourceRules::validateAddress(pin4Source, pin4Addr, "Analog RGB/RGBW White I2C source on channel " + String(channelNumber), message)) return false;
             }
-            if ((source == 1 && (int)(output["pca_channel"] | 255) == 255) ||
-                (pin2Source == 1 && (int)(output["pin2_channel"] | 255) == 255) ||
-                (pin3Source == 1 && (int)(output["pin3_channel"] | 255) == 255) ||
-                (colorOrder >= 4 && pin4Source == 1 && (int)(output["pin4_channel"] | 255) == 255)) {
-                message = "Analog RGB/RGBW PCA9685 channel is missing on channel " + String(channelNumber);
+            if ((OutputDefs::isPwmExpanderSource(source) && (int)(output["pca_channel"] | 255) == 255) ||
+                (OutputDefs::isPwmExpanderSource(pin2Source) && (int)(output["pin2_channel"] | 255) == 255) ||
+                (OutputDefs::isPwmExpanderSource(pin3Source) && (int)(output["pin3_channel"] | 255) == 255) ||
+                (colorOrder >= 4 && OutputDefs::isPwmExpanderSource(pin4Source) && (int)(output["pin4_channel"] | 255) == 255)) {
+                message = "Analog RGB/RGBW PWM Expander channel is missing on channel " + String(channelNumber);
                 return false;
             }
         }
