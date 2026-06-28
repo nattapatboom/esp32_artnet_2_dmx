@@ -57,6 +57,13 @@ public:
             writeReg16(0x02, 0x0000); // OUTPUT ports
         } else if (_kind == DIG_EXP_PCF857X) {
             writePcf(0x0000);
+        } else if (_kind == 10) { // AW9523
+            // Set all 16 pins to GPIO mode (1 = GPIO, 0 = LED/PWM mode)
+            writeReg8(0x11, 0xFF); // LEDOUT Port 0
+            writeReg8(0x12, 0xFF); // LEDOUT Port 1
+            // Configure pins as Output: Config Port 0 (0x02) = 0x00, Config Port 1 (0x03) = 0x00 (0 = Output)
+            writeReg8(0x02, 0x00);
+            writeReg8(0x03, 0x00);
         }
     }
 
@@ -75,6 +82,9 @@ public:
             writeReg16(0x02, _state);
         } else if (_kind == DIG_EXP_PCF857X) {
             writePcf(_state);
+        } else if (_kind == 10) { // AW9523 (16 channels)
+            writeReg8(0x04, _state & 0xFF);  // Output Port 0
+            writeReg8(0x05, (_state >> 8) & 0xFF); // Output Port 1
         }
     }
 
@@ -93,6 +103,10 @@ public:
             uint16_t val = rx[0];
             if (width > 1) val |= (uint16_t)rx[1] << 8;
             return val;
+        } else if (_kind == 10) { // AW9523
+            uint8_t lo = regRead8(0x00); // Input Port 0
+            uint8_t hi = regRead8(0x01); // Input Port 1
+            return ((uint16_t)hi << 8) | lo;
         }
         return 0xFFFF;
     }
@@ -121,6 +135,13 @@ public:
             writeReg16(0x06, config);
         } else if (_kind == DIG_EXP_PCF857X) {
             writeChannel(channel, true, true);
+        } else if (_kind == 10) { // AW9523
+            uint8_t configReg = (channel < 8) ? 0x02 : 0x03;
+            uint8_t portBit = (uint8_t)1 << (channel & 7);
+            uint8_t config = regRead8(configReg);
+            if (config == 0xFF) return;
+            config |= portBit;
+            writeReg8(configReg, config);
         }
     }
 

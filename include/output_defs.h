@@ -474,7 +474,11 @@ inline uint8_t sourceMaskForSourceId(uint8_t source) {
 }
 
 inline bool isPwmExpanderSource(uint8_t source) {
-    return sourceMaskForSourceId(source) == SRC_PWM_EXPANDER;
+    return (sourceMaskForSourceId(source) & SRC_PWM_EXPANDER) != 0;
+}
+
+inline bool isDigitalExpanderSource(uint8_t source) {
+    return (sourceMaskForSourceId(source) & SRC_DIGITAL_EXPANDER) != 0;
 }
 
 inline bool sourceAllowedForSlot(uint8_t type, uint8_t mode, uint8_t slotIndex, uint8_t source) {

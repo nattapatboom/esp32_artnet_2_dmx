@@ -524,7 +524,7 @@ inline void writeOutputPin(OutputChannel& ch, uint8_t pinNum, bool state) {
         pcaManager.getOrCreateDriver(address, source);
         pcaManager.setFrequency(address, outputCtrl.sharedPcaFrequency(address), source);
         if (channel != 255) pcaManager.write(address, channel, activeState ? 4095 : 0, false, source);
-    } else if (source >= 2 && source <= 4) {
+    } else if (OutputDefs::isDigitalExpanderSource(source)) {
         if (channel != 255) digitalExpanderManager.write(source, address, channel, activeState, true);
     }
 }
@@ -542,7 +542,7 @@ inline bool readOutputPin(OutputChannel& ch, uint8_t pinNum) {
     bool val = false;
     if (source == 0) {
         if (gpio != 255) val = digitalRead(gpio) == HIGH;
-    } else if (source >= 2 && source <= 4) {
+    } else if (OutputDefs::isDigitalExpanderSource(source)) {
         if (channel != 255) val = digitalExpanderManager.digitalRead(source, address, channel);
     }
     return val ^ inv;

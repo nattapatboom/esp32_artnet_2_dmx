@@ -38,6 +38,24 @@ public:
             writeRegister(0x15, 0xAA);
             writeRegister(0x16, 0xAA);
             writeRegister(0x17, 0xAA);
+        } else if (_source == 9) {
+            // Wake SN3218 (Register 0x00 = 0x01)
+            writeRegister(0x00, 0x01);
+            delay(5);
+            // Enable all 18 channels (LED Control registers 0x13, 0x14, 0x15 = 0x3F each)
+            writeRegister(0x13, 0x3F);
+            writeRegister(0x14, 0x3F);
+            writeRegister(0x15, 0x3F);
+            writeRegister(0x16, 0xFF); // Initial update
+        } else if (_source == 10) {
+            // Configure AW9523: set all 16 pins to LED mode (PWM control)
+            writeRegister(0x11, 0x00); // LEDOUT Port 0
+            writeRegister(0x12, 0x00); // LEDOUT Port 1
+            writeRegister(0x02, 0x00); // Config Port 0: all output
+            writeRegister(0x03, 0x00); // Config Port 1: all output
+            delay(5);
+        } else if (_source == 11) {
+            // TLC5940 is SPI-based. Stub only.
         } else {
             // Wake PCA9685, enable register Auto-Increment for multi-byte writes
             writeRegister(0x00, 0x20); // MODE1 with AI bit set
@@ -46,7 +64,7 @@ public:
     }
 
     void setFrequency(uint16_t freq) {
-        if (_source == 8) return; // PCA9635 has a fixed internal oscillator (typically Fm+ Speed)
+        if (_source == 8 || _source == 9 || _source == 10 || _source == 11) return;
 
         if (freq < 24) freq = 24;
         if (freq > 1526) freq = 1526;
@@ -67,7 +85,7 @@ public:
     }
 
     void writeChannel(uint8_t channel, uint16_t duty, bool force = false) {
-        if (channel > 15) return;
+        if (channel > 17) return;
 
         if (_source == 8) {
             // Map 12-bit duty (0..4095) to PCA9635 8-bit duty (0..255)
@@ -80,6 +98,34 @@ public:
 
             // PWM register on PCA9635 is 0x02 + channel
             writeRegister(0x02 + channel, duty8);
+            return;
+        } else if (_source == 9) {
+            // Map 12-bit duty (0..4095) to SN3218 8-bit duty (0..255)
+            uint8_t duty8 = (uint8_t)((duty * 255) / 4095);
+
+            if (!force && _lastDuty[channel] == duty8) {
+                return;
+            }
+            _lastDuty[channel] = duty8;
+
+            // PWM register on SN3218 is 0x01 + channel
+            writeRegister(0x01 + channel, duty8);
+            writeRegister(0x16, 0xFF); // Update PWM data
+            return;
+        } else if (_source == 10) {
+            // Map 12-bit duty (0..4095) to AW9523 8-bit duty (0..255)
+            uint8_t duty8 = (uint8_t)((duty * 255) / 4095);
+
+            if (!force && _lastDuty[channel] == duty8) {
+                return;
+            }
+            _lastDuty[channel] = duty8;
+
+            // PWM register on AW9523 is 0x20 + channel
+            writeRegister(0x20 + channel, duty8);
+            return;
+        } else if (_source == 11) {
+            // TLC5940 (SPI) stub write
             return;
         }
 

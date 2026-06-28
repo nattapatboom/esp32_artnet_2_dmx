@@ -68,7 +68,7 @@ inline void OutputControl::setupChannels() {
                     if (pcaAddrCount < 8) pcaAddrs[pcaAddrCount++] = addr;
                     Serial.printf("%s initialized at 0x%02X: freq=%dHz type=%d\n", src == 8 ? "PCA9635" : "PCA9685", addr, freq, ch.type);
                 }
-            } else if (src >= 2 && src <= 4) {
+            } else if (OutputDefs::isDigitalExpanderSource(src)) {
                 writeOutputPin(ch, r + 1, false);
             }
         }

@@ -40,11 +40,14 @@ constexpr SourceAddressRule ADDRESS_RULES[] = {
     {5, SRC_I2C_DAC, "MCP4725 address must be 0x60 or 0x61", {{0x60, 0x61}, {0, 0}}},
     {6, SRC_I2C_DAC, "DAC7571 address must be 0x4C or 0x4D", {{0x4C, 0x4D}, {0, 0}}},
     {7, SRC_I2C_DAC, "DAC7573 address must be 0x4C-0x5B", {{0x4C, 0x5B}, {0, 0}}},
-    {8, SRC_PWM_EXPANDER, "PCA9635 address must be 0x10-0x7F", {{0x10, 0x7F}, {0, 0}}}
+    {8, SRC_PWM_EXPANDER, "PCA9635 address must be 0x10-0x7F", {{0x10, 0x7F}, {0, 0}}},
+    {9, SRC_PWM_EXPANDER, "SN3218 address must be 0x54", {{0x54, 0x54}, {0, 0}}},
+    {10, SRC_PWM_EXPANDER | SRC_DIGITAL_EXPANDER, "AW9523 address must be 0x58-0x5B", {{0x58, 0x5B}, {0, 0}}},
+    {11, SRC_PWM_EXPANDER, "TLC5940 (SPI) does not use I2C address", {{0, 255}, {0, 0}}}
 };
-constexpr uint8_t ADDRESS_RULES_COUNT = 8;
+constexpr uint8_t ADDRESS_RULES_COUNT = 11;
 
-// Source display names (must match index: 0=GPIO, 1=PCA9685, 2-4=digital expanders, 5-7=I2C DAC, 8=PCA9635)
+// Source display names (must match index: 0=GPIO, 1=PCA9685, 2-4=digital expanders, 5-7=I2C DAC, 8=PCA9635, 9=SN3218, 10=AW9523, 11=TLC5940 (SPI))
 constexpr const char* SOURCE_NAMES[] = {
     "ESP32",
     "PCA9685",
@@ -54,9 +57,12 @@ constexpr const char* SOURCE_NAMES[] = {
     "MCP4725 (I2C DAC)",
     "DAC7571 (I2C DAC)",
     "DAC7573 (I2C DAC)",
-    "PCA9635"
+    "PCA9635",
+    "SN3218",
+    "AW9523",
+    "TLC5940 (SPI)"
 };
-constexpr uint8_t SOURCE_NAMES_COUNT = 9;
+constexpr uint8_t SOURCE_NAMES_COUNT = 12;
 
 constexpr const char* UNSUPPORTED_LABEL = "Unsupported I2C source";
 

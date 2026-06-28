@@ -545,6 +545,8 @@ bool outputsHaveDuplicateExpanderChannel(JsonArray outputs, String& message) {
 uint8_t defaultI2cAddressForSource(uint8_t source) {
     if (source == 1) return 0x40;
     if (source == 8) return 0x10;
+    if (source == 9) return 0x54;
+    if (source == 10) return 0x58;
     if (source == 5) return 0x60;
     if (source == 6 || source == 7) return 0x4C;
     return 0x20;
@@ -1081,7 +1083,7 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         }
         if (type == OutputDefs::TYPE_SMOKE) {
             uint8_t pin2Source = output["pin2_source"] | 0;
-            if (pin2Source > 4) {
+            if (pin2Source != 0 && !OutputDefs::isDigitalExpanderSource(pin2Source)) {
                 message = "Unsupported smoke shooter hybrid pin source on channel " + String(channelNumber);
                 return false;
             }
@@ -1097,7 +1099,8 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         if (type == OutputDefs::TYPE_MOTOR) {
             uint8_t pin2Source = output["pin2_source"] | 0;
             uint8_t pin3Source = output["pin3_source"] | 0;
-            if (pin2Source > 4 || pin3Source > 4) {
+            if ((pin2Source != 0 && !OutputDefs::isDigitalExpanderSource(pin2Source)) ||
+                (pin3Source != 0 && !OutputDefs::isPwmExpanderSource(pin3Source))) {
                 message = "Unsupported motor hybrid pin source on channel " + String(channelNumber);
                 return false;
             }
@@ -1112,12 +1115,12 @@ bool validateOutputJson(JsonArray outputs, String& message) {
         }
         if (type == OutputDefs::TYPE_MOTOR && (uint8_t)(output["mc_mode"] | 0) == 2) {
             uint8_t enSource = output["pin3_source"] | 0;
-            if (enSource >= 2) {
-                message = "Motor EN pin needs PWM; use ESP32 GPIO or PCA9685 on channel " + String(channelNumber);
+            if (enSource != 0 && !OutputDefs::isPwmExpanderSource(enSource)) {
+                message = "Motor EN pin needs PWM; use ESP32 GPIO or PWM Expander on channel " + String(channelNumber);
                 return false;
             }
-            if (enSource == 1 && (int)(output["pin3_channel"] | 255) == 255) {
-                message = "Motor EN PCA9685 channel is missing on channel " + String(channelNumber);
+            if (OutputDefs::isPwmExpanderSource(enSource) && (int)(output["pin3_channel"] | 255) == 255) {
+                message = "Motor EN PWM Expander channel is missing on channel " + String(channelNumber);
                 return false;
             }
         }

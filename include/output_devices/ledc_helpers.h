@@ -60,7 +60,7 @@ inline void setupSegmentOutput(OutputChannel& ch, uint8_t idx, bool offState) {
         if (ch.routes[routeIdx].channel != 255) pcaManager.write(ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_off ? 4095 : 0, false, src);
         return;
     }
-    if (src >= 2 && src <= 4) {
+    if (OutputDefs::isDigitalExpanderSource(src)) {
         if (ch.routes[routeIdx].channel != 255) digitalExpanderManager.write(src, ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_off, true);
         return;
     }
@@ -82,7 +82,7 @@ inline void writeSegmentOutput(OutputChannel& ch, uint8_t idx, bool state) {
         if (ch.routes[routeIdx].channel != 255) pcaManager.write(ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_state ? 4095 : 0, false, src);
         return;
     }
-    if (src >= 2 && src <= 4) {
+    if (OutputDefs::isDigitalExpanderSource(src)) {
         if (ch.routes[routeIdx].channel != 255) digitalExpanderManager.write(src, ch.routes[routeIdx].addr, ch.routes[routeIdx].channel, active_state);
         return;
     }
