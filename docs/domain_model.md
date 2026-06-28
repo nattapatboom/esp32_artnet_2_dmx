@@ -514,16 +514,15 @@ This section is the central contract for `/outputs.json`, Web UI, C++ validation
 
 Fields expected to be persisted in `/outputs.json`:
 - identity by array index, not by stable ID.
-- `type`, `source`, `start_universe`, `start_address`.
-- DAC type selection via source ID: `source=5` (MCP4725), `source=6` (DAC7571), `source=7` (DAC7573); DAC7573 channel uses `pca_channel` (`0..3`).
-- primary routing: `pin`, `pca_addr`, `pca_channel`.
-- multi-pin routing: `pin2`, `pin3`, `pin4`, `pin2_source`, `pin3_source`, `pin4_source`, `pin2_addr`, `pin3_addr`, `pin4_addr`, `pin2_channel`, `pin3_channel`, `pin4_channel`.
-- PCA contiguous/legacy routing fields: `pca_channel2`, `pca_channel3`, `pca_channel4`.
+- `type`, `start_universe`, `start_address`.
+- DAC type selection via source ID: `source=5` (MCP4725), `source=6` (DAC7571), `source=7` (DAC7573); DAC7573 channel uses channel index.
+- routing: generalized into the `pins` JSON array (up to 9 items, where index correlates with slot active masks defined in C++ metadata). Each pin route item contains:
+  - `pin`: ESP32 physical GPIO pin (`0..39`, or `255` for None)
+  - `source`: routing target type (`0=GPIO`, `1=PCA9685`, `2=MCP23017`, `3=TCA9555`, `4=PCF857x`, `5=MCP4725`, `6=DAC7571`, `7=DAC7573`)
+  - `addr`: I2C address (`0x20..0x27`, `0x40..0x4F`, etc.)
+  - `channel`: expander channel (`0..15`, or `255` for None)
+  - `invert`: boolean active-high vs active-low inversion flag
 - LED fields: `led_count`, `color_order`, `led_protocol`.
-- motor/servo/stepper/function/PWM fields: `mc_mode`, `mc_resolution`, `mc_freq`, `mc_deadband`, `mc_invert`, `mc_brake`, `mc_min_us`, `mc_max_us`, `mc_steps_per_rev`, `mc_homing_*`, `mc_scale_factor`, `mc_unit_type`, `mc_enable_active_high`, `mc_dir_invert`, `mc_step_invert`.
-- PWM DAC calibration fields: `pwm_dac_mode` (`0=Custom`, `1=0-10V`, `2=4-20mA`), `pwm_dac_min`, `pwm_dac_max` as duty percent times 100 (`0..10000`).
-- inversion fields: `pin_invert`, `pin2_invert`, `pin3_invert`, `pin4_invert`, `seg_inverts`.
-- 7-segment direct-drive routing: `seg_pins`, `seg_sources`, `seg_addrs`, `seg_channels`.
 - solenoid/smoke fields: `solenoid_mode`, `solenoid_threshold`, `solenoid_pulse_ms`, `solenoid_pre_delay`, `solenoid_post_delay`, `smoke_duration_ms`, `settle_delay_ms`, `shoot_duration_ms`, `smoke_lockout_ms`; Smoke Shooter reuses `solenoid_threshold` as its trigger threshold.
 - network-like output fields if used by a type: `dest_ip`, `dest_port`.
 
