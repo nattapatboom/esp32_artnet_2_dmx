@@ -28,7 +28,12 @@ RMT_DMX_DRIVER_RAM = 5150 * 4 + 32
 I2C_ROUTE_RAM = 32
 
 BASE_OVERHEAD_US = 500
-I2C_WRITE_US = 180
+# I2C write time scales with bus speed: ~100 µs Arduino Wire overhead
+# + 27 bits × (1,000,000/speed) µs per typical 3-byte register write.
+def i2c_write_us(i2c_speed=400000):
+    if i2c_speed < 10000:
+        i2c_speed = 400000
+    return 100 + 27000000 // i2c_speed
 
 def print_banner():
     print("=====================================================================")
@@ -272,7 +277,7 @@ def estimate_channel_cost(ch):
     elif ch_type == 18: cpu = 25
     
     writes = i2c_writes_for_channel(ch)
-    cpu += writes * I2C_WRITE_US
+    cpu += writes * i2c_write_us(ch.get("i2c_speed", 400000))
     ram += writes * I2C_ROUTE_RAM
     return {"cpu": cpu, "ram": ram}
 

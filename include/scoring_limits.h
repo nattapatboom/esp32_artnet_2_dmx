@@ -24,7 +24,7 @@ constexpr uint8_t MAX_TIMER  = 4;
 // ── CPU budget constants ──
 constexpr uint32_t BASE_OVERHEAD_US  = 500;   // output loop overhead per frame
 constexpr uint32_t SAFETY_RESERVE_US = 1500;  // reserve per frame
-constexpr uint16_t I2C_WRITE_US      = 180;   // per active I2C transaction
+// I2C_WRITE_US is now calculated dynamically from sysCfg.i2c_speed in scoring.h
 constexpr uint16_t DMX_SERVICE_US    = 250;   // DMX UART/RMT enqueue
 
 // ── RAM budget constants ──

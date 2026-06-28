@@ -163,7 +163,13 @@ inline uint8_t sevenSegCount(uint8_t type, uint8_t mode) {
     return d ? d->segmentCount : 0;
 }
 
-constexpr uint16_t I2C_WRITE_US = ScoringLimits::I2C_WRITE_US;
+// I2C write time scales with bus speed: ~100 µs Arduino Wire overhead
+// + 27 bits × (1,000,000/speed) µs per typical 3-byte register write.
+inline uint16_t i2cWriteUs() {
+    uint32_t speed = sysCfg.i2c_speed;
+    if (speed < 10000) speed = 400000;
+    return 100 + 27000000U / speed;
+}
 
 inline uint8_t i2cWritesForChannel(const OutputChannel& ch) {
     const auto* def = OutputDefs::modeDef(ch.type, ch.mc_mode);
@@ -221,7 +227,7 @@ inline PerChannelCost estimateChannelCost(const OutputChannel& ch) {
     if (def) c.ramBytes += def->cost.extraRamBytes;
     if (def != nullptr && (def->cost.flags & OutputDefs::CF_DYN_LED_STRIP)) c.cpuUs = ledStripServiceUs(ch.led_count, ch.color_order);
     if (def != nullptr && (def->cost.flags & OutputDefs::CF_DYN_LED_STRIP)) c.ramBytes += pixelBufferRam(ch.led_count, ch.color_order);
-    c.cpuUs += (uint16_t)i2cWritesForChannel(ch) * I2C_WRITE_US;
+    c.cpuUs += (uint16_t)i2cWritesForChannel(ch) * i2cWriteUs();
     c.ramBytes += (uint32_t)i2cWritesForChannel(ch) * I2C_ROUTE_RAM;
     return c;
 }
