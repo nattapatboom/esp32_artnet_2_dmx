@@ -32,6 +32,10 @@
 #include "ota_control.h"
 #include "recovery_control.h"
 
+// Scroll timing for display overflow lines
+#define SCROLL_SPEED_MS  300
+#define SCROLL_PAUSE_MS 2000
+
 const char* getFirmwareVersion() {
     static char version[32] = {0};
     if (version[0] != '\0') return version;
@@ -2430,21 +2434,61 @@ void networkTask(void* pvParameters) {
         
         // ESP-NOW Slave keeps AP active so it can always be configured in the field.
 
-        // Update I2C Display (non-blocking, ~2 Hz)
+        // Update I2C Display (non-blocking)
         if (display.isActive()) {
             static unsigned long lastDisplayUpdate = 0;
+            static int scrollOff[4] = {0, 0, 0, 0};
+            static int scrollPhase[4] = {0, 0, 0, 0}; // 0=pause_start, 1=scroll, 2=pause_end
+            static unsigned long lastScroll[4] = {0, 0, 0, 0};
+            static String prevLine[4] = {"", "", "", ""};
+
             unsigned long now = millis();
             if (now - lastDisplayUpdate >= sysCfg.display_refresh_ms) {
                 lastDisplayUpdate = now;
 
-                // Build display lines
+                uint8_t dcols = display.displayCols();
                 IPAddress ip = ETH.localIP();
-                String line1 = "IP " + (ethConnected ? ip.toString() : String("--.---.-.--"));
-                String line2 = ethConnected ? "ETH Link Up" : (WiFi.isConnected() ? "Wi-Fi Connected" : "No Link");
-                String line3 = "U " + String(activeUniverseMin()) + "-" + String(activeUniverseMax());
-                String line4 = "FPS " + String(sysCfg.output_fps) + "  Heap " + String(ESP.getFreeHeap() / 1024) + "K";
+                String lines[4];
+                lines[0] = "IP " + (ethConnected ? ip.toString() : String("--.---.-.--"));
+                lines[1] = ethConnected ? "ETH Link Up" : (WiFi.isConnected() ? "Wi-Fi Connected" : "No Link");
+                lines[2] = "U " + String(activeUniverseMin()) + "-" + String(activeUniverseMax());
+                lines[3] = "FPS " + String(sysCfg.output_fps) + "  Heap " + String(ESP.getFreeHeap() / 1024) + "K";
 
-                display.update(line1, line2, line3, line4);
+                for (int i = 0; i < 4; i++) {
+                    if (prevLine[i] != lines[i]) {
+                        scrollOff[i] = 0;
+                        scrollPhase[i] = 0;
+                        prevLine[i] = lines[i];
+                    }
+                    if ((uint8_t)lines[i].length() > dcols) {
+                        if (scrollPhase[i] == 0) {
+                            if (now - lastScroll[i] >= SCROLL_PAUSE_MS) {
+                                scrollPhase[i] = 1;
+                                lastScroll[i] = now;
+                            }
+                        } else if (scrollPhase[i] == 1) {
+                            if (now - lastScroll[i] >= SCROLL_SPEED_MS) {
+                                scrollOff[i]++;
+                                lastScroll[i] = now;
+                                if (scrollOff[i] >= (int)lines[i].length() - (int)dcols) {
+                                    scrollPhase[i] = 2;
+                                }
+                            }
+                        } else {
+                            if (now - lastScroll[i] >= SCROLL_PAUSE_MS) {
+                                scrollOff[i] = 0;
+                                scrollPhase[i] = 0;
+                                lastScroll[i] = now;
+                            }
+                        }
+                        lines[i] = lines[i].substring(scrollOff[i], scrollOff[i] + dcols);
+                    } else {
+                        scrollOff[i] = 0;
+                        scrollPhase[i] = 0;
+                    }
+                }
+
+                display.update(lines[0], lines[1], lines[2], lines[3]);
             }
         } else if (sysCfg.display_enabled) {
             // Attempt periodic recovery if display was deactivated by I2C errors (ADR004)
@@ -2664,6 +2708,27 @@ void setup() {
     if (display.isActive()) {
         display.setBrightness(sysCfg.display_brightness);
         Serial.printf("Display initialized: type=%d, addr=0x%02X\n", sysCfg.display_enabled, sysCfg.display_i2c_addr);
+
+        // Show startup logo
+        uint8_t dcols = display.displayCols();
+        String mac = WiFi.macAddress();
+        mac.replace(":", "");
+        String suffix = mac.substring(mac.length() - 4);
+        suffix.toLowerCase();
+        String s1 = String(sysCfg.artnet_short_name) + suffix;
+        if ((uint8_t)s1.length() > dcols) s1 = s1.substring(0, dcols);
+        String s2 = "WT32-ETH01 Node";
+        if ((uint8_t)s2.length() > dcols) s2 = s2.substring(0, dcols);
+        const char* modeStr = "?";
+        if (sysCfg.device_mode == 0) modeStr = "Art-Net Eth";
+        else if (sysCfg.device_mode == 1) modeStr = "ESP-NOW Master";
+        else if (sysCfg.device_mode == 2) modeStr = "ESP-NOW Slave";
+        String s3 = String(modeStr);
+        if ((uint8_t)s3.length() > dcols) s3 = s3.substring(0, dcols);
+        String s4 = "Booting...";
+        if ((uint8_t)s4.length() > dcols) s4 = s4.substring(0, dcols);
+        display.update(s1, s2, s3, s4);
+        vTaskDelay(pdMS_TO_TICKS(3000));
     }
 
     // Initialize Outputs System after network startup current settles.
